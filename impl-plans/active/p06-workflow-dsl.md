@@ -200,6 +200,7 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p06-workflow-dsl-type
 
 - [ ] Model, loader, validator, expressions, templates, context, escalation, schema and step_api delivered with the exact names
 - [ ] No `eval`, `exec`, `compile` or `literal_eval` in `src/telescreen/workflow/dsl` (`grep -rn "eval(\|exec(\|compile(" src/telescreen/workflow/dsl` prints only regex `re.compile` uses)
+- [ ] `step_type: ClassVar[StepType]` passes the scoped `ty check`; if ty 0.0.85 rejects it, stop and file a Reconciliation request (never `# ty: ignore`, never a per-file-ignore)
 - [ ] Scoped verification passes; logs recorded
 - [ ] Progress Log updated
 

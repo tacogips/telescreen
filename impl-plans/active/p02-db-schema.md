@@ -152,6 +152,7 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p02-db-schema-typelin
 - [ ] 27 tables with the exact names; all `*Row` classes exported from `telescreen.db.models`
 - [ ] Migration and metadata parity test passes; PostgreSQL trigger present (integration test written)
 - [ ] `tests/support/db.py` harness seeds the counter and the chain head
+- [ ] Table dunders are unannotated: `grep -rnE '__(tablename|table_args)__ *:|ClassVar' src/telescreen/db` prints nothing
 - [ ] Scoped verification commands pass; logs recorded
 - [ ] Progress Log updated
 

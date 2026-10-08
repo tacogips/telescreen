@@ -1,11 +1,19 @@
 {
-  "taskId": "telescreen-v1-20261008-s314",
+  "taskId": "telescreen-v1-20261008-s319",
   "workflowMode": "issue-resolution",
   "implementationBranch": "main",
   "baseBranch": "main",
   "remote": "origin",
-  "originalHead": "cfa6529a03f46309b3afe8289ddd5850578fe26d",
-  "evidenceRoot": "tmp/telescreen-v1-20261008-s314",
+  "originalHead": "7022a5405da6d29341a454c9598cab4d4e60d4dc",
+  "evidenceRoot": "tmp/telescreen-v1-20261008-s319",
+  "supersedes": "impl-plans/active/telescreen-v1-20261008-s314-dispatch.json (originalHead cfa6529; removed in this run)",
+  "waves": {
+    "1": ["p01-foundation"],
+    "2": ["p02-db-schema", "p03-detection-rules", "p04-ports", "p05-police-contract", "p07-web-shell"],
+    "3": ["p06-workflow-dsl", "p08-masking", "p09-detection-llm-ml", "p10-api-common", "p11-police-sdk", "p12-ui-issues", "p13-ui-workflows", "p14-ui-ops", "p21-collectors-slack", "p22-collectors-google", "p23-collectors-github"],
+    "4": ["p15-audit-search", "p16-issues-ingest", "p17-notifications", "p18-evidence", "p19-police-bureau", "p20-collectors-core", "p24-workflow-engine", "p25-workflow-nodes", "p26-workflow-mapreduce", "p27-assistant", "p29-examples-compose"],
+    "5": ["p28-assembly"]
+  },
   "designDocPaths": [
     "design-docs/specs/architecture.md",
     "design-docs/specs/command.md",
@@ -23,7 +31,7 @@
     "design-docs/user-qa/qa-ui-authentication.md"
   ],
   "reviewContext": {
-    "issueReference": "local-input-only (no GitHub issue URL or number); workflowExecutionId opus-luna-design-and-implement-review-loop-session-314; intake communication comm-005166 from step5-impl-plan-review",
+    "issueReference": "workflowInput issue (no issueUrl/issueNumber/issueRepository); workflowExecutionId opus-luna-design-and-implement-review-loop-session-319; intake comm-005176; design accepted unchanged by step3-design-review comm-005178 (accepted=true, no findings)",
     "userProblem": "Build Telescreen v1: a 'Sentry for confidential-information retention violations'. Collectors (Slack, Google Drive/Docs/Sheets, GitHub, custom crawlers and AI agents, custom Police) scan content on events and schedules, detect credentials and PII without ever persisting raw values, group findings into Sentry-like issues, drive DB-persisted incident-response workflows with escalation, evidence gates and Police re-verification, and expose search (Meilisearch over masked data only), audit, MCP and agent chat, and a SolidJS UI.",
     "requiredOutcomes": [
       "Reporting Bureau FastAPI app: push ingestion, issues with Sentry-like grouping/status/first-last-seen, workflow definitions/runs, police register/claim/heartbeat/result, evidence upload with rejection on PII/credentials, audit search, chat; plus an MCP server entrypoint.",
@@ -54,7 +62,9 @@
       "Any [tool.typelint.per-file-ignores] entry must be a narrow boundary module with a justification, owned by p01 or serial reconciliation, and called out in review; the ASGI TL005 ignore for the SDK is NOT pre-approved.",
       "Police SDK (src/telescreen_police_sdk) never imports telescreen.*; the Bureau never imports the SDK except in contract tests.",
       "All plans of a wave share one working directory and branch: write only inside writePaths, no git mutation commands, per-file sha256 drift logging (impl-plans/conventions.md section 2), verification shells start with `set -o pipefail` and `export PYTHONDONTWRITEBYTECODE=1`.",
-      "No secrets committed; examples use placeholders and env:/file: secret refs only."
+      "No secrets committed; examples use placeholders and env:/file: secret refs only.",
+      "SQLAlchemy table dunders (__tablename__, __table_args__) are written unannotated; typelint TL003 exempts class-body dunders (commit 7022a54). Never ClassVar[...] or `__tablename__: str` on ORM models (ty 0.0.85 invalid-attribute-override / dataclass-field-order).",
+      "ruff excludes Markdown (pyproject.toml extend-exclude [\"*.md\"]); never run ruff on plan or design .md files."
     ],
     "designDecisionsAndRationale": [
       "Self-built durable workflow engine on PostgreSQL instead of Airflow/n8n/Kestra: human-in-the-loop steps, send-back, evidence gates, DB-visible progress and raw-data-free guarantees (design-docs/specs/notes.md, design-workflow-engine.md).",
@@ -175,6 +185,7 @@
         "27 tables with the exact names; all *Row classes exported from telescreen.db.models",
         "Migration and metadata parity test passes; PostgreSQL audit trigger present (integration test written)",
         "tests/support/db.py harness seeds the counter and the chain head",
+        "ORM table dunders unannotated: no `__tablename__:` or `__table_args__:` annotation and no ClassVar under src/telescreen/db",
         "Scoped verification passes; logs recorded",
         "Progress Log updated"
       ],
@@ -183,7 +194,8 @@
         "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/db tests/db tests/support/db.py",
         "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/db tests/db tests/support/db.py",
         "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/db 2>&1 | tee /tmp/telescreen-p02-db-schema-pytest.log",
-        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-p02-db-schema-typelint.log 2>&1; ! grep -E '^(src/telescreen/db|tests/db|tests/support/db.py)' /tmp/telescreen-p02-db-schema-typelint.log"
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-p02-db-schema-typelint.log 2>&1; ! grep -E '^(src/telescreen/db|tests/db|tests/support/db.py)' /tmp/telescreen-p02-db-schema-typelint.log",
+        "! grep -rnE '__(tablename|table_args)__ *:|ClassVar' src/telescreen/db"
       ]
     },
     {
@@ -320,6 +332,7 @@
       "acceptanceCriteria": [
         "Model, loader, validator, expressions, templates, context, escalation, schema and step_api delivered with the exact names",
         "No eval, exec, compile (except regex re.compile) or literal_eval in src/telescreen/workflow/dsl",
+        "`step_type: ClassVar[StepType]` on the plain DSL step dataclasses passes the scoped ty check; if ty 0.0.85 rejects it, stop and file a Reconciliation request (never # ty: ignore, never a per-file-ignore)",
         "Scoped verification passes; logs recorded",
         "Progress Log updated"
       ],
