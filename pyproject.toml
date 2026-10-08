@@ -39,6 +39,8 @@ addopts = "-ra"
 target-version = "py312"
 line-length = 100
 src = ["src", "tests"]
+# Markdown code blocks in design docs and plans are illustrative, not formatted source.
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 # ANN enforces annotations (ANN401 forbids Any); PGH forbids blanket type ignores.

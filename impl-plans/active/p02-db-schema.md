@@ -106,8 +106,11 @@ and the map-reduce data model):
 - `MappedAsDataclass` field order: fields without defaults come first. Nullable columns use
   `default=None`; timestamps the service sets have no default. Do not use `init=False` for
   primary keys: services pass `new_id()`.
-- Use `__tablename__: ClassVar[str] = "..."` and `__table_args__: ClassVar[tuple[...]]`
-  so typelint TL003 is satisfied without creating dataclass fields.
+- Write `__tablename__ = "..."` and `__table_args__ = (...)` unannotated. typelint TL003
+  exempts class-body dunder attributes. Do NOT annotate them: ty 0.0.85 reports
+  `invalid-attribute-override` for `ClassVar[...]`, and `__tablename__: str = ...` becomes a
+  dataclass field with a default, so every required column after it fails
+  `dataclass-field-order`. Verified by spike on 2026-10-08.
 - `Base` itself declares no typed fields.
 - `env.py` must not read `alembic.ini` or logging config. It reads the URL from
   `config.get_main_option("sqlalchemy.url")`, which `upgrade` sets.

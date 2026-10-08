@@ -7,7 +7,11 @@ the syntax tree:
 TL000  file cannot be parsed
 TL001  function parameter without a type annotation
 TL002  function without a return type annotation
-TL003  variable bound without a type annotation (``x = 1`` instead of ``x: int = 1``)
+TL003  variable bound without a type annotation (``x = 1`` instead of ``x: int = 1``).
+       Exempt: enum members, TypeVar/NewType factories, and dunder attributes assigned in
+       a class body (``__tablename__``, ``__table_args__``, ``__slots__``): their type is
+       declared by the base class or the data model, and re-annotating them makes ty
+       report an invalid override or turns them into dataclass fields.
 TL004  ``self.attr = ...`` where ``attr`` is not declared with a type in the class body
 TL005  forbidden type (``Any``, ``object``, ``dict`` and other mapping types)
 TL006  ``**kwargs`` parameter in a function definition
@@ -251,6 +255,11 @@ def _terminal_name(node: ast.expr) -> str | None:
     if isinstance(node, ast.Attribute):
         return node.attr
     return None
+
+
+def _is_dunder(name: str) -> bool:
+    """Return whether ``name`` is a dunder such as ``__tablename__`` or ``__slots__``."""
+    return len(name) > 4 and name.startswith("__") and name.endswith("__")
 
 
 def _decorator_is_dataclass(decorator: ast.expr) -> bool:
@@ -585,6 +594,10 @@ class ModuleChecker(ast.NodeVisitor):
 
     def _is_exempt_assignment(self, node: ast.Assign) -> bool:
         if self.scope.is_enum_class:
+            return True
+        if self.scope.class_fields is not None and all(
+            isinstance(target, ast.Name) and _is_dunder(target.id) for target in node.targets
+        ):
             return True
         if isinstance(node.value, ast.Call):
             return _terminal_name(node.value.func) in UNANNOTATABLE_FACTORY_CALLS

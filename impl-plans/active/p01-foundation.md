@@ -225,7 +225,9 @@ compile under the strict rules:
 - a FastAPI route with a `pydantic.dataclasses.dataclass` body and response, called
   through `httpx.ASGITransport`;
 - a SQLAlchemy `class Base(MappedAsDataclass, DeclarativeBase)` model with
-  `__tablename__: ClassVar[str]`, written and read on aiosqlite in memory;
+  unannotated `__tablename__ = "..."` and `__table_args__ = (...)` (typelint exempts
+  class-body dunders; ty 0.0.85 rejects `ClassVar[str]` as an invalid override and treats
+  `__tablename__: str` as a dataclass field), written and read on aiosqlite in memory;
 - `mcp.server.fastmcp.FastMCP` registering one typed tool function (not run);
 - `anthropic.AsyncAnthropic(api_key="x", http_client=httpx.AsyncClient(transport=MockTransport(...)))`
   constructed (no call needed).

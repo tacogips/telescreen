@@ -181,3 +181,30 @@ def test_repository_is_clean() -> None:
     )
     violations: list[Violation] = lint_files(files, config, repository_root)
     assert [v.render() for v in violations] == []
+
+
+def test_class_body_dunder_attributes_need_no_annotation() -> None:
+    source: str = """
+        from sqlalchemy.orm import DeclarativeBase, Mapped, MappedAsDataclass
+
+        class Base(MappedAsDataclass, DeclarativeBase):
+            pass
+
+        class Issue(Base):
+            __tablename__ = "issues"
+            __table_args__ = ()
+
+            id: Mapped[str]
+    """
+    assert rules_of(source) == []
+
+
+def test_module_level_dunder_and_class_non_dunder_still_need_annotation() -> None:
+    source: str = """
+        __all__ = ["x"]
+
+        class Box:
+            __slots__ = ()
+            size = 1
+    """
+    assert rules_of(source) == [Rule.UNANNOTATED_VARIABLE, Rule.UNANNOTATED_VARIABLE]

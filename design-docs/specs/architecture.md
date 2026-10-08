@@ -207,7 +207,7 @@ The repo enforces `tools/typelint.py` (TL001-TL010), ruff ANN/PGH and ty with
 | Typed payloads | Inbound and outbound API bodies, LLM structured outputs, connector responses and contract envelopes are pydantic dataclasses or stdlib dataclasses parsed with `TypeAdapter.validate_json(bytes)`. Outbound mappings are produced by `dataclasses.asdict(...)` passed inline to the library call. |
 | FastAPI | Request/response bodies are `pydantic.dataclasses.dataclass`; never `BaseModel`. |
 | Settings | `TelescreenSettings` is a frozen stdlib dataclass built by `load_settings(env: EnvSource)` where `EnvSource` is a Protocol with `get(key) -> str | None` (satisfied by `os.environ`). No pydantic-settings. |
-| ORM | `class Base(MappedAsDataclass, DeclarativeBase)`; table names via `__tablename__: ClassVar[str]`; no `TypeDecorator` subclasses (JSON is `Text`, timestamps normalized in repositories). |
+| ORM | `class Base(MappedAsDataclass, DeclarativeBase)`; table names via unannotated `__tablename__ = "..."` (typelint exempts class-body dunders; annotating them breaks ty or creates dataclass fields); no `TypeDecorator` subclasses (JSON is `Text`, timestamps normalized in repositories). |
 | Interfaces | `typing.Protocol`; stateful services are dataclasses. |
 | Exceptions | `TelescreenError(code: ErrorCode, detail: str)` where `detail` must be a static or already-masked string. Raw content is never formatted into exception messages. |
 

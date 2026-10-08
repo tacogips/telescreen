@@ -54,7 +54,9 @@ These rules are mandatory and are enforced by `ruff` (ANN, PGH), `ty check`
    return types (including `-> None`), and every variable binding: module,
    class and function locals use `name: T = value`. Tuple unpacking targets must
    be declared first (`a: int` / `b: str` then `a, b = pair`). Loop, `with`,
-   `except`, walrus and match-capture targets are inferred and exempt. (TL001-TL003)
+   `except`, walrus and match-capture targets are inferred and exempt, as are enum
+   members and dunder attributes in a class body (`__tablename__ = "t"`,
+   `__slots__ = ()`), whose types come from the base class. (TL001-TL003)
 2. **Instance attributes are declared in the class body.** `self.x = ...` is
    only allowed when `x: T` is declared in the class body. (TL004)
 3. **No `Any`, no `object`, no `dict`.** `Any`, `object`, `dict`, `Dict`,

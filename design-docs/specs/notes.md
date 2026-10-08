@@ -112,9 +112,11 @@ riela (https://github.com/tacogips/riela) is a conceptual reference only; no cod
 - ty 0.0.85 (pinned in `uv.lock`) can hang on recursive `type` aliases. `JsonValue` is a
   self-referencing frozen dataclass, never an alias. Pydantic's own `JsonValue` alias is not
   used either.
-- SQLAlchemy: `MappedAsDataclass` is an allowed base in `tools/typelint.py`. Use
-  `__tablename__: ClassVar[str] = "..."` so the annotation satisfies TL003 without becoming a
-  dataclass field. Avoid `TypeDecorator` subclasses (they would need class-level typed
+- SQLAlchemy: `MappedAsDataclass` is an allowed base in `tools/typelint.py`. Write
+  `__tablename__ = "..."` and `__table_args__ = (...)` unannotated; TL003 exempts class-body
+  dunder attributes. Spike (2026-10-08, ty 0.0.85): `ClassVar[str]` fails with
+  `invalid-attribute-override`, and `__tablename__: str = "..."` is treated as a dataclass
+  field with a default, which breaks `dataclass-field-order` for every required column. Avoid `TypeDecorator` subclasses (they would need class-level typed
   attributes on a non-allowed base).
 - FastAPI accepts pydantic dataclasses as body and response models. Endpoints that must see
   raw bytes (signatures, contract validation, evidence) take `Request` and parse with
