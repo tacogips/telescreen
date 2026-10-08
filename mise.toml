@@ -1,0 +1,98 @@
+min_version = "2026.8.3"
+
+[[hooks.enter]]
+shell = "bash"
+script = '''
+if command -v kinko >/dev/null 2>&1 && kinko hook --help >/dev/null 2>&1; then
+  eval "$(kinko --path "$MISE_PROJECT_ROOT" hook enter bash)"
+fi
+'''
+
+[[hooks.leave]]
+shell = "bash"
+script = '''
+if command -v kinko >/dev/null 2>&1 && kinko hook --help >/dev/null 2>&1; then
+  eval "$(kinko hook leave bash)"
+fi
+'''
+
+[tools]
+gitleaks = "latest"
+pre-commit = "latest"
+python = "3.12"
+uv = "latest"
+
+[tasks.default]
+description = "Show available tasks"
+run = "mise tasks ls"
+
+[tasks.sync]
+description = "Sync project dependencies with uv"
+run = "uv sync --dev"
+
+[tasks.lock]
+description = "Refresh uv.lock"
+run = "uv lock"
+
+[tasks.run]
+description = "Run the application"
+run = "uv run python -m telescreen"
+
+[tasks.test]
+description = "Run tests"
+run = "uv run pytest"
+
+[tasks.test-verbose]
+description = "Run tests with verbose output"
+run = "uv run pytest -vv"
+
+[tasks.test-cov]
+description = "Run tests with coverage"
+run = "uv run pytest --cov=telescreen --cov-report=term-missing"
+
+[tasks.lint]
+description = "Run Ruff lint checks"
+run = "uv run ruff check ."
+
+[tasks.typecheck]
+description = "Run ty type checks"
+run = "uv run ty check ."
+
+[tasks.fmt]
+description = "Format code with Ruff"
+run = "uv run ruff format ."
+
+[tasks.fmt-check]
+description = "Check formatting"
+run = "uv run ruff format --check ."
+
+[tasks.build]
+description = "Build the package"
+run = "uv build"
+
+[tasks.clean]
+description = "Remove generated artifacts"
+run = "rm -rf build dist htmlcov .coverage .pytest_cache .ruff_cache src/*.egg-info"
+
+[tasks.ci]
+description = "Run the standard CI checks"
+run = "mise run fmt-check && mise run lint && mise run typecheck && mise run test && mise run build"
+
+[tasks.install-git-hooks]
+description = "Install mise tools and the repository pre-commit hook"
+run = '''
+mise install
+
+hooks_path=$(git config --local --get core.hooksPath || true)
+if [ "$hooks_path" = ".git/hooks" ]; then
+  git config --local --unset-all core.hooksPath
+  hooks_path=""
+fi
+
+if [ -z "$hooks_path" ]; then
+  mise exec -- pre-commit install
+else
+  mise exec -- pre-commit validate-config .pre-commit-config.yaml
+  echo "Using existing custom Git hooks path: $hooks_path"
+fi
+'''

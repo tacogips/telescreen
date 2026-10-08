@@ -1,0 +1,3 @@
+interface:
+  display_name: "python-coding-standards"
+  short_description: "Use when writing, reviewing, or refactoring Python code. Provides typing, module layout, error handling, testing, and uv-based workflow guidance."

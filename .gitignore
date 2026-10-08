@@ -1,0 +1,36 @@
+# This .gitignore file is expanded to the directory where `ign checkout` is executed.
+# It is NOT for the ign-template repository itself.
+
+# Python environments and caches
+**/.venv/
+**/venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/.coverage
+**/.coverage.*
+**/*.py[cod]
+**/*.egg-info/
+**/.python-version
+
+# Build artifacts
+/build/
+/dist/
+**/*.whl
+**/*.tar.gz
+htmlcov/
+
+**/.env
+**/*.private*
+
+## ide's /meta infos
+**/.vscode
+**/.idea
+**/.~lock*
+**/.DS_Store
+
+## tmp and local outputs
+**/tmp
+
+mise.local.toml
