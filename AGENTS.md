@@ -41,6 +41,7 @@ This is telescreen, a modern Python project managed with `uv`.
 ├── .gitignore         # Git ignore patterns
 ├── src/               # Package source code
 │   └── telescreen/
+├── tools/             # Developer tooling (typelint AST linter)
 └── tests/             # Test suite
 ```
 
@@ -50,6 +51,8 @@ This is telescreen, a modern Python project managed with `uv`.
 - Run the application with `uv run python -m telescreen`
 - Run tests with `uv run pytest`
 - Lint with `uv run ruff check .`
+- Type lint with `uv run python tools/typelint.py`
+- Type check with `uv run ty check`
 - Format with `uv run ruff format .`
 - Build distributions with `uv build`
 
@@ -87,3 +90,9 @@ Use these specialized skills when relevant:
 - Add tests for behavior changes
 - Use `ruff format` and `ruff check` before finishing changes
 - Use `ty check` for static type checking before finishing Python changes
+- Strict typing is mandatory and enforced by `tools/typelint.py` (`mise run typelint`):
+  every declaration (parameters, returns, variables, instance attributes) carries a type;
+  `Any`, `object` and `dict`/mapping types are forbidden; `**kwargs` parameters and `**`
+  call unpacking are forbidden; data types are dataclasses or enums; no `# type: ignore`.
+  See the Typing section of the python-coding-standards skill for boundary patterns.
+- Set up tooling with `mise run setup`; `mise run ci` runs format, lint, typelint, ty, tests, build

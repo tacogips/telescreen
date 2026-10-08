@@ -20,7 +20,7 @@ Apply these standards when:
 
 1. Prefer clarity over clever abstractions.
 2. Keep modules small and focused.
-3. Use explicit typing for public functions and important internal boundaries.
+3. Type everything explicitly; see the strict typing rules below.
 4. Make invalid states hard to represent and easy to test.
 
 ## Source File Size
@@ -39,17 +39,58 @@ Apply these standards when:
 ## Code Style
 
 - Prefer `pathlib.Path` over raw path strings
-- Prefer dataclasses or small classes only when they simplify state management
+- Model data and stateful services as dataclasses; closed value sets as enums
 - Raise specific exceptions when failure needs to propagate
 - Return simple value objects instead of overloaded tuples
 - Keep side effects near the CLI boundary
 
-## Typing
+## Typing (strict, enforced)
 
-- Add return types to public functions
-- Use concrete collection types where practical
-- Prefer `str | None` style syntax for optional values
-- Avoid `Any` unless a boundary genuinely requires it
+These rules are mandatory and are enforced by `ruff` (ANN, PGH), `ty check`
+(warnings are errors), and the project AST linter `tools/typelint.py`
+(`mise run typelint` / `uv run python tools/typelint.py`).
+
+1. **Every declaration is typed.** All parameters (except `self`/`cls`), all
+   return types (including `-> None`), and every variable binding: module,
+   class and function locals use `name: T = value`. Tuple unpacking targets must
+   be declared first (`a: int` / `b: str` then `a, b = pair`). Loop, `with`,
+   `except`, walrus and match-capture targets are inferred and exempt. (TL001-TL003)
+2. **Instance attributes are declared in the class body.** `self.x = ...` is
+   only allowed when `x: T` is declared in the class body. (TL004)
+3. **No `Any`, no `object`, no `dict`.** `Any`, `object`, `dict`, `Dict`,
+   `defaultdict`, `OrderedDict`, `Mapping`, `MutableMapping` and `TypedDict` are
+   forbidden in annotations, `cast()` and type aliases. Model data with
+   `@dataclass` (stdlib or `pydantic.dataclasses`) and closed sets with `Enum` /
+   `StrEnum`. Interfaces use `typing.Protocol`. (TL005)
+4. **No `**kwargs`.** Neither `**kwargs` parameters nor `**mapping` call-site
+   unpacking. Declare explicit keyword-only parameters. (TL006, TL007)
+5. **Types are dataclasses or enums.** A class that declares typed fields must
+   be a `@dataclass`, an `Enum`, a `Protocol`, an exception, or a SQLAlchemy
+   `MappedAsDataclass` model. Stateful services are dataclasses too. (TL008)
+6. **No implicit `Any` through bare generics.** `list`, `tuple`, `set`,
+   `Callable`, `Sequence`, `Iterable`, ... always take type arguments;
+   `Callable[..., T]` is forbidden (use explicit parameters or `ParamSpec`). (TL009)
+7. **No suppression comments.** `# type: ignore`, `# ty: ignore`,
+   `# pyright: ignore` are forbidden. (TL010)
+8. Prefer `str | None`, PEP 695 generics (`def f[T](x: T) -> T`) and
+   `type Alias = ...`. Avoid recursive type aliases (ty 0.0.x can hang on
+   them); use a self-referencing `Protocol` or dataclass instead.
+
+### External boundaries
+
+Third-party APIs that speak in mappings (JSON, TOML, HTTP clients, Meilisearch,
+SQL JSONB) are converted at the boundary:
+
+- Parse inbound payloads directly into dataclasses (pydantic dataclasses /
+  `TypeAdapter`) instead of holding intermediate mappings.
+- Describe inbound mapping shapes with a structural `Protocol` (see
+  `TomlTable` in `tools/typelint.py`) rather than `dict[str, Any]`.
+- Serialize outbound with `dataclasses.asdict(...)` passed directly to the
+  library call; do not bind the mapping to an annotated variable.
+- If a boundary module genuinely cannot comply, add it to
+  `[tool.typelint.per-file-ignores]` in `pyproject.toml` with a comment naming
+  the boundary. This is the only exemption mechanism; there are no inline
+  suppressions, and new entries must be justified in review.
 
 ## Testing
 
@@ -59,13 +100,18 @@ Apply these standards when:
 
 ## Tooling
 
-Run these before finishing changes:
+Set up once with `mise run setup` (installs mise tools, syncs ruff/ty/pytest via
+`uv sync --dev`, installs pre-commit hooks). Run these before finishing changes:
 
 ```bash
 uv run ruff format .
 uv run ruff check .
+uv run python tools/typelint.py
+uv run ty check
 uv run pytest
 ```
+
+`mise run ci` runs all of them plus the build.
 
 ## Workflow
 

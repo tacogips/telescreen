@@ -17,7 +17,9 @@ fi
 '''
 
 [tools]
+bun = "latest"
 gitleaks = "latest"
+node = "22"
 pre-commit = "latest"
 python = "3.12"
 uv = "latest"
@@ -25,6 +27,14 @@ uv = "latest"
 [tasks.default]
 description = "Show available tasks"
 run = "mise tasks ls"
+
+[tasks.setup]
+description = "Install mise tools, sync Python dev tools (ruff, ty, pytest) via uv, install git hooks"
+run = '''
+mise install
+uv sync --dev
+mise run install-git-hooks
+'''
 
 [tasks.sync]
 description = "Sync project dependencies with uv"
@@ -56,7 +66,11 @@ run = "uv run ruff check ."
 
 [tasks.typecheck]
 description = "Run ty type checks"
-run = "uv run ty check ."
+run = "uv run ty check"
+
+[tasks.typelint]
+description = "Run the project AST type lint (typed declarations; no Any/object/dict; no **kwargs; dataclass/enum types)"
+run = "uv run python tools/typelint.py"
 
 [tasks.fmt]
 description = "Format code with Ruff"
@@ -76,7 +90,7 @@ run = "rm -rf build dist htmlcov .coverage .pytest_cache .ruff_cache src/*.egg-i
 
 [tasks.ci]
 description = "Run the standard CI checks"
-run = "mise run fmt-check && mise run lint && mise run typecheck && mise run test && mise run build"
+run = "mise run fmt-check && mise run lint && mise run typelint && mise run typecheck && mise run test && mise run build"
 
 [tasks.install-git-hooks]
 description = "Install mise tools and the repository pre-commit hook"

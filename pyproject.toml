@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "telescreen"
 version = "0.1.0"
-description = "A Python project"
+description = "Telescreen: sensitive-data retention violation monitoring and incident response"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
@@ -32,6 +32,7 @@ packages = ["src/telescreen"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["tools"]
 addopts = "-ra"
 
 [tool.ruff]
@@ -40,7 +41,29 @@ line-length = 100
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "SIM"]
+# ANN enforces annotations (ANN401 forbids Any); PGH forbids blanket type ignores.
+select = ["E", "F", "I", "B", "UP", "SIM", "ANN", "PGH"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["telescreen", "typelint"]
+
+[tool.ty.environment]
+python-version = "3.12"
+extra-paths = ["tools"]
+
+[tool.ty.terminal]
+error-on-warning = true
+
+# Project AST lint (tools/typelint.py). Rules TL001-TL010 are documented in the
+# module docstring and in .claude/skills/python-coding-standards/SKILL.md.
+# per-file-ignores is the ONLY exemption mechanism; every entry needs a comment
+# explaining the external boundary that makes it unavoidable.
+[tool.typelint]
+paths = ["src", "tests", "tools"]
+exclude = ["src/web"]
+extra-allowed-bases = []
+
+[tool.typelint.per-file-ignores]
 
 [tool.ruff.format]
 quote-style = "double"

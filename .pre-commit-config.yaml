@@ -6,3 +6,19 @@ repos:
         entry: mise exec -- gitleaks git --pre-commit --staged --redact --verbose
         language: system
         pass_filenames: false
+      - id: ruff-format
+        name: ruff format check
+        entry: uv run ruff format --check
+        language: system
+        types: [python]
+      - id: ruff-check
+        name: ruff lint
+        entry: uv run ruff check
+        language: system
+        types: [python]
+      - id: typelint
+        name: typelint (project AST type discipline)
+        entry: uv run python tools/typelint.py
+        language: system
+        pass_filenames: false
+        types: [python]
