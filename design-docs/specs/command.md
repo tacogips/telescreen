@@ -23,6 +23,7 @@ are secret references (`env:NAME` or `file:/path`).
 | `telescreen migrate [--revision head]` | Apply Alembic migrations |
 | `telescreen workflow validate FILE...` | Offline validation of workflow YAML/JSON; prints errors with JSON paths |
 | `telescreen collector run NAME [--watch]` | Enqueue an immediate scan of a collector config; `--watch` (gdrive kinds) registers the Drive push channel |
+| `telescreen collector sweep NAME` | Start a concurrent map-reduce sweep of a collector config's whole estate and print the map job id (exit 1 with `conflict` if a sweep of that config is still active) |
 | `telescreen police list` | List registered police with mode, labels and heartbeat age |
 | `telescreen token create --label TEXT --scopes read,write` | Create an API token and print it once |
 | `telescreen search reindex` | Rebuild all search indexes through the IndexGuard |
@@ -60,6 +61,8 @@ Bare `telescreen` prints help and exits 2.
 | `TELESCREEN_GITHUB_WEBHOOK_SECRET` | for GitHub events | - | Secret ref (per-collector `credential_ref` holds API tokens) |
 | `TELESCREEN_GITHUB_API_URL` | no | `https://api.github.com` | GitHub Enterprise base URL |
 | `TELESCREEN_GOOGLE_SERVICE_ACCOUNT` | for Google | - | Secret ref to service account JSON |
+| `TELESCREEN_GOOGLE_DELEGATED_ADMIN` | for domain-wide Drive sweeps | unset | Workspace admin email impersonated (domain-wide delegation) to list users for whole-domain sweeps; unset limits sweeps to the selector's drives/folders |
+| `TELESCREEN_MAP_DISPATCH_SECONDS` / `TELESCREEN_SWEEP_SHARD_SIZE` | no | 2 / 100 | Map-reduce dispatch tick; Drive file ids per shard |
 | `TELESCREEN_PUBLIC_BASE_URL` | for Drive watch and push callbacks | - | External Bureau URL |
 | `TELESCREEN_SMTP_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD` / `_FROM` / `_STARTTLS` | for email | - / 587 / - / secret ref / - / `true` | SMTP settings |
 | `TELESCREEN_WORKER_CONCURRENCY` / `TELESCREEN_WORKER_POLL_SECONDS` | no | 8 / 1.0 | Engine worker |

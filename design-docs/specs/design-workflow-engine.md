@@ -51,7 +51,7 @@ duration; only for executor types marked retryable), `on_error` (step id; defaul
 | `parallel` | `branches: [step ids]`, `join` (join step id) | forks all branches | no |
 | `join` | `mode: all|any` | `next` | yes (until branches arrive) |
 | `sub_workflow` | `workflow` (name), `version` (optional, default latest active) | `outcomes: {succeeded, failed}` | yes |
-| `map` | `source` (`partition` via collector or police, or `items` from a prior step output), `map` (`via: collector|police|sub_workflow`), `max_concurrency`, `shard_timeout`, `shard_max_attempts`, `failure`, `timeout` | `outcomes: {succeeded, partial, failed}` | yes (until the map job is reduced) |
+| `map` | `source.partition` (`via: collector|police`, `collector` config name), `map` (`via: collector|police`), `max_concurrency`, `shard_timeout`, `shard_max_attempts`, `failure`, `timeout` | `outcomes: {succeeded, partial, failed}` | yes (until the map job is reduced) |
 | `end` | `result: succeeded|failed|cancelled` | terminates run | - |
 
 Static validation at upload (errors list with JSON paths, no values): schema shape; unique
@@ -59,7 +59,8 @@ ids; `start` and every routing target exist; `send_back.to` is a step that can p
 every step reachable from `start`; `parallel.branches` reach the named `join` and no branch
 reaches `end` without passing it; `human_task.outcomes` non-empty; expressions and
 templates parse and reference only known roots; durations parse; `sub_workflow` references
-an existing definition (checked by the API, not by the offline CLI); source text passes
+an existing definition and `map` names an existing collector config of a compatible kind
+(both checked by the API, not by the offline CLI); source text passes
 `Redactor` (otherwise `raw_value_detected`).
 
 ### Expressions and templates

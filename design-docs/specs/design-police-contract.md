@@ -61,12 +61,19 @@ serve (`unsupported_contract_version`).
   - `detect`: `selector` (the `police` collector config selector document), `collector_config_id`.
   - `partition`, `scan_shard`: map-reduce sweep tasks; inputs, results and the
     `partition-result.schema.json` schema are specified in `design-map-reduce-sweeps.md`.
+    A `scan_shard` result must account for every resource it enumerated: each one is
+    either in `complete_locators` (fully scanned) or counted in `stats.resources_failed`
+    (enumerated but not fully scanned). A resource in neither place, while
+    `resources_failed = 0`, is treated as removed. Any `resources_failed > 0` blocks
+    removal reconciliation for the whole sweep. The SDK `SweepHandler` counts a resource
+    as failed whenever its handler raises.
   - `custom:<name>`: `payload` (free JSON object, built from masked workflow context).
 - Result envelope: `contract_version`, `task_id`, `status` (`completed`|`failed`),
   `outcome` (`passed`|`failed`, required for `verify_remediation`), `summary` (max 2000
   chars), `findings` (masked findings: `locator`, `rule_id`, `rule_class`,
   `masked_snippet`, `location`, `confidence`, `external_fingerprint`), `payload` (custom
-  only), `error` (`code`, `detail`) when failed, `result_token` (callback only).
+  only), `error` (`code`, `detail`, optional `retry_after_seconds` used with code
+  `rate_limited`) when failed, `result_token` (callback only).
 
 ### Endpoints (`/api/police/v1`)
 
@@ -125,7 +132,13 @@ class PoliceGateway(Protocol):
   audited), findings of `detect` tasks recorded through `IssueRecorder.record_external`
   (which re-keys external fingerprints; one resource per finding `locator`, `complete=true`
   per locator listed in the result), and `RunSignaler.signal(step_run_id, police_result)`
-  for workflow tasks.
+  for workflow tasks. `partition` and `scan_shard` results, their failures and their expiry
+  are handed to the `MapResultSink` port (`design-map-reduce-sweeps.md`). For `scan_shard`,
+  findings are recorded first through `record_external` with the task's
+  `collector_config_id`.
+- Every `police_tasks` row created for a sweep or a `police` collector carries
+  `collector_config_id`, so the external issues it records belong to that config and take
+  part in removal reconciliation.
 - Admin API outside the contract: `GET /api/police/workers` (status, labels, heartbeat age),
   `POST /api/police/workers/{id}/disable`.
 

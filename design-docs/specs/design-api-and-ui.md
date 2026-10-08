@@ -53,7 +53,9 @@ members) must never appear on the wire, so pydantic dataclass bodies never have 
 | Evidence | `PUT /api/evidence?issue_id&step_run_id?&filename` (raw body), `GET /api/evidence?issue_id&step_run_id?`, `GET /api/evidence/{id}`, `GET /api/evidence/{id}/content` | write / read |
 | Escalation | `GET/POST /api/escalation-policies`, `PUT /api/escalation-policies/{name}` | read / admin |
 | Directory | `GET/POST /api/members`, `GET/POST /api/teams`, `PUT /api/teams/{slug}/members` | read / admin |
-| Collectors | `GET /api/collectors`, `POST /api/collectors`, `PATCH /api/collectors/{id}`, `POST /api/collectors/{id}/run` | read / admin |
+| Collectors | `GET /api/collectors`, `POST /api/collectors`, `PATCH /api/collectors/{id}`, `POST /api/collectors/{id}/run`, `POST /api/collectors/{id}/sweep` (via `SweepLauncher`; 409 `conflict` while a sweep of the config is active) | read / admin |
+| Map jobs | `GET /api/map-jobs?origin&status&collector_config_id`, `GET /api/map-jobs/{id}` (counts by status, partitions done/total, findings so far, paused_until, failed shard keys with error codes) | read |
+| | `POST /api/map-jobs/{id}/cancel`, `POST /api/map-jobs/{id}/retry-failed` | admin |
 | Collector webhooks | `POST /api/collectors/{kind}/webhook` for `slack`, `github`, `gdrive` (also serves gdocs/gsheets), dispatched through `CollectorRegistry` | signatures |
 | Police | `/api/police/v1/*` (contract), `GET /api/police/workers`, `POST /api/police/workers/{id}/disable` | contract / read, admin |
 | Audit | `GET /api/audit/search?q&action&actor&target_kind&from&to`, `GET /api/audit/verify` | read |

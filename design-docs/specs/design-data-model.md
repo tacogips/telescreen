@@ -42,7 +42,7 @@ Recipient references (used in workflows, escalation policies and notifications) 
 
 | Table | Columns | Notes |
 |-------|---------|-------|
-| `issues` | id, number (unique), grouping_key (unique), source, resource_key, display_locator, resource_ref_json nullable, collector_config_id nullable, display_title, rule_class, severity, status, assignee_member_id nullable, assignee_team_id nullable, first_seen, last_seen, times_seen, distinct_fingerprints, regression_count, resolved_at nullable, resolution (`manual`, `auto`) nullable | |
+| `issues` | id, number (unique), grouping_key (unique), source, resource_key, display_locator, resource_ref_json nullable, collector_config_id nullable, display_title, rule_class, severity, status, assignee_member_id nullable, assignee_team_id nullable, first_seen, last_seen, last_checked_at, sweep_covered (bool), times_seen, distinct_fingerprints, regression_count, resolved_at nullable, resolution (`manual`, `auto`) nullable, INDEX(collector_config_id, status, last_checked_at) | `last_seen` is the last finding (Sentry semantics). `last_checked_at` is the last time any scan (complete, incomplete or skipped) covered the resource. `sweep_covered` is the adapter's statement from the latest scan that a full sweep of the config enumerates this resource. Both are used only by sweep removal reconciliation |
 | `findings` | id, issue_id, scan_job_id nullable, source, resource_key, display_locator, location (masked), rule_id, rule_class, detector, confidence, masked_snippet, fingerprint, fingerprint_key_id, observed_at, UNIQUE(issue_id, scan_job_id, fingerprint) | Sentry "event"; one row per observation per scan |
 | `issue_history` | id, issue_id, kind, actor_ref, from_value, to_value, note (masked), at | kinds: `created`, `status_changed`, `assigned`, `commented`, `regressed`, `auto_resolved`, `workflow_started`, `evidence_added`, `sla_breached` |
 
@@ -85,7 +85,8 @@ Issue status machine (`IssueStatus` StrEnum):
 
 Engine task kinds: `advance_step`, `timer_fired`, `sla_check`, `police_timeout`,
 `collector_scan`, `police_push_delivery`, `notification_delivery`, `child_run_finished`,
-`collector_watch_renew`. External side effects (notification sends, police push deliveries) only
+`collector_watch_renew`, and the map-reduce kinds `map_partition`, `map_dispatch`,
+`map_shard`, `map_reduce` (`design-map-reduce-sweeps.md`). External side effects (notification sends, police push deliveries) only
 happen in their own delivery tasks, never inside `advance_step` or `sla_check`.
 
 ### Notifications, evidence, police

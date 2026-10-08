@@ -16,17 +16,32 @@ Monitored content is never stored.
 ### Scan pipeline (`telescreen.issues.scan`)
 
 1. Input: `ResourceContent(source, raw_locator, ref: ResourceRef | None, collector_config_id,
-   display_title, segments: tuple[Segment, ...], complete: bool)`; `Segment(locator, text
-   repr=False)`. `ref` is stored as `issues.resource_ref_json` under the rule in the data
+   display_title, segments: tuple[Segment, ...], complete: bool, sweep_covered: bool)`;
+   `Segment(locator, text repr=False)`. `sweep_covered` is true when a full sweep of the
+   config enumerates this resource. It is false for GitHub `refs/pull/*` and unselected
+   refs, and false for `custom` pushes. For `police` configs it is always true, because the
+   Police sweep defines that estate. `ref` is stored as `issues.resource_ref_json` under the rule in the data
    model; `ResourceRescanner.rescan(issue_id)` uses it with the owning collector adapter.
 2. Segments become `ScanItem`s and are sent to the injected `Detector` in batches.
 3. `Masker.seal` produces `MaskedFinding`s (rule_id, rule_class, severity, masked
    snippet, masked location, fingerprint, detector, confidence).
-4. `IssueService.record_scan(ResourceScan)` persists, audits, indexes and emits
-   `IssueEvent`s (`issue_created`, `issue_regressed`) through the `IssueEventSink` port.
+4. `IssueService.record_scan(ResourceScan) -> RecordOutcome` persists, audits, indexes and
+   emits `IssueEvent`s (`issue_created`, `issue_regressed`) through the `IssueEventSink`
+   port. `RecordOutcome` holds counts only (`findings_inserted`, `issues_opened`,
+   `issues_regressed`, `issues_auto_resolved`) plus the affected issue ids, which are used
+   by the ingest response and are never stored in sweep summaries.
 5. The `ResourceContent` object is released; size limit `TELESCREEN_SCAN_MAX_BYTES`
    (default 5 MiB) per resource; larger resources are skipped and counted in
-   `scan_jobs.resources_skipped` with reason code `too_large`.
+   `scan_jobs.resources_skipped` with reason code `too_large`. A skipped resource is still
+   reported as an incomplete scan with no segments. That report changes no status; it only
+   updates `last_checked_at`.
+6. Every recorded scan sets `issues.last_checked_at = scan time` on all issues of that
+   `resource_key`, whatever their status.
+7. In sweeps, a resource whose fetch or export fails is recorded the same way as a skipped
+   resource, as an incomplete scan with no segments, and is counted in `resources_failed`.
+   Any such failure makes the sweep `partial`, so no removal reconciliation runs. An
+   upstream "not found" or trashed state is a removal and is recorded as a complete empty
+   scan. See `design-map-reduce-sweeps.md` (Map, Reduce).
 
 `ResourceScanner` (port) exposes `scan_resource(content, scan_job_id)` so collectors, police
 results and push ingestion share this path.
@@ -158,9 +173,21 @@ Besides event and incremental schedule scans, every built-in kind supports a ful
 its whole estate (for example all Drive files of the domain via domain-wide delegation),
 started by `sweep_cron`, `telescreen collector sweep <name>`, `POST /api/collectors/{id}/sweep`
 or a workflow `map` step. Sweeps are partitioned and scanned concurrently through the
-optional `SweepCapable` adapter capability (`partition`, `scan_shard`); collectors of kind
+optional `SweepCapable` adapter capability (`partition`, `shard_resources`); collectors of kind
 `police` delegate both to Police workers (`partition` / `scan_shard` task types). See
 `design-map-reduce-sweeps.md`.
+
+collectors-core owns `src/telescreen/collectors/sweep.py`:
+
+- `CollectorSweeper` port implementation: it resolves the config and adapter through the
+  registry, rejects kinds without `SweepCapable` (`sweep_unsupported`), and scans each
+  shard resource through `ResourceScanner` with the given `scan_job_id`.
+- Sweep starts: the scheduler tick for `sweep_cron` (idempotency key
+  `sweep:<config>:<fire-iso>`), the router's `POST /api/collectors/{id}/sweep` and the CLI
+  all call the `SweepLauncher` port.
+- `SweepLauncher` refuses a second collector-origin sweep of a config while one is not
+  terminal (`conflict`, 409 at the API). This is safe for reconciliation even when sweeps
+  overlap, because the watermark is per job.
 
 ## References
 

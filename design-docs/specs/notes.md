@@ -43,6 +43,44 @@ Drive) as concurrent map-reduce. Decision: implement map-reduce in the self-buil
 Airflow remains usable from the outside: an Airflow DAG can act as a push-mode Police or
 push masked findings through the ingest API.
 
+### Map step scope in v1
+
+The first map-reduce draft also allowed `source.items` (fan-out over a prior step's output
+list) and `map.via: sub_workflow` (one child run per item). Both are dropped from v1.
+
+- No accepted requirement needs them. The owner requirement is whole-estate inspection by
+  collectors and Police, which `source.partition` with `via: collector|police` covers.
+- Each would need its own undefined integration: child-run completion routed into
+  `map_items`, and redaction and typing of item lists taken from step outputs.
+
+They can be added later as new DSL fields without schema changes to the map tables, apart
+from a nullable `child_run_id`.
+
+### Sweep removal reconciliation by watermark
+
+A sweep cannot list every resource it enumerated: that would mean storing locators, and
+holding up to 10^7 keys. Instead, every scan of a resource sets `issues.last_checked_at`,
+including incomplete and size-skipped scans. After a `succeeded` sweep, open issues of the
+config with `sweep_covered = true` whose `last_checked_at` is older than the job's
+`created_at` belong to resources the sweep never saw, and are auto-resolved.
+`sweep_covered` (set by the adapter on each scan) keeps issues that sweeps never enumerate,
+such as GitHub `refs/pull/*`, from being resolved by mistake. Those refs are exactly where
+the incident workflow's Police re-check looks for leftover data.
+
+Four reasons this is correct:
+
+- Clean resources that still exist were already auto-resolved during the map phase by
+  their complete scans.
+- Resources that still have findings were touched.
+- Resources that failed to fetch or scan inside an otherwise successful shard are recorded
+  as incomplete scans for collectors, and counted in `resources_failed` for both collectors
+  and Police. Any `resources_failed > 0` makes the sweep `partial`, so a sweep with
+  resource-level failures never reconciles. Only an explicit `removed` entry (for example
+  an upstream 404), or absence from a Police result that reports zero failures, counts as
+  removal.
+- A `partial` or `failed` sweep never reconciles, because a failed shard could hide a
+  resource that still exists.
+
 ### Why the v1 queue polls instead of using LISTEN/NOTIFY
 
 The issue suggests `FOR UPDATE SKIP LOCKED` plus LISTEN/NOTIFY. v1 keeps `SKIP LOCKED` but
