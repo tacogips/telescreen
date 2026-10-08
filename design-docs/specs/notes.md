@@ -26,6 +26,37 @@ outside the masking guarantees, and its human-task and send-back semantics would
 custom code. n8n remains supported where it fits best: as a push-mode Police.
 Kestra 2.0's worker model inspired the pull-mode police protocol.
 
+### Map-reduce sweeps: self-built vs Airflow
+
+The owner asked whether Airflow should run whole-estate sweeps (for example all of Google
+Drive) as concurrent map-reduce. Decision: implement map-reduce in the self-built engine
+(`design-map-reduce-sweeps.md`); do not adopt Airflow as the core engine.
+
+| Concern | Airflow dynamic task mapping (`expand`) | Self-built map-reduce |
+|---------|----------------------------------------|-----------------------|
+| Raw-data guarantee | Mapped inputs/outputs go through XCom and task logs capture stdout; masking cannot be enforced centrally | Shard descriptors are opaque ids that pass the `Redactor`; summaries are counts only |
+| Private-network Police | Celery/Kubernetes executors need inbound access to broker/metadata DB | Pull-mode Police only make outbound HTTPS calls; n8n can join via push mode |
+| Shard volume (10^4-10^5 Drive shards) | Each mapped task instance is a scheduler-managed task with per-instance overhead and a default `max_map_length` | Shards are rows claimed in batches with `SKIP LOCKED`; global concurrency cap in the database |
+| Quotas and backpressure | Pools/slots per Airflow deployment | Per-job `max_concurrency` plus `paused_until` on upstream 429 |
+| Operations | Scheduler, webserver, triggerer, executor, metadata DB | Existing `telescreen worker` processes and PostgreSQL |
+
+Airflow remains usable from the outside: an Airflow DAG can act as a push-mode Police or
+push masked findings through the ingest API.
+
+### Why the v1 queue polls instead of using LISTEN/NOTIFY
+
+The issue suggests `FOR UPDATE SKIP LOCKED` plus LISTEN/NOTIFY. v1 keeps `SKIP LOCKED` but
+uses a 1 s poll. Reasons:
+
+- LISTEN needs a dedicated asyncpg connection outside SQLAlchemy sessions, and it has no
+  SQLite equivalent, so offline tests could not cover it.
+- The workloads (human tasks measured in hours, SLA timers, scans) do not need sub-second
+  dispatch.
+- Correctness never depends on notifications: a poller is needed anyway for timers
+  (`available_at`) and lease recovery.
+
+NOTIFY can be added later as a wake-up hint without schema changes.
+
 ### riela concept mapping
 
 | riela concept | Telescreen equivalent | Difference |

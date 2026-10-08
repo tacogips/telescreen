@@ -59,6 +59,10 @@ to read. Names are used consistently in Python packages, API paths, UI labels an
 | 12 | Custom police in private networks, subscription workers | Pull mode (register/claim/heartbeat/result) and collector kind `police` for centrally configured private crawlers | `design-police-contract.md` |
 | 13 | Strict typing conventions | Typing boundary decisions in section 6 of this file | this file |
 | 14 | Loosely coupled police, n8n-buildable, SDK | Versioned HTTP+JSON contract, push webhook mode, `telescreen_police_sdk`, n8n example | `design-police-contract.md` |
+| 15 | Plain naming; only Telescreen, Reporting Bureau and Police themed | Section 1 naming map. The themed page names in the original UI acceptance criterion map to the Collectors page and the Assistant chat page | this file |
+| 16 | Owner decisions: text and image evidence, Claude (default) or Codex managed LLM, bearer tokens for v1 | Evidence scan-and-reject with a fail-closed image scanner; `TELESCREEN_MANAGED_LLM_PROVIDER`; `api_tokens` | `design-api-and-ui.md`, `design-detectors.md`, `design-docs/user-qa/qa-*.md` (all resolved) |
+| 17 | Reviewed draft is the baseline | Commit 2036af9 re-reviewed on 2026-10-08. Fixes were limited to stale names, JSON wire encoding, cross-package endpoint ownership, ports for issue history and the evidence gate, the SDK ASGI boundary, and the polling-only queue rationale | all files |
+| 18 | Whole-estate inspection (for example all of Google Drive, also by Police) runs concurrently as map-reduce, not sequentially; Airflow considered | Durable map-reduce sweeps in the self-built engine: streaming partition, `map_items` dispatched concurrently with a global `max_concurrency`, quota backpressure, reduce with removal reconciliation; `map` DSL step; Police `partition`/`scan_shard` task types; built-in sweeps for Drive/Docs/Sheets, GitHub, Slack. Airflow rejected as core engine (`notes.md`) | `design-map-reduce-sweeps.md` |
 
 ### 3. Runtime Processes
 
@@ -120,7 +124,7 @@ Protocols):
 |------|---------|----------------|-------------|
 | `AuditLog.append(entry: AuditEntry)` | Hash-chained append in the caller's session | audit-search (`telescreen.audit`) | all L3 |
 | `SearchIndexer.index_issue/finding/run/audit(id)` | Post-commit indexing | audit-search (`telescreen.search`) | issues, workflow, audit-search |
-| `IssueRecorder.record_scan(ResourceScan)`, `record_external(ExternalScan)` | Persist masked findings, grouping, auto-resolve; `record_external` re-scans with `Redactor` and re-keys fingerprints | issues-ingest | collectors-core, police-bureau, ingest router |
+| `IssueRecorder.record_scan(ResourceScan)`, `record_external(ExternalScan)`, `add_history(IssueHistoryEntry)` | Persist masked findings, grouping, auto-resolve; `record_external` re-scans with `Redactor` and re-keys fingerprints; `add_history` appends an `issue_history` row (kinds `workflow_started`, `evidence_added`, `sla_breached`) in the caller's session, with the note redacted | issues-ingest | collectors-core, police-bureau, ingest router, workflow-engine, evidence |
 | `ResourceScanner.scan_resource(ResourceContent, scan_job_id)` | Transient raw-content scan path | issues-ingest | collectors-core, ingest router |
 | `ResourceRescanner.rescan(issue_id)` | Rescan an issue resource | collectors-core | workflow-nodes (`detect`) |
 | `CollectorAdapter` plus DTOs (`InboundWebhook`, `EventCheck`, `ResourceRef`, `ResourceContent`, `Segment`, `ChangePage`, `CollectorCursor`, `CollectorConfig`, `WatchState`, selector dataclasses), in `ports/collectors.py` | Per-source collector contract | collectors-slack, collectors-google, collectors-github | collectors-core |
@@ -129,7 +133,7 @@ Protocols):
 | `NotificationSender.send(NotificationRequest) -> NotificationReceipt` | In the caller's transaction: DLP gate, insert the `notifications` row (status `queued`, or `blocked`) and its audit record, then enqueue a `notification_delivery` task (idempotency key `notify:<notification_id>`). No network I/O | notifications | workflow (notify executor, SLA escalation) |
 | `PoliceGateway.dispatch/cancel` | Police task dispatch | police-bureau | workflow-nodes, collectors-core (`police` kind) |
 | `RunSignaler.signal(step_run_id, StepSignal)` | Resume waiting steps | workflow-engine | police-bureau, api human tasks |
-| `EvidenceQuery.accepted_count(step_run_id)` | Evidence gate | evidence | workflow-engine |
+| `EvidenceQuery.accepted_count(issue_id, step_run_id)` | Evidence gate; counts only accepted evidence whose `issue_id` matches the run's issue, so evidence filed against another issue cannot satisfy the gate | evidence | workflow-engine |
 | `TaskQueue` and `TaskHandler(kind, handle)` | Durable queue and pluggable task kinds | workflow-engine (queue) | collectors-core (`collector_scan`, `collector_watch_renew`), police-bureau (`police_push_delivery`), notifications (`notification_delivery`) |
 | `ScheduleProvider.tick(now)` | Scheduler hook for cron work | collectors-core | workflow-engine scheduler |
 | `StepExecutor`, `StepContext`, `StepOutcome`, `StepSignal` | Workflow node execution | workflow-engine, workflow-nodes | workflow-engine |
@@ -196,7 +200,9 @@ The repo enforces `tools/typelint.py` (TL001-TL010), ruff ANN/PGH and ty with
 | Topic | Decision |
 |-------|----------|
 | Arbitrary JSON | `telescreen.core.json` defines a closed, self-referencing frozen dataclass `JsonValue` (kind enum + scalar fields + `items: tuple[JsonValue, ...]` + `members: tuple[JsonMember, ...]`), plus `parse_json(text) -> JsonValue`, `parse_yaml(text) -> JsonValue` (PyYAML `safe_load`), `dump_json(value) -> str` (canonical: sorted keys, no whitespace) and typed accessors. No recursive `type` alias anywhere. |
-| Decoding json/yaml natives | Converted inside `telescreen/core/json.py` only, using structural Protocols in the style of `TomlTable` in `tools/typelint.py`. If ty cannot narrow those Protocols, that single file gets a `TL005` per-file-ignore (justified: stdlib json/PyYAML return untyped natives). The SDK has the same boundary in `src/telescreen_police_sdk/_json.py` with the same rule. These are the only two pre-approved per-file-ignore candidates; each is added by the foundation plan only when the implementation proves it necessary. |
+| Decoding json/yaml natives | Converted inside `telescreen/core/json.py` only, using structural Protocols in the style of `TomlTable` in `tools/typelint.py`. If ty cannot narrow those Protocols, that single file gets a `TL005` per-file-ignore (justified: stdlib json/PyYAML return untyped natives). The SDK has the same boundary in `src/telescreen_police_sdk/_json.py` with the same rule. These two files and the SDK `asgi.py` (row below) are the only pre-approved per-file-ignore candidates; each is added by the foundation plan only when the implementation proves it necessary. |
+| JSON on the wire | `JsonValue` is never a pydantic dataclass field. UI-facing APIs carry free-form JSON as `*_json` strings. External contracts (police v1, ingest source config) carry native JSON written and read through the JSON boundary. See "Free-form JSON on the wire" in `design-api-and-ui.md` |
+| ASGI (SDK only) | `telescreen_police_sdk/asgi.py` types ASGI with local structural Protocols. It is the third pre-approved `TL005` per-file-ignore candidate, used only if those Protocols cannot be made to type-check. The Bureau needs no ASGI typing because FastAPI owns it |
 | Typed payloads | Inbound and outbound API bodies, LLM structured outputs, connector responses and contract envelopes are pydantic dataclasses or stdlib dataclasses parsed with `TypeAdapter.validate_json(bytes)`. Outbound mappings are produced by `dataclasses.asdict(...)` passed inline to the library call. |
 | FastAPI | Request/response bodies are `pydantic.dataclasses.dataclass`; never `BaseModel`. |
 | Settings | `TelescreenSettings` is a frozen stdlib dataclass built by `load_settings(env: EnvSource)` where `EnvSource` is a Protocol with `get(key) -> str | None` (satisfied by `os.environ`). No pydantic-settings. |
@@ -260,12 +266,16 @@ replace stub files created by an earlier wave only where noted (explicit handoff
 | 4 | collectors-github | `src/telescreen/collectors/github/**`, `tests/collectors/github/**` | ports, masking |
 | 4 | workflow-engine | `src/telescreen/workflow/{engine,queue,scheduler,escalation,triggers}/**`, `src/telescreen/workflow/executors/{__init__,flow,human}.py`, `src/telescreen/api/routers/{workflows,runs,human_tasks,escalation}.py`, `tests/workflow/engine/**` | workflow-dsl, masking, api-common |
 | 4 | workflow-nodes | `src/telescreen/workflow/executors/{detect,ai_agent,notify,police_verify}.py`, `tests/workflow/executors/**` | workflow-dsl, masking, detection-llm-ml |
+| 4 | workflow-mapreduce | `src/telescreen/workflow/mapreduce/**`, `src/telescreen/workflow/executors/map.py`, `src/telescreen/api/routers/map_jobs.py`, `tests/workflow/mapreduce/**` | workflow-dsl, masking, api-common |
 | 4 | assistant | `src/telescreen/assistant/**`, `src/telescreen/api/routers/chat.py`, `tests/assistant/**` | masking, api-common, detection-llm-ml |
 | 5 | assembly | `src/telescreen/wiring.py`, `src/telescreen/api/app.py`, `src/telescreen/cli.py`, `src/telescreen/__main__.py`, `tests/e2e/**`, `tests/leak/**`, `tests/test_package.py` | all wave 4 plans |
 | 5 | examples-compose | `examples/compose/**`, `examples/workflows/**`, `tests/examples/**` | workflow-dsl, assembly (CLI names only) |
 
 Constraints:
 
+- Foundation writes the final `README.md` (setup with `mise run setup`, architecture
+  overview, CLI and API usage, UI build, compose quick start) from this design. Later plans
+  never touch it.
 - Only foundation edits root files and `src/web/package.json`/`bun.lock`. Other plans that
   need a dependency request it through serial reconciliation. Foundation therefore adds the
   full v1 dependency set up front (listed in `design-docs/specs/command.md`, Dependencies).
@@ -302,6 +312,7 @@ gitleaks pre-commit hook does not flag committed sources.
 | `design-docs/specs/design-collectors-and-ingestion.md` | Collectors, triggers, push API, scan pipeline, issue lifecycle |
 | `design-docs/specs/design-workflow-engine.md` | Workflow DSL v1, node types, engine durability, escalation |
 | `design-docs/specs/design-police-contract.md` | Police contract v1, pull/push, signing, SDK, n8n |
+| `design-docs/specs/design-map-reduce-sweeps.md` | Concurrent map-reduce sweeps: partition/map/reduce, `map` step, Police sweep tasks, quotas |
 | `design-docs/specs/design-api-and-ui.md` | REST API, auth, Assistant MCP/chat, evidence API, UI |
 | `design-docs/specs/command.md` | CLI, environment variables, exit codes, dependencies |
 | `design-docs/specs/notes.md` | Engine rationale vs Airflow/n8n/Kestra, riela mapping, tooling notes |

@@ -1,7 +1,7 @@
 # Reporting Bureau API, Assistant and UI
 
-REST API surface, authentication, error model, evidence (Evidence) API, search, Big
-Brother MCP/chat, and the SolidJS UI.
+REST API surface, authentication, error model, evidence API, search, Assistant MCP/chat,
+and the SolidJS UI.
 
 ## Overview
 
@@ -26,6 +26,17 @@ contain only masked data. The UI consumes the same API.
 - Validation errors list only `loc` and `type` (see Masking design).
 - Pagination: `?limit=<1-200>&cursor=<opaque>`; responses `{items, next_cursor}`.
 
+### Free-form JSON on the wire
+
+`JsonValue` (`telescreen.core.json`) is an internal model. Its dataclass shape (kind, items,
+members) must never appear on the wire, so pydantic dataclass bodies never have a
+`JsonValue` field. Two rules apply:
+
+| API family | Free-form members | Encoding |
+|------------|-------------------|----------|
+| Internal REST API used by the UI (`/api/collectors`, `/api/runs`) | collector `selector`, step `input`/`output`, run `context` (escalation tiers and workflow sources are typed or plain strings and are not affected) | A JSON-encoded string field with the `_json` suffix (`selector_json`, `input_json`, `output_json`, `context_json`), the same canonical text as the DB column. Inbound strings are parsed with `parse_json` and decoded into the per-kind dataclasses; invalid documents return 422 `validation_error` with JSON paths only. The UI uses `JSON.parse`/`JSON.stringify` |
+| External contracts (`/api/police/v1`, `GET /api/ingest/v1/sources/{name}/config`) | police task `input`, result `payload`, custom selector `document` | Native JSON objects, so n8n and other clients need no double decoding. The router reads the raw body. Typed members are parsed with `TypeAdapter.validate_json` on a dataclass without the free-form member (unknown members are ignored). The free-form member is extracted with `parse_json` and its accessors. Responses are written with `dump_json` into a `Response` with type `application/json`. The SDK does the same through `telescreen_police_sdk/_json.py` |
+
 ### Endpoints
 
 | Area | Endpoint | Scope |
@@ -33,13 +44,13 @@ contain only masked data. The UI consumes the same API.
 | Health | `GET /api/health` | none |
 | Ingest | `POST /api/ingest/v1/scan`, `POST /api/ingest/v1/findings`, `GET /api/ingest/v1/sources/{name}/config` | ingest |
 | Issues | `GET /api/issues?status&source&rule_class&severity&assignee&q&sort=last_seen|first_seen|times_seen` | read |
-| | `GET /api/issues/{id}`, `/events`, `/history`, `/stats`, `/runs`, `/evidence` | read |
+| | `GET /api/issues/{id}`, `/events`, `/history`, `/stats` (linked runs come from `GET /api/runs?issue_id=`, evidence from `GET /api/evidence?issue_id=`, so each router reads only its own package's tables) | read |
 | | `PATCH /api/issues/{id}` `{status?, assignee_ref?}`; `POST /api/issues/{id}/comments` | write |
 | Workflows | `GET /api/workflows`, `GET /api/workflows/{name}`, `GET /api/workflows/{name}/versions/{v}`, `GET /api/workflows/schema` | read |
 | | `POST /api/workflows` `{source_format, source_text}` (new version), `POST /api/workflows/validate`, `POST /api/workflows/{name}/activate {version}` | write |
 | Runs | `POST /api/workflows/{name}/runs {issue_id?}`, `GET /api/runs?status&workflow&issue_id`, `GET /api/runs/{id}` (steps, transitions, human tasks), `POST /api/runs/{id}/cancel` | read / write |
 | Human tasks | `GET /api/human-tasks?assignee=me|<ref>&status`, `POST /api/human-tasks/{id}/complete {outcome, comment?}` | read / write |
-| Evidence | `PUT /api/evidence?issue_id&step_run_id?&filename` (raw body), `GET /api/evidence/{id}`, `GET /api/evidence/{id}/content` | write / read |
+| Evidence | `PUT /api/evidence?issue_id&step_run_id?&filename` (raw body), `GET /api/evidence?issue_id&step_run_id?`, `GET /api/evidence/{id}`, `GET /api/evidence/{id}/content` | write / read |
 | Escalation | `GET/POST /api/escalation-policies`, `PUT /api/escalation-policies/{name}` | read / admin |
 | Directory | `GET/POST /api/members`, `GET/POST /api/teams`, `PUT /api/teams/{slug}/members` | read / admin |
 | Collectors | `GET /api/collectors`, `POST /api/collectors`, `PATCH /api/collectors/{id}`, `POST /api/collectors/{id}/run` | read / admin |
@@ -74,7 +85,8 @@ contain only masked data. The UI consumes the same API.
   `evidence_rejected` with rule classes only, audit record.
 - Clean content is stored through `EvidenceStore` (`LocalFileEvidenceStore` at
   `TELESCREEN_EVIDENCE_DIR`, key = evidence id) with sha256; the filename is redacted;
-  `RunSignaler` is not called (completion is explicit through the human task).
+  history `evidence_added` is written through `IssueRecorder.add_history`; `RunSignaler` is
+  not called (completion is explicit through the human task).
 
 ### Search
 

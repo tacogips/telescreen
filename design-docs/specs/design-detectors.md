@@ -130,8 +130,8 @@ Tests use a fake classifier; transformers is never imported in tests.
 - `build_detector(settings, names) -> Detector` in `factory.py` is the only constructor
   used by the rest of the system. `build_managed_llm_client(settings) -> LlmClient | None`
   is the only constructor for the managed provider client. It returns None when the
-  selected provider has no credentials. Evidence's `LlmImageEvidenceScanner` and Big
-  Brother chat use it (wired in assembly). Workflow `detect` nodes may pass an explicit list.
+  selected provider has no credentials. Evidence's `LlmImageEvidenceScanner` and Assistant
+  chat use it (wired in assembly). Workflow `detect` nodes may pass an explicit list.
 
 ### Batching for scans
 

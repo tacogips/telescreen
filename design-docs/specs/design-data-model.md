@@ -34,7 +34,7 @@ Recipient references (used in workflows, escalation policies and notifications) 
 
 | Table | Columns | Notes |
 |-------|---------|-------|
-| `collector_configs` | id, name (unique), kind (`slack`, `gdrive`, `gdocs`, `gsheets`, `github`, `custom`, `police`), trigger_mode (`event`, `schedule`, `both`), cron nullable, selector_json, credential_ref nullable, cursor_json nullable, enabled, last_scheduled_at | Selector is per-kind typed (see collectors design); `credential_ref` is a secret ref |
+| `collector_configs` | id, name (unique), kind (`slack`, `gdrive`, `gdocs`, `gsheets`, `github`, `custom`, `police`), trigger_mode (`event`, `schedule`, `both`), cron nullable, sweep_cron nullable, sweep_max_concurrency (default 16), selector_json, credential_ref nullable, cursor_json nullable, enabled, last_scheduled_at | Selector is per-kind typed (see collectors design); `credential_ref` is a secret ref |
 | `scan_jobs` | id, collector_config_id nullable, source, trigger (`event`, `schedule`, `push`, `manual`, `workflow`), status (`running`, `succeeded`, `failed`, `partial`), started_at, finished_at, resources_scanned, resources_skipped, findings_count, error_code nullable | No content, no raw locators |
 | `replay_nonces` | scope, nonce, expires_at, PK(scope, nonce) | Webhook/callback replay protection |
 
@@ -81,6 +81,7 @@ Issue status machine (`IssueStatus` StrEnum):
 | `transitions` | id, run_id, from_step_run_id nullable, to_step_id, kind (`start`, `next`, `branch`, `send_back`, `fork`, `join`, `timeout`, `error`), reason (masked) nullable, at | Run history for the UI |
 | `engine_tasks` | id, kind, ref_id, payload_json, status (`ready`, `leased`, `done`, `cancelled`, `dead`), available_at, lease_owner nullable, lease_expires_at nullable, attempts, max_attempts, idempotency_key (unique), last_error_code nullable, created_at | The durable queue; timers are tasks with future `available_at` |
 | `human_tasks` | id, run_id, step_run_id (unique), kind (`approval`, `evidence`), title (masked), assignee_ref, escalation_policy_id nullable, tier_index, due_at nullable, status (`open`, `completed`, `cancelled`), outcome nullable, comment (masked) nullable, completed_by nullable, completed_at nullable | |
+| `map_jobs`, `map_partitions`, `map_items` | see `design-map-reduce-sweeps.md` (Data model) | Concurrent map-reduce sweeps; UNIQUE(map_job_id, shard_key), INDEX(map_job_id, status) |
 
 Engine task kinds: `advance_step`, `timer_fired`, `sla_check`, `police_timeout`,
 `collector_scan`, `police_push_delivery`, `notification_delivery`, `child_run_finished`,

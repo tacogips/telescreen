@@ -152,6 +152,16 @@ complete scan with no segments for that `raw_locator`, so its open issues auto-r
 `source` for pushers must match an enabled `custom` collector config name; unknown sources are
 rejected with 404 `unknown_source`.
 
+### Full sweeps (map-reduce)
+
+Besides event and incremental schedule scans, every built-in kind supports a full sweep of
+its whole estate (for example all Drive files of the domain via domain-wide delegation),
+started by `sweep_cron`, `telescreen collector sweep <name>`, `POST /api/collectors/{id}/sweep`
+or a workflow `map` step. Sweeps are partitioned and scanned concurrently through the
+optional `SweepCapable` adapter capability (`partition`, `scan_shard`); collectors of kind
+`police` delegate both to Police workers (`partition` / `scan_shard` task types). See
+`design-map-reduce-sweeps.md`.
+
 ## References
 
 See `design-docs/references/README.md`.

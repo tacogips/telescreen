@@ -51,6 +51,7 @@ duration; only for executor types marked retryable), `on_error` (step id; defaul
 | `parallel` | `branches: [step ids]`, `join` (join step id) | forks all branches | no |
 | `join` | `mode: all|any` | `next` | yes (until branches arrive) |
 | `sub_workflow` | `workflow` (name), `version` (optional, default latest active) | `outcomes: {succeeded, failed}` | yes |
+| `map` | `source` (`partition` via collector or police, or `items` from a prior step output), `map` (`via: collector|police|sub_workflow`), `max_concurrency`, `shard_timeout`, `shard_max_attempts`, `failure`, `timeout` | `outcomes: {succeeded, partial, failed}` | yes (until the map job is reduced) |
 | `end` | `result: succeeded|failed|cancelled` | terminates run | - |
 
 Static validation at upload (errors list with JSON paths, no values): schema shape; unique
@@ -87,11 +88,12 @@ class StepExecutor(Protocol):
 `StepOutcome` variants (dataclass with `kind` enum): `completed(output: JsonValue, route:
 str | None)`, `waiting(wait_kind, timer_at: datetime | None)`, `failed(error_code,
 retryable)`. `StepSignal` variants: `human_completed`, `evidence_accepted`,
-`police_result`, `timer_fired`, `child_finished`, `branch_arrived`. Executors never touch
+`police_result`, `timer_fired`, `child_finished`, `branch_arrived`, `map_finished`. Executors never touch
 the queue directly; they return outcomes and receive signals.
 
 Other ports consumed: `NotificationSender` (notifications), `PoliceGateway`, `EvidenceQuery`
-(count accepted evidence for a step run), `IssueReader`, `ResourceRescanner` (detect node),
+(count accepted evidence for the run's issue and step run), `IssueRecorder.add_history`
+(`workflow_started`, `sla_breached`), `IssueReader`, `ResourceRescanner` (detect node),
 `LlmClient` (ai_agent), `AuditLog`, `RunSignaler` (implemented by the engine; called by
 police, evidence and human-task API).
 
@@ -146,7 +148,7 @@ police, evidence and human-task API).
 - `telescreen worker` loop: reclaim expired leases, run scheduler tick, claim up to
   `TELESCREEN_WORKER_CONCURRENCY` tasks, dispatch by kind, sleep
   `TELESCREEN_WORKER_POLL_SECONDS` (default 1.0) when idle. Polling only in v1 (no
-  LISTEN/NOTIFY).
+  LISTEN/NOTIFY; rationale in `notes.md`).
 - Tests drive the engine with SQLite repositories, `FakeClock` and a synchronous
   `run_until_idle()` helper that claims and executes ready tasks whose `available_at <= now`.
 
@@ -173,7 +175,8 @@ tiers:
 - Completion (`POST /api/human-tasks/{id}/complete {outcome, comment}`): caller must be the
   assignee, a member of the assignee team, or hold `admin`; outcome must be declared;
   `evidence` tasks additionally require `>= min_files` accepted evidence for the step run
-  (409 `evidence_required` otherwise). Comment is redacted before storage.
+  and the run's issue (`EvidenceQuery.accepted_count(issue_id, step_run_id)`; 409
+  `evidence_required` otherwise). Comment is redacted before storage.
 - Recipient resolution: `member:` -> member email/slack user, `team:` -> team mailing list
   email, team Slack channel, and members, `email:` -> address, `slack:` -> channel.
 
@@ -185,6 +188,7 @@ tiers:
 | `ai_agent` | Builds prompt from template (masked context only, plus `Redactor` pass), calls `LlmClient.complete_json` with schema built from `output`, validates, redacts string outputs |
 | `notify` | Renders templates and calls `NotificationSender.send`. The DLP gate runs, the notification row and its audit record are written, and `notification_delivery` is enqueued in the step transaction. The step completes once the notification is queued, with output `{queued: true, notification_ids}`, or with `{queued: false, delivered: false}` when the DLP verdict is `blocked`. Delivery is at-least-once, keyed by notification id. The step does not wait for delivery |
 | `evidence_upload` | Waiting human task of kind `evidence`; resumes on `human_completed` |
+| `map` | Creates a `map_jobs` row and its initial partitions, then waits; the map-reduce machinery (`design-map-reduce-sweeps.md`) dispatches shards concurrently and resumes the step with `map_finished` carrying the count-only sweep result |
 | `police_verify` | Dispatches `PoliceTaskRequest` through `PoliceGateway` with deadline `now + timeout` and enqueues `police_timeout`; resumes on `police_result` (outcome `passed` or `failed`) or timeout (`error`) |
 
 ### Triggers

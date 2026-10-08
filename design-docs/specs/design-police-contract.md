@@ -1,7 +1,7 @@
 # Police Contract v1
 
-Versioned, language-agnostic HTTP+JSON contract between the Reporting Bureau and Thought
-Police workers (custom detectors and verifiers), with pull and push transports, a standalone
+Versioned, language-agnostic HTTP+JSON contract between the Reporting Bureau and Police
+workers (custom detectors and verifiers), with pull and push transports, a standalone
 Python SDK and an n8n example.
 
 ## Overview
@@ -48,7 +48,7 @@ serve (`unsupported_contract_version`).
 ### Envelopes
 
 - Manifest: `name`, `version`, `contract_version`, `mode` (`pull`|`push`), `task_types`
-  (`detect`, `verify_remediation`, `custom:<name>`), `labels` (list of `key=value`),
+  (`detect`, `verify_remediation`, `partition`, `scan_shard`, `custom:<name>`), `labels` (list of `key=value`),
   `concurrency` (1-64), `endpoint_url` (push only, https unless
   `TELESCREEN_POLICE_ALLOW_HTTP=true` for dev).
 - Registration response: `worker_id`, `worker_token` (pull) or `signing_secret` (push),
@@ -59,6 +59,8 @@ serve (`unsupported_contract_version`).
   - `verify_remediation`: `issue` (`id`, `short_id`, `source`, `display_locator`,
     `rule_class`, `severity`, `first_seen`, `last_seen`), `instructions` (masked text).
   - `detect`: `selector` (the `police` collector config selector document), `collector_config_id`.
+  - `partition`, `scan_shard`: map-reduce sweep tasks; inputs, results and the
+    `partition-result.schema.json` schema are specified in `design-map-reduce-sweeps.md`.
   - `custom:<name>`: `payload` (free JSON object, built from masked workflow context).
 - Result envelope: `contract_version`, `task_id`, `status` (`completed`|`failed`),
   `outcome` (`passed`|`failed`, required for `verify_remediation`), `summary` (max 2000
@@ -78,7 +80,9 @@ serve (`unsupported_contract_version`).
 | `POST /callbacks/{task_id}` | push signature + one-time `result_token` | Push asynchronous result |
 
 All inbound bodies are read raw, size-limited (1 MiB), schema-validated with
-`telescreen.contracts.validate`, then parsed into pydantic dataclasses.
+`telescreen.contracts.validate`, then parsed into pydantic dataclasses. Free-form members
+(`input`, `payload`) stay native JSON objects on the wire; their encoding and decoding follow
+"Free-form JSON on the wire" in `design-api-and-ui.md`.
 
 ### Push signing
 
@@ -134,7 +138,8 @@ class PoliceGateway(Protocol):
 | `signing.py` | `sign(secret, body, now, nonce)`, `verify(headers, body, secret, now, nonce_seen)` |
 | `client.py` | `BureauClient` (httpx.AsyncClient): register, claim, heartbeat, submit_result, callback |
 | `worker.py` | `PullWorker`: handler registry by task type, concurrency semaphore, heartbeat loop, graceful stop |
-| `webhook.py` | `create_webhook_app(handlers, secret, mode=sync|async)`: minimal pure-ASGI app verifying signatures, dispatching to handlers, replying 200/202, posting signed callbacks |
+| `webhook.py` | `WebhookHandler(handlers, secret, mode=sync|async)` with `handle(WebhookRequest(headers: tuple[tuple[str, str], ...], body: bytes)) -> WebhookReply(status, headers, body)`. It is framework-neutral: it verifies signatures, dispatches to handlers, replies 200/202 and posts signed callbacks. Unit tests call it directly |
+| `asgi.py` | `create_webhook_app(handler) -> AsgiApp`: a thin pure-ASGI adapter over `WebhookHandler`. ASGI scope, receive and send are typed with structural Protocols local to this file. If ty cannot accept dict-based ASGI messages through those Protocols, this single file is the third pre-approved `TL005` per-file-ignore candidate (the ASGI specification mandates dict scopes and messages), added through foundation reconciliation |
 | `masking.py` | `mask_value(value, keep_prefix)` helper so police never send raw values |
 
 Dependencies: stdlib and httpx only. Tests use httpx MockTransport and an in-process ASGI
