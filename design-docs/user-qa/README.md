@@ -17,6 +17,9 @@ Store questions, pending decisions, and items awaiting user approval.
 
 - [qa-example.md](./qa-example.md) - Example: Database Selection (template example)
 - [pending-example.md](./pending-example.md) - Example: CLI Output Format (template example)
+- [qa-ui-authentication.md](./qa-ui-authentication.md) - UI/API authentication model (resolved: bearer API tokens; OIDC later)
+- [qa-evidence-file-types.md](./qa-evidence-file-types.md) - Evidence file types (resolved: text and images; images scanned by vision managed LLM)
+- [qa-llm-data-egress.md](./qa-llm-data-egress.md) - Managed LLM provider and egress (resolved: Claude default, Codex selectable; text detection opt-in)
 
 ## Adding New Items
 
