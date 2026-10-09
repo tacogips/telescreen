@@ -1,16 +1,16 @@
 # P29 Compose Deployment and Example Workflows Implementation Plan
 
-**Status**: Ready (run B revision; the run A deliverables below are implemented and accepted)
-**Design Reference**: design-docs/specs/architecture.md sections 3 (Deployment and examples) and 8 (run B README exception, Run B2), design-docs/specs/command.md (Subcommands, Environment Variables), design-docs/specs/design-collectors-and-ingestion.md (Assembly bindings), design-docs/specs/design-workflow-engine.md (Document schema, escalation policy), design-docs/specs/design-ui-sentry.md sections 8.5, 8.6
+**Status**: Ready (run B4 revision; the run A deliverables below are implemented and accepted; run B deliverables are NOT yet in the tree)
+**Design Reference**: design-docs/specs/architecture.md sections 3 (Deployment and examples, including the run B4 non-root evidence-dir and example-police fingerprint-key constraints) and 8 (run B README exception, Run B2), design-docs/specs/command.md (Subcommands, Environment Variables), design-docs/specs/design-collectors-and-ingestion.md (Assembly bindings), design-docs/specs/design-workflow-engine.md (Document schema, escalation policy), design-docs/specs/design-ui-sentry.md sections 8.5, 8.6
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-09 (run B2, session 342)
+**Last Updated**: 2026-10-10 (run B4)
 
 ## Plan Metadata
 
 - planId: `p29-examples-compose`
 - planPath: `impl-plans/active/p29-examples-compose.md`
-- wave: B3-3 in the s345 manifest (B2-3 in s342; last; runs alone)
-- dependsOn: `p13-ui-workflows`, `p28-assembly`, `p28b-e2e-flows`, `p28c-leak-matrix` (run B2), plus accepted `p12-ui-issues`, `p14-ui-ops`, `p30-ui-design-system`, `p31-ui-mock-api`, `p06-workflow-dsl`, `p08-masking`
+- wave: B4-2 (last; runs alone; earlier: B3-3 in s345, B2-3 in s342)
+- dependsOn: `p28b-e2e-flows`, `p28c-leak-matrix`, plus the 30 integration-accepted plans at e24a433 (including `p28-assembly`, `p13-ui-workflows`, `p06-workflow-dsl`, `p08-masking`)
 - writePaths:
   - `impl-plans/active/p29-examples-compose.md`
   - `examples/compose`
@@ -114,6 +114,74 @@ defects found there); no new services; no docker run in tests; no changes to
 - If `main(["--help"])` is parsed for subcommand names, it raises `SystemExit`. Catch it
   with `pytest.raises(SystemExit)` and read `capsys`.
 
+## Run B4 additions (architecture.md section 3, accepted design)
+
+State at e24a433 (checked by the plan author):
+- none of the run B deliverables above are in the tree yet;
+- in root `README.md`, the stale `compose.yaml` path and the "belongs to the assembly
+  plan" sentence are still present;
+- the README has no UI dev/mock/screenshots/serve text, no webhook 401 note, and does not
+  mention `tests/e2e` or `tests/leak`;
+- `docker-compose.yml` has no explicit `TELESCREEN_WEB_DIST` on `bureau` (the Dockerfile
+  sets it as an `ENV`).
+
+Implement them all, plus these two items.
+
+- Writable evidence directory (non-root image):
+  - In `Dockerfile`, after `useradd` and before `USER telescreen`, create
+    `/app/var/evidence` and `chown` it (and `/app/var`) to `telescreen`.
+  - In `docker-compose.yml`, add a top-level named volume `evidence-data`. Mount it as
+    `evidence-data:/app/var/evidence` on `bureau` and `engine`.
+  - `.env.example` keeps `TELESCREEN_EVIDENCE_DIR=/app/var/evidence`.
+  - Why: `src/telescreen/evidence/store.py:LocalFileEvidenceStore.put` runs `mkdir` lazily
+    as uid 10001, and `/app` is owned by root. A named volume copies the image directory's
+    ownership on first use.
+  - Do not mount a bind path, and do not run as root.
+- Example Police fingerprint key:
+  - `examples/police/python/private_db_police.py:main` reads `TELESCREEN_FINGERPRINT_KEY`
+    as raw key bytes. Today the service inherits the Bureau's
+    `file:/run/secrets/fingerprint_key` ref string from `.env`.
+  - In the `example-police` `environment`, add
+    `TELESCREEN_FINGERPRINT_KEY: ${POLICE_FINGERPRINT_KEY}`. Compose `environment`
+    overrides `env_file`.
+  - In `.env.example`, add `POLICE_FINGERPRINT_KEY=replace-me-placeholder` (it passes the
+    existing placeholder rule).
+  - In `examples/compose/README.md`, create `secrets/police_fingerprint_key` with a
+    placeholder `printf`, then
+    `export POLICE_FINGERPRINT_KEY="$(cat secrets/police_fingerprint_key)"`. This is the
+    same pattern as `POLICE_ENROLLMENT_TOKEN`.
+  - Do NOT add it to the compose top-level `secrets:` list, and do NOT reuse the Bureau
+    key: this is the Police's own key.
+  - Do NOT edit `examples/police/**` (accepted p11/p19 output; not in writePaths).
+- New `tests/examples/test_examples.py` tests (same style as
+  `test_compose_stack_parses_with_six_services`; `parse_yaml` and `JsonValue` accessors
+  only; no dict variables). Each entry is situation -> expected outcome:
+  - `bureau` and `engine` `volumes` -> each has an item ending in `:/app/var/evidence`,
+    and the top-level `volumes` names include `evidence-data`;
+  - `Dockerfile` text -> the line containing `/app/var/evidence` and `chown` comes after
+    the `useradd` line and before `USER telescreen`;
+  - `example-police` `environment.TELESCREEN_FINGERPRINT_KEY` -> equals
+    `${POLICE_FINGERPRINT_KEY}`;
+  - `bureau` `environment.TELESCREEN_WEB_DIST` -> equals `/app/web` (run B deliverable).
+  - Also add the run B tests listed above: the `bun install --frozen-lockfile` and
+    `/app/web` Dockerfile checks; no `VITE_TELESCREEN_MOCK` under `examples/compose`;
+    CLI subcommands exist; the `.env.example` `file:/run/secrets/<name>` consistency
+    check; `workflow validate` exits 0 for all 4 workflow examples.
+- Invariants:
+  - the six services are unchanged;
+  - webhook secrets stay unset on active `.env.example` lines;
+  - every `*_KEY`, `*_TOKEN`, `*_SECRET` and `*_PASSWORD` value is a ref or a placeholder;
+  - `find_leaks` is empty for every example file;
+  - no file outside writePaths changes.
+- Full-suite pitfall:
+  - `tests/workflow/mapreduce/test_mapreduce.py::test_dispatch_caps_ten_thousand_shards_at_thirty_two`
+    takes about 40 s and is load-sensitive.
+  - If the whole-repository pytest fails ONLY on it, rerun it alone. Then rerun the full
+    suite with no other heavy process.
+  - Only the final passing full run is a verification entry. Earlier attempts go in the
+    Progress Log (conventions 7a).
+  - Never edit map-reduce code or that test.
+
 ## Run B Verification (final gates; all must pass)
 
 ```bash
@@ -129,7 +197,8 @@ uv build --out-dir /tmp/telescreen-p29-final-dist 2>&1 | tee /tmp/telescreen-p29
 (cd src/web && bun run screenshots) 2>&1 | tee /tmp/telescreen-p29-screenshots.log; echo "exit=$?"
 ls tmp/ui-screenshots/*.png | wc -l    # 28 (13 pages x 2 themes + mobile issues x 2)
 uv run --frozen telescreen workflow validate examples/workflows/github-credential-leak.yaml examples/workflows/slack-pii.yaml examples/workflows/gdrive-mynumber-sheet.yaml examples/workflows/drive-weekly-sweep.yaml 2>&1 | tee /tmp/telescreen-p29-workflow-validate.log; echo "exit=$?"
-test -z "$(git status --porcelain -- design-docs)"; echo "exit=$?"   # design-docs untouched (all committed at cdf195d; empty output expected)
+test -z "$(git status --porcelain -- design-docs)"; echo "exit=$?"   # design-docs untouched (the run B4 architecture.md section 3 edit is committed in the run checkpoint before dispatch; empty output expected)
+uv run --frozen pytest -p no:cacheprovider tests/examples 2>&1 | tee /tmp/telescreen-p29-final-examples.log; echo "exit=$?"   # includes the run B and run B4 tests
 command -v docker && docker compose -f examples/compose/docker-compose.yml --env-file examples/compose/.env.example config > /tmp/telescreen-p29-compose-config.log 2>&1; echo "exit=$?"
 ```
 
@@ -144,8 +213,9 @@ TopBar render (no unstyled page, no raw-looking value).
 
 - [ ] Compose files reconciled; new `tests/examples` assertions pass (including `workflow validate` exit 0 for all four workflow examples and the `.env.example` active `file:/run/secrets/<name>` -> compose `secrets.<name>` consistency check); webhook secrets stay unset on active `.env.example` lines
 - [ ] Root README documents setup, architecture, UI (dev, mock, screenshots), serve and compose
+- [ ] Run B4 additions delivered: evidence-data volume on bureau and engine with a non-root-owned `/app/var/evidence`; example-police `TELESCREEN_FINGERPRINT_KEY: ${POLICE_FINGERPRINT_KEY}` with the placeholder and README steps; their tests pass
 - [ ] All final gates above pass (or the browser/docker gaps are recorded explicitly)
-- [ ] Progress Log updated
+- [ ] Progress Log updated (Run B4 session: hashes before and after, final passing commands only)
 
 ## Run A Intent and Deliverables (accepted history)
 

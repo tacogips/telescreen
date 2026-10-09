@@ -3,15 +3,15 @@
 **Status**: In Progress
 **Design Reference**: design-docs/specs/architecture.md section 8 (Run B2) and 9, design-docs/specs/design-collectors-and-ingestion.md (Per-kind behavior, Push ingestion API, Full sweeps, Assembly bindings), design-docs/specs/design-workflow-engine.md, design-docs/specs/design-map-reduce-sweeps.md, design-docs/specs/design-police-contract.md
 **Created**: 2026-10-09 (run B2, session 342; split out of p28-assembly)
-**Last Updated**: 2026-10-10
+**Last Updated**: 2026-10-10 (run B4)
 
 ## Plan Metadata
 
 - planId: `p28b-e2e-flows`
 - planPath: `impl-plans/active/p28b-e2e-flows.md`
-- wave: B3-2 in the s345 manifest (B2-2 in s342; parallel with `p28c-leak-matrix`; no shared files)
-- dependsOn: `p28-assembly` (collector registry and webhook secrets bound), plus the 29
-  accepted plans at cdf195d
+- wave: B4-1 (parallel with `p28c-leak-matrix`; no shared files; earlier: B3-2 in s345, B2-2 in s342)
+- dependsOn: the 30 integration-accepted plans at e24a433 (p01-p27, p30, p31,
+  p28-assembly); no dependency on `p28c-leak-matrix`
 - writePaths:
   - `impl-plans/active/p28b-e2e-flows.md`
   - `tests/e2e/harness.py`
@@ -23,6 +23,57 @@
 - artifactRoots: none
 
 Read `impl-plans/conventions.md` first (sections 2, 3, 6, 7, 7a, 8).
+
+## Run B4 Work (verify, fill gaps, report)
+
+The code is in the tree. Owner commit e24a433 fixed the two product bugs behind the
+earlier p24 Reconciliation request: `telescreen.workflow.recipients` passes recipient
+references, and wiring registers `EvidenceUploadExecutor`. The owner then reported the
+full suite at 385 passed, 4 skipped. That Reconciliation request is RESOLVED. Do not repeat it.
+
+1. Fresh-read the five owned test files and record their SHA-256 before any edit.
+2. Conformance check. Confirm that each item below is asserted in the named file. Add
+   ONLY the missing assertions; do not rewrite passing tests.
+   - `test_flow_github_remediation.py`:
+     - after the signed push: exactly one github issue, plus a run for it;
+     - `rescan`, `verify_credential` and `live_check` succeeded;
+     - after PT4H plus 1 minute: escalation to `team:secops-tier2`, and a Slack body
+       with `find_leaks == ()`;
+     - completing the task before any accepted upload -> 409 `evidence_required`;
+     - a raw upload -> 422, with no file under `<tmp>/evidence`;
+     - `github_admin_review` opens;
+     - police `failed` -> a `send_back` transition to `dev_remediation`;
+     - police `passed` -> run `succeeded` and the end step `completed`;
+     - history is non-empty and the audit chain is valid;
+     - no unknown host was called, and `find_leaks` is empty over every outbound body and
+       every API response.
+   - `test_flow_sweep.py`:
+     - success: the job `succeeded` and the issue auto-resolves;
+     - failure: the job ends `partial` and the issue stays open;
+     - a second sweep -> 409 `conflict`.
+     - Accepted correction: the sweep has one root partition plus three shard items, not
+       three root partitions.
+   - `test_flow_ingest.py`:
+     - scan -> masked issue;
+     - raw findings -> 422 `raw_value_detected` with no echo;
+     - `custom:nope` -> 404 `unknown_source`;
+     - the config endpoint returns the selector.
+   - `test_flow_chat.py`:
+     - the tool step ran against the DB (count 2 in the second Anthropic request);
+     - the answer is returned;
+     - no raw sample appears in any Anthropic body.
+3. If a newly added assertion fails because of product behavior, do not edit `src/**`.
+   Write a Reconciliation request naming the owning plan and file, and report the plan
+   as blocked.
+4. Run the Verification block below on the final source.
+5. Tick the remaining checkboxes. Add a Progress Log session "Run B4" that contains:
+   - an "Owner resolution" line: the p24 request was resolved by e24a433, and the
+     earlier exit-1 aggregates are superseded history;
+   - the before and after hashes;
+   - only the final passing commands with their log paths.
+6. No whole-repository `pytest` here. p29 runs it alone as its final gate, because
+   `tests/workflow/mapreduce/test_mapreduce.py::test_dispatch_caps_ten_thousand_shards_at_thirty_two`
+   is throughput-sensitive while wave-1 workers run in parallel.
 
 ## Intent and Context
 
@@ -260,7 +311,6 @@ uv run --frozen ruff format --check --no-cache tests/e2e 2>&1 | tee /tmp/telescr
 uv run --frozen ruff check --no-cache tests/e2e 2>&1 | tee /tmp/telescreen-p28b-e2e-flows-ruff.log; echo "exit=$?"
 uv run --frozen ty check tests/e2e 2>&1 | tee /tmp/telescreen-p28b-e2e-flows-ty.log; echo "exit=$?"
 uv run --frozen python tools/typelint.py > /tmp/telescreen-p28b-e2e-flows-typelint.log 2>&1; ! grep -E '^tests/e2e/(harness|test_flow_)' /tmp/telescreen-p28b-e2e-flows-typelint.log; echo "exit=$?"
-uv run --frozen pytest -p no:cacheprovider 2>&1 | tee /tmp/telescreen-p28b-e2e-flows-pytest-all.log; echo "exit=$?"
 test -z "$(find tests/e2e -name '*.py' -exec wc -l {} + | awk '$1 >= 1000 && $2 != "total"')"; echo "exit=$?"
 ! grep -rnE 'AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|xox[abp]-' tests/e2e; echo "exit=$?"
 test "$(grep -c '^- \[ \]' impl-plans/active/p28b-e2e-flows.md)" -eq 0; echo "exit=$?"
@@ -269,9 +319,10 @@ test "$(grep -c '^- \[ \]' impl-plans/active/p28b-e2e-flows.md)" -eq 0; echo "ex
 Evidence required:
 
 - every command exits 0;
-- the `tests/e2e` run shows the four new test files passed (at least 6 tests: 1
+- the `tests/e2e` run shows the four flow files passed (at least 6 tests: 1
   remediation, 2 sweep scenarios + conflict, ingest, chat) with 0 failed and 0 skipped;
-- the full pytest run shows 0 failed.
+  the run B4 baseline is 16 passed for the whole `tests/e2e` directory;
+- the whole-repository pytest is p29's final gate (run B4 step 6), not this plan's.
 
 ## Completion Criteria
 
@@ -281,7 +332,9 @@ Evidence required:
 - [x] Push ingestion flow passes (scan -> issue; raw findings -> 422; unknown source -> 404)
 - [x] Chat flow passes (tool executed against the DB; no raw value forwarded)
 - [ ] Verification passes on the final source (logs recorded); Reconciliation requests (if any) listed
+- [ ] Run B4 conformance check done (every item in "Run B4 Work" step 2 asserted; gaps filled only in owned files)
 - [x] Progress Log updated
+- [ ] Run B4 Progress Log session with the Owner resolution line, hashes and final passing commands only
 
 ## Progress Log
 

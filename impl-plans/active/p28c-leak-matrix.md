@@ -3,15 +3,15 @@
 **Status**: In Progress
 **Design Reference**: design-docs/specs/design-masking.md (Leak test matrix, including the run B2 paragraph on the traces sink and the harness seams), design-docs/specs/architecture.md sections 7, 8 (Run B2), 9, design-docs/specs/design-ui-sentry.md 8.3 (fixture leak check)
 **Created**: 2026-10-09 (run B2, session 342; split out of p28-assembly)
-**Last Updated**: 2026-10-09
+**Last Updated**: 2026-10-10 (run B4)
 
 ## Plan Metadata
 
 - planId: `p28c-leak-matrix`
 - planPath: `impl-plans/active/p28c-leak-matrix.md`
-- wave: B3-2 in the s345 manifest (B2-2 in s342; parallel with `p28b-e2e-flows`; no shared files)
-- dependsOn: `p28-assembly` (collector registry and webhook secrets bound), plus the 29
-  accepted plans at cdf195d
+- wave: B4-1 (parallel with `p28b-e2e-flows`; no shared files; earlier: B3-2 in s345, B2-2 in s342)
+- dependsOn: the 30 integration-accepted plans at e24a433 (p01-p27, p30, p31,
+  p28-assembly); no dependency on `p28b-e2e-flows`
 - writePaths:
   - `impl-plans/active/p28c-leak-matrix.md`
   - `tests/leak` (directory; includes the existing `tests/leak/test_ui_fixtures.py`)
@@ -19,6 +19,43 @@
 - artifactRoots: none
 
 Read `impl-plans/conventions.md` first (sections 2, 3, 6, 7, 7a, 8).
+
+## Run B4 Work (verify, fill gaps, report)
+
+The code is in the tree. The earlier Reconciliation request against p28b, for the
+GitHub remediation test, is RESOLVED: owner commit e24a433 added
+`telescreen.workflow.recipients` and registered `EvidenceUploadExecutor`. The owner then
+reported the full suite at 385 passed, 4 skipped. Do not repeat that request.
+
+1. Fresh-read every file under `tests/leak` and record its SHA-256 before any edit.
+2. Conformance check. Add ONLY what is missing; do not rewrite passing code.
+   - `flows.py` performs all 11 flows in the order of section "Flows".
+   - `test_leak_matrix.py` runs them, then checks every sink in section "Sinks".
+   - The DB sink covers both worlds.
+   - The non-empty guards from section "Tests" are asserted: at least 1 DB text, 1 log
+     line, 1 search document, 1 Slack request, 1 Anthropic request, 1 evidence file and
+     20 API responses, plus `Uncaught exception` in `log_buffer`.
+   - Every issue has `times_seen >= 1`.
+   - Every assertion message is the sink label only.
+   - The three focused tests exist and pass:
+     - `test_image_metadata_is_stripped_before_storage`;
+     - `test_scanner_unavailable_returns_503_and_stores_nothing`;
+     - `test_raw_findings_push_is_rejected_without_echo`.
+   - `test_ui_fixtures.py` is unchanged (SHA-256 `2bd5e05a...`, see Progress Log).
+3. A real leak, or a newly added check that fails because of product behavior, becomes
+   a Reconciliation request naming the owning plan and file. Never edit `src/**` or
+   `tests/e2e/**`.
+4. If any file under `tests/leak` changes, repeat the mutation sanity check. Record it in
+   the Progress Log only, never as a verification entry.
+5. Run the Verification block below on the final source.
+6. Tick the remaining checkboxes. Add a Progress Log session "Run B4" that contains:
+   - an "Owner resolution" line: the p28b request was resolved by e24a433, and the
+     earlier exit-1 aggregates are superseded history;
+   - the hashes;
+   - only the final passing commands with their log paths.
+7. No whole-repository `pytest` here. p29 runs it alone as its final gate, because the
+   10,000-shard map-reduce test is throughput-sensitive while wave-1 workers run in
+   parallel.
 
 ## Intent and Context
 
@@ -225,7 +262,6 @@ uv run --frozen ruff format --check --no-cache tests/leak 2>&1 | tee /tmp/telesc
 uv run --frozen ruff check --no-cache tests/leak 2>&1 | tee /tmp/telescreen-p28c-leak-matrix-ruff.log; echo "exit=$?"
 uv run --frozen ty check tests/leak 2>&1 | tee /tmp/telescreen-p28c-leak-matrix-ty.log; echo "exit=$?"
 uv run --frozen python tools/typelint.py > /tmp/telescreen-p28c-leak-matrix-typelint.log 2>&1; ! grep -E '^tests/leak/' /tmp/telescreen-p28c-leak-matrix-typelint.log; echo "exit=$?"
-uv run --frozen pytest -p no:cacheprovider 2>&1 | tee /tmp/telescreen-p28c-leak-matrix-pytest-all.log; echo "exit=$?"
 test -z "$(find tests/leak -name '*.py' -exec wc -l {} + | awk '$1 >= 1000 && $2 != "total"')"; echo "exit=$?"
 ! grep -rnE 'AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|xox[abp]-|BEGIN [A-Z ]*PRIVATE KEY' tests/leak; echo "exit=$?"
 test "$(grep -c '^- \[ \]' impl-plans/active/p28c-leak-matrix.md)" -eq 0; echo "exit=$?"
@@ -235,8 +271,8 @@ Evidence required:
 
 - every command exits 0;
 - the `tests/leak` run shows `test_leak_matrix`, the three focused tests and
-  `test_ui_fixtures` passed, with 0 failed and 0 skipped;
-- the full pytest run shows 0 failed.
+  `test_ui_fixtures` passed, with 0 failed and 0 skipped (run B4 baseline: 5 passed);
+- the whole-repository pytest is p29's final gate (run B4 step 7), not this plan's.
 
 Mutation sanity (record in the Progress Log only, never as a verification entry,
 conventions 7a):
@@ -252,7 +288,9 @@ conventions 7a):
 - [x] Focused image-strip, scanner-unavailable and raw-findings tests pass; `test_ui_fixtures.py` still passes
 - [x] Mutation sanity recorded in the Progress Log
 - [ ] Verification passes on the final source (logs recorded); Reconciliation requests (if any) listed
+- [ ] Run B4 conformance check done (every item in "Run B4 Work" step 2 present; gaps filled only under `tests/leak`)
 - [x] Progress Log updated
+- [ ] Run B4 Progress Log session with the Owner resolution line, hashes and final passing commands only
 
 ## Progress Log
 

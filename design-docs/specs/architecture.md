@@ -94,6 +94,13 @@ Deployment and examples (examples-compose plan):
   built UI), `engine` (`telescreen worker`), `example-police` (the SDK pull-mode example).
   `examples/compose/Dockerfile` builds the wheel and the UI (bun) in stages.
   `examples/compose/.env.example` contains placeholders and `env:`/`file:` secret refs only.
+  The runtime image runs as a non-root user, so every path a service writes
+  (`TELESCREEN_EVIDENCE_DIR`, created lazily by `LocalFileEvidenceStore.put`) is created
+  in the image owned by that user and backed by a named volume mounted on `bureau` and
+  `engine`; otherwise the first evidence upload fails with a permission error. The
+  example Police reads `TELESCREEN_FINGERPRINT_KEY` as a raw value (not a ref), so its
+  service overrides it from a host-exported value, as it does for the enrollment token,
+  instead of inheriting the Bureau's `file:` ref string from `.env`.
 - `examples/workflows/`: `github-credential-leak.yaml` (AI verification, first-line triage
   human task with SLA, dev team remediation with evidence upload, GitHub Enterprise admin
   verification of refs/forks/caches, police `verify_remediation`, send-back on failure,
