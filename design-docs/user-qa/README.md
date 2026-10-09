@@ -21,6 +21,10 @@ Store questions, pending decisions, and items awaiting user approval.
 - [qa-evidence-file-types.md](./qa-evidence-file-types.md) - Evidence file types (resolved: text and images; images scanned by vision managed LLM)
 - [qa-llm-data-egress.md](./qa-llm-data-egress.md) - Managed LLM provider and egress (resolved: Claude default, Codex selectable; text detection opt-in)
 
+- [qa-credential-validity-check.md](./qa-credential-validity-check.md) - Provider-side credential validity checks (resolved: rejected)
+- [qa-on-demand-reveal.md](./qa-on-demand-reveal.md) - Live reveal of matched values (resolved: rejected; deep links only)
+- [qa-automated-remediation-scopes.md](./qa-automated-remediation-scopes.md) - Write scopes for automated remediation (resolved: rejected; read-only)
+
 ## Adding New Items
 
 1. Create a new file with appropriate prefix (`qa-` or `pending-`)

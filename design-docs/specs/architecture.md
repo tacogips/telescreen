@@ -349,6 +349,7 @@ gitleaks pre-commit hook does not flag committed sources.
 | `design-docs/specs/design-map-reduce-sweeps.md` | Concurrent map-reduce sweeps: partition/map/reduce, `map` step, Police sweep tasks, quotas |
 | `design-docs/specs/design-synthetic-test-dataset.md` | Approved synthetic test dataset sources, fictitious-value rules, labeled corpus generator (follow-up) |
 | `design-docs/specs/design-ui-sentry.md` | Sentry-based UI: tokens, components, shell, issue list/detail and page patterns, licensing constraints |
+| `design-docs/specs/design-v1-1-dspm-adoption.md` | v1.1 gap analysis against comparable DSPM/DLP systems and adopted features F1-F10 (exposure, placement policies, verified resolution, coverage, owner routing, health, linked occurrences, risk score, exceptions) |
 | `design-docs/specs/design-api-and-ui.md` | REST API, auth, Assistant MCP/chat, evidence API, UI |
 | `design-docs/specs/command.md` | CLI, environment variables, exit codes, dependencies |
 | `design-docs/specs/notes.md` | Engine rationale vs Airflow/n8n/Kestra, riela mapping, tooling notes |
