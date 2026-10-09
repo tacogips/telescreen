@@ -1,6 +1,6 @@
 # P28c Raw-Value Leak Matrix Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress
 **Design Reference**: design-docs/specs/design-masking.md (Leak test matrix, including the run B2 paragraph on the traces sink and the harness seams), design-docs/specs/architecture.md sections 7, 8 (Run B2), 9, design-docs/specs/design-ui-sentry.md 8.3 (fixture leak check)
 **Created**: 2026-10-09 (run B2, session 342; split out of p28-assembly)
 **Last Updated**: 2026-10-09
@@ -247,12 +247,12 @@ conventions 7a):
 
 ## Completion Criteria
 
-- [ ] Harness, image builders, flows and sink collectors delivered under `tests/leak`
-- [ ] All 11 flows run; every sink is non-empty and leak-free in `test_leak_matrix` (the traceback sink is `log_buffer` with `Uncaught exception` after `install_excepthook(world.container.redactor)`)
-- [ ] Focused image-strip, scanner-unavailable and raw-findings tests pass; `test_ui_fixtures.py` still passes
-- [ ] Mutation sanity recorded in the Progress Log
+- [x] Harness, image builders, flows and sink collectors delivered under `tests/leak`
+- [x] All 11 flows run; every sink is non-empty and leak-free in `test_leak_matrix` (the traceback sink is `log_buffer` with `Uncaught exception` after `install_excepthook(world.container.redactor)`)
+- [x] Focused image-strip, scanner-unavailable and raw-findings tests pass; `test_ui_fixtures.py` still passes
+- [x] Mutation sanity recorded in the Progress Log
 - [ ] Verification passes on the final source (logs recorded); Reconciliation requests (if any) listed
-- [ ] Progress Log updated
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -261,3 +261,20 @@ conventions 7a):
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-10 implementation
+**Tasks Completed**: Added the real-container SQLite/MockTransport/FakeClock harness, PNG/JPEG metadata builders, request-driven flows for push ingestion, GitHub webhook scanning, issue/search/audit reads, Slack workflow notification, text/image evidence, scanner-unavailable response, Police claim/raw rejection/clean acceptance, chat tool then answer, and forced API/exception paths; added DB/log/search/outbound/evidence/API/traceback/stderr sink readers and the issue `times_seen` guard. Existing UI fixture test unchanged.
+**Tasks In Progress**: Full repository verification must be clean on the stable combined tree.
+**Blockers**: None; the required full-suite command ran on the moving shared tree and has one p28b-owned failure described in the reconciliation request below.
+**Reconciliation requests**: p28b-e2e-flows, `tests/e2e/test_flow_github_remediation.py::test_github_remediation_escalates_rejects_evidence_and_rechecks`: the full pytest run (log `/tmp/telescreen-p28c-leak-matrix-pytest-all.log`, exit 1) reports the expected human task list is empty after the run reaches `first_line_triage`; p28c has no write ownership for `tests/e2e/**`. Please correct/verify the p28b GitHub remediation flow and rerun the whole-repository suite. Earlier run in the moving tree also observed `tests/e2e/test_flow_sweep.py` partitioning failures, but the source-matched rerun passed both sweep tests.
+**Hashes**: `tests/leak/harness.py` before=absent after=cb45ea79243d45857d7151c489a4183d98e10065f9d90ac943ba8011396c3544; `tests/leak/images.py` before=absent after=d2919a9310ea230d508adaeac3cb358227ebfc7fe01aa0f82849bcc2b73c5598; `tests/leak/flows.py` before=absent after=971d6855675051d0a9efd0387a9b6646d1c131a8ab5828ce12e30509dce7b15f; `tests/leak/sinks.py` before=absent after=c4551b9cc90f269c1c663c95050b2311d04aba2b48f794f0718f908ac41da0e5; `tests/leak/test_leak_matrix.py` before=absent after=756e06f2f7adf2a003087a1bf6323a672d7255d4b8a45d6acd8a354ae9f0e6b8; `tests/leak/test_ui_fixtures.py` unchanged=2bd5e05a79396651a8129873acd8378f6c3cdfd9fd442191a43e17f77ce7f5e5; this plan before=b236331992c4885ad38868e91d9318fba39f313f35832ee0f9d9b4bd113863a5, final SHA-256 recorded at `tmp/telescreen-v1-20261010-s345/p28c-leak-matrix/plan-final-sha256.txt`.
+**Verification**: `uv run --frozen pytest -p no:cacheprovider tests/leak` -> exit 0, 5 passed (log `/tmp/telescreen-p28c-leak-matrix-pytest.log`); `uv run --frozen ruff format --check --no-cache tests/leak` -> exit 0 (log `/tmp/telescreen-p28c-leak-matrix-format.log`); `uv run --frozen ruff check --no-cache tests/leak` -> exit 0 (log `/tmp/telescreen-p28c-leak-matrix-ruff.log`); `uv run --frozen ty check tests/leak` -> exit 0 (log `/tmp/telescreen-p28c-leak-matrix-ty.log`); `uv run --frozen python tools/typelint.py` and p28c path filter -> exit 0, no p28c violations (log `/tmp/telescreen-p28c-leak-matrix-typelint.log`); Python line limit and forbidden-literal guards -> exit 0 (logs `/tmp/telescreen-p28c-leak-matrix-line-limit.log`, `/tmp/telescreen-p28c-leak-matrix-sample-literals.log`). Whole repository `uv run --frozen pytest -p no:cacheprovider` -> exit 1, 381 passed, 4 expected offline skips, 1 p28b-owned failure (log `/tmp/telescreen-p28c-leak-matrix-pytest-all.log`).
+**Notes**: Mutation sanity temporarily appended `all_samples()[0].value` to the outbound sink and `test_leak_matrix` failed at the `mutation:outbound` label (exit 1; log `/tmp/telescreen-p28c-leak-mutation-sanity.log`); the mutation was removed, then the final scoped suite passed. Superseded import/flow debugging runs were recorded in `/tmp/telescreen-p28c-initial-pytest.log`, `/tmp/telescreen-p28c-initial2-pytest.log`, `/tmp/telescreen-p28c-initial3-pytest.log`, `/tmp/telescreen-p28c-initial4-pytest.log`, `/tmp/telescreen-p28c-initial5-pytest.log`, `/tmp/telescreen-p28c-debug6-pytest.log`, `/tmp/telescreen-p28c-debug7-pytest.log`, `/tmp/telescreen-p28c-debug8-pytest.log`, `/tmp/telescreen-p28c-debug9-pytest.log`, `/tmp/telescreen-p28c-debug10-pytest.log`, `/tmp/telescreen-p28c-debug11-pytest.log`, `/tmp/telescreen-p28c-debug12-pytest.log`, `/tmp/telescreen-p28c-debug13-pytest.log`, `/tmp/telescreen-p28c-debug14-pytest.log`, `/tmp/telescreen-p28c-debug15-pytest.log`, and `/tmp/telescreen-p28c-debug16-pytest.log`; the source-matched final focused run supersedes those diagnostics.
+
+### Session: 2026-10-10 continuation 2
+**Tasks Completed**: Re-ran the full repository pytest command after the p28b E2E files appeared in the shared tree; p28c leak matrix and the UI fixture passed as part of the aggregate.
+**Tasks In Progress**: Full repository verification must pass on the final combined tree.
+**Blockers**: None within p28c writePaths. The required aggregate remains failed by a test owned by p28b; p28c cannot edit `tests/e2e/**` under its accepted writePaths.
+**Reconciliation requests**: p28b-e2e-flows, `tests/e2e/test_flow_github_remediation.py::test_github_remediation_escalates_rejects_evidence_and_rechecks`: rerun still exits 1 because the expected human-task list is empty after `first_line_triage` becomes ready. Full log: `/tmp/telescreen-p28c-leak-matrix-pytest-all-rerun.log` (exit 1; 381 passed, 4 expected offline skips, 1 failed). Correct and rerun the p28b flow, then rerun the whole-repository suite. Earlier sweep failures are resolved in this rerun; all three sweep tests passed.
+**Verification**: The aggregate command `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider` -> exit 1, 381 passed, 4 expected offline skips, 1 p28b-owned failure (complete log `/tmp/telescreen-p28c-leak-matrix-pytest-all-rerun.log`). The p28c matrix and UI fixture passed in this aggregate; prior scoped p28c gates remain source-identical.
+**Notes**: This rerun supersedes the previous aggregate attempt only for current shared-tree status; both nonzero attempts remain recorded for traceability.

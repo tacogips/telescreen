@@ -17,7 +17,7 @@ from telescreen.core.vocabulary import (
 )
 from telescreen.db.models import EscalationPolicyRow, HumanTaskRow, WorkflowRunRow
 from telescreen.ports.audit import AuditEntry, AuditLog
-from telescreen.ports.directory import RecipientResolver, ResolvedRecipients
+from telescreen.ports.directory import RecipientResolver
 from telescreen.ports.issues import IssueHistoryEntry, IssueRecorder
 from telescreen.ports.notifications import NotificationRequest, NotificationSender
 from telescreen.ports.workflow import ClaimedTask, TaskResult, TaskSpec
@@ -28,6 +28,7 @@ from telescreen.workflow.dsl.escalation import (
 )
 from telescreen.workflow.engine.repository import WorkflowRepository
 from telescreen.workflow.queue.sql_queue import SqlTaskQueue
+from telescreen.workflow.recipients import ReachableRef, reachable_refs, refs_for_channel
 
 
 @dataclass
@@ -109,28 +110,20 @@ class SlaCheckHandler:
         refs: tuple[str, ...],
         channels: tuple[NotificationChannel, ...],
     ) -> None:
-        """Resolve tier recipients and enqueue DLP-gated channel notifications."""
-        resolved: list[tuple[str, ResolvedRecipients]] = [
-            (ref, await self.resolver.resolve(session, ref)) for ref in refs
-        ]
+        """Enqueue DLP-gated tier notifications by recipient reference per channel.
+
+        References are passed through unresolved (the sender resolves them at delivery);
+        unknown recipients are skipped so the escalation itself still completes.
+        """
+        reachable: tuple[ReachableRef, ...] = await reachable_refs(self.resolver, session, refs)
         for channel in channels:
-            targets: list[str] = []
-            for _, recipient in resolved:
-                if channel is NotificationChannel.EMAIL:
-                    targets.extend(recipient.emails)
-                else:
-                    targets.extend(recipient.slack_channels)
-                    targets.extend(recipient.slack_user_ids)
-            if targets:
-                unique_targets: list[str] = []
-                for target in targets:
-                    if target not in unique_targets:
-                        unique_targets.append(target)
+            channel_refs: tuple[str, ...] = refs_for_channel(reachable, channel)
+            if channel_refs:
                 await self.notifications.send(
                     session,
                     NotificationRequest(
                         channel,
-                        tuple(unique_targets),
+                        channel_refs,
                         "Workflow task escalated",
                         human_task.title,
                         "system:workflow",

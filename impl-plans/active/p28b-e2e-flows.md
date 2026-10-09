@@ -1,9 +1,9 @@
 # P28b End-to-End Flows (GitHub Remediation, Sweep, Push Ingestion, Chat) Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress
 **Design Reference**: design-docs/specs/architecture.md section 8 (Run B2) and 9, design-docs/specs/design-collectors-and-ingestion.md (Per-kind behavior, Push ingestion API, Full sweeps, Assembly bindings), design-docs/specs/design-workflow-engine.md, design-docs/specs/design-map-reduce-sweeps.md, design-docs/specs/design-police-contract.md
 **Created**: 2026-10-09 (run B2, session 342; split out of p28-assembly)
-**Last Updated**: 2026-10-09
+**Last Updated**: 2026-10-10
 
 ## Plan Metadata
 
@@ -275,13 +275,13 @@ Evidence required:
 
 ## Completion Criteria
 
-- [ ] `tests/e2e/harness.py` delivered (PairEnv, OutboundRecorder, E2EWorld, make_world, drain)
+- [x] `tests/e2e/harness.py` delivered (PairEnv, OutboundRecorder, E2EWorld, make_world, drain)
 - [ ] GitHub remediation flow passes end to end (escalation, masked Slack, evidence reject/accept, send-back, police pass, run succeeded, audit valid)
-- [ ] Sweep flow passes (succeeded with auto-resolve; partial without reconciliation; 409 conflict)
-- [ ] Push ingestion flow passes (scan -> issue; raw findings -> 422; unknown source -> 404)
-- [ ] Chat flow passes (tool executed against the DB; no raw value forwarded)
+- [x] Sweep flow passes (succeeded with auto-resolve; partial without reconciliation; 409 conflict)
+- [x] Push ingestion flow passes (scan -> issue; raw findings -> 422; unknown source -> 404)
+- [x] Chat flow passes (tool executed against the DB; no raw value forwarded)
 - [ ] Verification passes on the final source (logs recorded); Reconciliation requests (if any) listed
-- [ ] Progress Log updated
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -290,3 +290,13 @@ Evidence required:
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-10 Step 6 implementation
+**Tasks Completed**: Added the shared SQLite/ASGI E2E harness and four flow test files. Sweep success verifies one completed root partition and three succeeded repository shards, automatic issue resolution and HTTP 409 on a concurrent start; the partial sweep preserves the unresolved issue. Push ingestion verifies masked issue output, rejection of raw pushed findings, and unknown-source handling. Chat verifies the DB-backed count tool and masked provider traffic.
+**Tasks In Progress**: GitHub remediation reaches the `first_line_triage` step but does not create its human task; final behavioral verification remains incomplete.
+**Blockers**: No dependency admission blocker. One required flow is unresolved pending the p24-owned workflow-engine repair described below.
+**Reconciliation requests**: `p24-workflow-engine` (accepted dependency; files outside this plan's writePaths): the GitHub remediation E2E produces `first_line_triage` with status `ready`, but its `advance_step` queue task retries three times and remains ready at `2026-10-01T00:01:10`; `/api/human-tasks?status=open` returns an empty list. With pytest log capture enabled, `EngineWorker` reports three `advance_step` failures. See `/tmp/telescreen-p28b-remediation-errors.log` and `/tmp/telescreen-p28b-e2e-flows-pytest.log`. Repair and resume criterion: fix the p24-owned advance/human-task execution failure, then rerun the full p28b Verification block and confirm the task opens, SLA escalation, evidence reject/accept, police send-back/pass, successful run, and valid audit chain.
+**Verification**: Final E2E suite -> exit 1, 16 passed, 1 failed (remediation only), log `/tmp/telescreen-p28b-e2e-flows-pytest-final.log`; final full suite -> exit 1, 381 passed, 4 expected offline integration skips, 1 failed (same remediation test), log `/tmp/telescreen-p28b-e2e-flows-pytest-all-final.log`. Format check -> exit 0, 9 files formatted, `/tmp/telescreen-p28b-e2e-flows-format-final.log`; Ruff -> exit 0, `/tmp/telescreen-p28b-e2e-flows-ruff-final.log`; ty -> exit 0, `/tmp/telescreen-p28b-e2e-flows-ty-final.log`; filtered typelint -> exit 0 with no p28b diagnostics, `/tmp/telescreen-p28b-e2e-flows-typelint-final.log`; Python line-limit and raw-token-pattern guards -> exit 0. Do not treat either failed aggregate as a passing gate.
+**Hashes**: The `before:step6-implement` immutable snapshot records the five test/support source paths as missing; it records the plan SHA-256 as `ff5a0f83d2a3ca416f11af74e40a6f9dc8ceb9be70c948623b3ac33606637bf8`. Final source SHA-256: `tests/e2e/harness.py` `63b1c0fb64f9d69961301e02707c96d051c85f3ccfd4201b39cd6285f023b0b7`; `tests/e2e/test_flow_github_remediation.py` `5ffaf3dc1c4b0232e657cae24dde22b6eda639e5bb81042a39c35eee65da3dbb`; `tests/e2e/test_flow_sweep.py` `5a651597b142f54b08881083f49f970821aa17bdc4af9539e4726d6e57474217`; `tests/e2e/test_flow_ingest.py` `7a37df5985ae264c93bbf4f106c9813bf209ed1afad48e008591f1b6724caa73`; `tests/e2e/test_flow_chat.py` `6518067165b01a280de24b0b9cf3cfa4ba252099f5fcb7fdb96e663527321832`. Plan's final hash is captured in the Step 6 result.
+**Notes**: Dependency readiness used the runtime-owned acceptedPlanIds list, which includes `p28-assembly`. Changed test files are only the declared p28b write paths. The four newly added flow files contribute 7 tests; 6 pass and the remediation test remains unresolved. No source changes were made outside the assigned test paths. Workflow mode `issue-resolution`; issue reference: `workflowInput` (no GitHub issue), Telescreen v1 final run B3, `opus-luna-design-and-implement-review-loop-session-345`; dispatch `comm-005811`, intake `comm-005812`, design accepted `comm-005814`, plans accepted `comm-005816`. Read-only codex-agent reference: `/root/p28b_api_survey`.
+**Prior Attempts**: The sweep mock path matcher and response assertions were corrected; an intermediate run with the serialized SQLite worker reached success but exposed the plan's mistaken expectation of three root partitions instead of one root plus three shard items. The final E2E run passes all three sweep tests. The first format/Ruff check found one overlong sweep diagnostic line; it was reflowed and both final gates pass. Intermediate logs: `/tmp/telescreen-p28b-sweep-diag.log`, `/tmp/telescreen-p28b-sweep-concurrency-01.log`, `/tmp/telescreen-p28b-sweep-concurrency-02.log`. These are superseded by the final-source verification above; the remediation failure remains current.

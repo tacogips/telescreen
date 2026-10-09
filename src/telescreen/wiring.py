@@ -109,7 +109,7 @@ from telescreen.workflow.executors.flow import (
     SubWorkflowExecutor,
     WaitExecutor,
 )
-from telescreen.workflow.executors.human import HumanTaskExecutor
+from telescreen.workflow.executors.human import EvidenceUploadExecutor, HumanTaskExecutor
 from telescreen.workflow.executors.map import MapExecutor
 from telescreen.workflow.executors.notify import NotifyExecutor
 from telescreen.workflow.executors.police_verify import PoliceVerifyExecutor
@@ -360,6 +360,11 @@ def build_container(
         executors.register(flow_executor)
     executors.register(
         HumanTaskExecutor(
+            notification_service, queue, resolver, primitives.clock, primitives.redactor
+        )
+    )
+    executors.register(
+        EvidenceUploadExecutor(
             notification_service, queue, resolver, primitives.clock, primitives.redactor
         )
     )

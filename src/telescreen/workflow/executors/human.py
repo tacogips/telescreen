@@ -18,12 +18,13 @@ from telescreen.core.vocabulary import (
 )
 from telescreen.db.models import EscalationPolicyRow, HumanTaskRow
 from telescreen.masking.redact import Redactor
-from telescreen.ports.directory import RecipientResolver, ResolvedRecipients
+from telescreen.ports.directory import RecipientResolver
 from telescreen.ports.notifications import NotificationRequest, NotificationSender
 from telescreen.ports.workflow import StepSignal, StepSignalKind, TaskSpec
 from telescreen.workflow.dsl.model import EvidenceUploadStep, HumanTaskStep, NamedRoute
 from telescreen.workflow.dsl.templates import render
 from telescreen.workflow.queue.sql_queue import SqlTaskQueue
+from telescreen.workflow.recipients import ReachableRef, reachable_refs, refs_for_channel
 from telescreen.workflow.step_api import StepContext, StepOutcome, WaitKind
 
 
@@ -125,35 +126,30 @@ class HumanTaskExecutor:
         )
 
     async def _notify(self, ctx: StepContext, task_id: str, assignee: str, title: str) -> None:
-        """Queue email and Slack notifications using resolved contacts."""
-        recipients: ResolvedRecipients = await self.resolver.resolve(ctx.session, assignee)
-        if recipients.emails:
-            await self.notifications.send(
-                ctx.session,
-                NotificationRequest(
-                    NotificationChannel.EMAIL,
-                    recipients.emails,
-                    "Workflow task assigned",
-                    title,
-                    "system:workflow",
-                    ctx.run_id,
-                    ctx.issue_id,
-                ),
-            )
-        slack_targets: tuple[str, ...] = recipients.slack_channels + recipients.slack_user_ids
-        if slack_targets:
-            await self.notifications.send(
-                ctx.session,
-                NotificationRequest(
-                    NotificationChannel.SLACK,
-                    slack_targets,
-                    "Workflow task assigned",
-                    title,
-                    "system:workflow",
-                    ctx.run_id,
-                    ctx.issue_id,
-                ),
-            )
+        """Queue assignee notifications by recipient reference on every reachable channel.
+
+        The sender resolves references at delivery time, so the assignee reference itself is
+        sent. An unknown assignee is skipped so the human task still opens.
+        """
+        del task_id
+        reachable: tuple[ReachableRef, ...] = await reachable_refs(
+            self.resolver, ctx.session, (assignee,)
+        )
+        for channel in (NotificationChannel.EMAIL, NotificationChannel.SLACK):
+            refs: tuple[str, ...] = refs_for_channel(reachable, channel)
+            if refs:
+                await self.notifications.send(
+                    ctx.session,
+                    NotificationRequest(
+                        channel,
+                        refs,
+                        "Workflow task assigned",
+                        title,
+                        "system:workflow",
+                        ctx.run_id,
+                        ctx.issue_id,
+                    ),
+                )
 
 
 @dataclass
