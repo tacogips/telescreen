@@ -189,6 +189,39 @@ collectors-core owns `src/telescreen/collectors/sweep.py`:
   terminal (`conflict`, 409 at the API). This is safe for reconciliation even when sweeps
   overlap, because the watermark is per job.
 
+### Assembly bindings (`telescreen.wiring`, run B2)
+
+`build_container` registers every built-in kind in the `CollectorRegistry`, each with its
+`SweepCapable` implementation: `slack` (`SlackAdapter`, `SlackSweep`), `gdrive`, `gdocs`
+and `gsheets` (`build_google_adapters`, one `GoogleSweep` per kind) and `github`
+(`GitHubAdapter`, `GitHubSweep`). `police` and `custom` are not registry adapters.
+
+- Registration is unconditional. A deployment that never configures Slack or Google still
+  starts; the adapters exist but fail at use.
+- API credentials are resolved lazily inside each adapter's `api_factory(config)`: the
+  config's `credential_ref` when set, else the global kind setting
+  (`TELESCREEN_SLACK_BOT_TOKEN`, `TELESCREEN_GOOGLE_SERVICE_ACCOUNT`; GitHub has no global
+  token). A missing or unresolvable credential raises `ConfigError` inside the scan or
+  sweep task. The task fails with the masked error code and never echoes the reference
+  target or value.
+- Webhook secrets (`WebhookSecrets`) are resolved once at build time with `resolve_secret`:
+  slack from `TELESCREEN_SLACK_SIGNING_SECRET`, github from
+  `TELESCREEN_GITHUB_WEBHOOK_SECRET`. An unset variable leaves that secret `None`, and
+  the adapter then answers every event `invalid` (fail closed, 401). A variable that is set
+  but does not resolve raises `ConfigError` at startup (exit 3).
+- The Drive channel token key is
+  `HMAC-SHA256(fingerprint_key, "telescreen:gdrive-channel-token:v1")`. The same bytes go to
+  `build_google_adapters` (watch creation) and to `WebhookSecrets.gdrive`
+  (verification), so a channel created by `collector run --watch` always verifies after
+  a restart. No new setting is introduced.
+- Other inputs come from existing settings: GitHub host from `TELESCREEN_GITHUB_API_URL`;
+  size limit `TELESCREEN_SCAN_MAX_BYTES`; Drive shard size `TELESCREEN_SWEEP_SHARD_SIZE`;
+  `TELESCREEN_PUBLIC_BASE_URL` for watch callbacks. The Google `AdminApi` for domain-wide
+  sweeps is built only when `TELESCREEN_GOOGLE_DELEGATED_ADMIN` is set, else `None`.
+- All adapters share the container's single `httpx.AsyncClient`. Tests inject an
+  `httpx.MockTransport` through `build_container(http=...)`, so assembly needs no
+  per-adapter test seam.
+
 ## References
 
 See `design-docs/references/README.md`.

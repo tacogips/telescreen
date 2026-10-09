@@ -1,15 +1,15 @@
 # P13 UI Workflows and Runs Pages Implementation Plan
 
-**Status**: Completed (run B implementation)
-**Design Reference**: design-docs/specs/design-ui-sentry.md sections 6 (Workflows, Runs), 7, 8.1, 8.1a, 8.2; design-docs/specs/design-workflow-engine.md (DSL step fields); design-docs/specs/design-map-reduce-sweeps.md (API and UI)
+**Status**: In Progress (run B2: keyed ErrorBanner wrap and re-verification; run B implementation complete)
+**Design Reference**: design-docs/specs/design-ui-sentry.md sections 6 (Workflows, Runs), 7, 8.1, 8.1a, 8.2; design-docs/specs/design-workflow-engine.md (DSL step fields); design-docs/specs/design-map-reduce-sweeps.md (API and UI); design-docs/specs/architecture.md section 8 (Run B2)
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-09 (run B, session 341)
+**Last Updated**: 2026-10-09 (run B2, session 342)
 
 ## Plan Metadata
 
 - planId: `p13-ui-workflows`
 - planPath: `impl-plans/active/p13-ui-workflows.md`
-- wave: B2 (parallel with p12, p14, p28)
+- wave: B2-1 (parallel with `p28-assembly`, which touches only Python paths)
 - dependsOn: `p30-ui-design-system`, `p31-ui-mock-api`
 - writePaths:
   - `impl-plans/active/p13-ui-workflows.md`
@@ -35,6 +35,60 @@ the behaviors covered by existing tests; change markup and add the patterns belo
   changes; no edits outside your two page directories.
 - Omitted per design 8.1: workflow trigger summary, last run, runs in period; runs-list
   current step and SLA due; human-task due time and tier.
+
+## Run B2 Scope (s342; the only work in this run)
+
+The run B code is complete and accepted apart from one low integration note. Do not
+rebuild or restyle anything.
+
+The note: two `ErrorBanner` renders are built inside a `<Show fallback>`. `ErrorBanner`
+(`src/web/src/components/ErrorBanner.tsx`, p30-owned, do not edit) reads `props.error`
+once, so a banner that is already mounted does not update when the error value changes.
+p12 and p14 render it keyed (`src/web/src/pages/issues/IssueList.tsx:347-349`:
+`<Show when={error()} keyed>{(value) => <ErrorBanner error={value} />}</Show>`).
+
+Changes:
+
+- `src/web/src/pages/workflows/WorkflowEditor.tsx` (Versions panel, line ~113):
+  - Add `versionsError = createMemo((): ApiError | undefined => ...)`. It returns
+    `versions.error` when that is an `ApiError`, the existing generic
+    `new ApiError(0, "request_failed", "Versions could not be loaded.")` for any other
+    error, and `undefined` otherwise.
+  - Render `<Show when={versionsError()} keyed>{(value) => <ErrorBanner error={value} />}</Show>`.
+  - Keep the success body gated by `when={!versions.error}`, without the `fallback`
+    banner.
+- `src/web/src/pages/runs/RunDetail.tsx` (line ~127): the same transformation for
+  `detail.error`, with a `detailError` memo and the existing message "Run details could
+  not be loaded.". Keep:
+  - the `runData()` error-safety;
+  - the disabled Cancel button;
+  - polling only while running or waiting;
+  - every other behavior from P13-ADV-01/02.
+- Leave the inline `div.error-banner` action-error renders unchanged (WorkflowEditor
+  ~98 with the `raw_value_detected` message; RunDetail ~46, ~68 and the first span of
+  ~127). They are not `ErrorBanner` and are already reactive accessor `<Show>`s.
+
+Tests (add to the existing files; keep all 20 current tests and their assertions):
+
+- Editor: the versions request for workflow `a` fails with a 404 envelope, then the
+  route changes to workflow `b` whose versions request fails with 500 `internal`. The
+  alert shows `internal`, not `not_found`.
+- Run detail: the run `r1` request fails 404, then the route changes to `r2`, which fails
+  500. The alert shows the second code, and there is still no repeat fetch after 5 s on
+  the errored run.
+- If one of these regressions also passes against the pre-change source, record that in
+  the Progress Log (the keyed wrap is still required for consistency with p12/p14). That
+  is not a blocker.
+
+Invariants:
+
+- No edits outside `src/web/src/pages/workflows`, `src/web/src/pages/runs` and this plan.
+- No `<h1>`, no `innerHTML`, every file < 400 lines.
+- `bun install` only with `--frozen-lockfile`.
+
+Reporting (conventions 7a): P13-ADV-01, P13-ADV-02 and P13-TI-01 are fixed. List them
+ONLY in the step result `addressedFeedback`, never in `findings`, `risks` or
+`authorSelfCheck`.
 
 ## Run B Deliverables (these supersede the run A list below where they differ)
 
@@ -153,12 +207,25 @@ the behaviors covered by existing tests; change markup and add the patterns belo
 ```bash
 set -o pipefail
 test -d src/web/node_modules || (cd src/web && bun install --frozen-lockfile)
-cd src/web && bun run typecheck 2>&1 | tee /tmp/telescreen-p13-ui-workflows-typecheck.log; echo "exit=$?"
-cd src/web && bunx vitest run src/pages/workflows src/pages/runs 2>&1 | tee /tmp/telescreen-p13-ui-workflows-test.log; echo "exit=$?"
-cd src/web && bun run build --outDir /tmp/telescreen-p13-ui-workflows-web --emptyOutDir 2>&1 | tee /tmp/telescreen-p13-ui-workflows-build.log; echo "exit=$?"
-! grep -rn 'innerHTML\|<h1' src/web/src/pages/workflows src/web/src/pages/runs
-test -z "$(find src/web/src/pages/workflows src/web/src/pages/runs -name '*.ts*' -exec wc -l {} + | awk '$1 >= 400 && $2 != "total"')"
+(cd src/web && bun run typecheck) 2>&1 | tee /tmp/telescreen-p13-ui-workflows-typecheck.log; echo "exit=$?"
+(cd src/web && bunx vitest run src/pages/workflows src/pages/runs) 2>&1 | tee /tmp/telescreen-p13-ui-workflows-test.log; echo "exit=$?"
+(cd src/web && bun run build --outDir /tmp/telescreen-p13-ui-workflows-web --emptyOutDir) 2>&1 | tee /tmp/telescreen-p13-ui-workflows-build.log; echo "exit=$?"
+(cd src/web && bun run test) 2>&1 | tee /tmp/telescreen-p13-ui-workflows-test-all.log; echo "exit=$?"
+! grep -rn 'innerHTML\|<h1' src/web/src/pages/workflows src/web/src/pages/runs; echo "exit=$?"
+test -z "$(find src/web/src/pages/workflows src/web/src/pages/runs -name '*.ts*' -exec wc -l {} + | awk '$1 >= 400 && $2 != "total"')"; echo "exit=$?"
+! grep -rn 'fallback={<ErrorBanner' src/web/src/pages/workflows src/web/src/pages/runs; echo "exit=$?"
+test "$(grep -rn '<ErrorBanner' src/web/src/pages/workflows src/web/src/pages/runs | grep -v '\.test\.' | wc -l)" -eq "$(grep -rn 'keyed>.*<ErrorBanner' src/web/src/pages/workflows src/web/src/pages/runs | grep -v '\.test\.' | wc -l)"; echo "exit=$?"
+test "$(grep -c '^- \[ \]' impl-plans/active/p13-ui-workflows.md)" -eq 0; echo "exit=$?"
 ```
+
+Keep each keyed `<Show ... keyed>` and its `<ErrorBanner>` child on one line (the files
+use dense one-line JSX). The keyed-count check depends on that.
+
+Run B2 evidence:
+
+- every command exits 0;
+- the scoped vitest run shows at least 22 tests passed and 0 failed;
+- the full `bun run test` shows 0 failed.
 
 All exit 0. If `typecheck` fails only in p12/p14 page files still in progress, record
 the log and re-run later; your paths must show zero errors
@@ -174,6 +241,7 @@ run by p29.
 - [x] No source edits outside the two page directories and this plan
 - [x] Progress Log updated
 - [x] P13-ADV-02: primary run-resource failures show the ErrorBanner without unhandled reads or polling
+- [ ] Run B2: every page `ErrorBanner` render is keyed (`<Show when={...} keyed>`), the two route-change regressions pass, and the Verification block passes on the final source (logs recorded)
 
 ## Progress Log
 

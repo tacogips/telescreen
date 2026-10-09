@@ -302,6 +302,27 @@ quick start). No run B plan edits `pyproject.toml` or `uv.lock`. ui-mock-api (p3
 aligns the UI client types with the router serializers and makes the matching mechanical
 page edits as an explicit wave-1 -> wave-2 handoff (`design-ui-sentry.md` section 8.1a).
 
+Run B2 (2026-10-09, final): 28 plans are accepted at commit d6cffb3 (p01-p12, p14-p27,
+p30, p31). Only ui-workflows (p13), assembly (p28) and examples-compose (p29) remain, and
+their ownership is unchanged. p13 is complete; it only re-verifies and wraps its
+`ErrorBanner` uses in `<Show keyed>` as p12 and p14 do. Assembly may be split into
+sequential plans, each with explicit file-level, disjoint write paths and each under 400
+lines:
+
+| Wave | Plan | Owns | Depends on |
+|------|------|------|------------|
+| B2-1 | p13 | `src/web/src/pages/{workflows,runs}/**` | accepted |
+| B2-1 | p28a (container/CLI/serve) | `wiring.py`, `wiring_builders.py` and further `wiring_*.py` split modules, `api/app.py`, `cli.py`, `__main__.py`, `tests/test_package.py`, `tests/e2e/test_serve_static.py`, `tests/e2e/test_api_routes.py`, plus new `tests/e2e/test_wiring*.py` | accepted |
+| B2-2 | p28b (E2E flows) | new `tests/e2e/` files for GitHub remediation, sweep, push ingestion and chat, and their shared e2e harness module | p28a |
+| B2-2 | p28c (leak matrix) | `tests/leak/**` (including the existing `test_ui_fixtures.py`), with its own harness under `tests/leak/` | p28a |
+| B2-3 | p29 | as section 8.7 of `design-ui-sentry.md` | p13, p28* |
+
+p28b and p28c may run in parallel because they share no files. They read `tests/support/**`
+and the container but do not edit them. A wiring defect found by p28b or p28c becomes a
+reconciliation request against p28a; it is not fixed in place. E2E tests may drive the
+standalone `telescreen_police_sdk` `PullWorker` in process. This is test code, not Bureau
+runtime, so the rule that the Bureau never imports the SDK still holds.
+
 ### 9. Verification Strategy
 
 | Level | Tooling | Network |

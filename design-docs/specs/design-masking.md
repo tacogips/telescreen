@@ -160,6 +160,17 @@ Assertions: no sample (or its separator-stripped variant) appears in any text co
 any table, captured log output, captured search documents, sent notification payloads,
 stored evidence files, API response bodies, or rendered tracebacks.
 
+v1 has no distributed tracing exporter. The "traces" sink of the requirement is therefore
+the rendered traceback text and exception messages: the forced-exception flow output
+captured through `install_excepthook` and the logging formatter, plus the 500 error
+response body. Outbound HTTP request bodies captured by the test `MockTransport` (Slack,
+police push, LLM) count as notification and egress sinks. The matrix runs the real
+`build_container` and injects only these seams: SQLite sessions, the in-memory search
+backend (Meilisearch unset), `MockTransport` (including canned LLM responses), and
+`FakeClock`. Only the two cases that the HTTP seam cannot express may replace the
+container's image scanner: scanner unavailable and free-text scanner output. The matrix
+must not stub a service in a way that bypasses the production masking path.
+
 ## References
 
 See `design-docs/references/README.md`.

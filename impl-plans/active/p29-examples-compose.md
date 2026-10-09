@@ -1,16 +1,16 @@
 # P29 Compose Deployment and Example Workflows Implementation Plan
 
 **Status**: Ready (run B revision; the run A deliverables below are implemented and accepted)
-**Design Reference**: design-docs/specs/architecture.md sections 3 (Deployment and examples) and 8 (run B README exception), design-docs/specs/command.md (Subcommands, Environment Variables), design-docs/specs/design-workflow-engine.md (Document schema, escalation policy), design-docs/specs/design-ui-sentry.md sections 8.5, 8.6
+**Design Reference**: design-docs/specs/architecture.md sections 3 (Deployment and examples) and 8 (run B README exception, Run B2), design-docs/specs/command.md (Subcommands, Environment Variables), design-docs/specs/design-collectors-and-ingestion.md (Assembly bindings), design-docs/specs/design-workflow-engine.md (Document schema, escalation policy), design-docs/specs/design-ui-sentry.md sections 8.5, 8.6
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-09 (run B, session 341)
+**Last Updated**: 2026-10-09 (run B2, session 342)
 
 ## Plan Metadata
 
 - planId: `p29-examples-compose`
 - planPath: `impl-plans/active/p29-examples-compose.md`
-- wave: B3 (last; runs alone)
-- dependsOn: `p12-ui-issues`, `p13-ui-workflows`, `p14-ui-ops`, `p28-assembly`, `p30-ui-design-system`, `p31-ui-mock-api` (plus accepted `p06-workflow-dsl`, `p08-masking`)
+- wave: B2-3 (last; runs alone)
+- dependsOn: `p13-ui-workflows`, `p28-assembly`, `p28b-e2e-flows`, `p28c-leak-matrix` (run B2), plus accepted `p12-ui-issues`, `p14-ui-ops`, `p30-ui-design-system`, `p31-ui-mock-api`, `p06-workflow-dsl`, `p08-masking`
 - writePaths:
   - `impl-plans/active/p29-examples-compose.md`
   - `examples/compose`
@@ -65,6 +65,54 @@ defects found there); no new services; no docker run in tests; no changes to
     not `compose.yaml`) and point to `examples/compose/README.md`.
   - Remove the stale sentence saying router mounting "belongs to the assembly plan".
   - CLI section matches `design-docs/specs/command.md` subcommands.
+  - Collector webhooks (one or two sentences, design-collectors-and-ingestion.md
+    "Assembly bindings"):
+    - Slack and GitHub webhooks are rejected with 401 until
+      `TELESCREEN_SLACK_SIGNING_SECRET` / `TELESCREEN_GITHUB_WEBHOOK_SECRET` are set as
+      secret refs. In compose, the referenced secret files must also be created and
+      mounted.
+    - Drive channel tokens are derived from the fingerprint key; there is no extra
+      variable.
+  - Testing section: name `tests/e2e` (end-to-end flows) and `tests/leak` (raw-value
+    leak matrix over every sink).
+
+## Run B2 notes (s342)
+
+- p28 was split into `p28-assembly` (container, collector bindings, CLI, serve),
+  `p28b-e2e-flows` and `p28c-leak-matrix`. All three must be complete before this plan
+  starts. If a final gate fails in their files, do not edit them. Write a Reconciliation
+  request naming the owning plan and file.
+- `examples/compose/.env.example`:
+  - must not gain a Drive channel variable;
+  - keeps `TELESCREEN_SLACK_SIGNING_SECRET` and `TELESCREEN_GITHUB_WEBHOOK_SECRET` UNSET
+    on active lines. Unset is the documented fail-closed default: webhooks answer 401.
+  - You may add them as commented example lines only, for example
+    `# TELESCREEN_GITHUB_WEBHOOK_SECRET=file:/run/secrets/github_webhook_secret`.
+- Pitfall (exit 3):
+  - Never add an active (uncommented) `file:` ref unless all three hold:
+    - `docker-compose.yml` declares that secret under top-level `secrets:`;
+    - every service using `env_file: .env` mounts it;
+    - `examples/compose/README.md` creates the file.
+  - A set but unresolvable ref raises `ConfigError` at startup (`core/secrets.py:resolve_secret`,
+    design "Assembly bindings"). Bureau and engine would exit 3, and the example would no
+    longer be runnable.
+- `tests/examples/test_examples.py`: add a consistency test.
+  - For every active (not `#`-commented) `.env.example` line whose value starts with
+    `file:/run/secrets/<name>`, `<name>` is a key of the top-level `secrets` mapping in
+    `docker-compose.yml`.
+  - Parse with the existing `parse_yaml` helper. Do not weaken the existing
+    ref/placeholder rule.
+- README (root and `examples/compose/README.md`): state that Slack and GitHub webhooks
+  return 401 until the operator sets these refs AND creates and mounts the matching
+  secret files.
+- `tests/examples/test_examples.py`: add one test.
+  - It runs `telescreen.cli.main(["workflow", "validate", <path>])` for each of
+    `github-credential-leak.yaml`, `slack-pii.yaml`, `gdrive-mynumber-sheet.yaml` and
+    `drive-weekly-sweep.yaml`.
+  - Each call must return 0.
+  - `escalation-policies.json` is not a workflow; keep its existing loader test.
+- If `main(["--help"])` is parsed for subcommand names, it raises `SystemExit`. Catch it
+  with `pytest.raises(SystemExit)` and read `capsys`.
 
 ## Run B Verification (final gates; all must pass)
 
@@ -80,6 +128,8 @@ uv build --out-dir /tmp/telescreen-p29-final-dist 2>&1 | tee /tmp/telescreen-p29
 (cd src/web && (test -d node_modules || bun install --frozen-lockfile) && bun run typecheck && bun run test && bun run build --outDir /tmp/telescreen-p29-final-web --emptyOutDir) 2>&1 | tee /tmp/telescreen-p29-final-web.log; echo "exit=$?"
 (cd src/web && bun run screenshots) 2>&1 | tee /tmp/telescreen-p29-screenshots.log; echo "exit=$?"
 ls tmp/ui-screenshots/*.png | wc -l    # 28 (13 pages x 2 themes + mobile issues x 2)
+uv run --frozen telescreen workflow validate examples/workflows/github-credential-leak.yaml examples/workflows/slack-pii.yaml examples/workflows/gdrive-mynumber-sheet.yaml examples/workflows/drive-weekly-sweep.yaml 2>&1 | tee /tmp/telescreen-p29-workflow-validate.log; echo "exit=$?"
+git status --porcelain -- design-docs/user-qa design-docs/specs/design-v1-1-dspm-adoption.md > /tmp/telescreen-p29-preexisting.log; echo "exit=$?"   # still lists README.md (M) and the four untracked files
 command -v docker && docker compose -f examples/compose/docker-compose.yml --env-file examples/compose/.env.example config > /tmp/telescreen-p29-compose-config.log 2>&1; echo "exit=$?"
 ```
 
@@ -92,7 +142,7 @@ TopBar render (no unstyled page, no raw-looking value).
 
 ## Run B Completion Criteria
 
-- [ ] Compose files reconciled; new `tests/examples` assertions pass
+- [ ] Compose files reconciled; new `tests/examples` assertions pass (including `workflow validate` exit 0 for all four workflow examples and the `.env.example` active `file:/run/secrets/<name>` -> compose `secrets.<name>` consistency check); webhook secrets stay unset on active `.env.example` lines
 - [ ] Root README documents setup, architecture, UI (dev, mock, screenshots), serve and compose
 - [ ] All final gates above pass (or the browser/docker gaps are recorded explicitly)
 - [ ] Progress Log updated
