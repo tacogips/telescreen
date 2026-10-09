@@ -1,6 +1,6 @@
 # P26 Map-Reduce Sweeps (Map Step, Partition, Dispatch, Shards, Reduce) Implementation Plan
 
-**Status**: Completed (run A implementation; downstream review pending)
+**Status**: In Progress (run A2 verification, session 340)
 **Design Reference**: design-docs/specs/design-map-reduce-sweeps.md (all sections), design-docs/specs/notes.md (Map step scope in v1; Sweep removal reconciliation by watermark)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -279,6 +279,24 @@ Not in scope: populating `findings_by_rule_class` in `collectors/sweep.py` (p20 
 - [x] Run A Resume items R0-R11 checked with evidence
 - [x] Scoped verification passes on the final tree; logs recorded
 - [x] Progress Log updated (run A session)
+
+## Run A2 Verify (2026-10-09, session 340)
+
+Code is complete; this pass verifies it and proves the hard tests are meaningful. Fix
+only real gaps inside this plan's writePaths; never rewrite working code.
+
+- [ ] V0 Run the Verification block on the current tree before any edit; log every
+  command, exit status and `/tmp/telescreen-p26-workflow-mapreduce-a2-*.log` path.
+- [ ] V1 Re-check Deliverables, Tests and items R1-R11 against the current source; list
+  any gap in the Progress Log and fix it.
+- [ ] V2 Mutation evidence (one line each in the Progress Log): for (a) the 10,000-shard
+  cap test, (b) crash recovery without duplicate shards, (c) 429 backpressure, (d) removal
+  reconciliation blocked by `resources_failed > 0`: record sha256 of the guarded source
+  file, apply a one-line mutation that disables the guard, run only that test (must FAIL),
+  restore, and confirm the sha256 equals the original. A test that still passes under its
+  mutation is a gap: strengthen it, then repeat.
+- [ ] V3 Re-run the Verification block on the final tree; every command exits 0. Report
+  fixed items only in `addressedFeedback` (conventions 7a).
 
 ## Progress Log
 

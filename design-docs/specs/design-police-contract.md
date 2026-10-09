@@ -95,7 +95,9 @@ All inbound bodies are read raw, size-limited (1 MiB), schema-validated with
 
 - Secret: `signing_secret = base64url(HMAC-SHA256(TELESCREEN_POLICE_SIGNING_KEY,
   "police-push\0" + worker_id))`. It is derived on demand and never stored; rotating the
-  master key rotates all push secrets (police must re-register).
+  master key rotates all push secrets (police must re-register). Both sides use the UTF-8
+  bytes of the `signing_secret` string itself as the HMAC key (it is not base64-decoded),
+  so the SDK, the Bureau and an n8n Crypto node holding the string compute the same value.
 - Headers on Bureau -> police deliveries and on police -> Bureau callbacks:
   `X-Telescreen-Timestamp` (unix seconds), `X-Telescreen-Nonce` (32 hex chars),
   `X-Telescreen-Signature: v1=<hex HMAC-SHA256(secret, timestamp + "." + nonce + "." +
@@ -108,14 +110,14 @@ All inbound bodies are read raw, size-limited (1 MiB), schema-validated with
 - Synchronous answer: a 200 response to the delivery must be a valid result envelope and is
   accepted without callback (the Bureau initiated the TLS connection to the registered
   endpoint). 202 means "callback later". Other statuses or network errors are retried with
-  backoff (`police_push_delivery` engine task) until `max_attempts` (default 5) or deadline.
+  backoff (`police_push_delivery` engine task) until the task's `max_attempts` or deadline.
 
 ### Bureau side (`telescreen.police`)
 
 ```python
 class PoliceGateway(Protocol):
-    async def dispatch(self, request: PoliceTaskRequest) -> str: ...   # returns task_id
-    async def cancel(self, task_id: str) -> None: ...
+    async def dispatch(self, session: AsyncSession, request: PoliceTaskRequest) -> str: ...  # task_id
+    async def cancel(self, session: AsyncSession, task_id: str) -> None: ...
 ```
 
 - `RoutingPoliceGateway` creates the `police_tasks` row and picks a transport: if an active
@@ -123,8 +125,12 @@ class PoliceGateway(Protocol):
   `last_delivery_at`) enqueues delivery; otherwise `PullQueueTransport` leaves the task
   `queued` for any matching pull worker. New transports implement the same internal
   `PoliceTransport` protocol without engine changes.
+- Attempts: `dispatch` stores `attempt = 0` and `max_attempts` from
+  `PoliceTaskRequest.max_attempts` (default 3). `attempt` is incremented exactly once per
+  pull claim or push delivery attempt, never on re-queue, and the same `max_attempts`
+  bounds both pull leases and push deliveries.
 - Leases: claim sets `leased` with `lease_expires_at = now + lease_seconds`; expired leases
-  return to `queued` with `attempt + 1` until `max_attempts` (3), then `failed`.
+  return to `queued` (worker cleared) while `attempt < max_attempts`, then `failed`.
 - Deadline: tasks past `deadline` become `expired`; the engine's `police_timeout` resumes
   the step with outcome `error`.
 - Result acceptance: schema validation, task state check, `Redactor` scan of every string

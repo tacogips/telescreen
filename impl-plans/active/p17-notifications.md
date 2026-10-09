@@ -1,6 +1,6 @@
 # P17 Notifications and Outbound DLP Gate Implementation Plan
 
-**Status**: Completed
+**Status**: In Progress (run A2 verification, session 340)
 **Design Reference**: design-docs/specs/design-masking.md (DLP gate), design-docs/specs/design-data-model.md (notifications), design-docs/specs/design-workflow-engine.md (Recipient resolution)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -158,6 +158,22 @@ in-tree code; do not rewrite working modules. Static gap review (s338 planning) 
 - [x] Run A Resume items R0-R5 checked with evidence
 - [x] Scoped verification passes on the final tree; logs recorded
 - [x] Progress Log updated (run A session)
+
+## Run A2 Verify (2026-10-09, session 340)
+
+Code is complete; this pass verifies it against the current tree. Resume rule: fix only
+real gaps or failing causes inside this plan's writePaths; never rewrite working code.
+
+- [ ] V0 Run the Verification block on the current tree before any edit; log every
+  command, exit status and `/tmp/telescreen-p17-notifications-a2-*.log` path.
+- [ ] V1 Re-check Deliverables, Tests and items R1-R5 against the current source; list
+  any gap in the Progress Log and fix it.
+- [ ] V2 Leak coverage: tests must assert that a raw sample from `tests.support.samples`
+  never appears in (a) `notifications` rows, (b) the captured fake Slack request body,
+  (c) the captured fake SMTP message, (d) caplog records, for both the `mask` and the
+  `block` DLP policy. Add any missing assertion; `block` must send nothing.
+- [ ] V3 Re-run the Verification block on the final tree; every command exits 0. Report
+  fixed items only in `addressedFeedback` (conventions 7a).
 
 ## Progress Log
 

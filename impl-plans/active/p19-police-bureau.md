@@ -1,9 +1,9 @@
 # P19 Police Bureau Side (Gateway, Pull and Push Transports, Result Acceptance) Implementation Plan
 
-**Status**: Ready (run A wave A2, session 338)
-**Design Reference**: design-docs/specs/design-police-contract.md (Endpoints, Push signing, Bureau side), design-docs/specs/design-map-reduce-sweeps.md (Police contract additions), design-docs/specs/design-masking.md (Re-scan of inbound masked data)
+**Status**: Ready (run A2 wave A2-2, session 340)
+**Design Reference**: design-docs/specs/design-police-contract.md (Endpoints, Push signing, Bureau side incl. the Attempts bullet revised in session 340), design-docs/specs/design-map-reduce-sweeps.md (Police contract additions), design-docs/specs/design-masking.md (Re-scan of inbound masked data)
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-08
+**Last Updated**: 2026-10-09
 
 ## Plan Metadata
 
@@ -39,8 +39,11 @@ and re-scanned; raw values are rejected.
 
 - `repository.py`: queries and updates for `PoliceWorkerRow` and `PoliceTaskRow`.
 - `signing.py`: the same algorithm as the SDK, implemented independently:
-  - `derive_push_secret(master: bytes, worker_id: str) -> bytes`
-    (`base64url(HMAC-SHA256(master, "police-push\0" + worker_id))` as bytes);
+  - `derive_push_secret(master: bytes, worker_id: str) -> str`
+    (`base64url(HMAC-SHA256(master, "police-push\0" + worker_id))`, unpadded or padded
+    exactly as returned at registration). The HMAC key for `sign`/`verify` is
+    `derive_push_secret(...).encode("utf-8")`: the UTF-8 bytes of the string, NEVER the
+    base64-decoded digest (design D4; the SDK and n8n hold the string);
   - `sign(secret, body, timestamp, nonce) -> str` (`v1=<hex>`);
   - `verify_signature(headers, body, secret, now, nonce_store_result) -> bool`
     (300 s window, constant-time comparison).
@@ -59,7 +62,8 @@ and re-scanned; raw values are rejected.
   - `class PoliceTransport(Protocol)` with `async def deliver(self, session, task: PoliceTaskRow) -> None`.
   - `PullQueueTransport` (no-op: the task stays `queued`).
   - `WebhookTransport(queue: TaskQueue, clock)` enqueues `police_push_delivery` with
-    idempotency key `police-push:<task_id>:<attempt>`.
+    idempotency key `police-push:<task_id>:1` (the engine task is enqueued once; later
+    attempts are engine retries of the same task, see `delivery.py`).
   - `RoutingPoliceGateway(pull: PullQueueTransport, webhook: WebhookTransport, clock)`
     implements `PoliceGateway`. `dispatch` inserts the task row (`queued`,
     `input_json = dump_json(request.input)`, labels, deadline, step_run_id,
@@ -104,15 +108,21 @@ and re-scanned; raw values are rejected.
   1. Build the task envelope with
      `callback {url: <public_base_url>/api/police/v1/callbacks/<task_id>, result_token}`,
      where the token is 32 random bytes in base64url and only its hash is stored.
-  2. Sign the request (headers per the design) and POST it to `endpoint_url`.
+  2. Increment `task.attempt` by exactly 1 (committed before the POST, in its own short
+     transaction), sign the request (headers per the design) and POST it to
+     `endpoint_url`. Never hold a DB transaction across the POST.
   3. 200 -> accept the body as a result (sync).
   4. 202 -> status `delivered` and `last_delivery_at`.
-  5. Anything else, or a network error -> retry with backoff `10 s * 2^(attempt-1)`
-     until `max_attempts` or the deadline -> task `failed`.
+  5. Anything else, or a network error -> `TaskResult.retry(now + 10 s * 2^(attempt-1),
+     error_code)` while `attempt < max_attempts` and the retry time is before the
+     deadline; otherwise task `failed` and, for a map task (`partition`/`scan_shard`),
+     `map_sink.task_failed(ShardFailure(FETCH_FAILED, None))`. A workflow task is left to
+     the engine `police_timeout` (same rule as `maintenance.py`).
+  6. A task already terminal or `cancelled` when the handler runs -> no POST, done.
 - `maintenance.py`: `PoliceMaintenance(map_sink: MapResultSink, clock)` implements
   `ScheduleProvider`:
-  - expired leases -> back to `queued` with `worker_id` cleared (pull) until
-    `max_attempts`, then `failed`;
+  - expired leases -> back to `queued` with `worker_id` cleared and `attempt` UNCHANGED
+    while `attempt < max_attempts`, otherwise `failed` (the next claim increments it);
   - tasks past their deadline and not terminal -> `expired`;
   - map tasks that become `failed` or `expired` -> `map_sink.task_failed(...)`. Workflow
     timeouts are handled by the engine timer.
@@ -137,8 +147,8 @@ and re-scanned; raw values are rejected.
 
 ## Run A Interface Notes (2026-10-09, session 338)
 
-Not started at s319; implement from this plan in wave A2 of
-`impl-plans/active/telescreen-v1-20261009-s338-dispatch.json`. The in-tree contracts below
+Not started at s319 or s338; implement from this plan in wave A2-2 of
+`impl-plans/active/telescreen-v1-20261009-s340-dispatch.json`. The in-tree contracts below
 were checked during s338 planning; use them exactly and do not edit them (Reconciliation
 request if one is wrong):
 
@@ -193,6 +203,18 @@ request if one is wrong):
 - `police_tasks.labels` and `police_workers.labels` are comma-separated `key=value`
   strings. Compare them as sets.
 - Long-poll must not hold a DB transaction while sleeping.
+- `attempt` changes only in `ClaimService.claim` and `PolicePushDeliveryHandler` (+1 each);
+  re-queue never touches it. `max_attempts` is the value stored at dispatch from
+  `PoliceTaskRequest.max_attempts` (default 3); ignore the DB column default 5.
+- A disabled worker, an unknown token, or a token for a different `{id}` -> 401
+  `unauthorized` with a static detail. Compare token hashes with `hmac.compare_digest`.
+- Raw-value rejection must not mutate the task (status, lease, attempt, result_json stay
+  as they were) and the audit entry carries only `task_id` and `worker_id`.
+- `POST /callbacks/{task_id}` for a pull task or a task without `callback_token_hash`
+  -> 401; after acceptance the same token -> 409 `conflict`.
+- Do not import `telescreen_police_sdk` anywhere under `src/telescreen` (only the
+  contract test). Do not edit `src/telescreen/contracts`, `ports`, `db`, `api/common`
+  or any other plan's paths; write a Reconciliation request instead.
 
 ## Tests
 
@@ -215,10 +237,28 @@ request if one is wrong):
     with MockTransport answering 202 -> delivered; the callback with a valid signature
     and token -> accepted; a replayed nonce -> 401; reusing the token -> 409; a 200 sync
     answer -> accepted without a callback.
+  - attempts: dispatch -> row has `attempt == 0` and `max_attempts == 3`; claim ->
+    `attempt == 1`; lease expiry through maintenance -> `queued`, `attempt == 1`;
+    second claim -> `attempt == 2`; with `max_attempts=2`, the next expiry -> `failed`.
+  - push retries: MockTransport answering 500 -> `TaskResult` kind retry with
+    `available_at == now + 10 s`, `attempt == 1`; second run -> `now + 20 s`; at
+    `max_attempts` -> task `failed` and, for a `scan_shard` task, `task_failed` called once.
+  - signing interop: the `signing_secret` string returned by push registration, used as
+    `signing_secret.encode("utf-8")`, verifies a Bureau-signed delivery with the Bureau's
+    own `verify_signature`; a key built from the base64-decoded digest does NOT verify.
+  - disabled worker (admin disable) -> claim 401; another worker's token on `{id}` -> 401.
+  - leak: after a rejected raw-sample result, no `police_tasks` column, audit row or
+    captured log record (caplog) contains the sample (`tests.support.samples`).
 - `tests/contract/test_bureau_contract.py`: mount the police router in a FastAPI app
   (SQLite) and drive it with the SDK `BureauClient` and `PullWorker` through
   `httpx.ASGITransport`. The full cycle is register, claim, heartbeat and result. Every
-  Bureau response body validates against its schema.
+  Bureau response body validates against its schema. Add a push case: register a push
+  worker, deliver a task through `PolicePushDeliveryHandler` whose `httpx.AsyncClient`
+  uses an `httpx.MockTransport` that forwards the request to the SDK
+  `WebhookHandler(handlers, secret=registration.signing_secret.encode("utf-8"),
+  mode=WebhookMode.SYNC)` via `WebhookRequest`/`WebhookReply`. Expected: the SDK accepts
+  the Bureau signature (reply 200, not 401) and the Bureau accepts the sync result (task
+  `completed`).
 
 ## Verification
 
@@ -232,13 +272,21 @@ uv run --frozen ty check $P
 uv run --frozen pytest -p no:cacheprovider tests/police tests/contract/test_bureau_contract.py 2>&1 | tee /tmp/telescreen-p19-police-bureau-pytest.log
 uv run --frozen python tools/typelint.py > /tmp/telescreen-p19-police-bureau-typelint.log 2>&1; grep -E '^(src/telescreen/police|src/telescreen/api/routers/police.py|tests/police|tests/contract/test_bureau_contract.py)' /tmp/telescreen-p19-police-bureau-typelint.log   # prints nothing
 grep -rn "telescreen_police_sdk" src/telescreen   # prints nothing
+test -z "$(find src/telescreen/police tests/police -name '*.py' -exec wc -l {} + | awk '$1 >= 1000 && $2 != "total"')"; echo "exit=$?"
+uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-p19-police-bureau-pytest-all.log 2>&1; echo "exit=$?"   # informational
 ```
+
+Evidence each command must establish: the four scoped gates exit 0; the pytest log
+shows every `tests/police` and contract test passed with 0 failed and 0 errors; the
+typelint grep prints nothing; the SDK import grep prints nothing; no file reaches 1000
+lines.
 
 ## Completion Criteria
 
 - [ ] Registration, gateway and transports, claims, results, push delivery, maintenance and router delivered with the exact names
 - [ ] Pull and push flows, replay, token one-time use and raw-value rejection tested
-- [ ] The SDK-driven contract test passes
+- [ ] Attempt counting, push retry/exhaustion and signing-interop tests pass
+- [ ] The SDK-driven contract test (pull cycle and push case) passes
 - [ ] Scoped verification passes; logs recorded
 - [ ] Progress Log updated
 

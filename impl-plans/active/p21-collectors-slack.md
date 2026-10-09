@@ -1,6 +1,6 @@
 # P21 Slack Collector Adapter Implementation Plan
 
-**Status**: Completed (run A implementation and verification complete; formal review downstream)
+**Status**: In Progress (run A2 verification, session 340)
 **Design Reference**: design-docs/specs/design-collectors-and-ingestion.md (Collector adapters, Resource identity, Per-kind behavior: slack), design-docs/specs/design-map-reduce-sweeps.md (Built-in sweep implementations: slack)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -156,6 +156,22 @@ defect. Do not edit source unless a gate fails.
   `ChangePage` with `has_more=False` (Slack history pages newest-first, so a
   `{channel_id: last_ts}` cursor cannot hold partial progress); `file_deleted` is not
   filtered by channel; thread replies are not enumerated by schedule or sweep.
+
+## Run A2 Verify (2026-10-09, session 340)
+
+Code is complete; this pass verifies it against the current tree. Resume rule: fix only
+real gaps or failing causes inside this plan's writePaths; never rewrite working code.
+
+- [ ] V0 Run the Verification block on the current tree before any edit; log every
+  command, exit status and `/tmp/telescreen-p21-collectors-slack-a2-*.log` path.
+- [ ] V1 Re-check Deliverables, Tests and Completion Criteria against the current source;
+  list any gap in the Progress Log and fix it.
+- [ ] V2 Event-mode signature tests cover: valid -> accepted; wrong signature -> rejected;
+  timestamp older than 300 s -> rejected; `url_verification` challenge handled. A raw
+  message-text sample never appears in `ResourceRef`, cursors, returned errors or caplog.
+  Add any missing case; all tests use fakes (no network).
+- [ ] V3 Re-run the Verification block on the final tree; every command exits 0. Report
+  fixed items only in `addressedFeedback` (conventions 7a).
 
 ## Progress Log
 

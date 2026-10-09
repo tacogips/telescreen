@@ -1,6 +1,6 @@
 # P11 Police SDK, Examples (Python and n8n) Implementation Plan
 
-**Status**: Completed (run A implementation, session 338)
+**Status**: In Progress (run A2 verification, session 340)
 **Design Reference**: design-docs/specs/design-police-contract.md (Push signing, Python SDK, Examples), design-docs/specs/design-map-reduce-sweeps.md (Police contract additions)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -189,6 +189,26 @@ cause and fix it first. Static gap review (s338 planning) found:
 - [x] Run A Resume items R0-R7 checked with evidence
 - [x] Scoped verification passes on the final tree; logs recorded
 - [x] Progress Log updated (run A session)
+
+## Run A2 Verify (2026-10-09, session 340)
+
+Code is complete; this pass verifies it against the current tree. Resume rule: fix only
+real gaps or failing causes inside this plan's writePaths; never rewrite working code.
+
+- [ ] V0 Run the Verification block on the current tree before any edit; log every
+  command, exit status and `/tmp/telescreen-p11-police-sdk-a2-*.log` path.
+- [ ] V1 Re-check Deliverables, Tests and items R1-R7 against the current source; list
+  any gap in the Progress Log and fix it.
+- [ ] V2 Push key (design D4, `design-police-contract.md` Push signing): the HMAC key is
+  the UTF-8 bytes of the registration `signing_secret` string, never its base64 decode.
+  State this in the `signing.py` module docstring and in `examples/police/n8n/README.md`
+  if absent. Add a test in `tests/police_sdk/`: `models.Registration.signing_secret`
+  string -> `.encode("utf-8")` -> `signature_headers` then `verify` -> valid; the same
+  headers verified with `base64.urlsafe_b64decode(secret + padding)` as key -> invalid.
+- [ ] V3 Confirm (no edit expected) `examples/police/n8n/README.md` still documents the
+  push-mode `scan_shard` flow with count-only `stats` and `complete_locators`.
+- [ ] V4 Re-run the Verification block on the final tree; every command exits 0. Report
+  fixed items only in `addressedFeedback` (conventions 7a).
 
 ## Progress Log
 
