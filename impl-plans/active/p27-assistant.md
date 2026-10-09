@@ -1,9 +1,9 @@
 # P27 Assistant (MCP Server and Agent Chat) Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-api-and-ui.md (Assistant), design-docs/specs/architecture.md section 7 item 7
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-08
+**Last Updated**: 2026-10-09
 
 ## Plan Metadata
 
@@ -120,15 +120,15 @@ uv run --frozen ruff format --check --no-cache $P
 uv run --frozen ruff check --no-cache $P
 uv run --frozen ty check $P
 uv run --frozen pytest -p no:cacheprovider tests/assistant 2>&1 | tee /tmp/telescreen-p27-assistant-pytest.log
-uv run --frozen python tools/typelint.py > /tmp/telescreen-p27-assistant-typelint.log 2>&1; grep -E '^(src/telescreen/assistant|src/telescreen/api/routers/chat.py|tests/assistant)' /tmp/telescreen-p27-assistant-typelint.log   # prints nothing
+uv run --frozen python tools/typelint.py > /tmp/telescreen-p27-assistant-typelint.log 2>&1; ! grep -E '(/src/telescreen/assistant/|/src/telescreen/api/routers/chat\.py|/tests/assistant/)' /tmp/telescreen-p27-assistant-typelint.log   # typelint prints absolute paths; prints nothing for p27
 ```
 
 ## Completion Criteria
 
-- [ ] AssistantTools (six tools), MCP server builder, ChatService and the chat router delivered with the exact names
-- [ ] Leak guard and tool-loop tests pass
-- [ ] Scoped verification passes; logs recorded
-- [ ] Progress Log updated
+- [x] AssistantTools (six tools), MCP server builder, ChatService and the chat router delivered with the exact names
+- [x] Leak guard and tool-loop tests pass
+- [x] Scoped verification passes; logs recorded
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -137,3 +137,15 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p27-assistant-typelin
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-09 08:20 JST
+**Tasks Completed**: Implemented all six read-only assistant tools, FastMCP registration and stdio entrypoint, typed JSON tool-loop ChatService, and authenticated `/api/chat` router. Added six SQLite-backed assistant tests covering redaction of seeded sensitive values, query/count/report behavior, tool-loop limits and invalid calls, the exact MCP tool set, and unavailable-client HTTP behavior. The chat router maps only `LLM_UNAVAILABLE` to the planned static 503 response because the shared API mapper does not currently map that code.
+**Tasks In Progress**: None in p27 scope; formal review and combined-tree integration belong to downstream workflow steps.
+**Blockers**: None for p27 scoped implementation. Full-tree typelint remains nonzero on other plan paths; p27 paths are clean.
+**Verification**:
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/assistant src/telescreen/api/routers/chat.py tests/assistant` — exit 0; `/tmp/telescreen-p27-assistant-format-final.log`.
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/assistant src/telescreen/api/routers/chat.py tests/assistant` — exit 0; `/tmp/telescreen-p27-assistant-ruff-final.log`.
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/assistant src/telescreen/api/routers/chat.py tests/assistant` — exit 0; `/tmp/telescreen-p27-assistant-ty-final.log`.
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/assistant` — exit 0; 6 passed, 0 failed; `/tmp/telescreen-p27-assistant-pytest-final.log`.
+- `uv run --frozen python tools/typelint.py` — full tree exit 1 on 93 diagnostics outside p27; absolute-path filter found no p27 diagnostics; `/tmp/telescreen-p27-assistant-typelint-final.log`.
+**Source SHA-256**: `src/telescreen/assistant/__init__.py` 7a1643a55e6ec14d72df7cec1c76ed612b89a99cd54f6224aa189ca69648ff1a; `chat.py` e4de1c3ce8628bbfcd3a1f698293183c20282b6f0297e3ca2182b6c107fba7a2; `mcp_server.py` 9fdb5ad177388a3b248e993407886b139b54c94e105a3401ff7e0e56172843b8; `tools.py` 4c4e3bf2204eb641ab7e062c6167accdec2b64e0510e8d9888fb97cd3ddb9b7f; `src/telescreen/api/routers/chat.py` 5e6cb5c5f62397fbc84ff8662c45b8abbfc381d9b8f9576761d670c31509cb78; `tests/assistant/test_assistant.py` 98da33d0b4b2e8d50936fe0dddf11f46e02f704d0938a5527b8d3ea2d7b40eb9.

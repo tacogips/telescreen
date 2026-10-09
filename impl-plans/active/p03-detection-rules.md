@@ -1,6 +1,6 @@
 # P03 Detection Types, Rule Detector and Composite Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-detectors.md (Types, Rule detector, Composite and configuration)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-08
@@ -177,11 +177,11 @@ exist there.)
 
 ## Completion Criteria
 
-- [ ] All 15 rule ids implemented with validators as specified
-- [ ] `Detector`, `ScanItem`, `RawFinding`, `DetectionResult`, `Span`, `PUBLIC_PREFIXES`, `CompositeDetector` exported with the exact names
-- [ ] Every sample in `tests/support/samples.py` is detected with the correct class and span
-- [ ] Scoped verification passes; logs recorded
-- [ ] Progress Log updated
+- [x] All 15 rule ids implemented with validators as specified
+- [x] `Detector`, `ScanItem`, `RawFinding`, `DetectionResult`, `Span`, `PUBLIC_PREFIXES`, `CompositeDetector` exported with the exact names
+- [x] Every sample in `tests/support/samples.py` is detected with the correct class and span
+- [x] Scoped verification passes; logs recorded
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -190,3 +190,49 @@ exist there.)
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-08 20:05 JST
+**Tasks Completed**: Implemented and exported the 15-rule catalog, validators, typed detector contracts, NFKC span mapping, RuleDetector, CompositeDetector union/cascade behavior, and focused sample/edge tests. Dependency p01-foundation was admitted by `acceptedPlanIds`.
+**Tasks In Progress**: Independent test-integrity, adversarial and serial integration reviews are downstream workflow steps.
+**Blockers**: None for p03 scope.
+**Reconciliation requests**: None.
+**Hashes**: All p03 source files were absent before implementation. Final source digests are recorded in `tmp/telescreen-v1-20261008-s319/p03-detection-rules/final-source-hashes.sha256`; plan before=5870257767969625e4284098c817e5198ec934efb342684bbde1e7ce6de74e3f; plan after digest is in the same manifest.
+**Verification**:
+- `uv run --frozen ruff format --check --no-cache src/telescreen/detection/__init__.py src/telescreen/detection/types.py src/telescreen/detection/normalize.py src/telescreen/detection/rule_detector.py src/telescreen/detection/composite.py src/telescreen/detection/rules tests/detection/rules` -> exit 0 (log: `/tmp/telescreen-p03-detection-rules-format-final.log`).
+- `uv run --frozen ruff check --no-cache src/telescreen/detection/__init__.py src/telescreen/detection/types.py src/telescreen/detection/normalize.py src/telescreen/detection/rule_detector.py src/telescreen/detection/composite.py src/telescreen/detection/rules tests/detection/rules` -> exit 0 (log: `/tmp/telescreen-p03-detection-rules-ruff-final.log`).
+- `uv run --frozen ty check src/telescreen/detection/__init__.py src/telescreen/detection/types.py src/telescreen/detection/normalize.py src/telescreen/detection/rule_detector.py src/telescreen/detection/composite.py src/telescreen/detection/rules tests/detection/rules` -> exit 0 (log: `/tmp/telescreen-p03-detection-rules-ty-final.log`).
+- `uv run --frozen pytest -p no:cacheprovider tests/detection/rules` -> exit 0, 10 passed, 0 failed (log: `/tmp/telescreen-p03-detection-rules-pytest-final.log`).
+- `uv run --frozen python tools/typelint.py src/telescreen/detection tests/detection/rules` -> exit 0, 9 files clean (log: `/tmp/telescreen-p03-detection-rules-typelint-scoped.log`).
+- Whole-repository `uv run --frozen python tools/typelint.py` -> exit 1 with 5 TL003 diagnostics in concurrently owned `src/telescreen/db/models/__init__.py` and `tests/db/*`; no diagnostics in p03 paths (log: `/tmp/telescreen-p03-detection-rules-typelint-all-final.log`). No outside-write-path changes made.
+**Notes**: Google API key matching accepts 28-35 suffix characters to include the established synthetic sample while recognizing canonical 35-character suffixes. The p03 source-filtered type gate passed; whole-repository typelint remains with db-owned contributors. Formal reviews and integration acceptance remain downstream.
+
+### Session: 2026-10-08 20:17 JST
+**Tasks Completed**: Addressed test-integrity findings P03-TI-001 and P03-TI-002. `RuleDetector.scan_text` now orders candidates highest priority first; the `my_number` regex rejects grouped-digit submatches inside card numbers. Replaced the vacuous overlap check with hyphenated card/phone and grouped card/My Number regressions. Cascade coverage now uses a per-window marker confirmer, two medium candidates beyond index 300, and verifies filtering plus span rebasing. Also corrected the AWS negative fixture to exactly 40 characters and added a keyword-positive control.
+**Tasks In Progress**: Independent re-review of the repairs and serial integration remain downstream workflow steps.
+**Blockers**: None for p03 scope.
+**Reconciliation requests**: None.
+**Hashes**: `src/telescreen/detection/rule_detector.py` before=6c74d08bbf4798c50917f6a3a123b8b4d1ed6700401d2255e5722be0c4d31c2d after=see `tmp/telescreen-v1-20261008-s319/p03-detection-rules/final-source-hashes.sha256`; `src/telescreen/detection/rules/catalog.py` before=0173f4e256d2186c3c7d2c12a6040f023a2615e252e16bab78421bec3e352e1d after=see manifest; `tests/detection/rules/test_rules.py` before=e7db607985a1d5e8c25159b84b18c0e18bc19e374af1cf6d3465f0221e97bc3c after=see manifest; plan before=ae98fd337e649f22f22832a06020cd11d8bf49ddc9e326a2fdac2b4eeecc509b; plan after digest is in the manifest.
+**Verification**:
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/detection tests/detection/rules` -> exit 0, 9 files already formatted (log: `/tmp/telescreen-p03-detection-rules-format.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/detection tests/detection/rules` -> exit 0 (log: `/tmp/telescreen-p03-detection-rules-ruff.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/detection tests/detection/rules` -> exit 0 (log: `/tmp/telescreen-p03-detection-rules-ty.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/detection/rules` -> exit 0, 10 passed, 0 failed (log: `/tmp/telescreen-p03-detection-rules-pytest.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py src/telescreen/detection tests/detection/rules` -> exit 0, 9 files clean (log: `/tmp/telescreen-p03-detection-rules-typelint-ti-repair.log`).
+- Whole-repository `uv run --frozen python tools/typelint.py` with p03-path filtering -> scoped filter exit 0; raw tool exit 1 with six TL003 findings in `src/telescreen/db/models/__init__.py` and `tests/db/*` (log: `/tmp/telescreen-p03-detection-rules-typelint-ti-repair-all.log`).
+**Notes**: Test-integrity repair criteria pass. The low-priority Google API fixture/design length difference remains disclosed for serial integration; no p01-owned fixture was changed.
+
+### Session: 2026-10-08 adversarial repairs
+**Tasks Completed**: Addressed adversarial findings P03-AR-001 and P03-AR-002. Bounded the email local part to 1..64 characters, restored My Number word boundaries, and raised validated card confidence to 0.985 so cards win overlap resolution. Added four My Number adjacency span regressions and a 100,000-pair long-run scan-time test; retained the shared email sample exact-span coverage and all card assertions.
+**Tasks In Progress**: Independent test-integrity and adversarial re-review are downstream workflow steps.
+**Blockers**: None for p03 scope.
+**Reconciliation requests**: None.
+**Hashes**: `src/telescreen/detection/rules/catalog.py` before=dbe551ae4aa1bf6d6e0d93ed369e4cfee116e2bf7e81302a460f8e0d197d13ab after=b8709e82f531cf13c0f9860d203de8da250176128fb7a2a100cc2b4a509b28c2; `tests/detection/rules/test_rules.py` before=425c4c649f3955ae13dcd172045d695c4f343c49bdafa108c476ff6ff93a7d97 after=4a10434c42acaa55ebef5b3fb1e8279399c59637b26166852ab58e955d5b4352; plan before=05c758b431c563ebdd177fe998cdbce7264f0063de37ede7cdba8d2b4fb6d179; plan after digest is in `tmp/telescreen-v1-20261008-s319/p03-detection-rules/final-source-hashes.sha256`.
+**Verification**:
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/detection/rules 2>&1 | tee /tmp/telescreen-p03-detection-rules-ar-pytest.log` -> exit 0, 12 passed, including all samples, four adjacent My Number cases, card overlaps, and the long-run timing assertion (0.27s suite).
+- `uv run --frozen ruff format --check --no-cache src/telescreen/detection/__init__.py src/telescreen/detection/types.py src/telescreen/detection/normalize.py src/telescreen/detection/rule_detector.py src/telescreen/detection/composite.py src/telescreen/detection/rules tests/detection/rules` -> exit 0 (log: `/tmp/telescreen-p03-detection-rules-ar-format-final.log`).
+- `uv run --frozen ruff check --no-cache src/telescreen/detection/__init__.py src/telescreen/detection/types.py src/telescreen/detection/normalize.py src/telescreen/detection/rule_detector.py src/telescreen/detection/composite.py src/telescreen/detection/rules tests/detection/rules` -> exit 0 (log: `/tmp/telescreen-p03-detection-rules-ar-ruff-final.log`).
+- `uv run --frozen ty check src/telescreen/detection/__init__.py src/telescreen/detection/types.py src/telescreen/detection/normalize.py src/telescreen/detection/rule_detector.py src/telescreen/detection/composite.py src/telescreen/detection/rules tests/detection/rules` -> exit 0 (log: `/tmp/telescreen-p03-detection-rules-ar-ty-final.log`).
+- `uv run --frozen python tools/typelint.py` -> exit 0, 68 files clean (log: `/tmp/telescreen-p03-detection-rules-ar-typelint-raw.log`).
+- In-memory regression mutation restoring the unbounded email `+` pattern and scanning `"a." * 100_000` -> the 5s bound was exceeded (56.542s), confirming the performance test rejects the old pattern (log: `/tmp/telescreen-p03-detection-rules-ar-email-mutation.log`).
+- `shasum -a 256 -c tmp/telescreen-v1-20261008-s319/p03-detection-rules/final-source-hashes.sha256` -> refreshed after this entry; all 10 entries must verify.
+**Notes**: First static-check wrapper attempts returned shell exit 1 because zsh reserves `status`; the wrapped tools had already run, and final reruns using `rc` exited 0. Previous whole-repository typelint diagnostics have cleared on the current shared tree. Google API suffix range {28,35} remains a disclosed p01-fixture/design reconciliation item for serial integration.

@@ -1,9 +1,9 @@
 # P11 Police SDK, Examples (Python and n8n) Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-police-contract.md (Push signing, Python SDK, Examples), design-docs/specs/design-map-reduce-sweeps.md (Police contract additions)
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-08
+**Last Updated**: 2026-10-09
 
 ## Plan Metadata
 
@@ -132,11 +132,11 @@ grep -rn "from telescreen\.\|import telescreen$" src/telescreen_police_sdk   # p
 
 ## Completion Criteria
 
-- [ ] All SDK modules delivered; no `telescreen.*` imports in the SDK
-- [ ] Pull and push modes tested, including cancellation, replay and the async callback
-- [ ] Python and n8n examples plus READMEs delivered, with no secrets
-- [ ] Scoped verification passes; logs recorded
-- [ ] Progress Log updated
+- [x] All SDK modules delivered; no `telescreen.*` imports in the SDK (`src/telescreen_police_sdk/`; import scan passed)
+- [x] Pull and push modes tested, including cancellation, replay and the async callback (`tests/police_sdk/test_sdk.py`; 15 focused tests passed)
+- [x] Python and n8n examples plus READMEs delivered, with no secrets (`examples/police/`)
+- [x] Scoped verification passes; logs recorded (2026-10-09 final logs under `/tmp/telescreen-p11-police-sdk-*-final.log`; global typelint remains nonzero only for unrelated shared-tree files)
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -145,3 +145,24 @@ grep -rn "from telescreen\.\|import telescreen$" src/telescreen_police_sdk   # p
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-09
+**Tasks Completed**: Delivered the standalone pull/push Police SDK, schema-aligned models, sweep helpers, Python and n8n examples, and contract/behavior tests. `submit_result(token, result)` matches the plan contract. No `telescreen.*` imports exist in the SDK.
+**Tasks In Progress**: Formal test-integrity, adversarial and combined-tree integration review are downstream workflow steps.
+**Blockers**: None for p11 implementation.
+**Verification**: Format check, ruff, ty, SDK-path typelint filter and no-import scan passed. `pytest tests/police_sdk tests/contract/test_sdk_contract.py`: 14 passed. Full-tree `tools/typelint.py` exited 1 on unrelated shared-tree diagnostics outside p11; complete log: `/tmp/telescreen-p11-police-sdk-typelint-final.log`.
+**Evidence**: Final scoped logs `/tmp/telescreen-p11-police-sdk-format-final.log`, `/tmp/telescreen-p11-police-sdk-ruff-final.log`, `/tmp/telescreen-p11-police-sdk-ty-final.log`, `/tmp/telescreen-p11-police-sdk-pytest-final.log`, `/tmp/telescreen-p11-police-sdk-typelint-final.log`, `/tmp/telescreen-p11-police-sdk-imports-final.log`; plan-local edit intentions in `tmp/telescreen-v1-20261008-s319/p11-police-sdk/edits/`.
+
+### Session: 2026-10-09 — P11-TI-WORKER-COVERAGE repair
+**Tasks Completed**: Captured `ClaimRequest.max_tasks` in the PullWorker fake Bureau and asserted the initial two-slot request plus the free-slot bound for every observed claim. Added a raising-handler test that confirms a failed `handler_error` result uses static detail and excludes the raw sample from submitted bytes. Existing cancellation and `submitted == ["task-b"]` assertions remain unchanged.
+**Tasks In Progress**: Formal test-integrity, adversarial and combined-tree integration review are downstream workflow steps.
+**Blockers**: None for this repair.
+**Verification**: Scoped format, ruff, ty, typelint (13 files clean), import scan, and combined SDK/contract pytest all exited 0; pytest reported 15 passed. The earlier format check exited 1 for assertion wrapping and was corrected before final gates. Full-tree typelint remains a known unrelated nonzero baseline from shared-tree paths.
+**Evidence**: `/tmp/telescreen-p11-police-sdk-worker-coverage-focused.log`; `/tmp/telescreen-p11-police-sdk-format-ti-repair-final.log`; `/tmp/telescreen-p11-police-sdk-ruff-ti-repair-final.log`; `/tmp/telescreen-p11-police-sdk-ty-ti-repair-final.log`; `/tmp/telescreen-p11-police-sdk-typelint-ti-repair-final.log`; `/tmp/telescreen-p11-police-sdk-pytest-ti-repair-final.log`; `/tmp/telescreen-p11-police-sdk-imports-ti-repair-final.log`; intentions in `tmp/telescreen-v1-20261008-s319/p11-police-sdk/edits/`.
+
+### Session: 2026-10-09 — free-slot wait correction
+**Tasks Completed**: The strengthened test reproduced that the worker waited for every handler to finish before reclaiming a newly freed slot. Updated `_wait_for_activity` to wake on the first completed handler or shutdown, cancel and await its stop waiter, then let the claim loop recompute free slots. The test now observes a claim of one while `task-a` is still active, and retains the original `submitted == ["task-b"]` and cancellation checks.
+**Tasks In Progress**: Formal test-integrity, adversarial and combined-tree integration review are downstream workflow steps.
+**Blockers**: None for p11 implementation.
+**Verification**: Final source format, ruff, ty, scoped typelint (13 files clean), import scan, and SDK/contract pytest exited 0; pytest reported 15 passed. The pre-fix reproduction failed on the expected free-slot assertion and is resolved by the source change.
+**Evidence**: Reproduction `/tmp/telescreen-p11-police-sdk-worker-free-slot-reproduction.log`; focused post-fix test `/tmp/telescreen-p11-police-sdk-worker-coverage-post-fix.log`; final source logs `/tmp/telescreen-p11-police-sdk-format-ti-repair-source-final.log`, `/tmp/telescreen-p11-police-sdk-ruff-ti-repair-source-final.log`, `/tmp/telescreen-p11-police-sdk-ty-ti-repair-source-final.log`, `/tmp/telescreen-p11-police-sdk-typelint-ti-repair-source-final.log`, `/tmp/telescreen-p11-police-sdk-pytest-ti-repair-source-final.log`, `/tmp/telescreen-p11-police-sdk-imports-ti-repair-source-final.log`.

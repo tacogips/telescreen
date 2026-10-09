@@ -1,6 +1,6 @@
 # P18 Evidence Upload, Scan-and-Reject, Image Scanner and Metadata Stripper Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-api-and-ui.md (Evidence), design-docs/specs/command.md (Dependencies decisions: stdlib stripper), design-docs/user-qa/qa-evidence-file-types.md, design-docs/specs/design-masking.md (leak test matrix, image cases)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-08
@@ -142,10 +142,10 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p18-evidence-typelint
 
 ## Completion Criteria
 
-- [ ] Classifier, stripper (JPEG, PNG, WebP), image scanner, store, service, query and router delivered with the exact names
-- [ ] Every evidence case in the design-masking leak matrix is covered by a test here
-- [ ] Scoped verification passes; logs recorded
-- [ ] Progress Log updated
+- [x] Classifier, stripper (JPEG, PNG, WebP), image scanner, store, service, query and router delivered with the exact names
+- [x] Every evidence case in the design-masking leak matrix is covered by a test here
+- [x] Scoped verification passes; logs recorded
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -154,3 +154,10 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p18-evidence-typelint
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-09 p18 implementation
+**Tasks Completed**: Implemented the evidence classifier, JPEG/PNG/WebP metadata stripping, fail-closed LLM image scanner, owner-only local store, evidence service/query, authenticated API router, and leak-focused tests. API tests cover rejection, bounded uploads, scanner-unavailable 503, list/get/content; storage tests assert mode 0600.
+**Tasks In Progress**: None
+**Blockers**: None within p18. Full-tree typelint reports violations outside p18 paths; p18 paths are clean.
+**Verification**: `uv run --frozen ruff format --check --no-cache src/telescreen/evidence src/telescreen/api/routers/evidence.py tests/evidence` exit 0 (`/tmp/telescreen-p18-evidence-format-final.log`); `uv run --frozen ruff check --no-cache src/telescreen/evidence src/telescreen/api/routers/evidence.py tests/evidence` exit 0 (`/tmp/telescreen-p18-evidence-ruff-final.log`); `uv run --frozen ty check src/telescreen/evidence src/telescreen/api/routers/evidence.py tests/evidence` exit 0 (`/tmp/telescreen-p18-evidence-ty-final.log`); `uv run --frozen python tools/typelint.py src/telescreen/evidence src/telescreen/api/routers/evidence.py tests/evidence` exit 0, 9 files clean (`/tmp/telescreen-p18-evidence-typelint-scoped-final.log`); scoped pytest exit 0, 7 passed (`/tmp/telescreen-p18-evidence-pytest-final.log`). Full-tree typelint exit 1 with no p18 diagnostics (`/tmp/telescreen-p18-evidence-typelint-full-final.log`); this is not claimed as a global pass.
+**Source Hashes**: `src/telescreen/evidence/__init__.py` 1b2cf1b99ed6594229976244220c89dad7ea65e5495c93466f0cd622092a5e0d; `image.py` 4cecab5e2bedcf15607a34abb8cd460067fb55358b87320c0c45d0a78e479f28; `query.py` 29f2119cae7aa02e268c1a179d33e04cd242f6e2dedaa7d1e12c54025a5c80f0; `service.py` 0330d2749bac5f87947292e7bbae7a328d560a7fe312185eb5909ba3556e8a28; `store.py` 4fb981d3e75e2f307a55c5d9f4f837ce45e6d62fbecbcb1a84def486900a8ad4; `strip.py` 25877e24a2a978a28a814bd408ad7d16482fea4281bbb25ce925d9d29b32b1cd; `types.py` d5bb07993248475fa0319c07a01f1e5791322534e6fab78aa49a58d58e709b4d; `src/telescreen/api/routers/evidence.py` 22fdcc9df30b05b93fce57aa5fcb0853bc5756b4d1035890ab96132d0adfd40e; `tests/evidence/test_evidence.py` 1bfa29e6bc9e557c9dfef46241ceb3aa3fd87d3a51c3b360e64e4c4510f52062.

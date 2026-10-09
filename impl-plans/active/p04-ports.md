@@ -1,6 +1,6 @@
 # P04 Ports (Cross-Plan Protocols and DTOs) Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/architecture.md section 4 (Ports table), design-docs/specs/design-map-reduce-sweeps.md (Partitioner and shard executor ports), design-docs/specs/design-collectors-and-ingestion.md
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-08
@@ -239,10 +239,10 @@ grep -rn "telescreen\.\(db\|detection\|masking\|issues\|workflow\|police\|collec
 
 ## Completion Criteria
 
-- [ ] Every module and symbol above exists with the exact field names, order and types
-- [ ] No imports beyond core, stdlib and `AsyncSession`
-- [ ] Scoped verification passes; logs recorded
-- [ ] Progress Log updated
+- [x] Every module and symbol above exists with the exact field names, order and types
+- [x] No imports beyond core, stdlib and `AsyncSession`
+- [x] Scoped verification passes; logs recorded
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -251,3 +251,18 @@ grep -rn "telescreen\.\(db\|detection\|masking\|issues\|workflow\|police\|collec
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-08 20:05 JST
+**Tasks Completed**: Added all assigned `telescreen.ports` frozen DTOs, selectors, enums, pure aggregation helpers, and Protocols; added DTO and structural-Protocol tests; checked every completion criterion.
+**Tasks In Progress**: None
+**Blockers**: None
+**Reconciliation requests**: None
+**Hashes**: All 14 Python source/test hashes are recorded in `tmp/telescreen-v1-20261008-s319/p04-ports/final-source-hashes.sha256`; all source/test paths were absent before this session. Plan before hash `0f1d92432c2592f4edd1adb8496854caf878c4508f627e28bbd8b6b039c59906`; after hash is available in the node-boundary change evidence.
+**Verification**:
+- `uv run --frozen ruff format --check --no-cache src/telescreen/ports tests/ports` -> exit 0 (14 files already formatted; log `/tmp/telescreen-p04-ports-format.log`).
+- `uv run --frozen ruff check --no-cache src/telescreen/ports tests/ports` -> exit 0 (all checks passed; log `/tmp/telescreen-p04-ports-ruff.log`).
+- `uv run --frozen ty check src/telescreen/ports tests/ports` -> exit 0 (all checks passed; log `/tmp/telescreen-p04-ports-ty.log`).
+- `uv run --frozen pytest -p no:cacheprovider tests/ports 2>&1 | tee /tmp/telescreen-p04-ports-pytest.log` -> exit 0, 5 passed.
+- `uv run --frozen python tools/typelint.py > /tmp/telescreen-p04-ports-typelint.log 2>&1; ! grep -E '(/src/telescreen/ports|/tests/ports)' /tmp/telescreen-p04-ports-typelint.log` -> exit 0; no p04 findings.
+- `! grep -rn 'telescreen\.\(db\|detection\|masking\|issues\|workflow\|police\|collectors\)' src/telescreen/ports` -> exit 0; no forbidden imports (log `/tmp/telescreen-p04-ports-imports.log`).
+**Notes**: Whole-tree typelint reports 5 unrelated violations in `src/telescreen/db/models/__init__.py` and `tests/db/`; p04's filtered gate passes. The earlier full-tree report also captured p04 fake-class TL008 findings, which were corrected and rechecked. Full report: `/tmp/telescreen-p04-ports-typelint-full.log`; current full output: `/tmp/telescreen-p04-ports-typelint.log`.

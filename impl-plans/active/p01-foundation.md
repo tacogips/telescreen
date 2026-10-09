@@ -1,6 +1,6 @@
 # P01 Foundation Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/architecture.md (sections 4, 5, 6, 8), design-docs/specs/command.md
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-08
@@ -297,46 +297,47 @@ installs, fill the table in the "Toolchain Audit Manifest" section with real val
 ```bash
 set -o pipefail
 export PYTHONDONTWRITEBYTECODE=1
-uv lock && uv sync --dev                                   # exit 0
-grep -A1 'name = "ty"' uv.lock                             # version = "0.0.85"
-uv run --frozen ruff format --check --no-cache src/telescreen/core src/telescreen_police_sdk tests/core tests/support tests/conftest.py
-uv run --frozen ruff check --no-cache .                    # whole repo: only foundation + scaffold exist
-uv run --frozen python tools/typelint.py                   # exit 0
-uv run --frozen ty check                                   # exit 0
-uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-p01-foundation-pytest.log 2>&1; echo "exit=$?"   # exit 0, includes tests/tools and tests/test_package.py
-uv build --out-dir /tmp/telescreen-p01-foundation-dist     # wheel contains telescreen/ and telescreen_police_sdk/
-unzip -l /tmp/telescreen-p01-foundation-dist/*.whl | grep -E 'telescreen_police_sdk/__init__.py|telescreen/core/json.py'
-cd src/web && bun install --frozen-lockfile                # exit 0, no lockfile change
+uv lock && uv sync --dev > /tmp/telescreen-p01-uv-lock-sync-final.log 2>&1
+grep -A1 'name = "ty"' uv.lock | grep -q 'version = "0.0.85"'
+uv run --frozen ruff format --check --no-cache src/telescreen/core src/telescreen_police_sdk tests/core tests/support tests/conftest.py > /tmp/telescreen-p01-format-final.log 2>&1
+uv run --frozen ruff check --no-cache . > /tmp/telescreen-p01-ruff-final.log 2>&1
+uv run --frozen python tools/typelint.py > /tmp/telescreen-p01-typelint-final.log 2>&1
+uv run --frozen ty check > /tmp/telescreen-p01-ty-final.log 2>&1
+uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-p01-pytest-final.log 2>&1
+uv build --out-dir /tmp/telescreen-p01-foundation-dist-final > /tmp/telescreen-p01-build-final.log 2>&1
+unzip -l /tmp/telescreen-p01-foundation-dist-final/*.whl | grep -E 'telescreen_police_sdk/__init__.py|telescreen/core/json.py' > /tmp/telescreen-p01-wheel-contents.log 2>&1
+cd src/web && bun install --frozen-lockfile > /tmp/telescreen-p01-bun-frozen.log 2>&1
+test "$(grep -c '^| .*TBD' impl-plans/active/p01-foundation.md)" -eq 0
 ```
 
 Because this is wave 1, full-repository checks must pass, not just scoped ones.
 
 ## Completion Criteria
 
-- [ ] All deliverables exist with the exact public names above
-- [ ] `ty` pin unchanged (0.0.85); no new per-file-ignores except the pre-approved JSON
+- [x] All deliverables exist with the exact public names above
+- [x] `ty` pin unchanged (0.0.85); no new per-file-ignores except the pre-approved JSON
       boundary, if proven necessary and logged
-- [ ] All verification commands exit 0 with log paths recorded
-- [ ] README covers every topic in deliverable 7
-- [ ] The Toolchain Audit Manifest table has real values in every cell
+- [x] All verification commands exit 0 with log paths recorded
+- [x] README covers every topic in deliverable 7
+- [x] The Toolchain Audit Manifest table has real values in every cell
       (`grep -c '^| .*TBD' impl-plans/active/p01-foundation.md` prints 0); `uv` and
       `bun` are pinned in `mise.toml`
-- [ ] Progress Log updated with hashes and command evidence
+- [x] Progress Log updated with hashes and command evidence
 
 ## Toolchain Audit Manifest
 
 | Item | Version or digest | Provenance | Install command | Exit | Log |
 |------|-------------------|------------|-----------------|------|-----|
-| python | TBD | mise (`python = "3.12"`) | `mise install` | TBD | TBD |
-| uv | TBD | mise (pinned by this plan) | `mise install` | TBD | TBD |
-| bun | TBD | mise (pinned by this plan) | `mise install` | TBD | TBD |
-| node | TBD | mise (`node = "22"`) | `mise install` | TBD | TBD |
-| ty | TBD (must be 0.0.85) | uv.lock | `uv sync --dev` | TBD | TBD |
-| ruff | TBD | uv.lock | `uv sync --dev` | TBD | TBD |
-| uv.lock sha256 | TBD | generated | `uv lock` | TBD | TBD |
-| .venv | TBD (python packages count from `uv pip list`) | uv.lock | `uv sync --dev` | TBD | TBD |
-| src/web/bun.lock sha256 | TBD | generated | `cd src/web && bun install` | TBD | TBD |
-| src/web/node_modules | TBD (top-level entry count) | bun.lock | `cd src/web && bun install` | TBD | TBD |
+| python | 3.12.14 | mise (`python = "3.12"`) | `mise install` | 0 | `/tmp/telescreen-p01-mise-install.log` |
+| uv | 0.12.3 | mise (`uv = "0.12.3"`) | `mise install` | 0 | `/tmp/telescreen-p01-mise-install.log` |
+| bun | 1.4.2 | mise (`bun = "1.4.2"`) | `mise install` | 0 | `/tmp/telescreen-p01-mise-install.log` |
+| node | v22.23.2 | mise (`node = "22"`) | `mise install` | 0 | `/tmp/telescreen-p01-mise-install.log` |
+| ty | 0.0.85 | uv.lock | `uv sync --dev` | 0 | `/tmp/telescreen-p01-uv-lock-sync-final.log` |
+| ruff | 0.16.10 | uv.lock | `uv sync --dev` | 0 | `/tmp/telescreen-p01-uv-lock-sync-final.log` |
+| uv.lock sha256 | `1f24a7a12cb37b7f753c143b5fbf94257a01d10012db1e037d7c05734a8e3bc2` | generated | `uv lock` | 0 | `/tmp/telescreen-p01-toolchain-details.log` |
+| .venv | 62 installed package entries | uv.lock | `uv sync --dev` | 0 | `/tmp/telescreen-p01-toolchain-details.log` |
+| src/web/bun.lock sha256 | `125174f45a6fceb669b0c86a3ceea99a920046071a318c156f0993580f3f6e45` | generated | `cd src/web && bun install` | 0 | `/tmp/telescreen-p01-toolchain-details.log` |
+| src/web/node_modules | 121 top-level entries | bun.lock | `cd src/web && bun install` | 0 | `/tmp/telescreen-p01-toolchain-details.log` |
 
 ## Progress Log
 
@@ -345,3 +346,12 @@ Because this is wave 1, full-repository checks must pass, not just scoped ones.
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-08 19:45 JST
+**Tasks Completed**: Implemented the p01 dependency/toolchain foundation; core vocabulary, JSON/YAML, errors, clock, durations, IDs, secrets, and settings modules; standalone Police SDK shell; integration-test support and synthetic samples; third-party typing spike; README; web package manifest and lock. Updated audit manifest and completion criteria.
+**Tasks In Progress**: None
+**Blockers**: None
+**Reconciliation requests**: None. The JSON native decoder requires the pre-approved narrow `TL005` boundary entry for stdlib json / PyYAML untyped native values; the mirrored SDK entry is retained for p11's same boundary.
+**Hashes**: `pyproject.toml` before=d22f380e67be878c517cd67d7efb1387cfd11da9184ca2d65614b74e0e2f2118 after=42b939e0c442981f7d556979b87d8014ad98a8da170e287208142eceb8a416cb; `uv.lock` before=39da26cb0587e00dc17f2583e46b0310688ab48f6358e00f1a29a1d4f17c7d59 after=1f24a7a12cb37b7f753c143b5fbf94257a01d10012db1e037d7c05734a8e3bc2; `mise.toml` before=0e174b7ab47030eb4c915adec64639e0e111cc7e04ce8b2e6744e08b2dbe6d9a after=12c8845296438d1187f9ad258c436be839ebfd7665b6d4574e33f07f09d5fdfb; `.gitignore` before=d19b85920ff82150d02472f5981df51f80fdf432375002f8c1fe8ecaca2e3353 after=1b03881a90cb58f0b420d952558ecaa699489c5554bcbbf3516f1b6f20ce5d31; `README.md` before=aa5f1c6ca6c3ffa348aac70659dfd9981e59bec1f2beab3abcbf858d8cb53246 after=a63b2947ac05d1d86dc501cd63e50020af8c3cdd19603df4e921622c43777c1c; new files hashes recorded in task evidence.
+**Verification**: `mise install` -> exit 0 (log: `/tmp/telescreen-p01-mise-install.log`); `uv lock && uv sync --dev` -> exit 0 (log: `/tmp/telescreen-p01-uv-lock-sync-final.log`); `cd src/web && bun install` -> exit 0 (log: `/tmp/telescreen-p01-bun-install.log`); scoped Ruff format check -> exit 0 (log: `/tmp/telescreen-p01-format-final.log`); full-repository Ruff -> exit 0 (log: `/tmp/telescreen-p01-ruff-final.log`); typelint -> exit 0 (log: `/tmp/telescreen-p01-typelint-final.log`); ty -> exit 0 (log: `/tmp/telescreen-p01-ty-final.log`); full pytest -> exit 0, 47 passed (log: `/tmp/telescreen-p01-pytest-final.log`); wheel build -> exit 0 (log: `/tmp/telescreen-p01-build-final.log`); wheel contents -> exit 0 (log: `/tmp/telescreen-p01-wheel-contents.log`); SDK files in wheel -> exit 0 (log: `/tmp/telescreen-p01-wheel-sdk.log`); frozen bun install -> exit 0 (log: `/tmp/telescreen-p01-bun-frozen.log`); no-TBD manifest gate -> exit 0 (log: `/tmp/telescreen-p01-no-tbd-final.log`).
+**Notes**: First verification pass identified formatting, annotations, and incompatible latest SDK major versions. Pinned Anthropic `<1`, MCP `<2`, and SQLAlchemy `<2.1` to match the accepted SDK surfaces; corrected issues and reran all relevant gates successfully. Initial logs: `/tmp/telescreen-p01-format.log`, `/tmp/telescreen-p01-ruff.log`, `/tmp/telescreen-p01-typelint.log`, `/tmp/telescreen-p01-ty.log`, and `/tmp/telescreen-p01-pytest.log`; their reported issues were corrected. No code outside p01 writePaths was changed; existing `src/telescreen` scaffold files were preserved.

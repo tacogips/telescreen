@@ -17,12 +17,12 @@ fi
 '''
 
 [tools]
-bun = "latest"
+bun = "1.4.2"
 gitleaks = "latest"
 node = "22"
 pre-commit = "latest"
 python = "3.12"
-uv = "latest"
+uv = "0.12.3"
 
 [tasks.default]
 description = "Show available tasks"
@@ -91,6 +91,26 @@ run = "rm -rf build dist htmlcov .coverage .pytest_cache .ruff_cache src/*.egg-i
 [tasks.ci]
 description = "Run the standard CI checks"
 run = "mise run fmt-check && mise run lint && mise run typelint && mise run typecheck && mise run test && mise run build"
+
+[tasks.web-install]
+description = "Install web dependencies from the frozen lockfile"
+run = "cd src/web && bun install --frozen-lockfile"
+
+[tasks.web-typecheck]
+description = "Typecheck the SolidJS application"
+run = "cd src/web && bun run typecheck"
+
+[tasks.web-test]
+description = "Run web component tests"
+run = "cd src/web && bun run test"
+
+[tasks.web-build]
+description = "Build the web application"
+run = "cd src/web && bun run build"
+
+[tasks.web-ci]
+description = "Install and verify the web application"
+run = "mise run web-install && mise run web-typecheck && mise run web-test && mise run web-build"
 
 [tasks.install-git-hooks]
 description = "Install mise tools and the repository pre-commit hook"

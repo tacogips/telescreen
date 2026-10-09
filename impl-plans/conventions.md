@@ -155,7 +155,10 @@ uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-<planId>-pytest-all
 ```
 
 Never run `uv build` into the repository: use
-`uv build --out-dir /tmp/telescreen-<planId>-dist`. Never run `bun run build` into
+`uv build --out-dir /tmp/telescreen-<planId>-dist`.
+Owner ruling (2026-10-08): `/tmp/telescreen-<planId>-*` paths are outside the repository and
+outside fanout change tracking. Writing build outputs and logs there is always permitted,
+needs no `artifactRoots` entry, and is never a reason to report a blocker. Never run `bun run build` into
 `src/web/dist`: use `bun run build --outDir /tmp/telescreen-<planId>-web --emptyOutDir`.
 
 Record in the Progress Log for every command: the command, exit status and log path. An

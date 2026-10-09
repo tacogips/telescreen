@@ -1,9 +1,9 @@
 # P25 Workflow Node Executors (detect, ai_agent, notify, police_verify) Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-workflow-engine.md (Node executors with external effects, Ports used by executors), design-docs/specs/design-police-contract.md (Inputs by task type: verify_remediation)
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-08
+**Last Updated**: 2026-10-09
 
 ## Plan Metadata
 
@@ -112,20 +112,19 @@ session where not used) with spec dataclasses from `telescreen.workflow.dsl.mode
 ```bash
 set -o pipefail
 export PYTHONDONTWRITEBYTECODE=1
-P="src/telescreen/workflow/executors/detect.py src/telescreen/workflow/executors/ai_agent.py src/telescreen/workflow/executors/notify.py src/telescreen/workflow/executors/police_verify.py tests/workflow/executors"
-uv run --frozen ruff format --check --no-cache $P
-uv run --frozen ruff check --no-cache $P
-uv run --frozen ty check $P
-uv run --frozen pytest -p no:cacheprovider tests/workflow/executors 2>&1 | tee /tmp/telescreen-p25-workflow-nodes-pytest.log
-uv run --frozen python tools/typelint.py > /tmp/telescreen-p25-workflow-nodes-typelint.log 2>&1; grep -E '^(src/telescreen/workflow/executors/(detect|ai_agent|notify|police_verify)\.py|tests/workflow/executors)' /tmp/telescreen-p25-workflow-nodes-typelint.log   # prints nothing
+uv run --frozen ruff format --check --no-cache src/telescreen/workflow/executors/detect.py src/telescreen/workflow/executors/ai_agent.py src/telescreen/workflow/executors/notify.py src/telescreen/workflow/executors/police_verify.py tests/workflow/executors
+uv run --frozen ruff check --no-cache src/telescreen/workflow/executors/detect.py src/telescreen/workflow/executors/ai_agent.py src/telescreen/workflow/executors/notify.py src/telescreen/workflow/executors/police_verify.py tests/workflow/executors
+uv run --frozen ty check src/telescreen/workflow/executors/detect.py src/telescreen/workflow/executors/ai_agent.py src/telescreen/workflow/executors/notify.py src/telescreen/workflow/executors/police_verify.py tests/workflow/executors
+uv run --frozen pytest -p no:cacheprovider tests/workflow/executors -q
+uv run --frozen python tools/typelint.py src/telescreen/workflow/executors/detect.py src/telescreen/workflow/executors/ai_agent.py src/telescreen/workflow/executors/notify.py src/telescreen/workflow/executors/police_verify.py tests/workflow/executors
 ```
 
 ## Completion Criteria
 
-- [ ] Four executors delivered with the exact names and `step_type` values
-- [ ] Tests above pass
-- [ ] Scoped verification passes; logs recorded
-- [ ] Progress Log updated
+- [x] Four executors delivered with the exact names and `step_type` values
+- [x] Tests above pass
+- [x] Scoped verification passes; logs recorded
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -134,3 +133,12 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p25-workflow-nodes-ty
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-09 07:34 JST
+**Tasks Completed**: Implemented DetectExecutor, AiAgentExecutor, NotifyExecutor and PoliceVerifyExecutor with safe routing, schema validation, redaction, notification DLP outcomes and Police timeout cancellation. Added 10 behavior tests. Updated verification instructions to run typelint directly on p25 paths.
+**Tasks In Progress**: None; independent integrity/adversarial review and combined-tree review are downstream.
+**Blockers**: None
+**Reconciliation requests**: None
+**Hashes**: detect.py before=absent after=2f752fec02777f10908e3d5f4a36571819a30652d83041384736b64c66014c9d; ai_agent.py before=absent after=377b0068efe454b44c7622769a9b269029042cdd101a3830a85784d49bdde3a8; notify.py before=absent after=934415a13385e530864e9b7d923254527a10a017397624887c016d5d7fcc65c4; police_verify.py before=absent after=7608f4dbfb29d9fb67435fc0d83c2b122ff5ca5cbf0b18a0cb541c833bc8919e; test_executors.py before=absent after=02a63e7b78f052b3ac8f40629b4a133b1cc723a858f20580eada02ec9466c5a9; plan before=66b8af2135db2862e3340a59db5edaeef2e28710a69c803e52c5ee81d7ccf192; final plan hash is reported in the Step 6 result.
+**Verification**: `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/workflow/executors/detect.py src/telescreen/workflow/executors/ai_agent.py src/telescreen/workflow/executors/notify.py src/telescreen/workflow/executors/police_verify.py tests/workflow/executors` -> exit 0 (log: `/tmp/telescreen-p25-workflow-nodes-format-final4.log`); `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/workflow/executors/detect.py src/telescreen/workflow/executors/ai_agent.py src/telescreen/workflow/executors/notify.py src/telescreen/workflow/executors/police_verify.py tests/workflow/executors` -> exit 0 (log: `/tmp/telescreen-p25-workflow-nodes-ruff-final4.log`); `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/workflow/executors/detect.py src/telescreen/workflow/executors/ai_agent.py src/telescreen/workflow/executors/notify.py src/telescreen/workflow/executors/police_verify.py tests/workflow/executors` -> exit 0 (log: `/tmp/telescreen-p25-workflow-nodes-ty-final4.log`); `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/workflow/executors -q` -> exit 0, 10 passed, 0 failed (log: `/tmp/telescreen-p25-workflow-nodes-pytest-final4.log`); `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py src/telescreen/workflow/executors/detect.py src/telescreen/workflow/executors/ai_agent.py src/telescreen/workflow/executors/notify.py src/telescreen/workflow/executors/police_verify.py tests/workflow/executors` -> exit 0, 5 files clean (log: `/tmp/telescreen-p25-workflow-nodes-typelint-final4.log`). Earlier Ruff/ty/typelint failures were corrected and rerun; an initial test import failure was fixed and all 10 tests pass on final source.
+**Notes**: No files outside p25 writePaths were changed. The executor package `__init__.py` remains owned by p24. This implementation does not register executors; p28 owns registry wiring.

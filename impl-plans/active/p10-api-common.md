@@ -1,9 +1,9 @@
 # P10 API Common, Directory and Tokens Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-api-and-ui.md (Authentication and errors, Free-form JSON on the wire, Endpoints: Health, Directory), design-docs/specs/design-masking.md (API error echo prevention), design-docs/specs/architecture.md section 5 item 6
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-08
+**Last Updated**: 2026-10-09
 
 ## Plan Metadata
 
@@ -159,11 +159,11 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p10-api-common-typeli
 
 ## Completion Criteria
 
-- [ ] ApiContext, Principal, require_scope, error handlers, pagination, body limiter delivered with the exact names
-- [ ] Directory service, tokens, resolver and router delivered
-- [ ] No-echo tests pass
-- [ ] Scoped verification passes; logs recorded
-- [ ] Progress Log updated
+- [x] ApiContext, Principal, require_scope, error handlers, pagination, body limiter delivered with the exact names
+- [x] Directory service, tokens, resolver and router delivered
+- [x] No-echo tests pass
+- [x] Scoped verification passes; logs recorded
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -172,3 +172,12 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p10-api-common-typeli
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-09 00:00
+**Tasks Completed**: Resumed p10 typing pass; retained pydantic dataclass request bodies with module-qualified decorators; annotated SQLAlchemy scalar results, recipient partitions, clock timestamps and test locals; confirmed API no-echo behavior.
+**Tasks In Progress**: None
+**Blockers**: None
+**Reconciliation requests**: None
+**Hashes**: src/telescreen/api/routers/directory.py before=154ac7b2babbc0d1d81d9539653e21be88814e86919e8d27957938f0caf452e1 after=d4b3f2d41036d6927cf7acea59c5708db4f00174f52651b5b0bc97d18d819961; src/telescreen/directory/repository.py before=2d7edd5307b21ada6abc325f6d01be3ae374ad606ee7e7d4197ead8ea1cbce80 after=af2302e3e71c7d9a2b67ecb9acf413666f5108261d63e1e833a1fae915f40595; src/telescreen/directory/resolver.py before=392894df8adaa07da898b9047c69aede3d7078a095aff10f5914dff9b7cc88c9 after=5db69951a1d79ef3b8a678921cb14a4c96c1a60e3e0c63a2d1f9eb5d4bfab947; src/telescreen/directory/service.py before=29a9b75c30e046552e670287d5567e42fdd531d6e86d1ca62258a652bbfe011b after=b50c592e3e320a5170d63b8a7e05d45434d3209a2d190ecfde7160dc1d77d402; tests/api/common/test_api.py before=82bdbff86d347a1bf8726e14369c7ff9418b32ba722b580cc67f340e623cbe36 after=21ad6592809fc33941efe27ccc2f7e83264a44901f7c139cec3eb7346dade49d
+**Verification**: `uv run --frozen ruff format --check --no-cache src/telescreen/directory src/telescreen/api/__init__.py src/telescreen/api/common src/telescreen/api/routers/__init__.py src/telescreen/api/routers/health.py src/telescreen/api/routers/directory.py tests/api/common` -> exit 0 (log: `tmp/telescreen-v1-20261008-s319/p10-api-common/logs/ruff-format-final.log`); `uv run --frozen ruff check --no-cache src/telescreen/directory src/telescreen/api/__init__.py src/telescreen/api/common src/telescreen/api/routers/__init__.py src/telescreen/api/routers/health.py src/telescreen/api/routers/directory.py tests/api/common` -> exit 0 (log: `tmp/telescreen-v1-20261008-s319/p10-api-common/logs/ruff-check-final.log`); `uv run --frozen ty check src/telescreen/directory src/telescreen/api/__init__.py src/telescreen/api/common src/telescreen/api/routers/__init__.py src/telescreen/api/routers/health.py src/telescreen/api/routers/directory.py tests/api/common` -> exit 0 (log: `tmp/telescreen-v1-20261008-s319/p10-api-common/logs/ty-check-final.log`); `uv run --frozen pytest -p no:cacheprovider tests/api/common` -> exit 0, 1 passed (log: `tmp/telescreen-v1-20261008-s319/p10-api-common/logs/pytest-final.log`); `uv run --frozen python tools/typelint.py` -> exit 0, 133 files clean (log: `tmp/telescreen-v1-20261008-s319/p10-api-common/logs/typelint-final.log`); `grep -E '^(src/telescreen/directory|src/telescreen/api/__init__.py|src/telescreen/api/common|src/telescreen/api/routers/(__init__|health|directory)\.py|tests/api/common)' tmp/telescreen-v1-20261008-s319/p10-api-common/logs/typelint-final.log` -> exit 1 (no matching p10 diagnostics; transcript: `tmp/telescreen-v1-20261008-s319/p10-api-common/logs/typelint-filter-evidence.txt`); `uv run --frozen pytest -p no:cacheprovider tests/tools/test_typelint.py` -> exit 0, 27 passed (log: `tmp/telescreen-v1-20261008-s319/p10-api-common/logs/typelint-tests.log`).
+**Notes**: Initial shell attempts passed a quoted path list as one argument and are preserved in the evidence logs; corrected exact-path verification above passed. Review finding `P10-INCOMPLETE` is implemented and verified. Formal test-integrity, adversarial and branch-evidence reviews remain downstream; no review approval is claimed.

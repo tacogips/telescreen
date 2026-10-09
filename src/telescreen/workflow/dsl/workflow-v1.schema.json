@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://telescreen.invalid/schemas/workflow-v1.schema.json",
+  "title": "Telescreen Workflow v1",
+  "type": "object",
+  "required": ["apiVersion", "kind", "name", "start", "steps"],
+  "properties": {
+    "apiVersion": {"const": "telescreen.workflow/v1"},
+    "kind": {"const": "Workflow"},
+    "name": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+    "description": {"type": "string"},
+    "trigger": {"type": "object"},
+    "defaults": {"type": "object"},
+    "start": {"type": "string"},
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "type"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+          "type": {"enum": ["detect", "ai_agent", "condition", "human_task", "notify", "evidence_upload", "police_verify", "wait", "send_back", "parallel", "join", "sub_workflow", "map", "end"]}
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false
+}

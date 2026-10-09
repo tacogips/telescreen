@@ -1,9 +1,9 @@
 # P15 Audit Log and Search Implementation Plan
 
-**Status**: Ready
+**Status**: Completed (implementation; formal review pending)
 **Design Reference**: design-docs/specs/design-data-model.md (Audit), design-docs/specs/design-api-and-ui.md (Search, Endpoints: Audit, Search), design-docs/specs/design-masking.md (IndexGuard), design-docs/specs/architecture.md section 5 item 8
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-08
+**Last Updated**: 2026-10-09
 
 ## Plan Metadata
 
@@ -176,10 +176,11 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p15-audit-search-type
 
 ## Completion Criteria
 
-- [ ] AuditLogService, verify_chain, the search backends, DocumentIndexer, AuditIndexSchedule, reindex_all and both routers delivered with the exact names
-- [ ] Guard rejection, tamper detection and leak tests pass
-- [ ] Scoped verification passes; logs recorded
-- [ ] Progress Log updated
+- [x] AuditLogService, verify_chain, the search backends, DocumentIndexer, AuditIndexSchedule, reindex_all and both routers delivered with the exact names
+- [x] Guard rejection, tamper detection and leak tests pass
+- [x] Audit API search and verify are exercised through an authenticated in-process ASGI app, including action, actor, from/to, response mapping, and missing-token assertions
+- [x] Scoped verification passes; logs recorded
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -188,3 +189,15 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p15-audit-search-type
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-09 implementation
+**Tasks Completed**: Implemented append-only hash-chained audit storage and verification, audit search, guarded issue/finding/run/audit indexing, Meilisearch and in-memory backends, incremental audit indexing, full reindexing, and read-scoped audit/search routers. Added redaction, tamper, guard rejection, safe logging, backend escaping, reindex, schedule, and per-index SearchHit mapping tests. Audit index lookup uses the unique record id column while preserving the sequence primary key.
+**Tasks In Progress**: Formal test-integrity, adversarial, and combined-tree integration reviews are owned by downstream workflow steps.
+**Blockers**: None for p15 scoped implementation.
+**Verification**: `ruff format --check`, `ruff check`, `ty check`, and `pytest tests/audit tests/search` all exited 0; pytest reported 8 passed, 0 failed. Full-tree `tools/typelint.py` exited 1 on diagnostics outside p15; the correctly unanchored absolute-path filter reported no p15 diagnostics. Logs: `/tmp/telescreen-p15-format-final-v2.log`, `/tmp/telescreen-p15-ruff-final-v2.log`, `/tmp/telescreen-p15-ty-final-v2.log`, `/tmp/telescreen-p15-pytest-final-v2.log`, `/tmp/telescreen-p15-typelint-full-final-v2.log`, `/tmp/telescreen-p15-typelint-scoped-final-v2.log`.
+
+### Session: 2026-10-09 review repair (P15-TI-AUDIT-API-UNTESTED)
+**Tasks Completed**: Added `test_audit_api_search_and_verify_use_indexed_records` in `tests/audit/test_audit.py`. The test creates a READ bearer, appends two distinct member actions, indexes the three resulting records through `AuditIndexSchedule` into `InMemorySearchBackend`, and exercises `/api/audit/search` action/actor filters, timezone-aware `from`/`to` windows, mapped item fields, `/api/audit/verify`, and unauthenticated 401 behavior. The eight earlier tests remain in place.
+**Tasks In Progress**: Independent test-integrity and adversarial re-review are owned by downstream workflow steps.
+**Blockers**: None for the p15 implementation repair.
+**Verification**: The focused API test passed (1 passed). Final scoped gates passed: ruff format, ruff check, ty check, typelint (18 files clean), and `pytest tests/audit tests/search` (9 passed, 0 failed). Final-source logs: `/tmp/telescreen-p15-audit-search-format-final-comm005509-v4.log`, `/tmp/telescreen-p15-audit-search-ruff-final-comm005509-v4.log`, `/tmp/telescreen-p15-audit-search-ty-final-comm005509-v4.log`, `/tmp/telescreen-p15-audit-search-typelint-scoped-final-comm005509-v4.log`, `/tmp/telescreen-p15-audit-search-pytest-final-comm005509-v4.log`. Earlier format/type diagnostics and a SQLite-naive-timestamp test assertion were corrected before these final gates; the record mapping assertion compares UTC-normalized timestamps to the persisted audit row.

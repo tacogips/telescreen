@@ -1,6 +1,6 @@
 # P06 Workflow DSL, Expressions and Step API Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-workflow-engine.md (Document schema, Expressions and templates, Ports used by executors, Human tasks escalation policy), design-docs/specs/design-map-reduce-sweeps.md (DSL step type `map`)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-08
@@ -193,16 +193,16 @@ uv run --frozen ruff format --check --no-cache src/telescreen/workflow/__init__.
 uv run --frozen ruff check --no-cache src/telescreen/workflow/__init__.py src/telescreen/workflow/dsl src/telescreen/workflow/step_api.py tests/workflow/dsl
 uv run --frozen ty check src/telescreen/workflow/__init__.py src/telescreen/workflow/dsl src/telescreen/workflow/step_api.py tests/workflow/dsl
 uv run --frozen pytest -p no:cacheprovider tests/workflow/dsl 2>&1 | tee /tmp/telescreen-p06-workflow-dsl-pytest.log
-uv run --frozen python tools/typelint.py > /tmp/telescreen-p06-workflow-dsl-typelint.log 2>&1; grep -E '^(src/telescreen/workflow/(__init__|step_api)\.py|src/telescreen/workflow/dsl|tests/workflow/dsl)' /tmp/telescreen-p06-workflow-dsl-typelint.log   # prints nothing
+uv run --frozen python tools/typelint.py > /tmp/telescreen-p06-workflow-dsl-typelint.log 2>&1; ! grep -E '(/src/telescreen/workflow/(__init__|step_api)\.py|/src/telescreen/workflow/dsl/|/tests/workflow/dsl/)' /tmp/telescreen-p06-workflow-dsl-typelint.log
 ```
 
 ## Completion Criteria
 
-- [ ] Model, loader, validator, expressions, templates, context, escalation, schema and step_api delivered with the exact names
-- [ ] No `eval`, `exec`, `compile` or `literal_eval` in `src/telescreen/workflow/dsl` (`grep -rn "eval(\|exec(\|compile(" src/telescreen/workflow/dsl` prints only regex `re.compile` uses)
-- [ ] `step_type: ClassVar[StepType]` passes the scoped `ty check`; if ty 0.0.85 rejects it, stop and file a Reconciliation request (never `# ty: ignore`, never a per-file-ignore)
-- [ ] Scoped verification passes; logs recorded
-- [ ] Progress Log updated
+- [x] Model, loader, validator, expressions, templates, context, escalation, schema and step_api delivered with the exact names
+- [x] No `eval`, `exec`, `compile` or `literal_eval` in `src/telescreen/workflow/dsl` (only regex `re.compile` is present)
+- [x] `step_type: ClassVar[StepType]` passes the scoped `ty check`; no suppression or per-file-ignore was added
+- [x] Scoped verification passes; logs recorded
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -211,3 +211,38 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p06-workflow-dsl-type
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-08 21:00 JST
+**Tasks Completed**: Implemented the typed workflow model and step API, YAML/JSON loader and compiled JSON round trip, static graph validation, safe expression parser/evaluator, path-only templates, masked run context serialization, escalation policy parsing and round trip, JSON Schema resource, and tests covering every step type and the assigned edge cases.
+**Tasks In Progress**: None
+**Blockers**: None
+**Reconciliation requests**: None
+**Hashes**: New source/test paths were absent before this session; final SHA-256 values are recorded in `tmp/telescreen-v1-20261008-s319/p06-workflow-dsl/final-source-hashes.sha256`. The plan hash before this progress update was `a2ec265be015ce04e19cf31d1b9e846b95bffe1ef72549121ff10ba037063aaa`; final plan hash is recorded separately in `tmp/telescreen-v1-20261008-s319/p06-workflow-dsl/plan-hash.sha256`.
+**Verification**: Scoped Ruff format -> exit 0 (`/tmp/telescreen-p06-workflow-dsl-format-final.log`); scoped Ruff check -> exit 0 (`/tmp/telescreen-p06-workflow-dsl-ruff-final.log`); scoped ty -> exit 0 (`/tmp/telescreen-p06-workflow-dsl-ty-final.log`); DSL pytest -> exit 0, 8 passed (`/tmp/telescreen-p06-workflow-dsl-pytest-final.log`); full typelint -> exit 1, 47 diagnostics in other concurrent paths (`/tmp/telescreen-p06-workflow-dsl-typelint-final.log`); p06 filter over that output -> exit 0, no diagnostics; no-dynamic-evaluation grep -> exit 0.
+**Notes**: A focused map rejection test first exposed that `source.partition.items` was not rejected; the parser was corrected to return `unsupported_field`, and the final 8-test run passes. The entire shared tree's typelint run remains nonzero for 47 diagnostics outside this plan; scoped typelint reports all 12 p06 files clean. No review decision is claimed; formal review and final integration are downstream.
+
+### Session: 2026-10-08 self-check repairs
+**Tasks Completed**: Corrected `CompiledWorkflow.step()` to raise `KeyError` for missing IDs; equality and inequality comparisons now return false with `type_mismatch` for unlike JSON kinds; map inline-item errors report the nested JSON pointer; unknown graph routes report their exact field pointers; malformed retry/failure values and negative map failure counts are rejected. Added assertions for these behaviors plus planned validation codes and paths, including duplicate IDs, unknown routes, unreachable steps, send-back and parallel graphs, empty outcomes, map bounds, invalid expressions/templates/durations, and multi-issue reporting.
+**Tasks In Progress**: None for p06. Formal independent review and combined-tree integration are downstream workflow steps.
+**Blockers**: None within p06. Full-repository typelint exits 1 with 60 diagnostics in other concurrent plan paths; p06 scoped typelint is clean.
+**Hashes**: Final source hashes and verification are recorded in `tmp/telescreen-v1-20261008-s319/p06-workflow-dsl/final-source-hashes-010-selfcheck.sha256`; this entry's final plan hash is recorded in `tmp/telescreen-v1-20261008-s319/p06-workflow-dsl/plan-hash-010-selfcheck.sha256`.
+**Verification**: Scoped Ruff format -> exit 0, 12 files already formatted (`/tmp/telescreen-p06-workflow-dsl-selfcheck-format.log`); scoped Ruff check -> exit 0 (`/tmp/telescreen-p06-workflow-dsl-selfcheck-ruff.log`); scoped ty -> exit 0 (`/tmp/telescreen-p06-workflow-dsl-selfcheck-ty.log`); DSL pytest -> exit 0, 11 passed (`/tmp/telescreen-p06-workflow-dsl-selfcheck-pytest-final.log`); scoped typelint -> exit 0, 12 files clean (`/tmp/telescreen-p06-workflow-dsl-selfcheck-typelint-scoped.log`); full typelint -> exit 1, 60 diagnostics outside p06 (`/tmp/telescreen-p06-workflow-dsl-selfcheck-typelint-full.log`), with zero p06 matches (`/tmp/telescreen-p06-workflow-dsl-selfcheck-typelint-filter.log`); prohibited-evaluation grep -> exit 0 (`/tmp/telescreen-p06-workflow-dsl-selfcheck-no-eval.log`); source hash check -> exit 0, 13/13 files match.
+**Notes**: The self-check added regression coverage in place of relying on inspection for the named validation rules. The shared-tree typelint failures are in concurrent API, directory, and Google collector paths, not p06. No review decision is claimed; formal review and final integration are downstream.
+
+### Session: 2026-10-09 06:55 JST
+**Tasks Completed**: Revalidated the existing p06 workflow DSL implementation and recorded current-source verification evidence for the redispatch.
+**Tasks In Progress**: Native test-integrity, adversarial and branch-evidence decisions for DISPATCH3-REVIEW-MISSING-p06 are pending the workflow's downstream native join.
+**Blockers**: None for assigned implementation work.
+**Reconciliation requests**: None.
+**Hashes**: Source hash inventory: `tmp/telescreen-v1-20261008-s319/p06-workflow-dsl/final-source-hashes-012-redispatch.sha256`; verification manifest: `tmp/telescreen-v1-20261008-s319/p06-workflow-dsl/verification-012-redispatch.json`. Plan hash before this entry: `69d2c17a8827865b9cfbd74ad618bdf0d260c6abd9dd1e064d81222f0f4f436b`.
+**Verification**: Scoped format, Ruff, `ty` and DSL pytest exit 0; 11 tests passed. Full typelint exits 1 with 47 diagnostics outside p06; scoped p06 filter exits 0 with 0 diagnostics. Prohibited dynamic-evaluation check exits 0. Complete logs are under `tmp/telescreen-v1-20261008-s319/p06-workflow-dsl/` and `/tmp/telescreen-p06-redispatch-*.log`.
+**Notes**: No implementation source changes were needed. Source checksum verification passed for 13/13 p06 files; comparison with the before:step6-implement snapshot found 22 files checked and 0 mismatches. This entry does not claim a formal review decision; the three missing native decisions remain downstream.
+
+### Session: 2026-10-09 07:07 JST — P06-ROUNDTRIP-LOSSY repair
+**Tasks Completed**: Added shared `_iso.format_duration` and used it in workflow and escalation serialization; zero durations now serialize as `PT0S` and fractional seconds retain microsecond precision. Corrected expression string decoding, normalized malformed string/number errors to `expression_error`, and added exponent-number parsing. Added round-trip tests for omitted/zero/fractional wait durations, zero human SLA, quoted string literals in both quote styles, decimal/exponent floats with evaluation parity, malformed escapes, and zero/fractional escalation tiers.
+**Tasks In Progress**: Independent Opus re-review of the Step 7 adversarial finding and branch evidence is pending downstream.
+**Blockers**: None for p06 implementation.
+**Reconciliation requests**: None.
+**Hashes**: Pre-edit/final inventories: `tmp/telescreen-v1-20261008-s319/p06-workflow-dsl/pre-edit-hashes-013-roundtrip.txt` and `tmp/telescreen-v1-20261008-s319/p06-workflow-dsl/final-source-hashes-013-roundtrip.sha256`. Changed files: `_iso.py` before=absent after=recorded in inventory; `loader.py` before=dfb128a6f4f9bef42d5f5d5179d72488b257ce37884cd95263cd6dfdd846ad3f after=8281855dc04540bc289a9fce702351e719cc507b7252807af04201a980485ec6; `escalation.py` before=d554bcd8770d14961b1967cee559fc282d4cb6bb3a85a00233894b189775b523 after=ade07ad54e5aa5c23e049f12395fb481b7dae1a3c3af29ef2b5a503ab264f3ee; `expressions.py` before=94b6a4ef8411bbf4873bd13c057b6f34bb766d5b274cd99bb1697dc2b8d199fc after=420366dbd4c584e88d36d49692a692a7ae2b4314cc6810cb44a5f203776e8895; DSL tests before=74cbc423a01ad2ec6625751255111cf84085895dd701e765e1bc862148d327c8 after=3e3ca6740c4c1a28cc5db5fd6a6c982e2a27a1a13256919c088fb69c65d4a4da. Plan hash before this entry=4e73535f8b25cba482c6356924a9fb9cac7328bf6a88b1191d1c950b662de47a.
+**Verification**: Final Ruff format, Ruff check, `ty`, DSL pytest (22 passed), direct p06 typelint (13 files clean), no-evaluation check, line cap and 14/14 SHA check all exit 0. Commands and complete logs are recorded in `tmp/telescreen-v1-20261008-s319/p06-workflow-dsl/verification-013-roundtrip.json`. Before the fix, the new targeted regression command exited 1 with 10 expected round-trip failures and one malformed-escape test passing; initial format/Ruff checks also exited 1 on formatting-only findings, all resolved before final verification.
+**Notes**: `loader.py` remains under 1000 lines (956). The optional low `TEST-GAP-p06-RULES` suggestions (extra slug/map/police/parallel validation cases) remain outside this mid-finding repair. The adversarial decision remains rejected until independent review rechecks the corrected source; no branch-evidence or final combined-tree acceptance is claimed.

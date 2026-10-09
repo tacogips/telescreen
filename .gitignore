@@ -32,6 +32,7 @@ htmlcov/
 
 ## tmp and local outputs
 **/tmp
+/var/
 
 mise.local.toml
 

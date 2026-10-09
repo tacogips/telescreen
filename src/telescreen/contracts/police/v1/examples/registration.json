@@ -1,0 +1,7 @@
+{
+  "worker_id": "worker-example",
+  "lease_seconds": 60,
+  "heartbeat_interval_seconds": 20,
+  "max_wait_seconds": 30,
+  "worker_token": "placeholder-worker-token"
+}

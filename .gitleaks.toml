@@ -1,0 +1,8 @@
+# Extends the default gitleaks rules. Allowlists only content that is provably not a secret.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "SHA-256 file hashes recorded in implementation-plan progress logs"
+paths = ['''^impl-plans/.*\.md$''']
+regexes = ['''(?:before|after)=[0-9a-f]{64}''']

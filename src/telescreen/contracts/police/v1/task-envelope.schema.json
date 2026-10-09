@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.telescreen.invalid/police/v1/task-envelope.schema.json",
+  "type": "object",
+  "properties": {
+    "contract_version": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^1\\.[0-9]+$"
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_type": {
+      "type": "string",
+      "pattern": "^(detect|verify_remediation|partition|scan_shard|custom:[a-z0-9_-]{1,64})$"
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "deadline": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "labels": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9_.-]+=[A-Za-z0-9_.:/-]+$"
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "callback": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "result_token": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "url",
+        "result_token"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "contract_version",
+    "task_id",
+    "task_type",
+    "attempt",
+    "issued_at",
+    "deadline",
+    "labels",
+    "input"
+  ],
+  "additionalProperties": false
+}
