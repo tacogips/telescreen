@@ -1,16 +1,16 @@
 # P13 UI Workflows and Runs Pages Implementation Plan
 
-**Status**: Completed
-**Design Reference**: design-docs/specs/design-api-and-ui.md (UI: Workflows, Runs), design-docs/specs/design-map-reduce-sweeps.md (API and UI)
+**Status**: Ready (run B revision; the run A implementation is the starting point)
+**Design Reference**: design-docs/specs/design-ui-sentry.md sections 6 (Workflows, Runs), 7, 8.1, 8.1a, 8.2; design-docs/specs/design-workflow-engine.md (DSL step fields); design-docs/specs/design-map-reduce-sweeps.md (API and UI)
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-09
+**Last Updated**: 2026-10-09 (run B, session 341)
 
 ## Plan Metadata
 
 - planId: `p13-ui-workflows`
 - planPath: `impl-plans/active/p13-ui-workflows.md`
-- wave: 3
-- dependsOn: `p07-web-shell`
+- wave: B2 (parallel with p12, p14, p28)
+- dependsOn: `p30-ui-design-system`, `p31-ui-mock-api`
 - writePaths:
   - `impl-plans/active/p13-ui-workflows.md`
   - `src/web/src/pages/workflows`
@@ -18,18 +18,73 @@
 - sharedPaths: none
 - artifactRoots: none
 
-Read `impl-plans/conventions.md` first (sections 2, 7, 8).
+Read `impl-plans/conventions.md` first (sections 2, 7, 7a, 8).
 
 ## Intent and Context
 
-These are the workflow editor and run-progress pages (acceptance: "workflow editor/run
-view"). Use only the p07 API client, types and components. Do not edit them.
+Run B rebuilds the Workflows and Runs pages on the design system (design-ui-sentry.md
+section 6 constrained by 8.1). Wave B1 delivered the components (`components/ui`,
+`TopBar.Slot` in `components/shell/TopBar.tsx`), the `yaml` npm package (p30) and the
+aligned API types plus mock API (p31; read `src/web/src/api/types.ts` and p31's Progress
+Log for the mechanical edits already made in your directories). Keep the `*Api` calls and
+the behaviors covered by existing tests; change markup and add the patterns below.
 
 ## Non-goals
 
-- No graph-drawing library; no new npm packages; no backend changes.
+- No graph-drawing library (inline SVG only); no npm package changes; no backend
+  changes; no edits outside your two page directories.
+- Omitted per design 8.1: workflow trigger summary, last run, runs in period; runs-list
+  current step and SLA due; human-task due time and tier.
 
-## Deliverables
+## Run B Deliverables (these supersede the run A list below where they differ)
+
+- `pages/workflows/graph.ts`: `parseWorkflowGraph(text: string, format: "yaml" | "json"):
+  { nodes: {id: string; type: string}[]; edges: {from: string; to: string; kind: "next" |
+  "branch" | "error" | "send_back"}[] } | null`. YAML via `import { parse } from "yaml"`,
+  JSON via `JSON.parse`; `null` on any parse error or missing `steps` list. Edges: `next`,
+  each `outcomes` value, each `cases[].next` and `default` (branch), `branches` items and
+  `join` (next), `on_error` and `on_exhausted` (error), `send_back.to` / step `to` of a
+  `send_back` step (send_back). Ignore unknown targets.
+- `pages/workflows/WorkflowGraph.tsx`: read-only inline SVG layered layout (rank by BFS
+  from the first step), lucide icon per step type, dashed return edges for send_back,
+  `role="img"` with an aria label; renders "Fix validation errors to preview" when the
+  graph is null.
+- Workflows list (`pages/workflows/index.tsx`): TopBar title "Workflows"; `Table` grouping
+  `workflowsApi.list()` items (versions `{id, name, version, active}`) by name: name,
+  latest version, active version; link to `/workflows/<name>`; `EmptyState`.
+- Workflow detail (`WorkflowEditor.tsx`): TopBar title = name, actions Validate /
+  Save as new version / Activate (`Button`s); versions from `workflowsApi.get(name)`;
+  source from `workflowsApi.version(name, v)`; mono editor with line numbers side by side
+  with `WorkflowGraph`; validation errors listed with JSON paths styled like invalid
+  search tokens; a create 422 (`WorkflowValidationError`) shows its errors the same way;
+  `raw_value_detected` shows "Source contains sensitive values" and never echoes text;
+  Start run form (optional issue id) -> `{run_id}` -> link to `/runs/<run_id>`; schema
+  link.
+- Runs list (`pages/runs/index.tsx`): TopBar title "Runs"; filters status (run statuses
+  of `RunStatus`) and workflow; `Table`: started (`RelativeTime`), workflow (name from one
+  `workflowsApi.list()` map by `definition_id`), issue link, trigger, status
+  `StatusIndicator` + text.
+- Run detail (`RunDetail.tsx`): TopBar title = workflow name + run id, actions Cancel
+  run; ordered step list (order by step-run order returned) with status glyph (lucide
+  spinner for running, check for succeeded, x for failed, clock for waiting/ready, slash
+  for cancelled), step id, step type (from the run's workflow version: map
+  `definition_id` -> `{name, version}` via `workflowsApi.list()`, then
+  `workflowsApi.version(name, version)` and `parseWorkflowGraph`; omit when unavailable),
+  visit count, attempt, `error_code`, collapsible masked input/output (`JSON.parse`
+  defensively, render as text; invalid shows "unavailable"); send_back transitions drawn
+  as a return arrow from the step run `from_step_run_id` to `to_step_id` with the masked
+  reason; current step highlighted (latest step not in a terminal status).
+- Waiting human task card: title, assignee, outcome `Select` from `outcomes`, comment,
+  Complete -> `humanTasksApi.complete`; 409 `evidence_required` shows "Upload evidence
+  first"; no due time.
+- Map step progress bar: when a step's `output_json` (or waiting `input_json`) has a
+  string `map_job_id`, `mapJobsApi.get(id)` -> bar of succeeded / failed / in flight
+  (absent `counts` keys are 0), partitions done/total, paused until, failed shard keys;
+  admin Cancel and Retry failed (responses are `{id, status}` -> re-fetch).
+- Polling: every 5 s only while the run status is running or waiting; keep form input
+  across polls (run-A behavior).
+
+## Run A Deliverables (history; behaviors still covered by tests)
 
 - `pages/workflows/index.tsx`: list view (`workflowsApi.list`: name, latest version,
   active version, trigger summary) or, with `:id` = workflow name, a detail view.
@@ -68,8 +123,25 @@ view"). Use only the p07 API client, types and components. Do not edit them.
   - a map step renders "120 / 1000" from the counts;
   - an evidence_required error shows the message.
 
+## Run B Tests (add; keep existing tests green with serializer-shaped responses)
+
+- `graph.ts`: YAML with steps a(next b), b(condition cases -> c, default d), d(send_back
+  to a) -> 4 nodes, edges a->b next, b->c and b->d branch, d->a send_back; invalid YAML
+  -> null; JSON input parses the same.
+- Editor: typing invalid YAML shows "Fix validation errors to preview"; validate errors
+  render with paths; a create 422 `{valid:false, errors:[...]}` renders the errors;
+  Start run navigates to `/runs/<run_id>`.
+- Runs list: workflow name resolved from `definition_id`; status filter sends `status=`.
+- Run detail: steps from `{run, steps, transitions, human_tasks}` render in order; the
+  send_back transition renders a return arrow labelled with its reason; human task
+  completion posts `{outcome, comment}`; a map step with `map_job_id` renders
+  "120 / 1000" partitions from the map job detail; a terminal run does not poll.
+
 ## Key Pitfalls
 
+- Pages never render `<h1>`; use `TopBar.Slot name="title"`. Never use `innerHTML`.
+- Every file under 400 lines; split the run detail into `runs/StepList.tsx`,
+  `runs/HumanTaskCard.tsx`, `runs/MapProgress.tsx` if needed.
 - `output_json` and `context_json` are strings; parse them defensively (invalid JSON
   shows "unavailable").
 - The map-job id is in the map step's output (`map_job_id`) or in its waiting
@@ -80,19 +152,27 @@ view"). Use only the p07 API client, types and components. Do not edit them.
 
 ```bash
 set -o pipefail
-test -d src/web/node_modules || (cd src/web && bun install --frozen-lockfile)   # p01 installed it; do not reinstall concurrently
-cd src/web && bun run typecheck 2>&1 | tee /tmp/telescreen-p13-ui-workflows-typecheck.log   # own files: zero errors
-cd src/web && bunx vitest run src/pages/workflows src/pages/runs 2>&1 | tee /tmp/telescreen-p13-ui-workflows-test.log   # exit 0
-cd src/web && bun run build --outDir /tmp/telescreen-p13-ui-workflows-web --emptyOutDir   # exit 0
+test -d src/web/node_modules || (cd src/web && bun install --frozen-lockfile)
+cd src/web && bun run typecheck 2>&1 | tee /tmp/telescreen-p13-ui-workflows-typecheck.log; echo "exit=$?"
+cd src/web && bunx vitest run src/pages/workflows src/pages/runs 2>&1 | tee /tmp/telescreen-p13-ui-workflows-test.log; echo "exit=$?"
+cd src/web && bun run build --outDir /tmp/telescreen-p13-ui-workflows-web --emptyOutDir 2>&1 | tee /tmp/telescreen-p13-ui-workflows-build.log; echo "exit=$?"
+! grep -rn 'innerHTML\|<h1' src/web/src/pages/workflows src/web/src/pages/runs
+test -z "$(find src/web/src/pages/workflows src/web/src/pages/runs -name '*.ts*' -exec wc -l {} + | awk '$1 >= 400 && $2 != "total"')"
 ```
+
+All exit 0. If `typecheck` fails only in p12/p14 page files still in progress, record
+the log and re-run later; your paths must show zero errors
+(`grep -E 'src/pages/(workflows|runs)' <log>` prints nothing). The screenshot smoke is
+run by p29.
 
 ## Completion Criteria
 
-- [x] Workflow list, editor (validate, save, activate, start run), runs list and run detail (steps, transitions, human tasks, map progress) delivered
-- [x] Tests listed above pass
-- [x] A 5-second waiting-run poll preserves the human-task outcome and comment; terminal runs are not polled
-- [x] No source edits outside the two page directories
-- [x] Progress Log updated
+- [ ] Graph parser and preview, workflows list and detail rebuilt per Run B Deliverables
+- [ ] Runs list and run detail (step list, send-back arrows, human task card, map progress) rebuilt
+- [ ] Run B tests and the retained run A tests pass; verification commands pass with logs recorded
+- [ ] Polling only for running/waiting runs; form input preserved across polls
+- [ ] No source edits outside the two page directories and this plan
+- [ ] Progress Log updated
 
 ## Progress Log
 

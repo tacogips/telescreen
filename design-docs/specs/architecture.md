@@ -290,6 +290,18 @@ Constraints:
   `tests/leak` by the assembly plan.
 - Every Python file stays under 1000 lines; every plan file under 400 lines.
 
+Run B (2026-10-09): waves 1-4 and the backend part of wave 5 are accepted at commit
+28ce81b (all plans except ui-issues/ui-workflows/ui-ops, assembly and examples-compose).
+The remaining work follows the plan boundaries in `design-ui-sentry.md` section 8.7:
+ui-design-system (p30, new) and ui-mock-api (p31, new) first; then ui-issues, ui-workflows,
+ui-ops and assembly in parallel; then examples-compose. Two ownership exceptions to the
+rules above apply to run B only: p30 is the single serial owner of
+`src/web/package.json`/`bun.lock` (foundation is accepted and closed), and
+examples-compose (p29) updates `README.md` (UI, `serve` with `TELESCREEN_WEB_DIST`, compose
+quick start). No run B plan edits `pyproject.toml` or `uv.lock`. ui-mock-api (p31) also
+aligns the UI client types with the router serializers and makes the matching mechanical
+page edits as an explicit wave-1 -> wave-2 handoff (`design-ui-sentry.md` section 8.1a).
+
 ### 9. Verification Strategy
 
 | Level | Tooling | Network |

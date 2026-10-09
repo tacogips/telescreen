@@ -1,0 +1,285 @@
+{
+  "taskId": "telescreen-v1-20261009-s341",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "28ce81b44ec881eb6b28957027cb8c67986380dd",
+  "evidenceRoot": "tmp/telescreen-v1-20261009-s341",
+  "evidenceRootNotes": "Untracked; never staged or committed. Use per-plan and per-attempt subdirectories: tmp/telescreen-v1-20261009-s341/<planId>/attempt-<n>/.",
+  "supersedes": "impl-plans/active/telescreen-v1-20261009-s340-dispatch.json and s338 (kept unchanged as run A/A2 historical records)",
+  "runScope": "Run B: Sentry-pattern UI (p30 design system and shell, p31 API client alignment and mock API, p12/p13/p14 page rebuilds), p28 assembly (wiring, app, CLI, serve with built UI, e2e and leak tests), p29 compose reconciliation, README and final gates.",
+  "designDocPaths": [
+    "design-docs/specs/design-ui-sentry.md",
+    "design-docs/specs/design-api-and-ui.md",
+    "design-docs/specs/architecture.md",
+    "design-docs/specs/command.md",
+    "design-docs/specs/design-masking.md",
+    "design-docs/specs/design-synthetic-test-dataset.md",
+    "design-docs/specs/design-workflow-engine.md",
+    "design-docs/specs/design-map-reduce-sweeps.md"
+  ],
+  "acceptedDependencies": [
+    {"planId": "p01-foundation", "planPath": "impl-plans/active/p01-foundation.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "telescreen.core (config incl. TELESCREEN_WEB_DIST, JSON boundary, masked logging) and tooling"},
+    {"planId": "p02-db-schema", "planPath": "impl-plans/active/p02-db-schema.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "SQLAlchemy models and Alembic migrations"},
+    {"planId": "p03-detection-rules", "planPath": "impl-plans/active/p03-detection-rules.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "RuleDetector with credential and PII rules incl. Japanese formats"},
+    {"planId": "p04-ports", "planPath": "impl-plans/active/p04-ports.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "adapter Protocols and fakes"},
+    {"planId": "p05-police-contract", "planPath": "impl-plans/active/p05-police-contract.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "versioned police JSON Schemas and OpenAPI"},
+    {"planId": "p06-workflow-dsl", "planPath": "impl-plans/active/p06-workflow-dsl.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "workflow DSL models and validation"},
+    {"planId": "p07-web-shell", "planPath": "impl-plans/active/p07-web-shell.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "SolidJS app skeleton, base API client, page areas"},
+    {"planId": "p08-masking", "planPath": "impl-plans/active/p08-masking.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "Masker, Redactor, IndexGuard, HMAC fingerprints"},
+    {"planId": "p09-detection-llm-ml", "planPath": "impl-plans/active/p09-detection-llm-ml.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "managed/local LLM and ML detectors, composite pipeline"},
+    {"planId": "p10-api-common", "planPath": "impl-plans/active/p10-api-common.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "API auth, errors, pagination and common routers"},
+    {"planId": "p11-police-sdk", "planPath": "impl-plans/completed/p11-police-sdk.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "standalone telescreen_police_sdk (pull and push modes)"},
+    {"planId": "p15-audit-search", "planPath": "impl-plans/active/p15-audit-search.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "hash-chained audit log, Meilisearch search and audit APIs"},
+    {"planId": "p16-issues-ingest", "planPath": "impl-plans/active/p16-issues-ingest.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "issue grouping, push ingestion, issues API incl. /api/issues/stats"},
+    {"planId": "p17-notifications", "planPath": "impl-plans/completed/p17-notifications.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "notification channels behind the outbound DLP gate"},
+    {"planId": "p18-evidence", "planPath": "impl-plans/active/p18-evidence.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "evidence upload with scan and reject"},
+    {"planId": "p19-police-bureau", "planPath": "impl-plans/completed/p19-police-bureau.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "PoliceGateway pull/push transports and /api/police/v1 router"},
+    {"planId": "p20-collectors-core", "planPath": "impl-plans/active/p20-collectors-core.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "collector framework, scheduling and collectors API"},
+    {"planId": "p21-collectors-slack", "planPath": "impl-plans/completed/p21-collectors-slack.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "Slack collector"},
+    {"planId": "p22-collectors-google", "planPath": "impl-plans/active/p22-collectors-google.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "Google Drive, Docs and Sheets collectors"},
+    {"planId": "p23-collectors-github", "planPath": "impl-plans/active/p23-collectors-github.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "GitHub collector"},
+    {"planId": "p24-workflow-engine", "planPath": "impl-plans/active/p24-workflow-engine.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "durable workflow engine, queue, timers and runs API"},
+    {"planId": "p25-workflow-nodes", "planPath": "impl-plans/active/p25-workflow-nodes.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "workflow node types incl. human_task, evidence_upload, police_verify"},
+    {"planId": "p26-workflow-mapreduce", "planPath": "impl-plans/completed/p26-workflow-mapreduce.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "map-reduce sweeps"},
+    {"planId": "p27-assistant", "planPath": "impl-plans/active/p27-assistant.md", "commit": "28ce81b44ec881eb6b28957027cb8c67986380dd", "provides": "MCP server and assistant chat API"}
+  ],
+  "designChangeThisRun": "design-ui-sentry.md section 8 (v1 boundaries: API capability mapping 8.1, serializer alignment and wave handoff 8.1a, route/shell contract 8.2, mock API 8.3, fonts/deps 8.4, screenshot smoke 8.5, serving 8.6, plan boundaries 8.7); architecture.md section 8 run B paragraph; command.md web deps and TELESCREEN_WEB_DIST; design-api-and-ui.md global /api/issues/stats and UI pointers. Accepted by step3-design-review comm-005685.",
+  "waves": {
+    "B1": ["p30-ui-design-system", "p31-ui-mock-api"],
+    "B2": ["p12-ui-issues", "p13-ui-workflows", "p14-ui-ops", "p28-assembly"],
+    "B3": ["p29-examples-compose"]
+  },
+  "waveRationale": "p30 changes package.json/bun.lock and provides components/shell; p31 aligns the API client with the router serializers and makes mechanical page edits while no page plan runs (explicit B1->B2 handoff of src/web/src/pages, design 8.1a). B2 page plans own disjoint page directories; p28 owns only Python assembly paths and tests and needs p31 fixtures for its leak test. p29 runs last: README, compose reconciliation and final full gates including the screenshot smoke. Within each wave writePaths are disjoint.",
+  "reviewContext": {
+    "issueReference": "workflowInput issueTitle 'Telescreen: sensitive-data retention violation monitoring, Sentry-style reporting, and DB-backed incident/AI workflow engine' (no GitHub issue number); run opus-luna-design-and-implement-review-loop-session-341, run B",
+    "userProblem": "Finish Telescreen v1: a Sentry-pattern UI that works against the real API and in a masked mock mode, an assembled Bureau whose `telescreen serve` serves API and UI, and runnable compose examples with documentation, without ever exposing raw sensitive values.",
+    "requiredOutcomes": [
+      "UI per design-ui-sentry.md (tokens light/dark, chonky buttons, rail + panel shell, issue list/detail, all pages restyled) limited to the accepted API (8.1).",
+      "UI client types equal the router serializers; mock API mode renders every page with masked fixtures only.",
+      "telescreen serve serves the API and the built UI; CLI, e2e and leak tests pass offline.",
+      "README, compose reconciliation; mise run ci and the web gates pass; screenshot smoke saved under tmp/."
+    ],
+    "nonGoals": [
+      "Any backend endpoint, parameter or response field change.",
+      "Re-implementing accepted plans; pyproject.toml/uv.lock changes.",
+      "Copying Sentry code, assets, icons, names or brand colors."
+    ],
+    "constraints": [
+      "Strict typing via tools/typelint.py, ruff ANN/PGH and ty; no Any/object/dict, no **kwargs, no type-ignore.",
+      "Raw detected values never persisted, logged, indexed, notified or returned; fixtures masked only.",
+      "Only p30 runs bun add/install without --frozen-lockfile; nobody edits pyproject.toml/uv.lock.",
+      "Python files < 1000 lines, plan files < 400 lines, web files < 400 lines.",
+      "Fixed findings only in addressedFeedback; offline-skipped integration tests are not risks (conventions 7a).",
+      "Builds go to /tmp; never into src/web/dist."
+    ],
+    "designDecisionsAndRationale": [
+      "Router serializers are authoritative; p31 aligns types instead of adapting wire data, so mock mode cannot hide real-backend breakage.",
+      "Mock switch is a constant-folded import.meta.env check with a dynamic import, so production bundles carry no fixtures.",
+      "UI located only via TELESCREEN_WEB_DIST; the wheel stays node-free."
+    ],
+    "intentionalTradeoffs": [
+      "Sentry patterns needing data the API lacks are omitted (design 8.1).",
+      "Docked assistant panel replaced by navigation to /assistant?context=."
+    ],
+    "supportedEdgeCases": [
+      "Empty states: no matching issues, zero unresolved, no collectors (design-ui-sentry.md).",
+      "Invalid workflow text shows 'Fix validation errors to preview' instead of a graph.",
+      "/ redirects to /issues; /chat and /chat/:id redirect to /assistant.",
+      "Bulk actions report per-issue failures in a toast with counts.",
+      "TELESCREEN_WEB_DIST without index.html: serve exits 3; unknown /api/ paths return JSON not_found, never the SPA fallback; unset serves API only (design 8.6).",
+      "Run polling only while a run is running or waiting.",
+      "Screenshot smoke without a local Chrome/Chromium exits non-zero and is recorded as a verification gap (design 8.5)."
+    ],
+    "outOfScopeEdgeCases": [
+      "Select-all-N-matching and multi-page bulk confirm (API returns no total count).",
+      "Ignore with duration or until-regressed; Rescan now; Set priority; escalation tier and due time on issue detail (design 8.1).",
+      "Docked assistant panel.",
+      "Offline verification of docker compose config and the Docker bun build (static tests/examples checks only).",
+      "OIDC SSO (bearer API tokens only in v1)."
+    ],
+    "planReviewAcceptance": "step5-impl-plan-review comm-005687: accepted, needs_revision=false, needs_design_revision=false",
+    "planReviewResidualRisks": [
+      "p30-ui-design-system.md:212 TopBar.Slot outside AppShell is either/or; page tests render without AppShell (Solid Portal defaults to document.body).",
+      "p31-ui-mock-api.md:133 MOCK_FIXTURE_MARKER must be used at runtime by the mock router; covered by the plan's mock-build grep (line 228).",
+      "p29-examples-compose.md:53 tests/examples parsing main(['--help']) must catch SystemExit.",
+      "Fonts fetched at implementation time; p30 review checks fonts/SOURCES.md URLs and sha256 against the OFL sources."
+    ],
+    "sourcePaths": [
+      "impl-plans/conventions.md",
+      "impl-plans/active/telescreen-v1-20261009-s341-dispatch.json",
+      "design-docs/specs/design-ui-sentry.md",
+      "src/telescreen/api/routers",
+      "src/web/src"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "p30-ui-design-system",
+      "planPath": "impl-plans/active/p30-ui-design-system.md",
+      "wave": "B1",
+      "dependsOn": ["p07-web-shell"],
+      "mode": "implement from plan",
+      "writePaths": ["impl-plans/active/p30-ui-design-system.md", "src/web/package.json", "src/web/bun.lock", "src/web/index.html", "src/web/public", "src/web/scripts", "src/web/src/styles", "src/web/src/components", "src/web/src/App.tsx", "src/web/src/routes.tsx", "src/web/src/main.tsx", "src/web/src/shell.test.tsx", "src/web/node_modules"],
+      "sharedPaths": [],
+      "artifactRoots": ["src/web/node_modules"],
+      "acceptanceCriteria": [
+        "lucide-solid, yaml and dev playwright-core added; bun install --frozen-lockfile clean.",
+        "Tokens, fonts with OFL texts and SOURCES.md, components and shell with pinned contracts; Layout/Sidebar removed; /chat redirects to /assistant.",
+        "Component and shell tests pass; no Sentry brand strings or colors in owned paths."
+      ],
+      "verification": [
+        "set -o pipefail; cd src/web && bun install --frozen-lockfile",
+        "set -o pipefail; cd src/web && bun run typecheck 2>&1 | tee /tmp/telescreen-p30-typecheck.log",
+        "set -o pipefail; cd src/web && bunx vitest run src/components src/shell.test.tsx 2>&1 | tee /tmp/telescreen-p30-test.log",
+        "set -o pipefail; cd src/web && bun run build --outDir /tmp/telescreen-p30-web --emptyOutDir 2>&1 | tee /tmp/telescreen-p30-build.log",
+        "! grep -rniE '7553ff|sentry|scraps|seer' src/web/src/styles src/web/src/components src/web/public",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p30-ui-design-system.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p31-ui-mock-api",
+      "planPath": "impl-plans/active/p31-ui-mock-api.md",
+      "wave": "B1",
+      "dependsOn": ["p07-web-shell"],
+      "mode": "implement from plan (includes the explicit B1->B2 mechanical handoff edits in src/web/src/pages)",
+      "writePaths": ["impl-plans/active/p31-ui-mock-api.md", "src/web/src/api", "src/web/src/pages"],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "types.ts/client.ts match the router serializers (design 8.1a).",
+        "Mock mode serves every page endpoint with masked fixtures; production build contains no fixture marker.",
+        "Fixture raw-pattern test and Redactor check pass; pages compile and their tests pass."
+      ],
+      "verification": [
+        "set -o pipefail; cd src/web && bun run typecheck 2>&1 | tee /tmp/telescreen-p31-typecheck.log",
+        "set -o pipefail; cd src/web && bunx vitest run src/api src/pages 2>&1 | tee /tmp/telescreen-p31-test.log",
+        "set -o pipefail; cd src/web && bun run build --outDir /tmp/telescreen-p31-web --emptyOutDir 2>&1 | tee /tmp/telescreen-p31-build.log",
+        "! grep -rl 'telescreen-mock-fixtures-v1' /tmp/telescreen-p31-web",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p31-ui-mock-api.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p12-ui-issues",
+      "planPath": "impl-plans/active/p12-ui-issues.md",
+      "wave": "B2",
+      "dependsOn": ["p30-ui-design-system", "p31-ui-mock-api"],
+      "mode": "rebuild pages from plan (run B revision)",
+      "writePaths": ["impl-plans/active/p12-ui-issues.md", "src/web/src/pages/issues", "src/web/src/pages/search"],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Issues list (query builder, URL state, views, sort, global chart, columns, bulk bar) and issue detail (header, action bar, graph, tag bars, navigation, fold sections, sidebar) per plan and design 8.1.",
+        "No per-row requests; no <h1> or innerHTML; tests pass."
+      ],
+      "verification": [
+        "set -o pipefail; cd src/web && bun run typecheck 2>&1 | tee /tmp/telescreen-p12-ui-issues-typecheck.log",
+        "set -o pipefail; cd src/web && bunx vitest run src/pages/issues src/pages/search 2>&1 | tee /tmp/telescreen-p12-ui-issues-test.log",
+        "set -o pipefail; cd src/web && bun run build --outDir /tmp/telescreen-p12-ui-issues-web --emptyOutDir 2>&1 | tee /tmp/telescreen-p12-ui-issues-build.log",
+        "! grep -rn 'innerHTML\\|<h1' src/web/src/pages/issues src/web/src/pages/search",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p12-ui-issues.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p13-ui-workflows",
+      "planPath": "impl-plans/active/p13-ui-workflows.md",
+      "wave": "B2",
+      "dependsOn": ["p30-ui-design-system", "p31-ui-mock-api"],
+      "mode": "rebuild pages from plan (run B revision)",
+      "writePaths": ["impl-plans/active/p13-ui-workflows.md", "src/web/src/pages/workflows", "src/web/src/pages/runs"],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Workflow graph preview and editor, runs list and run detail per plan.",
+        "Tests pass; polling only for running/waiting runs."
+      ],
+      "verification": [
+        "set -o pipefail; cd src/web && bun run typecheck 2>&1 | tee /tmp/telescreen-p13-ui-workflows-typecheck.log",
+        "set -o pipefail; cd src/web && bunx vitest run src/pages/workflows src/pages/runs 2>&1 | tee /tmp/telescreen-p13-ui-workflows-test.log",
+        "set -o pipefail; cd src/web && bun run build --outDir /tmp/telescreen-p13-ui-workflows-web --emptyOutDir 2>&1 | tee /tmp/telescreen-p13-ui-workflows-build.log",
+        "! grep -rn 'innerHTML\\|<h1' src/web/src/pages/workflows src/web/src/pages/runs",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p13-ui-workflows.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p14-ui-ops",
+      "planPath": "impl-plans/active/p14-ui-ops.md",
+      "wave": "B2",
+      "dependsOn": ["p30-ui-design-system", "p31-ui-mock-api"],
+      "mode": "rebuild pages from plan (run B revision)",
+      "writePaths": ["impl-plans/active/p14-ui-ops.md", "src/web/src/pages/police", "src/web/src/pages/collectors", "src/web/src/pages/escalation", "src/web/src/pages/audit", "src/web/src/pages/chat", "src/web/src/pages/settings"],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Police, collectors, escalation, audit, assistant and settings rebuilt per plan.",
+        "Tests pass; no <h1> or innerHTML."
+      ],
+      "verification": [
+        "set -o pipefail; cd src/web && bun run typecheck 2>&1 | tee /tmp/telescreen-p14-ui-ops-typecheck.log",
+        "set -o pipefail; cd src/web && bunx vitest run src/pages/police src/pages/collectors src/pages/escalation src/pages/audit src/pages/chat src/pages/settings 2>&1 | tee /tmp/telescreen-p14-ui-ops-test.log",
+        "set -o pipefail; cd src/web && bun run build --outDir /tmp/telescreen-p14-ui-ops-web --emptyOutDir 2>&1 | tee /tmp/telescreen-p14-ui-ops-build.log",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p14-ui-ops.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p28-assembly",
+      "planPath": "impl-plans/active/p28-assembly.md",
+      "wave": "B2",
+      "dependsOn": ["p31-ui-mock-api", "p01-foundation", "p02-db-schema", "p03-detection-rules", "p04-ports", "p05-police-contract", "p06-workflow-dsl", "p08-masking", "p09-detection-llm-ml", "p10-api-common", "p11-police-sdk", "p15-audit-search", "p16-issues-ingest", "p17-notifications", "p18-evidence", "p19-police-bureau", "p20-collectors-core", "p21-collectors-slack", "p22-collectors-google", "p23-collectors-github", "p24-workflow-engine", "p25-workflow-nodes", "p26-workflow-mapreduce", "p27-assistant"],
+      "mode": "implement from plan",
+      "writePaths": ["impl-plans/active/p28-assembly.md", "src/telescreen/wiring.py", "src/telescreen/wiring_builders.py", "src/telescreen/api/app.py", "src/telescreen/cli.py", "src/telescreen/__main__.py", "tests/e2e", "tests/leak", "tests/test_package.py"],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Container, create_app and CLI per command.md with documented exit codes.",
+        "serve serves the built UI per design 8.6; static tests pass; missing index.html exits 3.",
+        "E2E remediation, sweep, ingestion, chat and the leak matrix (incl. UI fixtures) pass; full Python gates pass; no pyproject/uv.lock change."
+      ],
+      "verification": [
+        "uv run --frozen ruff format --check --no-cache .",
+        "uv run --frozen ruff check --no-cache .",
+        "uv run --frozen python tools/typelint.py",
+        "uv run --frozen ty check",
+        "set -o pipefail; uv run --frozen pytest -p no:cacheprovider 2>&1 | tee /tmp/telescreen-p28-assembly-pytest.log",
+        "uv build --out-dir /tmp/telescreen-p28-assembly-dist",
+        "git diff --quiet -- pyproject.toml uv.lock",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p28-assembly.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p29-examples-compose",
+      "planPath": "impl-plans/active/p29-examples-compose.md",
+      "wave": "B3",
+      "dependsOn": ["p12-ui-issues", "p13-ui-workflows", "p14-ui-ops", "p28-assembly", "p30-ui-design-system", "p31-ui-mock-api"],
+      "mode": "reconcile, document, final gates",
+      "writePaths": ["impl-plans/active/p29-examples-compose.md", "examples/compose", "examples/workflows", "tests/examples", "README.md"],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Compose reconciled with p28 CLI and UI serving; tests/examples assertions pass.",
+        "README documents setup, architecture, UI (dev, mock, screenshots), serve and compose.",
+        "Full Python and web gates pass; screenshot smoke saved under tmp/ui-screenshots or the browser gap recorded."
+      ],
+      "verification": [
+        "uv run --frozen ruff format --check --no-cache .",
+        "uv run --frozen ruff check --no-cache .",
+        "uv run --frozen python tools/typelint.py",
+        "uv run --frozen ty check",
+        "set -o pipefail; uv run --frozen pytest -p no:cacheprovider 2>&1 | tee /tmp/telescreen-p29-final-pytest.log",
+        "uv build --out-dir /tmp/telescreen-p29-final-dist",
+        "set -o pipefail; cd src/web && (test -d node_modules || bun install --frozen-lockfile) && bun run typecheck && bun run test && bun run build --outDir /tmp/telescreen-p29-final-web --emptyOutDir",
+        "set -o pipefail; cd src/web && bun run screenshots 2>&1 | tee /tmp/telescreen-p29-screenshots.log",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p29-examples-compose.md)\" -eq 0"
+      ]
+    }
+  ],
+  "serialFinalization": {
+    "owner": "serial reconciliation after wave B3 joins (not a fanout plan)",
+    "steps": [
+      "Apply every Reconciliation request logged in the seven plan Progress Logs one at a time, with fresh reads and sha256 before/after.",
+      "Re-run the full gates with logs under /tmp/telescreen-s341-final-*.log: uv run --frozen ruff format --check --no-cache . ; uv run --frozen ruff check --no-cache . ; uv run --frozen python tools/typelint.py ; uv run --frozen ty check ; uv run --frozen pytest -p no:cacheprovider ; uv build --out-dir /tmp/telescreen-s341-final-dist ; cd src/web && bun install --frozen-lockfile && bun run typecheck && bun run test && bun run build --outDir /tmp/telescreen-s341-final-web --emptyOutDir.",
+      "Archive accepted plans to impl-plans/completed only after integration review."
+    ]
+  }
+}

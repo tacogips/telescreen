@@ -1,16 +1,16 @@
 # P12 UI Issues and Search Pages Implementation Plan
 
-**Status**: Completed
-**Design Reference**: design-docs/specs/design-api-and-ui.md (UI: Issues list, Issue detail, Search; Evidence)
+**Status**: Ready (run B revision; the run A implementation below is the starting point)
+**Design Reference**: design-docs/specs/design-ui-sentry.md sections 4, 5, 6 (Search), 7, 8.1, 8.1a, 8.2; design-docs/specs/design-api-and-ui.md (Issues, Evidence, Search endpoints)
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-09
+**Last Updated**: 2026-10-09 (run B, session 341)
 
 ## Plan Metadata
 
 - planId: `p12-ui-issues`
 - planPath: `impl-plans/active/p12-ui-issues.md`
-- wave: 3
-- dependsOn: `p07-web-shell`
+- wave: B2 (parallel with p13, p14, p28)
+- dependsOn: `p30-ui-design-system`, `p31-ui-mock-api`
 - writePaths:
   - `impl-plans/active/p12-ui-issues.md`
   - `src/web/src/pages/issues`
@@ -18,94 +18,173 @@
 - sharedPaths: none
 - artifactRoots: none
 
-Read `impl-plans/conventions.md` first (sections 2, 7, 8).
+Read `impl-plans/conventions.md` first (sections 2, 7, 7a, 8).
 
 ## Intent and Context
 
-These are the Sentry-like issue pages (acceptance: "issues list/detail"). The shell (p07)
-discovers `src/web/src/pages/<area>/index.tsx` automatically and routes `/issues` and
-`/issues/:id` to the same default export. Use only `src/web/src/api/client.ts`,
-`src/web/src/api/types.ts` and `src/web/src/components/*` from p07. Do not edit them; if
-something is missing, add a local helper inside your page directory and log a
-Reconciliation request.
+Run B rebuilds the Issues and Search pages on the Sentry-pattern design system
+(design-ui-sentry.md sections 4, 5, 6 constrained by 8.1). Wave B1 delivered:
+
+- p30: `src/web/src/components/ui/*` (exported from `components/ui/index.ts`), the shell
+  with `TopBar.Slot` (`components/shell/TopBar.tsx`), tokens, and `lucide-solid`.
+- p31: API types/client aligned with the router serializers (read
+  `src/web/src/api/types.ts`; `IssueEvent.observed_at`, `IssueHistory.kind/from_value/
+  to_value/note`, global `issuesApi.stats({bucket, days})`, `rawFetch`,
+  `ApiError.ruleClasses`) and the mock API; p31 already made mechanical edits in your
+  directories (read its Progress Log).
+
+Keep the data flow (same `*Api` calls) and every behavior covered by the existing tests;
+change markup and add the patterns below. Never call an endpoint the API does not have.
 
 ## Non-goals
 
-- No backend changes, no shell changes, no new npm packages.
+- No edits to `src/web/src/api`, `components`, `styles`, routes, shell or other pages.
+  Missing component feature -> local helper in your directory + Reconciliation request.
+- No backend changes, no npm packages, no Trend column, no "For review" view, no
+  Resources column, no Set priority, no Rescan now, no select-all-N banner (design 8.1).
 
 ## Deliverables
 
-- `pages/issues/index.tsx`: default export `IssuesPage`; renders `IssueList` when there
-  is no `id` param, else `IssueDetail`.
-- `pages/issues/IssueList.tsx`:
-  - Filters: status, source, rule class, severity, assignee, and free text `q`. The free
-    text goes to `issuesApi.list({q})`, which the backend serves through search.
-  - Sort select: `last_seen`, `first_seen`, `times_seen`.
-  - Columns: short id (a link to `/issues/<id>`), title, `StatusBadge`, first seen, last
-    seen (`RelativeTime`), events (`times_seen`), and a 14-day `Sparkline` from
-    `issuesApi.stats(id, {bucket: "day", days: 14})`, loaded lazily per row.
-  - `LoadMore` paging with `next_cursor`.
-- `pages/issues/IssueDetail.tsx`:
-  - Header: short id, title, status, severity, rule class, display locator, and first
-    seen / last seen / times seen.
-  - Status transition buttons limited to the allowed transitions from the data-model
-    status machine (encode the table as a constant).
-  - Assignee input that calls `issuesApi.update({assignee_ref})`.
-  - Masked event list from `issuesApi.events`, showing masked snippet, location, rule id,
-    detector, confidence and observed time.
-  - History timeline from `issuesApi.history`.
-  - Linked runs from `runsApi.list({issue_id})`, showing the current step and status,
-    each linking to `/runs/<id>`.
-  - Evidence list from `evidenceApi.list({issue_id})` and an upload form (a file input
-    sent as a raw body through a local typed helper). The helper reads only safe fields
-    from the 422 `evidence_rejected` contract and shows rule classes; 415 and 503 retain
-    their error codes through `ApiError`.
-  - Comment box that calls `issuesApi.comment`.
-- `pages/search/index.tsx`: a global search box; an index selector (issues, findings,
-  runs, audit) using `searchApi.search({q, index})`; issue results link to issues and
-  run results link to runs. Findings and audit use the non-link fallback until p15/p07
-  expose an issue id for findings hits.
-- Tests next to the pages (`*.test.tsx`, vitest with `@solidjs/testing-library`, a
-  mocked `fetch` via `vi.stubGlobal`):
-  - the list renders rows from a mocked page and shows a status badge and an events count;
-  - changing the status filter refetches with `status=resolved` in the URL;
-  - the detail shows only allowed transitions (for `resolved` only "Reopen");
-  - clicking a transition sends a PATCH with `{status}`;
-  - an evidence 422 response renders "Evidence rejected" plus the rule classes;
-  - search renders results for the chosen index;
-  - an error response renders `ErrorBanner` with the code.
+### Issues list (`pages/issues/IssueList.tsx` plus small files in `pages/issues/`)
+
+- `query.ts`: `ISSUE_QUERY_KEYS: QueryKeySpec[]` for `is` (6 statuses), `severity`
+  (high, medium), `rule` (9 rule classes), `source` (slack, gdrive, gdocs, gsheets,
+  github, custom, police), `assigned` (free value, description "member:<handle> or
+  team:<slug>"); `issueQueryToParams(tokens: QueryToken[], sort: string):
+  URLSearchParams` mapping `is->status`, `severity`, `rule->rule_class`, `source`,
+  `assigned->assignee`, text tokens joined by spaces -> `q`; invalid tokens and
+  `assigned:me|my_teams|none` are never sent.
+- URL is the state: read and write `?query=` and `?sort=` with `useSearchParams`;
+  default query `is:unresolved`, default sort `last_seen`.
+- TopBar: `TopBar.Slot name="title"` "Issues"; actions: Save view `SplitButton`
+  ("Save as new view", "Reset") with an accent dot when the query/sort differ from the
+  active saved view.
+- Saved views: `localStorage["telescreen.issueViews"]` JSON array of `{id, name, query,
+  sort, starred}`; after writing, `window.dispatchEvent(new Event("telescreen:issue-views"))`.
+- Layout grid `page-filters search sort` (wrapping on narrow containers):
+  `PageFilterBar` (Source segment only; writes `source:` into the query),
+  `SearchQueryBuilder` with `ISSUE_QUERY_KEYS`, `SortSelect` with Last seen ("Last time
+  the item was found"), First seen ("When the issue was first reported"), Findings
+  ("Number of findings").
+- Above the list: one `MiniBarChart` "Findings, last 14 days (all issues)" from
+  `issuesApi.stats({bucket: "day", days: 14})` (one request per page load).
+- Rows (container queries on the list container): min-height 82px, stretched link to
+  `/issues/<id>`, checkbox column; title 16px medium (rule class label + `display_title`,
+  ellipsis); message line `SeverityBar` + `Redacted text={display_locator}`; meta row
+  12px: `short_id` with a lucide source icon, location, status `Tag` when not
+  unresolved. Columns: Last seen 86px (sm), Age 50px (2xl), Findings 60px (lg, tooltip
+  "Since first seen"), Priority 64px (4xl, `PriorityBadge` from severity), Assignee 66px
+  (sm). Shift-click selects a range, Cmd/Ctrl-click toggles.
+- Bulk bar (sticky, 36px): select-all over loaded rows with indeterminate state; actions
+  Resolve, Ignore, Acknowledge, Assign to (member/team picker from
+  `directoryApi.members()`/`teams()` producing `member:<handle>`/`team:<slug>`), Start
+  workflow (picker over `workflowsApi.list()` items with `active === true`; calls
+  `workflowsApi.startRun(name, issueId)` per issue), more menu (Mark in progress,
+  Reopen). Each action runs one request per selected issue, offers only transitions
+  allowed for every selected status, then reloads and shows one `showToast` with
+  succeeded/failed counts.
+- Paging: `LoadMore` or `Pagination` with `next_cursor`.
+- Empty states: no matches ("No issues match your search", tips on filters and syntax);
+  zero unresolved for the default query ("Nothing exposed right now", link to
+  `/collectors`). Loading: `Placeholder` row skeletons.
+
+### Issue detail (`pages/issues/IssueDetail.tsx` plus `pages/issues/detail/*`)
+
+- TopBar title: `Issues` > source icon + copyable `short_id`.
+- Header: title (20px ellipsis + tooltip); counters Findings (`times_seen`) and Resources
+  (distinct `location` among loaded events); subtitle: status text, rule class,
+  `Redacted` display locator, badges (evidence count, active run).
+- Action bar `role="toolbar"`: Resolve (split; when `resolution` says removal show
+  "Resolved by removal" read-only), Ignore (plain), Acknowledge, Start workflow, more menu
+  (copy issue as Markdown via `navigator.clipboard.writeText` using masked fields only);
+  right: `PriorityBadge` (read-only) and Assignee `Select` (`PATCH {assignee_ref}`). When
+  resolved/ignored: Reopen + status banner.
+- Two columns at container width >= 1152px (main + 325px sidebar with Open/Close
+  sidebar), stacked below.
+- Main: findings graph (`MiniBarChart` "Loaded findings, last 14 days": events from
+  `issuesApi.events(id, {limit: 200})` bucketed by UTC day of `observed_at`); tag bars
+  (detector, first location segment) ; sticky finding navigation with tabs Findings /
+  Evidence / Runs, Recommended (highest confidence, then latest) / First / Latest, prev/
+  next; "Jump to" chips; `FoldSection`s in order: Highlights (rule class, rule id,
+  detector, confidence, severity, location, first/last seen), Location chain (split
+  `location` on ` > `, `/`, `:`; matched frame shows `Redacted text={masked_snippet}`),
+  Timeline (`Timeline` from `issuesApi.history`: icon per `kind`, `from_value ->
+  to_value`, `note`, `at`), Evidence (list + upload; keep the run-A rejection behavior:
+  422 shows "Evidence rejected" + rule classes, 415/503 keep their codes), Detection
+  details (detector, rule id, rule class, confidence, first 8 chars of `fingerprint`).
+- Sidebar: First/last seen (`RelativeTime`); Workflow runs (`runsApi.list({issue_id})`;
+  workflow name from one `workflowsApi.list()` id->name map using `definition_id`;
+  status `StatusIndicator`; `ProgressMarker` from issue status: unresolved/regressed 0,
+  acknowledged 1, in_progress 2, resolved 4); for the latest running/waiting run only,
+  one `runsApi.get` -> current step (latest step not succeeded/failed/cancelled) and
+  Escalation (open human task title, assignee, status); Activity (comment box "Add a
+  comment..."; history entries plus comments posted this session; toast "Comment
+  posted"); People (assignee display name from `directoryApi.members()`).
+
+### Search (`pages/search/index.tsx`)
+
+- TopBar title "Search"; free-text input; index tabs (issues, findings, runs, audit);
+  `Table` of hits (title, `Redacted` snippet when non-null, status `Tag`, time); keep the
+  run-A link rules (issues -> `/issues/<id>`, runs -> `/runs/<id>`, findings/audit no
+  link); "Ask Assistant" link to `/assistant?q=<encoded query>`; `EmptyState` for none.
 
 ## Key Pitfalls
 
-- Never render raw request or response bodies of the evidence upload; show only the
-  API's masked fields.
-- Allowed transitions (user): unresolved -> acknowledged, in_progress, resolved, ignored;
-  acknowledged -> in_progress, resolved, ignored, unresolved; in_progress -> resolved,
-  ignored, unresolved; regressed -> acknowledged, in_progress, resolved, ignored;
-  resolved -> unresolved; ignored -> unresolved.
-- Keep components small; one file per component; no file over 400 lines.
+- Pages never render `<h1>`; use `TopBar.Slot name="title"`.
+- Allowed transitions (unchanged): unresolved -> acknowledged, in_progress, resolved,
+  ignored; acknowledged -> in_progress, resolved, ignored, unresolved; in_progress ->
+  resolved, ignored, unresolved; regressed -> acknowledged, in_progress, resolved,
+  ignored; resolved -> unresolved; ignored -> unresolved.
+- Never use `innerHTML`; render masked text only through `Redacted` or text nodes.
+- No per-row requests in the list (no stats, no runs, no evidence per row).
+- An unknown `assigned:` ref makes the API return an error: show it in `ErrorBanner`,
+  keep the query editable.
+- One component per file; every file under 400 lines.
+
+## Tests (`*.test.tsx`, mocked fetch via `vi.stubGlobal`, responses in serializer shapes)
+
+- `query.ts`: `is:resolved rule:token foo` -> `status=resolved&rule_class=token&q=foo`;
+  `severity:[high, medium]` and `assigned:me` -> not sent; default sort `last_seen`.
+- List: rows render title, short id and Findings count; typing a status token updates
+  `?query=` and refetches with `status=`; the global chart requests
+  `/api/issues/stats?bucket=day&days=14` exactly once and no `/api/issues/<id>/stats`
+  request is made; selecting two rows and clicking Resolve sends two PATCH requests and
+  shows one toast; saving a view writes `telescreen.issueViews` and dispatches
+  `telescreen:issue-views`; empty result shows "No issues match your search".
+- Detail: only allowed transitions shown (resolved -> Reopen only); transition sends
+  PATCH `{status}`; events with two days of `observed_at` produce two non-zero bars;
+  history entry renders `from_value -> to_value`; evidence 422 renders "Evidence
+  rejected" and `credential`; 415/503 codes kept; masked snippet renders inside a
+  `Redacted` masked span; comment POST then appears in Activity.
+- Search: renders hits for the chosen index; findings hit is not a link; Ask Assistant
+  link carries `q`.
 
 ## Verification
 
 ```bash
 set -o pipefail
-test -d src/web/node_modules || (cd src/web && bun install --frozen-lockfile)   # p01 installed it; do not reinstall concurrently
-cd src/web && bun run typecheck 2>&1 | tee /tmp/telescreen-p12-ui-issues-typecheck.log    # exit 0
-cd src/web && bunx vitest run src/pages/issues src/pages/search 2>&1 | tee /tmp/telescreen-p12-ui-issues-test.log   # exit 0
-cd src/web && bun run build --outDir /tmp/telescreen-p12-ui-issues-web --emptyOutDir      # exit 0
+test -d src/web/node_modules || (cd src/web && bun install --frozen-lockfile)
+cd src/web && bun run typecheck 2>&1 | tee /tmp/telescreen-p12-ui-issues-typecheck.log; echo "exit=$?"
+cd src/web && bunx vitest run src/pages/issues src/pages/search 2>&1 | tee /tmp/telescreen-p12-ui-issues-test.log; echo "exit=$?"
+cd src/web && bun run build --outDir /tmp/telescreen-p12-ui-issues-web --emptyOutDir 2>&1 | tee /tmp/telescreen-p12-ui-issues-build.log; echo "exit=$?"
+! grep -rn 'innerHTML\|<h1' src/web/src/pages/issues src/web/src/pages/search
+test -z "$(find src/web/src/pages/issues src/web/src/pages/search -name '*.ts*' -exec wc -l {} + | awk '$1 >= 400 && $2 != "total"')"
 ```
 
-If `typecheck` fails only in files owned by other UI plans still in progress, record
-that with the log and re-run after they finish. Your own files must have zero errors
-(`grep "src/pages/\(issues\|search\)" <log>` prints nothing).
+All exit 0. If `typecheck` fails only in p13/p14 page files while they are in progress,
+record the log and re-run later; your paths must have zero errors
+(`grep -E 'src/pages/(issues|search)' <log>` prints nothing). Optionally run
+`VITE_TELESCREEN_MOCK=1 bun run dev` and check the pages by eye; the screenshot smoke is
+run by p29.
 
 ## Completion Criteria
 
-- [x] Issue list, issue detail (transitions, assignment, events, history, runs, evidence, comments) and search pages delivered
-- [x] Tests listed above pass
-- [x] Contract-shaped evidence 422 renders rule classes; 415 and 503 retain their codes
-- [x] No edits outside the two page directories
-- [x] Progress Log updated
+- [ ] Issues list per this plan (query builder, URL state, views, sort, chart, columns, bulk bar, empty states)
+- [ ] Issue detail per this plan (header, action bar, graph, tag bars, navigation, fold sections, sidebar)
+- [ ] Search page restyled; run-A behaviors kept
+- [ ] Tests listed above pass; verification commands pass with logs recorded
+- [ ] No edits outside the two page directories and this plan
+- [ ] Progress Log updated
 
 ## Progress Log
 

@@ -1,25 +1,103 @@
 # P29 Compose Deployment and Example Workflows Implementation Plan
 
-**Status**: Completed
-**Design Reference**: design-docs/specs/architecture.md section 3 (Deployment and examples), design-docs/specs/command.md (Subcommands, Environment Variables), design-docs/specs/design-workflow-engine.md (Document schema, escalation policy)
+**Status**: Ready (run B revision; the run A deliverables below are implemented and accepted)
+**Design Reference**: design-docs/specs/architecture.md sections 3 (Deployment and examples) and 8 (run B README exception), design-docs/specs/command.md (Subcommands, Environment Variables), design-docs/specs/design-workflow-engine.md (Document schema, escalation policy), design-docs/specs/design-ui-sentry.md sections 8.5, 8.6
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-09
+**Last Updated**: 2026-10-09 (run B, session 341)
 
 ## Plan Metadata
 
 - planId: `p29-examples-compose`
 - planPath: `impl-plans/active/p29-examples-compose.md`
-- wave: 4
-- dependsOn: `p06-workflow-dsl`, `p08-masking`
+- wave: B3 (last; runs alone)
+- dependsOn: `p12-ui-issues`, `p13-ui-workflows`, `p14-ui-ops`, `p28-assembly`, `p30-ui-design-system`, `p31-ui-mock-api` (plus accepted `p06-workflow-dsl`, `p08-masking`)
 - writePaths:
   - `impl-plans/active/p29-examples-compose.md`
   - `examples/compose`
   - `examples/workflows`
   - `tests/examples`
+  - `README.md`
 - sharedPaths: none
 - artifactRoots: none
 
 Read `impl-plans/conventions.md` first.
+
+## Run B Intent
+
+Run A delivered and accepted the compose stack, Dockerfile, `.env.example`, compose
+README, the workflow examples and `tests/examples`. Run B finishes the product: every
+other plan has joined, so this plan (1) reconciles `examples/compose` with the real CLI
+and UI serving from p28/p30 instead of recreating it, (2) updates the root `README.md`
+(run B ownership exception, architecture.md section 8), and (3) runs the final full gates
+including the UI screenshot smoke.
+
+Run B non-goals: no Python package or `src/web` edits (log Reconciliation requests for
+defects found there); no new services; no docker run in tests; no changes to
+`examples/police/` (accepted p11/p19 output).
+
+## Run B Deliverables
+
+- Compose reconciliation (fresh-read each file; change only what is wrong):
+  - `bureau` runs `telescreen serve --host 0.0.0.0 --port 8000` with
+    `TELESCREEN_WEB_DIST=/app/web` and no `VITE_TELESCREEN_MOCK` anywhere;
+  - `Dockerfile` web stage runs `bun install --frozen-lockfile` then `bun run build`
+    (the default `dist/`, which includes `public/fonts`) and copies `dist/` to
+    `/app/web`; the CLI subcommands used by `migrate`, `engine` and the README exist in
+    `src/telescreen/cli.py` (`telescreen --help` output);
+  - `examples/compose/README.md`: "open http://localhost:8000" serves the UI; enter the
+    admin token on Settings.
+- `tests/examples/test_examples.py` additions: bureau service environment contains
+  `TELESCREEN_WEB_DIST=/app/web`; the Dockerfile contains `bun install --frozen-lockfile`
+  and copies the web build to `/app/web`; no file under `examples/compose` contains
+  `VITE_TELESCREEN_MOCK`; every `telescreen <subcommand>` named in compose files exists in
+  `telescreen.cli` (parse `main(["--help"])` output or the argparse parser).
+- `README.md` (root; keep its sections and tone, edit in place):
+  - Web application: `mise run web-ci`; development `cd src/web && bun run dev` (proxy to
+    `:8000`); mock mode `VITE_TELESCREEN_MOCK=1 bun run dev` (masked fixtures, no
+    backend); screenshot smoke `bun run screenshots` (needs Chrome/Chromium or
+    `TELESCREEN_SCREENSHOT_BROWSER`; output `tmp/ui-screenshots/`); design reference
+    `design-docs/specs/design-ui-sentry.md`; fonts are OFL (see `src/web/public/fonts`),
+    icons Lucide (ISC).
+  - Serving: `cd src/web && bun run build`, then
+    `TELESCREEN_WEB_DIST=src/web/dist telescreen serve`; missing `index.html` exits 3;
+    the wheel does not contain UI assets.
+  - Local compose environment: fix the stale path (`examples/compose/docker-compose.yml`,
+    not `compose.yaml`) and point to `examples/compose/README.md`.
+  - Remove the stale sentence saying router mounting "belongs to the assembly plan".
+  - CLI section matches `design-docs/specs/command.md` subcommands.
+
+## Run B Verification (final gates; all must pass)
+
+```bash
+set -o pipefail
+export PYTHONDONTWRITEBYTECODE=1
+uv run --frozen ruff format --check --no-cache . 2>&1 | tee /tmp/telescreen-p29-final-format.log; echo "exit=$?"
+uv run --frozen ruff check --no-cache . 2>&1 | tee /tmp/telescreen-p29-final-ruff.log; echo "exit=$?"
+uv run --frozen python tools/typelint.py 2>&1 | tee /tmp/telescreen-p29-final-typelint.log; echo "exit=$?"
+uv run --frozen ty check 2>&1 | tee /tmp/telescreen-p29-final-ty.log; echo "exit=$?"
+uv run --frozen pytest -p no:cacheprovider 2>&1 | tee /tmp/telescreen-p29-final-pytest.log; echo "exit=$?"
+uv build --out-dir /tmp/telescreen-p29-final-dist 2>&1 | tee /tmp/telescreen-p29-final-build.log; echo "exit=$?"
+(cd src/web && (test -d node_modules || bun install --frozen-lockfile) && bun run typecheck && bun run test && bun run build --outDir /tmp/telescreen-p29-final-web --emptyOutDir) 2>&1 | tee /tmp/telescreen-p29-final-web.log; echo "exit=$?"
+(cd src/web && bun run screenshots) 2>&1 | tee /tmp/telescreen-p29-screenshots.log; echo "exit=$?"
+ls tmp/ui-screenshots/*.png | wc -l    # 28 (13 pages x 2 themes + mobile issues x 2)
+command -v docker && docker compose -f examples/compose/docker-compose.yml --env-file examples/compose/.env.example config > /tmp/telescreen-p29-compose-config.log 2>&1; echo "exit=$?"
+```
+
+The screenshot run exits 2 when no browser exists: record that as a verification gap
+(not a pass) in the Progress Log and in the step result `verificationGaps`. When docker
+is not installed, the `docker compose config` check is a verification gap (static
+`tests/examples` checks still apply). Look at the light and dark screenshots of Issues,
+issue detail and Run detail and note in the Progress Log that tokens, rail, panel and
+TopBar render (no unstyled page, no raw-looking value).
+
+## Run B Completion Criteria
+
+- [ ] Compose files reconciled; new `tests/examples` assertions pass
+- [ ] Root README documents setup, architecture, UI (dev, mock, screenshots), serve and compose
+- [ ] All final gates above pass (or the browser/docker gaps are recorded explicitly)
+- [ ] Progress Log updated
+
+## Run A Intent and Deliverables (accepted history)
 
 ## Intent and Context
 
@@ -30,8 +108,8 @@ escalation and police re-verification)". The CLI command names are pinned in
 
 ## Non-goals
 
-- No Python package code. No edits to `examples/police/` (owned by p11) or `README.md`
-  (p01).
+- No Python package code. No edits to `examples/police/` (owned by p11). (Run A only:
+  no `README.md` edits; run B updates it as listed above.)
 - Tests do not run docker.
 
 ## Deliverables

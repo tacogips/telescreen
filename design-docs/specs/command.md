@@ -66,7 +66,7 @@ Bare `telescreen` prints help and exits 2.
 | `TELESCREEN_PUBLIC_BASE_URL` | for Drive watch and push callbacks | - | External Bureau URL |
 | `TELESCREEN_SMTP_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD` / `_FROM` / `_STARTTLS` | for email | - / 587 / - / secret ref / - / `true` | SMTP settings |
 | `TELESCREEN_WORKER_CONCURRENCY` / `TELESCREEN_WORKER_POLL_SECONDS` | no | 8 / 1.0 | Engine worker |
-| `TELESCREEN_WEB_DIST` | no | unset | Built UI directory served at `/` |
+| `TELESCREEN_WEB_DIST` | no | unset (API only) | Built UI directory (`vite build` output, must contain `index.html`, else exit 3) served at `/` with SPA fallback for non-`/api/` paths; see `design-ui-sentry.md` section 8.6 |
 | `TELESCREEN_LOG_LEVEL` | no | `INFO` | Log level |
 | `TELESCREEN_TEST_DATABASE_URL` / `TELESCREEN_TEST_MEILI_URL` | tests only | unset | Enable `integration` tests |
 
@@ -86,7 +86,7 @@ Bare `telescreen` prints help and exits 2.
 | runtime | fastapi, uvicorn, pydantic (v2), sqlalchemy[asyncio] (2.x), asyncpg, alembic, httpx, anthropic, mcp, pyyaml, croniter, pyjwt[crypto], jsonschema |
 | optional `ml` | transformers, torch |
 | dev | pytest, pytest-cov, pytest-asyncio, aiosqlite, ruff, ty, types-pyyaml, types-croniter, types-jsonschema |
-| web (`src/web/package.json`) | solid-js, @solidjs/router; dev: typescript, vite, vite-plugin-solid, vitest, jsdom, @solidjs/testing-library, @testing-library/jest-dom |
+| web (`src/web/package.json`) | solid-js, @solidjs/router, lucide-solid, yaml (both added in run B by p30); dev: typescript, vite, vite-plugin-solid, vitest, jsdom, @solidjs/testing-library, @testing-library/jest-dom, playwright-core (run B, screenshot smoke only) |
 
 Decisions recorded with this table:
 

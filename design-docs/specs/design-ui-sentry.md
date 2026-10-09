@@ -47,7 +47,8 @@ Color roles (Telescreen palette; roles mirror Sentry's semantic token structure)
 
 Other tokens (values follow Sentry's scale; scales are generic, not identity-bearing):
 
-- Typography: `--font-sans: Rubik, "Avenir Next", system-ui, sans-serif`; `--font-mono:
+- Typography: `--font-sans: Rubik, "Avenir Next", "Hiragino Sans", "Noto Sans JP",
+  system-ui, sans-serif` (Japanese text falls back to system fonts); `--font-mono:
   "Roboto Mono", Monaco, Consolas, monospace`. Sizes `xs 11`, `sm 12`, `md 14` (body), `lg 16`,
   `xl 20`, `2xl 24`, `3xl 32` px. Weights 400 / 500. Line heights 1, 1.2, 1.4.
   Numbers in tables use `font-variant-numeric: tabular-nums`.
@@ -100,7 +101,8 @@ Icons: `lucide-solid` (ISC). Fonts: self-hosted Rubik and Roboto Mono woff2 file
 
 - **Primary rail** (74px, `--bg-primary`, right border, `aria-label="Primary navigation"`):
   organization label at the top; items Issues, Search, Workflows, Police, Collectors,
-  Escalation, Audit, Assistant, Settings; each item is a 32px square icon container (radius
+  Escalation, Audit, Assistant, Settings (Runs has no rail item; it is the second link of
+  the Workflows secondary panel and its routes highlight the Workflows item); each item is a 32px square icon container (radius
   6) with an 11px label below. Hover: `--hover-bg` with a muted border. Active
   (`aria-current="location"`): `--selected-bg` with `--accent-muted-border`.
 - **Secondary panel** (default 190px, resizable 150-450px, persisted; `--bg-secondary`):
@@ -118,6 +120,10 @@ Icons: `lucide-solid` (ISC). Fonts: self-hosted Rubik and Roboto Mono woff2 file
   status carry text).
 - **Shortcuts**: `mod+k` command palette (navigate, run issue actions, switch views),
   `mod+b` collapse navigation, `mod+/` open Assistant, `Esc` close drawer or palette.
+
+Sections 4-6 describe the full target pattern. Section 8 is binding for v1: it limits
+every page to what the accepted API (commit 28ce81b) returns and lists the parts that are
+omitted until a follow-up API exists.
 
 ### 4. Issues list (`/issues`)
 
@@ -221,7 +227,7 @@ Icons: `lucide-solid` (ISC). Fonts: self-hosted Rubik and Roboto Mono woff2 file
 | Collectors (`/collectors`) | Monitors list + feature badges | One row per collector config: kind icon, trigger mode, last scan, findings in period, errors, latest sweep progress; "Run now" and "Sweep now"; empty state "Connect a source" |
 | Escalation policies (`/escalation`) | Alerts list -> detail -> builder | List: name, tiers, used by workflows, last escalation. Detail: tier editor (after, assign to, notify, channels) as blocks; history of escalations |
 | Audit (`/audit`) | Audit log table + filters | Columns: actor (member / token / system / police / collector), action, target, summary (masked), time; time range and action filters; chain verification banner ("Chain verified up to #N" or the first broken sequence) |
-| Assistant (`/assistant` and docked panel) | Assistant chat pattern | Right-aligned user bubbles (max 80% width), full-width assistant messages, collapsible "tool calls" blocks with status and links to issues / runs; docked right panel opened with `mod+/` carrying the current page context (issue id or view) |
+| Assistant (`/assistant`; `/chat` redirects; docked panel deferred, see section 8) | Assistant chat pattern | Right-aligned user bubbles (max 80% width), full-width assistant messages, collapsible "tool calls" blocks with status and links to issues / runs; docked right panel opened with `mod+/` carrying the current page context (issue id or view) |
 | Settings (`/settings`) | Settings secondary nav + forms | Sections: Account (API token entry, theme System / Light / Dark), Members and teams, API tokens, Collectors credentials (secret refs only), About |
 
 ### 7. Implementation guidance
@@ -241,6 +247,163 @@ Icons: `lucide-solid` (ISC). Fonts: self-hosted Rubik and Roboto Mono woff2 file
 - Fixture data for the dev server: a mock API mode (`VITE_TELESCREEN_MOCK=1`) serving masked
   fixture issues, runs, police workers and collectors, so the UI can be developed and
   reviewed without the backend.
+
+### 8. v1 implementation boundaries (run B, 2026-10-09)
+
+Run B builds the UI against the accepted backend (commit 28ce81b) and adds no API endpoint,
+query parameter or response field. A pattern from sections 4-6 that needs data the API does
+not return is omitted in v1, not emulated with per-row requests or client-side guesses.
+The authoritative API shapes are the router serializers in `src/telescreen/api/routers/`
+(not `src/web/src/api/types.ts` as accepted with p07, which drifted; see 8.1a).
+
+#### 8.1 API capability mapping
+
+| UI element | v1 behavior (API source) |
+|------------|--------------------------|
+| Issue search tokens | Supported keys map one-to-one to `GET /api/issues` parameters: `is:` -> `status`, `severity:`, `rule:` -> `rule_class` (one `RuleClass` value: credential, token, private_key, password, payment_card, national_id, email, phone, address; the "By rule" groups of section 4 become collapsible link groups with one link per class), `source:`, `assigned:` -> `assignee` (a recipient ref `member:<handle>` or `team:<slug>`; the API answers an unknown ref with an error shown as a banner), free text -> `q`. One value per key; `assigned:me|my_teams|none`, `!`, `*`, `[a, b]`, comparisons and the keys `collector`, `has`, `first_seen`, `last_seen`, `times_seen` render as invalid tokens whose tooltip lists the supported keys, and invalid tokens are not sent. Default query `is:unresolved` |
+| Sort | Last seen, First seen, Findings (`sort=last_seen|first_seen|times_seen`). Trending, Severity and SLA due are omitted |
+| Page filter bar | Source segment only (same as `source:`). Collector and date range segments are omitted (no API filter) |
+| Secondary panel (Issues) | Feed, By source, By rule, Views. "For review" is omitted (the API cannot filter unassigned or "me") |
+| URL state | `/issues?query=<token text>&sort=<key>` is the single source of truth for the list; secondary-panel links and saved views are such URLs |
+| Saved views | `localStorage` key `telescreen.issueViews`, JSON array of `{id, name, query, sort, starred}`, written by the Issues page and read by the shell panel. No live counts |
+| List columns | Issue, Last seen, Age, Findings (`times_seen`), Assignee, Priority (read-only, derived from `severity`: high -> high, medium -> medium). The per-row Trend column is omitted (no per-issue series exists; the p07-era per-row stats call targets a route that does not exist and is removed). Above the list, one all-issues 14-day `MiniBarChart` from the global `GET /api/issues/stats` (`{buckets: [{start, count}]}`, `bucket=day`, `days=14`) keeps the count trend. Resources, comment count, unread dot and "Externally shared" flag are omitted |
+| Bulk actions | Resolve, Ignore, Acknowledge, Mark in progress, Reopen and Assign to run one `PATCH /api/issues/{id}` per selected issue (only transitions allowed by the data-model status machine are offered); per-issue failures are reported in a toast with counts. Ignore has no duration or until-regressed options. Start workflow calls `POST /api/workflows/{name}/runs` per issue (workflow picker over active workflows). Select-all covers loaded rows only; the "Select all N matching" banner and the multi-page confirm modal are omitted (no total count) |
+| Issue detail header | Findings = `times_seen`; Resources = distinct `location` values among loaded events. Badges: evidence count (`GET /api/evidence?issue_id`), active run (`GET /api/runs?issue_id`) |
+| Issue detail actions | Resolve, Ignore, Acknowledge, Reopen, Assignee (`PATCH`), Start workflow, copy as Markdown (client-side from masked data). "Rescan now" and Set priority are omitted |
+| Findings graph | One series built from the first page of `GET /api/issues/{id}/events?limit=200`: `observed_at` bucketed by UTC day over the last 14 days, labelled "Loaded findings, last 14 days"; no resources toggle and no markers |
+| Tag bars | Computed from loaded events: `detector` and the first `location` segment; `source` and `rule_class` from the issue |
+| Filter sheet | Finding search and collector/time selectors are omitted; finding navigation (Recommended = highest confidence then latest, First, Latest, previous/next) works over loaded events |
+| Location chain | The event `location` string split into frames on ` > `, `/` and `:`; the matched frame shows `masked_snippet` (no extra context lines exist) |
+| Fold sections | Highlights, Location chain, Timeline (`/history`), Evidence, Detection details (detector, `rule_id`, rule class, confidence, first 8 characters of `fingerprint`). Masking details is omitted (methods are not in the API) |
+| Sidebar | First/last seen; Workflow runs (`GET /api/runs?issue_id`: workflow name via the `GET /api/workflows` id map, status, started; `ProgressMarker` from issue status: unresolved/regressed -> Identified, acknowledged -> Assigned, in_progress -> Contained, resolved -> Remediated); for the latest running or waiting run only, one `GET /api/runs/{id}` gives the current step (latest step run not in a terminal status) and the Escalation section (open human task title, assignee and status; tier and due time are omitted because the run detail does not return them); Activity (`/history` entries rendered from `kind`, `actor_ref`, `from_value` -> `to_value`, `note`, `at`, plus comments posted in this session; `POST /comments` returns `{accepted: true}` and there is no comment list endpoint); People (assignee resolved through `GET /api/members`) |
+| Workflows | List: name, version, active (`GET /api/workflows` items are versions `{id, name, version, active}`; grouped by name). Detail (`GET /api/workflows/{name}` returns that name's versions; `GET /api/workflows/{name}/versions/{v}` the source): editor, validate, versions, activate; the graph preview parses the editor text client-side (JSON native, YAML with the `yaml` package) and draws steps with edges from `next`, `outcomes`, `cases`/`default`, `branches`/`join`, `on_error`, `on_exhausted`, and dashed return edges for `send_back.to`. Invalid text shows "Fix validation errors to preview". Trigger summary, last run and runs in period are omitted |
+| Runs | List: started, workflow (name via the `GET /api/workflows` id map from `definition_id`), issue, trigger, status. Current step and SLA due are omitted in the list. Detail (`{run, steps, transitions, human_tasks}`): step list as section 6 with status glyphs for `ready/running/waiting/succeeded/failed/cancelled`, `visit`, `attempt`, `error_code`, masked input/output; step types come from the run's workflow version (`GET /api/workflows/{name}/versions/{v}` parsed with the graph-preview parser); send-back return arrows from transitions of kind `send_back` (`from_step_run_id` -> `to_step_id`); waiting human task card with the `outcomes` completion form (no due time). The map progress bar is shown when a `map` step's `output_json` has a string member `map_job_id` (`GET /api/map-jobs/{id}`); otherwise the step renders without it |
+| Police | List columns from `GET /api/police/workers` (no in-flight count, no contract version). Status dot: `disabled` -> muted; `active` with `last_heartbeat_at` within 5 minutes -> success; otherwise warning labelled "Stale". Detail drawer shows the worker fields and Disable; heartbeat timeline and recent tasks are omitted |
+| Collectors | Kind, name, trigger mode, cron, enabled, latest sweep status (one `GET /api/map-jobs` call, latest item per `collector_config_id` by `created_at`; progress counts only in a drawer via `GET /api/map-jobs/{id}`), Run now, Sweep now (returns `{map_job_id}`). Enable/disable and edits send the full collector body. Last scan, findings in period and errors are omitted |
+| Escalation | List: name, tier count (parsed from `tiers_json`). Detail: tiers parsed from `tiers_json` rendered as read-only blocks, plus a JSON source editor submitted as `{tiers_json, source_format: "json"}` (POST to create, PUT `/{name}` to update) |
+| Audit | As section 6 with filters `q`, `action`, `actor`, `target_kind`, `from`, `to`, offset pagination over `{items, total}` and `GET /api/audit/verify` |
+| Assistant | Page at `/assistant` (page directory stays `pages/chat`). `mod+/` and the TopBar "Ask Assistant" button navigate to `/assistant?context=<current path>`; the page shows the context as a chip and prefixes it to the first message. Answers render as text (the API returns no tool-call trace) |
+| Search | As section 6; "Ask Assistant" links to `/assistant?q=<query>` |
+| Settings | Account (token in `sessionStorage`, theme), Members and teams (`/api/members`; `/api/teams` items `{id, slug, name, email, slack_channel}`; membership is set with `PUT /api/teams/{slug}/members {handles}` and is not listed), API tokens (no list endpoint: text pointing to `telescreen token create`), Collector credentials (`credential_ref` values from `/api/collectors`), About (`/api/health`) |
+
+#### 8.1a Client alignment with the router serializers (binding, p31)
+
+`src/web/src/api/types.ts` and `client.ts` must describe exactly what the accepted routers
+return; mock fixtures (8.3) use the same serializer shapes, never the old `types.ts` shapes.
+Known drift to fix (checked against `src/telescreen/api/routers/*.py` at 28ce81b):
+
+| Area | Alignment |
+|------|-----------|
+| Issues | `IssueEvent` = `_finding_json` (`observed_at`, `rule_id`, `rule_class`, `display_locator`, `fingerprint`, ...); `IssueHistory` = `{id, issue_id, kind, actor_ref, from_value, to_value, note, at}`; `Issue` adds the extra serializer fields; `issuesApi.stats` becomes the global `GET /api/issues/stats?bucket&days` -> `{buckets: [{start, count}]}`; `comment` returns `{accepted: true}` |
+| Lists | Runs, human tasks, workflows, evidence, escalation and collectors return `{items}` only (the client normalizes to `next_cursor: null`); audit returns `{items, total}` with `limit`/`offset`; search `snippet` is nullable |
+| Workflows | List and `GET /{name}` items `{id, name, version, active}`; version adds `id`, `compiled_json`, no `created_at`; schema is a raw JSON Schema document (text); create, activate return `{id, name, version, active}`; create failure is 422 `{valid, errors}` (decoded as validation errors); start run returns `{run_id}` |
+| Runs | Summary `{id, definition_id, issue_id, status, trigger, started_at, finished_at}`; detail `{run, steps, transitions, human_tasks}` with the step, transition and human-task fields of `runs.py`; cancel returns `{run_id, status}`; statuses `RunStatus` running/waiting/succeeded/failed/cancelled and `StepRunStatus` ready/running/waiting/succeeded/failed/cancelled |
+| Human tasks | Items `{id, run_id, step_run_id, kind, title, assignee_ref, due_at, status, outcome}`, status open/completed/cancelled; complete returns `{id, status}` |
+| Evidence | Adds `sha256`, no `run_id`; rejection error carries `rule_classes` |
+| Escalation | `{id, name, tiers_json}`; create/update body `{tiers_json, source_format}` |
+| Directory | Teams `{id, slug, name, email, slack_channel}`; set members body `{handles}`, 204 |
+| Collectors | Create/patch take the full body (including nullable `cron`, `sweep_cron`, `credential_ref`) and return `{id}`; run returns `{id}`; sweep returns `{map_job_id}`; the webhook helper is removed (the UI never calls it) |
+| Map jobs | List items `{id, origin, status, collector_config_id, created_at}`; detail `counts` holds present statuses only; cancel/retry return `{id, status}` |
+| Police | Workers have no `contract_version`; status active/disabled; disable returns `{id, status}` |
+
+Wave handoff: because aligning the types changes fields the existing pages read, p31 also
+makes the mechanical call-site and test-fixture updates in `src/web/src/pages/**` needed to
+keep `bun run typecheck` and `bun run test` green (renames, removed fields dropped from the
+display, response bodies re-fetched instead of used). No visual or structural page change.
+This is an explicit wave-1 -> wave-2 handoff (architecture.md section 8): p31 runs while
+no page plan is active; from wave 2 the page directories belong only to p12/p13/p14.
+p31 keeps the signatures of `ApiError`, `apiFetch`, `getToken` and `setToken`, which the
+p30-owned `ErrorBanner` and `shell.test.tsx` import, so the two wave-1 plans stay
+independent.
+
+#### 8.2 Shell and route contract
+
+- Routes keep the p07 contract: `AREAS` keys `issues, search, workflows, runs, police,
+  collectors, escalation, audit, chat, settings`; each page is the default export of
+  `pages/<key>/index.tsx`; `<path>` and `<path>/:id` routes; `/` redirects to `/issues`. The
+  `chat` area path becomes `/assistant`, with `/chat` and `/chat/:id` redirecting.
+- Pages render their title and actions only through `TopBar.Slot` (`name="title"` renders
+  the single `<h1>`, `name="actions"`) exported by the shell; pages never render an `<h1>`.
+- The shell owns the secondary panel content of every area (static links, for Issues the
+  URLs of section 8.1 plus saved views from `telescreen.issueViews`).
+- Shared components keep their paths and props: `ErrorBanner`, `JsonTextArea`, `LoadMore`,
+  `RelativeTime`, `Sparkline`, `StatusBadge`, `Unavailable` are restyled in place on tokens
+  (`StatusBadge` renders `Tag`, `Sparkline` renders `MiniBarChart`) so pages compile before
+  and after their rebuild. Only `Layout` and `Sidebar` are removed, replaced by the shell
+  under `components/shell/`.
+
+#### 8.3 Mock API mode
+
+- Switch: `import.meta.env.VITE_TELESCREEN_MOCK === "1"`, checked inside `apiFetch` and
+  the evidence blob fetch in `src/api/client.ts`. The mock module is loaded with a dynamic
+  `import()` inside that branch, so production builds (flag unset) do not contain fixtures.
+  Pages and tests keep calling the same `*Api` objects.
+- `src/api/mock/` holds a router (method + path pattern -> handler) over in-memory state
+  seeded from fixtures. It returns the router serializer shapes of 8.1a and the error model (`404
+  not_found` for unknown paths; police v1, ingest and webhook paths are not mocked).
+  Mutations (PATCH issue, comment, human-task complete, activate, cancel, run, sweep,
+  disable, escalation edits) change in-memory state for the page session only. Evidence
+  upload never reads the file body and returns an accepted record with a synthetic display
+  filename. Chat returns canned answers built from fixture counts. No token is required.
+- Coverage: every endpoint the pages call returns data; at least one issue per status and
+  per source, a regressed issue, a run per run status including a waiting human task with
+  SLA, a send-back transition and a `map` step with a running map job, police workers
+  online/offline/disabled in pull and push mode, one collector per kind, two escalation
+  policies, audit records with a verified chain, search hits for every index.
+- Timestamps are offsets from the module-load time, so relative times are stable.
+- Value rules (`design-synthetic-test-dataset.md`): fixtures contain only masked forms in
+  the exact Masker output formats (`design-masking.md`, Masking policy) and reserved
+  example domains. A vitest test serializes all fixtures and fails on any raw-looking value
+  (AWS `AKIA` + 16, `ghp_` + 36, `xox[abp]-` bodies, `AIza` + 35, PEM bodies, three-segment
+  JWTs, Luhn-valid 13-19 digit runs, 12-digit runs, emails outside example domains).
+  `tests/leak` also runs the rule detector over `src/web/src/api/mock/**` and asserts zero
+  findings.
+- The TopBar shows a muted "Mock data" tag when the flag is set.
+
+#### 8.4 Fonts, icons and dependencies
+
+- `src/web/public/fonts/`: Rubik 400/500 and Roboto Mono 400/500 woff2 (latin subset or
+  variable files) plus `OFL-Rubik.txt` and `OFL-RobotoMono.txt`; `@font-face` with
+  `font-display: swap` in `styles/`; no runtime font request.
+- `src/web/package.json` additions (single owner): `lucide-solid` (ISC), `yaml` (ISC, graph
+  preview), dev `playwright-core` (Apache-2.0, screenshot smoke; no bundled browser).
+
+#### 8.5 Screenshot smoke
+
+- `bun run screenshots` (script under `src/web/scripts/`) builds with
+  `VITE_TELESCREEN_MOCK=1`, serves the build with `vite preview` on a local port, and drives
+  a system Chrome/Chromium through `playwright-core` (`TELESCREEN_SCREENSHOT_BROWSER` path,
+  else auto-detected). Pages: `/issues`, one issue detail, `/search?q=...`, `/workflows`,
+  one workflow, `/runs`, one run, `/police`, `/collectors`, `/escalation`, `/audit`,
+  `/assistant`, `/settings`, at 1440x900 in light and dark (`colorScheme` emulation), plus
+  `/issues` at 390x844. Output: `<repo>/tmp/ui-screenshots/<page>-<theme>.png` (gitignored).
+  The script fails on any page error or console error. It is not part of `bun run test`,
+  `bun run build` or `mise run ci`; when no browser is available it exits non-zero with a
+  message and the gap is reported as a verification gap.
+
+#### 8.6 Serving the built UI (`telescreen serve`)
+
+- The UI is located only through `TELESCREEN_WEB_DIST` (absolute or working-directory
+  relative path to a `vite build` output). The wheel does not contain UI assets, so
+  `uv build` needs no node toolchain. Local use: `cd src/web && bun run build`, then
+  `TELESCREEN_WEB_DIST=src/web/dist telescreen serve`; the compose image sets
+  `/app/web`.
+- When set, the directory must contain `index.html`, else `serve` exits 3 (configuration
+  error). Files are served at `/`; any `GET` that is not under `/api/` and matches no file
+  returns `index.html` (SPA fallback). Paths under `/api/` never fall back (unknown ones
+  return the JSON `not_found` error). `index.html` is sent with `Cache-Control: no-cache`.
+  No new Python dependency (Starlette static files).
+- When unset, only the API is served.
+
+#### 8.7 Plan boundaries (run B)
+
+| Plan | Owns | Wave |
+|------|------|------|
+| p30-ui-design-system | `src/web/package.json`, `src/web/bun.lock`, `src/web/public/fonts/**`, `src/web/scripts/**`, `src/web/src/styles/**`, `src/web/src/components/**` (ui, shell, restyled shared components), `src/web/src/{App,routes,main}.tsx`, `src/web/src/shell.test.tsx` | 1 |
+| p31-ui-mock-api | `src/web/src/api/**` (serializer alignment 8.1a, client mock switch, `mock/**`, env typing), plus the 8.1a mechanical handoff edits in `src/web/src/pages/**` | 1 (no conflict with p30, which does not touch pages) |
+| p12 / p13 / p14 | Their existing page directories (unchanged) | 2 |
+| p28-assembly | As accepted plan, plus the static serving rules of 8.6 and the fixture leak test of 8.3 | 2 (parallel with p12-p14; the serve tests use a temporary dist directory, not a real build) |
+| p29-examples-compose | `examples/compose/**`, `examples/workflows/**`, `tests/examples/**`, `README.md` | 3 |
 
 ## Sources
 

@@ -1,16 +1,24 @@
 # P28 Assembly (Wiring, App, CLI, End-to-End and Leak Tests) Implementation Plan
 
 **Status**: Ready
-**Design Reference**: design-docs/specs/command.md, design-docs/specs/architecture.md sections 3, 4, 9, design-docs/specs/design-masking.md (Leak test matrix), design-docs/specs/design-api-and-ui.md (Serving)
+**Design Reference**: design-docs/specs/command.md, design-docs/specs/architecture.md sections 3, 4, 9, design-docs/specs/design-masking.md (Leak test matrix), design-docs/specs/design-api-and-ui.md (Serving), design-docs/specs/design-ui-sentry.md sections 8.3 (fixture leak check) and 8.6 (serving the built UI)
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-08
+**Last Updated**: 2026-10-09 (run B, session 341)
 
 ## Plan Metadata
 
 - planId: `p28-assembly`
 - planPath: `impl-plans/active/p28-assembly.md`
-- wave: 5
-- dependsOn: `p07-web-shell`, `p11-police-sdk`, `p12-ui-issues`, `p13-ui-workflows`, `p14-ui-ops`, `p15-audit-search`, `p16-issues-ingest`, `p17-notifications`, `p18-evidence`, `p19-police-bureau`, `p20-collectors-core`, `p21-collectors-slack`, `p22-collectors-google`, `p23-collectors-github`, `p24-workflow-engine`, `p25-workflow-nodes`, `p26-workflow-mapreduce`, `p27-assistant`, `p29-examples-compose`
+- wave: B2 (parallel with p12, p13, p14, which touch only `src/web/src/pages`)
+- dependsOn: `p31-ui-mock-api` (fixtures scanned by `tests/leak`), plus the accepted
+  backend plans at 28ce81b: `p01-foundation`, `p02-db-schema`, `p03-detection-rules`,
+  `p04-ports`, `p05-police-contract`, `p06-workflow-dsl`, `p08-masking`,
+  `p09-detection-llm-ml`, `p10-api-common`, `p11-police-sdk`, `p15-audit-search`,
+  `p16-issues-ingest`, `p17-notifications`, `p18-evidence`, `p19-police-bureau`,
+  `p20-collectors-core`, `p21-collectors-slack`, `p22-collectors-google`,
+  `p23-collectors-github`, `p24-workflow-engine`, `p25-workflow-nodes`,
+  `p26-workflow-mapreduce`, `p27-assistant`. `examples/workflows/*.yaml` used by the
+  tests already exist on main (accepted run-A p29 output; read-only here).
 - writePaths:
   - `impl-plans/active/p28-assembly.md`
   - `src/telescreen/wiring.py`
@@ -24,9 +32,10 @@
 - sharedPaths: none
 - artifactRoots: none
 
-Read `impl-plans/conventions.md` first. This is the only wave-5 plan, so when it runs
-every other plan is finished. Full-repository checks are REQUIRED to pass here, not
-informational.
+Read `impl-plans/conventions.md` first. Every Python-owning plan is finished when this
+runs (the parallel B2 plans edit only `src/web/src/pages`), so full-repository PYTHON
+checks are REQUIRED to pass here, not informational. Web checks are not part of this
+plan (p29 runs them after the UI plans join).
 
 ## Intent and Context
 
@@ -84,9 +93,21 @@ raw-value-never-leaks matrix required by the issue.
   - include every `build_*_router(...)` (health, directory, issues, ingest, workflows,
     runs, human_tasks, escalation, evidence, collectors, map_jobs, police, audit, search,
     chat);
-  - when `web_dist` is set, serve static files at `/` with SPA fallback to `index.html`
-    for non-`/api` paths;
+  - when `settings.web_dist` is set, serve the built UI (design-ui-sentry.md 8.6),
+    registered AFTER every API router:
+    - files under the directory are served at `/` (Starlette `StaticFiles` or an
+      equivalent route; no new dependency, do not edit `pyproject.toml`);
+    - any `GET`/`HEAD` path that is not under `/api/` and matches no file returns
+      `index.html` (SPA fallback) with `Cache-Control: no-cache`;
+    - paths under `/api/` never fall back: an unknown `/api/...` path returns 404 with
+      the common error body `{"error": {"code": "not_found", ...}}`;
+    - path traversal (`/../`) never escapes the directory;
+    - the directory is resolved relative to the working directory when relative;
+  - when `web_dist` is unset, only the API is served;
   - a lifespan that calls `ensure_indexes()`.
+- Startup check (in `cli.py` `serve`, before `uvicorn.run`, and in `create_app`): if
+  `web_dist` is set but `<web_dist>/index.html` is not a file -> `ConfigError` -> exit 3
+  with a masked static message (never print the path contents).
 - `cli.py`: argparse subcommands exactly per `command.md`: `serve`, `worker [--once]`,
   `migrate [--revision]`, `workflow validate FILE...`, `collector run NAME [--watch]`,
   `collector sweep NAME`, `police list`, `token create --label --scopes`,
@@ -129,6 +150,20 @@ raw-value-never-leaks matrix required by the issue.
     a deleted file is auto-resolved; with one blob 500 -> partial and no reconciliation.
   - Push ingestion: custom source scan -> issue; findings push with a raw value -> 422.
   - Chat: a fake LLM tool loop returns a count.
+- `tests/e2e/test_serve_static.py` (temporary dist with `index.html` and
+  `assets/app.js`, app via `ASGITransport`):
+  - `GET /` and `GET /issues/iss-01` -> 200 `index.html` body, `Cache-Control: no-cache`;
+  - `GET /assets/app.js` -> 200 file body;
+  - `GET /api/does-not-exist` -> 404 JSON with `error.code == "not_found"`;
+  - `GET /api/health` -> 200 (routers win over static);
+  - `GET /../pyproject.toml`-style traversal -> not the file content;
+  - `web_dist` unset -> `GET /` is 404;
+  - `main(["serve"])` with `TELESCREEN_WEB_DIST` pointing to a directory without
+    `index.html` -> 3 (monkeypatch `uvicorn.run` so nothing starts).
+- `tests/leak/test_ui_fixtures.py`: for every file under `src/web/src/api/mock`
+  (recursive, `*.ts`): `Redactor.default().has_hits(text)` is False and
+  `find_leaks(text) == ()`; the directory must exist and contain at least one file
+  (guards against a silent pass).
 - `tests/leak/`: the full matrix from design-masking.md. The flows are push ingestion,
   collector scan, issue listing, search, a workflow notify delivery, text and image
   evidence (rejected, accepted with metadata, scanner unavailable, free-text scanner
@@ -163,13 +198,17 @@ uv run --frozen python tools/typelint.py 2>&1 | tee /tmp/telescreen-p28-assembly
 uv run --frozen ty check 2>&1 | tee /tmp/telescreen-p28-assembly-ty.log
 uv run --frozen pytest -p no:cacheprovider 2>&1 | tee /tmp/telescreen-p28-assembly-pytest.log
 uv build --out-dir /tmp/telescreen-p28-assembly-dist 2>&1 | tee /tmp/telescreen-p28-assembly-build.log
-cd src/web && bun install --frozen-lockfile && bun run typecheck && bun run test && bun run build --outDir /tmp/telescreen-p28-assembly-web --emptyOutDir
 find src tests -name '*.py' -exec wc -l {} + | awk '$1 >= 1000 && $2 != "total"'   # prints nothing
+git diff --quiet -- pyproject.toml uv.lock   # no dependency change
 ```
+
+Record `echo "exit=$?"` after each command. Every command exits 0.
 
 ## Completion Criteria
 
 - [ ] Container, create_app and the CLI deliver every command in command.md with the documented exit codes
+- [ ] `telescreen serve` serves the built UI per design-ui-sentry.md 8.6 (static tests pass; missing index.html exits 3)
+- [ ] UI fixture leak test passes
 - [ ] E2E GitHub remediation, sweep, ingestion and chat tests pass
 - [ ] The leak matrix passes over every sink
 - [ ] Full-repository verification passes (logs recorded)

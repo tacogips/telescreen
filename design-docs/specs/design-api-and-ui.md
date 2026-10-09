@@ -44,7 +44,8 @@ members) must never appear on the wire, so pydantic dataclass bodies never have 
 | Health | `GET /api/health` | none |
 | Ingest | `POST /api/ingest/v1/scan`, `POST /api/ingest/v1/findings`, `GET /api/ingest/v1/sources/{name}/config` | ingest |
 | Issues | `GET /api/issues?status&source&rule_class&severity&assignee&q&sort=last_seen|first_seen|times_seen` | read |
-| | `GET /api/issues/{id}`, `/events`, `/history`, `/stats` (linked runs come from `GET /api/runs?issue_id=`, evidence from `GET /api/evidence?issue_id=`, so each router reads only its own package's tables) | read |
+| | `GET /api/issues/stats?bucket=day|hour&days=1-90` (global, all issues; `{buckets: [{start, count}]}`; there is no per-issue stats route) | read |
+| | `GET /api/issues/{id}`, `/events`, `/history` (linked runs come from `GET /api/runs?issue_id=`, evidence from `GET /api/evidence?issue_id=`, so each router reads only its own package's tables) | read |
 | | `PATCH /api/issues/{id}` `{status?, assignee_ref?}`; `POST /api/issues/{id}/comments` | write |
 | Workflows | `GET /api/workflows`, `GET /api/workflows/{name}`, `GET /api/workflows/{name}/versions/{v}`, `GET /api/workflows/schema` | read |
 | | `POST /api/workflows` `{source_format, source_text}` (new version), `POST /api/workflows/validate`, `POST /api/workflows/{name}/activate {version}` | write |
@@ -135,9 +136,11 @@ Stack: SolidJS, TypeScript (strict), Vite, `@solidjs/router`, vitest, jsdom,
 `@solidjs/testing-library`. Package scripts (owned by foundation in `package.json`):
 `dev`, `build` (`vite build`), `typecheck` (`tsc --noEmit`), `test` (`vitest run`).
 
-- Shell: Sentry-like sidebar (Issues, Search, Workflows, Runs, Police, Collectors, Escalation
-  Policies, Audit, Assistant, Settings), header with environment label, route table in
-  `routes.tsx` pointing to `pages/<area>/index.tsx`.
+- Shell: superseded by `design-ui-sentry.md` sections 3 and 8.2 (primary rail, secondary
+  panel, TopBar slots); the route table in `routes.tsx` still points to
+  `pages/<area>/index.tsx`.
+- Page scope against this API: `design-ui-sentry.md` section 8.1 (binding for v1; no new
+  endpoints are added for the UI rework). Mock API mode: section 8.3.
 - API client: `src/api/client.ts` (fetch wrapper with bearer token, error decoding into the
   error model) and `src/api/types.ts` (hand-written types mirroring the API dataclasses).
   The token is entered on the Settings page and kept in `sessionStorage`.
@@ -158,7 +161,8 @@ Stack: SolidJS, TypeScript (strict), Vite, `@solidjs/router`, vitest, jsdom,
     chat, Settings.
 - Tests: component tests per page with a mocked fetch.
 - Serving: `vite` dev server proxies `/api` to `http://localhost:8000`; in production the
-  Bureau serves `TELESCREEN_WEB_DIST` as static files at `/`.
+  Bureau serves `TELESCREEN_WEB_DIST` as static files at `/` with SPA fallback (rules in
+  `design-ui-sentry.md` section 8.6; the wheel carries no UI assets).
 
 ## References
 
