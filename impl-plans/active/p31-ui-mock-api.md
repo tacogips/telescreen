@@ -1,6 +1,6 @@
 # P31 UI API Client Alignment and Mock API Mode Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-ui-sentry.md sections 8.1, 8.1a, 8.3, 8.7; design-docs/specs/design-synthetic-test-dataset.md (Value rules); design-docs/specs/design-masking.md (Masking policy)
 **Created**: 2026-10-09
 **Last Updated**: 2026-10-09
@@ -128,7 +128,9 @@ non-obvious):
   In `apiFetch` and `rawFetch`: when `MOCK`, `const { mockFetch } = await
   import("./mock");` and use `mockFetch(path, init)` instead of `fetch`. Keep the dynamic
   import inside the `if` so Vite drops it when the flag is unset.
-- `env.d.ts`: `interface ImportMetaEnv { readonly VITE_TELESCREEN_MOCK?: string }`.
+- `src/web/src/api/env.d.ts` (inside this plan's write path `src/web/src/api`; tsconfig
+  includes all of `src`): `/// <reference types="vite/client" />` and
+  `interface ImportMetaEnv { readonly VITE_TELESCREEN_MOCK?: string }`.
 - `mock/index.ts`: `export async function mockFetch(path: string, init: RequestInit):
   Promise<Response>` and `export const MOCK_FIXTURE_MARKER = "telescreen-mock-fixtures-v1"`
   (referenced by the router so it is bundled only in mock builds).
@@ -237,12 +239,12 @@ while p30 is running, record it and re-run after p30 finishes.
 
 ## Completion Criteria
 
-- [ ] types.ts and client.ts match every router serializer listed in section 1
-- [ ] Mock mode serves every page endpoint with masked fixtures; production build has no fixtures
-- [ ] Fixture raw-pattern test and the Redactor check pass
-- [ ] Pages compile and their tests pass after the mechanical handoff edits
-- [ ] Verification commands pass with logs recorded
-- [ ] Progress Log updated (include the list of page files touched and why)
+- [x] types.ts and client.ts match every router serializer listed in section 1
+- [x] Mock mode serves every page endpoint with masked fixtures; production build has no fixtures
+- [x] Fixture raw-pattern test and the Redactor check pass
+- [x] Pages compile and their tests pass after the mechanical handoff edits
+- [x] Verification commands pass with logs recorded
+- [x] Progress Log updated (include the list of page files touched and why)
 
 ## Progress Log
 
@@ -251,3 +253,50 @@ while p30 is running, record it and re-run after p30 finishes.
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-09 16:40
+**Tasks Completed**: Aligned API types and clients with router serializers; added constant-folded mock mode, page endpoint router, mutable session state, masked fixtures, raw-pattern/Redactor coverage, and mock/client tests. Updated pages and tests to consume the wire shapes and dropped unsupported per-row issue stats. Final TypeScript check, API/page tests (40 passed), production build, fixture-marker checks for production and mock builds, Redactor check, and source line limits passed. Final source SHA-256 inventory: `tmp/telescreen-v1-20261009-s341/p31-ui-mock-api/source-sha256-final.txt`.
+**Page Files Touched and Why**:
+- `src/web/src/pages/issues/IssueList.tsx`, `IssueList.test.tsx`: remove unsupported per-row stats and align list behavior.
+- `src/web/src/pages/issues/IssueDetail.tsx`, `uploadEvidence.ts`: use serialized event/history/run fields and raw evidence upload response handling.
+- `src/web/src/pages/runs/index.tsx`, `RunDetail.tsx`, `RunDetail.test.tsx`: consume run summary/detail serializers, map job references, transitions, and supported polling states.
+- `src/web/src/pages/workflows/index.tsx`, `WorkflowEditor.tsx`, `WorkflowEditor.test.tsx`: consume workflow version references/details and run IDs.
+- `src/web/src/pages/escalation/index.tsx`, `index.test.tsx`: edit serialized tiers JSON.
+- `src/web/src/pages/collectors/index.tsx`: send full collector bodies and consume map job IDs.
+- `src/web/src/pages/police/index.test.tsx`: align status fixture with the police serializer.
+**Tasks In Progress**: Awaiting authorized write-path amendment and serial reconciliation for `src/web/src/env.d.ts`.
+**Blockers**: Plan deliverables require `src/web/src/env.d.ts`, but `fanoutItem.writePaths` authorizes only `impl-plans/active/p31-ui-mock-api.md`, `src/web/src/api`, and `src/web/src/pages`. Resume after checkpoint/dispatch authorizes `src/web/src/env.d.ts`; serial reconciliation should then review the existing declaration and rerun any required final gates.
+**Verification**:
+- `cd src/web && bun run typecheck` — exit 0; complete log `/tmp/telescreen-p31-typecheck-final.log`.
+- `cd src/web && bunx vitest run src/api src/pages` — exit 0; 14 files and 40 tests passed, 0 failed; complete log `/tmp/telescreen-p31-test-final.log`.
+- `cd src/web && bun run build --outDir /tmp/telescreen-p31-web --emptyOutDir` — exit 0; complete log `/tmp/telescreen-p31-build-final.log`.
+- `! grep -rl 'telescreen-mock-fixtures-v1' /tmp/telescreen-p31-web` — exit 0; no production fixture marker; log `/tmp/telescreen-p31-production-marker-check.log`.
+- `cd src/web && VITE_TELESCREEN_MOCK=1 bun run build --outDir /tmp/telescreen-p31-web-mock --emptyOutDir` — exit 0; complete log `/tmp/telescreen-p31-build-mock-final.log`.
+- `grep -rlq 'telescreen-mock-fixtures-v1' /tmp/telescreen-p31-web-mock` — exit 0; mock marker present; log `/tmp/telescreen-p31-mock-marker-check.log`.
+- `uv run --frozen python -c "import pathlib,sys; from telescreen.masking.redact import Redactor; r=Redactor.default(); bad=[str(p) for p in pathlib.Path('src/web/src/api/mock').rglob('*.ts') if r.has_hits(p.read_text())]; print(bad); sys.exit(1 if bad else 0)"` — exit 0; no Redactor hits; log `/tmp/telescreen-p31-redactor-final.log`.
+- `test -z "$(find src/web/src/api src/web/src/pages -name '*.ts*' -exec wc -l {} + | awk '$1 >= 400 && $2 != "total"')"` — exit 0; log `/tmp/telescreen-p31-line-limit.log`.
+**Notes**: An intermediate fixture Redactor check identified unmasked-looking email strings; fixture values were corrected to masked forms and the final check passed. Intermediate test/typecheck attempts were superseded by the final-source passing runs above.
+**Owner resolution (2026-10-09)**: The write-path blocker is resolved without a checkpoint
+amendment. The declaration now lives at `src/web/src/api/env.d.ts`, which is inside this
+plan's write paths (`src/web/src/env.d.ts` no longer exists). Verify typecheck, tests and
+build with the moved file and continue; this is not a blocker.
+### Session: 2026-10-09 17:05
+**Tasks Completed**: Resolved P31-INT-01. Confirmed the Vite env declaration is at authorized path `src/web/src/api/env.d.ts`; the former `src/web/src/env.d.ts` is absent. Updated plan status to Completed after all current-tree gates passed.
+**Tasks In Progress**: Independent step6 test-integrity and step7 adversarial reviews run after this implementation step.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `src/web/src/api/env.d.ts` SHA-256 `fa7a6bda65b022e4debcdd4dda45ef1a6000451e072d047059dde8e3fabe7e1a`; refreshed p31 source inventory: `tmp/telescreen-v1-20261009-s341/p31-ui-mock-api/source-sha256-int1.txt` (includes the moved declaration).
+**Verification**:
+- `cd src/web && bun run typecheck` -> exit 0 (log: `/tmp/telescreen-p31-typecheck-int1.log`).
+- `cd src/web && bunx vitest run src/api src/pages` -> exit 0, 14 files and 40 tests passed (log: `/tmp/telescreen-p31-test-int1.log`).
+- `cd src/web && bun run build --outDir /tmp/telescreen-p31-web-int1 --emptyOutDir` -> exit 0 (log: `/tmp/telescreen-p31-build-int1.log`).
+- `! grep -rl 'telescreen-mock-fixtures-v1' /tmp/telescreen-p31-web-int1` -> exit 0, production marker absent (log: `/tmp/telescreen-p31-production-marker-int1.log`).
+- `cd src/web && VITE_TELESCREEN_MOCK=1 bun run build --outDir /tmp/telescreen-p31-web-mock-int1 --emptyOutDir` -> exit 0 (log: `/tmp/telescreen-p31-build-mock-int1.log`).
+- `grep -rlq 'telescreen-mock-fixtures-v1' /tmp/telescreen-p31-web-mock-int1` -> exit 0, marker present (log: `/tmp/telescreen-p31-mock-marker-int1.log`).
+- `uv run --frozen python -c "import pathlib,sys; from telescreen.masking.redact import Redactor; r=Redactor.default(); bad=[str(p) for p in pathlib.Path('src/web/src/api/mock').rglob('*.ts') if r.has_hits(p.read_text())]; print(bad); sys.exit(1 if bad else 0)"` -> exit 0, no hits (log: `/tmp/telescreen-p31-redactor-int1.log`).
+- `test "$(grep -c '^- \[ \]' impl-plans/active/p31-ui-mock-api.md)" -eq 0` -> exit 0 (log: `/tmp/telescreen-p31-plan-check-int1.log`).
+- API/page TypeScript 400-line limit check -> exit 0, no violations (log: `/tmp/telescreen-p31-line-limit-int1.log`).
+- `git diff --check -- impl-plans/active/p31-ui-mock-api.md src/web/src/api src/web/src/pages` -> exit 0 (log: `/tmp/telescreen-p31-diff-check-int1.log`).
+- `test "$(grep -c '^- \[ \]' impl-plans/active/p31-ui-mock-api.md)" -eq 0` -> exit 0 after the plan update (log: `/tmp/telescreen-p31-plan-check-final-int1.log`).
+- Confirm `src/web/src/api/env.d.ts` exists, old path is absent, and its SHA-256 matches the refreshed inventory -> exit 0 (log: `/tmp/telescreen-p31-env-path-int1.log`).
+**Notes**: P31-INT-01 is resolved within the authorized write paths. No functional source changes were needed. Independent review decisions are produced by the subsequent workflow review steps.

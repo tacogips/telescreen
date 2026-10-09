@@ -1,6 +1,6 @@
 # P30 UI Design System and Application Shell Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-ui-sentry.md sections 1, 2, 3, 7, 8.2, 8.4, 8.5, 8.7
 **Created**: 2026-10-09
 **Last Updated**: 2026-10-09
@@ -260,14 +260,15 @@ optionally run `bun run screenshots` to prove the script works and log the resul
 
 ## Completion Criteria
 
-- [ ] Three dependencies added; `bun install --frozen-lockfile` clean
-- [ ] Tokens, fonts (with OFL texts and SOURCES.md), base styles and theme delivered
-- [ ] All section-2 components and the shell delivered with the pinned contracts
-- [ ] Layout/Sidebar removed; shared components restyled with unchanged props
-- [ ] `/chat` redirects to `/assistant`; rail, panel, TopBar slots, mobile, shortcuts work
-- [ ] Screenshot script present and wired as `bun run screenshots`
-- [ ] Tests listed above pass; verification commands pass with logs recorded
-- [ ] Progress Log updated
+- [x] Three dependencies added; `bun install --frozen-lockfile` clean
+- [x] Tokens, fonts (with OFL texts and SOURCES.md), base styles and theme delivered
+- [x] All section-2 components and the shell delivered with the pinned contracts
+- [x] Layout/Sidebar removed; shared components restyled with unchanged props
+- [x] `/chat` redirects to `/assistant`; rail, panel, TopBar slots, mobile, shortcuts work
+- [x] Screenshot script present and wired as `bun run screenshots`
+- [x] Tests listed above pass; verification commands pass with logs recorded
+- [x] P30-INT-01 repaired and verified with behavioral regression tests
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -276,3 +277,71 @@ optionally run `bun run screenshots` to prove the script works and log the resul
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-09 16:38
+**Tasks Completed**: Added `lucide-solid` 1.54.0, `yaml` 2.9.1 and dev dependency `playwright-core` 1.64.0; built tokenized themes/base styles, self-hosted Rubik and Roboto Mono with OFL files/SHA sources, the UI component barrel and pinned helpers, responsive rail/panel/topbar shell, theme persistence, shortcuts, routes/redirects, screenshot runner, and updated shared component styling/tests. Removed superseded Layout/Sidebar components and tests. No page, API, backend or Python files were edited by p30.
+**Tasks In Progress**: None.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**:
+- `src/web/package.json before=bab6565262c74f66514f56b1db5a1056b30ec767d35d86a1af7e486dcc8c8ce9 after=9ee590cadd262b7aa6c03add7fce1d3a019518ebb1f15658c834edfcec364835`
+- `src/web/bun.lock before=125174f45a6fceb669b0c86a3ceea99a920046071a318c156f0993580f3f6e45 after=a7020b44ae75aaea9890f6de2c6d83fa4fbfd441eda0e4f35c3921a1f13d4608`
+- `src/web/index.html before=03c0ea1ca9d570955e9ccea3db9ff2550987052e4e11c23eb08a001d7fd951ad after=cc2cdf41caaa67ca4377c63d5239fbf46fc4320b9f29cca59089bed3ce431b42`
+- `src/web/scripts/screenshots.ts before=absent after=47799b090a8ca6b48db9ca6df30491680b70ed7fa374976bbd2bb88ef2971ae6`
+- `src/web/public/fonts/Rubik-400.woff2 before=absent after=82ac0e78285c43d0cd203427c57ab30fb07b18f8e6166045f729442eb1abfa26`
+- `src/web/public/fonts/Rubik-500.woff2 before=absent after=54ad302324aa8000449efd8643186deb46777f0ca4d97f10deb9333536933613`
+- `src/web/public/fonts/RobotoMono-400.woff2 before=absent after=e03013e0baa5690a803c188da2214d920c3245b25ad78421ecc8ae86cd842ae9`
+- `src/web/public/fonts/RobotoMono-500.woff2 before=absent after=ce7027efa5c894e8b244b0ca05ec121b6a85655957afd9c76c59b56910de7d4e`
+- `src/web/public/fonts/OFL-Rubik.txt before=absent after=46a250495a963b0b84f2736c0185d0e3af8df9d23427bd425b92a8ece020283c`
+- `src/web/public/fonts/OFL-RobotoMono.txt before=absent after=b489132782690f2cc1ed23ab56d7057bbb08c42573603e8e704ae2e2ea9c8216`
+- `src/web/public/fonts/SOURCES.md before=absent after=b116008e1cf065cd12b27a53f5e3332cd9f851c56ad9d66ca041758c6f336418`
+- `src/web/src/styles/app.css before=39dab83445f7211f445e3274518f7b6e12589e62a422b8a8fd894d547ca94c2b after=19e403ef083f952d2a84ae725db220566cb0ff1bd5f98df33161fd440a0ffb76`
+- `src/web/src/styles/base.css before=absent after=f76ff8a6bbd14f5636e08a21205472949dab73c6587af5c2ea0abbc79f0d5d3a`
+- `src/web/src/styles/fonts.css before=absent after=e84f354dd6ffdc02e66b1fe587af33517bd611bf5b420a1635fb8e655ca55f97`
+- `src/web/src/styles/tokens.css before=absent after=63fcbfa7a650f67536f74d879e11f339e704231a40eaab1a7237a089451dc408`
+- `src/web/src/components/Layout.tsx before=97dc6181d87e1159d32e7749702847831a3c957ad0475009c73999eaa00c445e after=absent`
+- `src/web/src/components/Layout.test.tsx before=893efef84d6b9852daa0581862fc01090bfaa16323a5dbeacc95bc5be7364789 after=absent`
+- `src/web/src/components/Sidebar.tsx before=015b1687e40d54557818decf0e7328833b6bd339e730761c2285aa77a8e48522 after=absent`
+- `src/web/src/components/Sidebar.test.tsx before=72e0eba3a24d1e9096e55720860da574cf47deb5b7d04cdf80cead4a82c7bbdb after=absent`
+- `src/web/src/components/StatusBadge.tsx before=a46d2ff4311313b219e8cd41cb5e41bd417c2715a764c9c616a701a74a3ad0c9 after=e297667542d1bfdffe80deb0cad27b3923fd01e0ef65fcf82df6cccf761ebcc5`
+- `src/web/src/components/StatusBadge.test.tsx before=f68b1b811fb1c9c06520ef6e228f51978393897ae68e040371271db6b7e1ac2e after=4c3f5ea44df96163936d3bc90736373c981b291be452df75a0af8a05c4c95b40`
+- `src/web/src/components/Unavailable.tsx before=262a035ff65975bcb570b50406baef9055b02bc8dd530164ec2a8cf5ee833551 after=a9d65e923309c466eecd79f8c0b4f23ed64801a7d8532116e775c364fbeb1cd8`
+- `src/web/src/components/RelativeTime.tsx before=08bc0024207e032048b05ff31c739bc1f0b09351fe16a1dc52a24ea038012f0a after=95d30b449bed16dd507d53231e3fd0c43efbb25f59e924560f51e353e0f156dd`
+- `src/web/src/components/RelativeTime.test.tsx before=78d459937790fb8e40fd22f8419dc1e955e9497238c32c3673504d18677b0460 after=29b9648cf2a9f217cb7c71c19412491642ebad537d6f4ce0b475b6f621f391ac`
+- `src/web/src/components/Sparkline.tsx before=358768d2a239372fb51d1c095ffd46c7e0cbc6ce99d944481b5ba87d9bf2115b after=f61d7285261248944c84ade572e9bed5847875280377102d463fc5d14632e094`
+- `src/web/src/components/Sparkline.test.tsx before=e273507ed4d0b074d287c19d5dc6d5e7aefdd84a0438e461aac39d14a7c5bf62 after=1a32f68b36c302c80805cb643bdc049860582f9994b5e7cb7b19ea0d7a65a8bd`
+- `src/web/src/components/ui/index.tsx before=absent after=a57357cd7c2c6cfb1cab2ccfb64748d31cdab3bffd2072a3d4fc4e8ff1e8fd0e`
+- `src/web/src/components/ui/ui.css before=absent after=def1a21f989ae5a041d6c3fd79f12be7ad849f11ac06741a23735f81f738874c`
+- `src/web/src/components/ui/ui.test.tsx before=absent after=150e59467695abe9e635eb4f1cc7095567737af291164146f93b44425c3fb1aa`
+- `src/web/src/components/shell/AppShell.tsx before=absent after=61ca7b793f369f98edb476c21b29cda5aec5c603ccadd68f9a3171bf8d10d9e1`
+- `src/web/src/components/shell/PrimaryRail.tsx before=absent after=3d46a9ac68c1912b81d672551339ad70e1dfc4b7485c2a065085d20fe9e5d667`
+- `src/web/src/components/shell/SecondaryPanel.tsx before=absent after=3838c01e93325ab2be1515617a83d4e2dfdd8b76803501392673a4a60a7d4598`
+- `src/web/src/components/shell/TopBar.tsx before=absent after=9b5a45e25e75dbc6399313caa7d16e5c7ce54a1cbc885fe3c68085227c153e9d`
+- `src/web/src/components/shell/nav.ts before=absent after=79b1e8f75cfd40a2804492d7dea9ec62f198b4a1102a3514446a431786b4a0c2`
+- `src/web/src/components/shell/shortcuts.ts before=absent after=edfd06ebda3664aae999319c1022c5750aecb6a4957afc0f7f060d851eb76b68`
+- `src/web/src/components/shell/storage.ts before=absent after=a77e67ed0f6c4daa1a3217c423bb46b5e9947d562b6152364d7733c4462735a4`
+- `src/web/src/components/shell/theme.ts before=absent after=811803a2fa4a5899690e99dfc091ec06ea66106d6cf573d9498627ac8565f214`
+- `src/web/src/components/shell/shell.css before=absent after=94f12d07f0009a672f2826ed8aca1f1cc4001949bf1fabc798d499e1627f6e20`
+- `src/web/src/App.tsx before=212961181aae6fa4deaacb51e810fc3978ef8d6d38a339e67141804e8715ec28 after=d319be3cd75e6c6e7fa99f5c74ed2585f8ab5bfab93c953d83cb830f4e1cf5dd`
+- `src/web/src/routes.tsx before=ea6a07598a055d99c6b0dc6dcad60a0c16854bacef4b0242c1818b3db93f2755 after=5cdd1205a575386a7452d4c4b23f62f89eaa93659b34b0fceb63404af439f832`
+- `src/web/src/main.tsx before=f28a6f68c151feafbe24fd24011fb100b145eded00a4ff0632ce63aca838a1bf after=e2a38e59ecd48fd4f94fbbee19f3a68383269ca6ab498e17182ff8af36a05c6b`
+- `src/web/src/shell.test.tsx before=937e11450b58e0168b386e33d6d8e8242c3d4a55fcff049cba0258de4937903f after=34019d32c2ad901a7b7c09b5c43de8d4b18b8a8e225e8ef71c1f4579dd729502`
+**Verification**:
+- `cd src/web && bun install --frozen-lockfile` -> exit 0 (log: `/tmp/telescreen-p30-install-final.log`); no lockfile changes during install.
+- `cd src/web && bun run typecheck` -> exit 0 (log: `/tmp/telescreen-p30-typecheck-final.log`). Intermediate sibling p31 typecheck errors were rechecked after p31 edits and cleared.
+- `cd src/web && bunx vitest run src/components src/shell.test.tsx` -> exit 0, 20 passed, 0 failed (log: `/tmp/telescreen-p30-test-final.log`).
+- `cd src/web && bun run build --outDir /tmp/telescreen-p30-web-verified --emptyOutDir` -> exit 0 (log: `/tmp/telescreen-p30-build-final.log`).
+- `cd src/web && bun build scripts/screenshots.ts --target=bun --external playwright-core --outdir /tmp/telescreen-p30-script-check` -> exit 0 (log: `/tmp/telescreen-p30-script-check-final.log`).
+- `! grep -rniE '7553ff|sentry|scraps|seer' src/web/src/styles src/web/src/components src/web/public` plus required font-file and TSX-size checks -> exit 0 (log: `/tmp/telescreen-p30-static-final.log`).
+**Notes**: An early screenshot-script smoke attempt exposed preview readiness timing; the runner now polls the preview before opening pages. Full screenshot smoke is owned by p12/p13/p14 and p29 per this plan. Several typecheck snapshots during concurrent p31 edits were nonzero and superseded by the final current-tree exit 0; an initial bundle check without `--external playwright-core` also failed on Playwright's optional `chromium-bidi` references and was superseded by the passing externalized check. No review findings were supplied. Downstream review, documentation/index reconciliation, staging and commit remain workflow-owned later steps.
+
+### Adversarial review repair: 2026-10-09
+**Tasks Completed**: Fixed p30-ADV-01 by keeping SearchQueryBuilder input local until Enter, appending the trimmed draft exactly once, clearing the input, and retaining committed invalid text for validation. Fixed p30-ADV-02 by deriving SecondaryPanel title and landmark label reactively from the current area. Added controlled multi-keystroke/commit, invalid-token retention, and `/issues` to `/police` shell regression tests.
+**Verification**: `cd src/web && bunx vitest run src/components src/shell.test.tsx` -> exit 0, 32 passed (log: `/tmp/telescreen-p30-test-adv1.log`); `cd src/web && bun run typecheck` -> exit 0 (log: `/tmp/telescreen-p30-typecheck-adv1.log`); `cd src/web && bun run build --outDir /tmp/telescreen-p30-web-adv1 --emptyOutDir` -> exit 0 (log: `/tmp/telescreen-p30-build-adv1.log`); scoped brand scan -> exit 0 (log: `/tmp/telescreen-p30-brand-scan-adv1.log`).
+**Review Decision**: Both adversarial findings repaired; independent review remains pending.
+
+### Integration feedback repair: P30-INT-01
+**Tasks Completed**: Split the UI primitives into one module per component/helper with `index.tsx` as a re-export barrel; formatted and sectioned `ui.css`; loaded the UI stylesheet from `main.tsx`. `SplitButton` now renders a sibling menu controlled by its chevron button (`aria-haspopup`, `aria-expanded`), closing on Escape or menu-item click. `SortSelect` accepts `{value,label,detail}` options and visibly describes the selected choice. `PriorityBadge` uses a muted tag with a signal icon at all levels. Added behavioral tests for menu visibility/closure and DOM nesting, sort labels/detail/value callback, and all priority levels. Hash inventory: `tmp/telescreen-v1-20261009-s341/p30-ui-design-system/int1/source-sha256.json` (33 source paths with pre-node and final hashes; new modules recorded as absent before).
+**Verification**: `cd src/web && bun install --frozen-lockfile` -> exit 0, no changes (`/tmp/telescreen-p30-install-int1.log`). `cd src/web && bun run typecheck` -> exit 0 (`/tmp/telescreen-p30-typecheck-int1-final.log`). `cd src/web && bunx vitest run src/components src/shell.test.tsx` -> exit 0, 9 files / 35 tests passed (`/tmp/telescreen-p30-test-int1-final2.log`). `cd src/web && bun run test` -> exit 0, 23 files / 75 tests passed (`/tmp/telescreen-p30-test-all-int1.log`). `cd src/web && bun run build --outDir /tmp/telescreen-p30-web-int1 --emptyOutDir` -> exit 0 (`/tmp/telescreen-p30-build-int1.log`). Prettier check -> exit 0 (`/tmp/telescreen-p30-format-int1.log`). UI line-limit and scoped no-brand scan -> exit 0 (`/tmp/telescreen-p30-static-int1-final.log`).
+**Resolved Preliminary Attempts**: The initial typecheck found extraction import/return annotation errors; corrected and verified by the final typecheck. An initial test wrapper used zsh's readonly `status` variable and exited 1 after reporting 35 passed; rerun with `rc` exited 0 on the same source (`/tmp/telescreen-p30-test-int1-final2.log`).
+**Finding**: P30-INT-01 addressed with the behaviors and evidence above. Independent review remains downstream.

@@ -1,39 +1,36 @@
 import { A, useParams } from "@solidjs/router";
 import { createResource, For, Show, type JSX } from "solid-js";
 import { workflowsApi } from "../../api/client";
-import type { Workflow } from "../../api/types";
-import { ErrorBanner } from "../../components/ErrorBanner";
-import { RelativeTime } from "../../components/RelativeTime";
-import { StatusBadge } from "../../components/StatusBadge";
+import { EmptyState, Table } from "../../components/ui";
+import { TopBar } from "../../components/shell/TopBar";
 import { WorkflowEditor } from "./WorkflowEditor";
-
-type WorkflowSummary = Workflow & Readonly<{ latest_version?: number | null; trigger_summary?: string }>;
 
 export default function WorkflowsPage(): JSX.Element {
   const params = useParams<{ id?: string }>();
-  const [workflows, { refetch }] = createResource(() => workflowsApi.list());
-
-  return (
-    <section class="workflow-page">
-      <Show when={params.id} fallback={<>
-        <div class="page-heading"><div><h1>Workflows</h1><p>Manage validated workflow definitions and active versions.</p></div><A class="button-secondary" href="/workflows/new">New workflow</A></div>
-        <Show when={!workflows.error} fallback={<ErrorBanner error={workflows.error ?? null} />}>
-          <Show when={!workflows.loading} fallback={<p>Loading workflows...</p>}>
-            <Show when={(workflows()?.items.length ?? 0) > 0} fallback={<div class="empty-state">No workflows yet. Create a workflow to start a response process.</div>}>
-              <div class="table-scroll"><table><thead><tr><th>Name</th><th>Latest version</th><th>Active version</th><th>Updated</th></tr></thead><tbody>
-                <For each={workflows()?.items ?? []}>{(workflow) => <tr>
-                  <td><A href={`/workflows/${encodeURIComponent(workflow.name)}`}>{workflow.title || workflow.name}</A><div class="muted">{workflow.name}</div></td>
-                  <td>{(workflow as WorkflowSummary).latest_version ?? workflow.active_version ?? "—"}</td>
-                  <td>{workflow.active_version ?? "Not active"}</td>
-                  <td>{(workflow as WorkflowSummary).trigger_summary ?? workflow.description ?? "Manual"}<div class="muted"><RelativeTime iso={workflow.updated_at} /></div></td>
-                </tr>}</For>
-              </tbody></table></div>
-            </Show>
-          </Show>
+  const [workflows, { refetch }] = createResource(async () => {
+    const items = (await workflowsApi.list()).items;
+    const grouped = new Map<string, typeof items>();
+    for (const item of items) grouped.set(item.name, [...(grouped.get(item.name) ?? []), item]);
+    return [...grouped.entries()].map(([name, versions]) => {
+      const ordered = [...versions].sort((left, right) => right.version - left.version);
+      return { name, latest: ordered[0]?.version ?? 0, active: ordered.find((item) => item.active)?.version ?? null };
+    });
+  });
+  return <section class="workflow-page">
+    <Show when={params.id} fallback={<>
+      <TopBar.Slot name="title">Workflows</TopBar.Slot>
+      <TopBar.Slot name="actions"><A href="/workflows/new">New workflow</A></TopBar.Slot>
+      <Show when={!workflows.loading} fallback={<p>Loading workflows...</p>}>
+        <Show when={!workflows.error} fallback={<p role="alert">Workflows could not be loaded.</p>}>
+        <Show when={(workflows()?.length ?? 0) > 0} fallback={<EmptyState title="No workflows yet"><p>Create a workflow to start an incident response process.</p></EmptyState>}>
+          <Table><thead><tr><th>Name</th><th>Latest version</th><th>Active version</th></tr></thead><tbody>
+            <For each={workflows()}>{(item) => <tr><td><A href={`/workflows/${encodeURIComponent(item.name)}`}>{item.name}</A></td><td>{item.latest}</td><td>{item.active ?? "—"}</td></tr>}</For>
+          </tbody></Table>
         </Show>
-      </>}>
-        <WorkflowEditor name={params.id === "new" ? undefined : params.id} onChanged={() => refetch()} />
+        </Show>
       </Show>
-    </section>
-  );
+    </>}>
+      <WorkflowEditor name={params.id === "new" ? undefined : params.id} onChanged={() => refetch()} />
+    </Show>
+  </section>;
 }

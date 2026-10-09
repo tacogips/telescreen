@@ -1,0 +1,11 @@
+.workflow-editor-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,1fr);gap:16px;align-items:stretch}
+.workflow-source-editor{display:grid;grid-template-columns:42px minmax(0,1fr);min-height:420px;max-height:70vh;overflow:auto;border:1px solid var(--border-primary);border-radius:8px;background:var(--bg-primary)}
+.workflow-line-numbers{display:flex;flex-direction:column;align-items:end;padding:12px 8px;color:var(--text-secondary);font:12px/1.55 var(--font-mono);user-select:none}
+.workflow-source-editor textarea{min-width:0;resize:vertical;border:0;border-left:1px solid var(--border-secondary);border-radius:0;padding:12px;background:transparent;color:var(--text-primary);font:13px/1.55 var(--font-mono);white-space:pre;tab-size:2}
+.workflow-validation-errors{padding:12px 16px;border:1px solid var(--danger);border-radius:8px;background:var(--danger-muted-bg);color:var(--danger-content)}
+.workflow-validation-errors code{font-family:var(--font-mono)}
+.run-step-spinner{animation:run-step-spin 1s linear infinite}
+.step-title{display:flex;align-items:center;gap:8px}
+.current-step{border-left:3px solid var(--accent);padding-left:12px;background:var(--selected-bg)}
+@keyframes run-step-spin{to{transform:rotate(360deg)}}
+@media(max-width:992px){.workflow-editor-columns{grid-template-columns:1fr}.workflow-source-editor{min-height:300px}}

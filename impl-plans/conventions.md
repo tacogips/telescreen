@@ -166,8 +166,11 @@ incomplete log is not a pass.
 
 ## 7a. Reporting fixed review findings (owner ruling 2026-10-09)
 
-The progress gate treats every high or medium entry in your step result `findings` or
-`risks` as UNRESOLVED and blocks the plan. Therefore:
+The progress gate (a deterministic script) collects `findings`, `risks`,
+`authorSelfCheck.findings` and `authorSelfCheck.residualRisks` and blocks the plan on ANY
+entry whose `severity` is critical, high, mid or medium, or any string starting with
+"High:" / "Medium:". It ignores `status`: an entry marked "Fixed" still blocks.
+Therefore:
 
 - A review finding you have fixed and verified goes ONLY in `addressedFeedback`, with the
   changed paths, the verification commands and their passing results. Do not repeat it in

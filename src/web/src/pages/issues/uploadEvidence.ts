@@ -1,4 +1,4 @@
-import { ApiError, getToken } from "../../api/client";
+import { ApiError, rawFetch } from "../../api/client";
 
 export class EvidenceRejectedError extends Error {
   readonly detail: string;
@@ -23,12 +23,20 @@ function errorRecord(body: unknown): UnknownRecord | undefined {
   return body.error;
 }
 
-export async function uploadEvidence(file: Blob, issueId: string, filename: string): Promise<void> {
+export async function uploadEvidence(
+  file: Blob,
+  issueId: string,
+  filename: string,
+): Promise<void> {
   const params = new URLSearchParams({ issue_id: issueId, filename });
-  const headers = new Headers({ "Content-Type": file.type || "application/octet-stream" });
-  const token = getToken();
-  if (token !== null) headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetch(`/api/evidence?${params}`, { method: "PUT", headers, body: file });
+  const headers = new Headers({
+    "Content-Type": file.type || "application/octet-stream",
+  });
+  const response = await rawFetch(`/api/evidence?${params}`, {
+    method: "PUT",
+    headers,
+    body: file,
+  });
   if (response.ok) return;
 
   let body: unknown;
@@ -39,12 +47,18 @@ export async function uploadEvidence(file: Blob, issueId: string, filename: stri
   }
   const error = errorRecord(body);
   const code = typeof error?.code === "string" ? error.code : "request_failed";
-  const detail = typeof error?.detail === "string" ? error.detail : "The request could not be completed.";
+  const detail =
+    typeof error?.detail === "string"
+      ? error.detail
+      : "The request could not be completed.";
   if (code === "evidence_rejected") {
     const rawClasses = error?.rule_classes;
-    const ruleClasses = Array.isArray(rawClasses) ? rawClasses.filter((item): item is string => typeof item === "string") : [];
+    const ruleClasses = Array.isArray(rawClasses)
+      ? rawClasses.filter((item): item is string => typeof item === "string")
+      : [];
     throw new EvidenceRejectedError(detail, ruleClasses);
   }
-  const errorId = typeof error?.error_id === "string" ? error.error_id : undefined;
+  const errorId =
+    typeof error?.error_id === "string" ? error.error_id : undefined;
   throw new ApiError(response.status, code, detail, errorId);
 }

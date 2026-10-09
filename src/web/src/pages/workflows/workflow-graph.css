@@ -1,0 +1,11 @@
+.workflow-graph-panel{min-width:0;overflow:auto;border:1px solid var(--border-primary);border-radius:8px;background:var(--bg-secondary);padding:12px}
+.workflow-graph{display:block;min-width:100%;color:var(--text-secondary)}
+.workflow-edge{fill:none;stroke:var(--border-primary);stroke-width:2}
+.workflow-edge.branch{stroke:var(--accent)}
+.workflow-edge.error{stroke:var(--danger)}
+.workflow-edge.send_back{stroke:var(--warning);stroke-dasharray:5 4}
+.workflow-graph marker path{fill:currentColor}
+.workflow-node rect{fill:var(--bg-primary);stroke:var(--border-primary)}
+.workflow-node foreignObject{color:var(--accent)}
+.workflow-node-type{fill:var(--text-secondary);font-size:10px}
+.workflow-node-id{fill:var(--text-primary);font-size:12px;font-weight:600}

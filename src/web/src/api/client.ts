@@ -1,28 +1,42 @@
 import type {
-  ApiErrorBody, ApiMessage, AuditRecord, AuditVerify, ChatResponse, CollectorConfig, Comment,
-  Evidence, EscalationPolicy, EscalationTier, HumanTask, IngestResult, Issue, IssueEvent, IssueHistory,
-  IssueStats, JsonValue, MapJob, Member, Page, PoliceClaim, PoliceCredentials, PoliceHeartbeat, PoliceHeartbeatResponse,
-  PoliceManifest, PoliceResult, PoliceWorker, SearchResponse, Team, ValidateResponse, Workflow,
-  WorkflowRun, WorkflowRunDetail, WorkflowSchema, WorkflowVersion,
+  ApiErrorBody, ApiMessage, AuditRecord, AuditSearchResponse, AuditVerify, ChatResponse, CollectorConfig,
+  Evidence, EscalationPolicy, HumanTask, IngestFindingsResult, IngestScanResult, Issue, IssueEvent, IssueHistory,
+  IssueStatsBuckets, JsonValue, MapJob, MapJobSummary, Member, Page, PoliceClaim, PoliceCredentials,
+  PoliceHeartbeat, PoliceHeartbeatResponse, PoliceManifest, PoliceResult, PoliceWorker, SearchResponse,
+  Team, ValidateResponse, WorkflowVersion, WorkflowVersionRef, RunDetail, RunSummary, RunHumanTask,
 } from "./types";
 
 const TOKEN_KEY = "telescreen.token";
+const MOCK = import.meta.env.VITE_TELESCREEN_MOCK === "1";
 
 type ApiRequestInit = Omit<RequestInit, "body"> & Readonly<{ body?: BodyInit | null; json?: JsonValue }>;
+type UnknownRecord = Readonly<Record<string, unknown>>;
 
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly detail: string;
   readonly errorId: string | undefined;
+  readonly ruleClasses: readonly string[] | undefined;
 
-  constructor(status: number, code: string, detail: string, errorId?: string) {
+  constructor(status: number, code: string, detail: string, errorId?: string, ruleClasses?: readonly string[]) {
     super(detail);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
     this.detail = detail;
     this.errorId = errorId;
+    this.ruleClasses = ruleClasses;
+  }
+}
+
+export class WorkflowValidationError extends ApiError {
+  readonly errors: readonly Readonly<{ path: string; code: string }>[];
+
+  constructor(errors: readonly Readonly<{ path: string; code: string }>[]) {
+    super(422, "validation_error", "Workflow validation failed.");
+    this.name = "WorkflowValidationError";
+    this.errors = errors;
   }
 }
 
@@ -31,41 +45,62 @@ export function getToken(): string | null {
 }
 
 export function setToken(token: string | null): void {
-  if (token === null || token.trim() === "") {
-    globalThis.sessionStorage?.removeItem(TOKEN_KEY);
-  } else {
-    globalThis.sessionStorage?.setItem(TOKEN_KEY, token);
+  if (token === null || token.trim() === "") globalThis.sessionStorage?.removeItem(TOKEN_KEY);
+  else globalThis.sessionStorage?.setItem(TOKEN_KEY, token);
+}
+
+export async function rawFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers);
+  const token = getToken();
+  if (token !== null) headers.set("Authorization", `Bearer ${token}`);
+  const request = { ...init, headers };
+  if (MOCK) {
+    const { mockFetch } = await import("./mock");
+    return mockFetch(path, request);
   }
+  return fetch(path, request);
 }
 
 export async function apiFetch<T>(path: string, init: ApiRequestInit = {}): Promise<T> {
   const { json: jsonBody, ...requestInit } = init;
   const headers = new Headers(requestInit.headers);
-  const token = getToken();
-  if (token !== null) headers.set("Authorization", `Bearer ${token}`);
   let body = requestInit.body;
   if (jsonBody !== undefined) {
     headers.set("Content-Type", "application/json");
     body = JSON.stringify(jsonBody);
   }
-  const response = await fetch(path, { ...requestInit, headers, body });
-  if (!response.ok) {
-    let parsed: ApiErrorBody | undefined;
-    try {
-      parsed = (await response.json()) as ApiErrorBody;
-    } catch {
-      parsed = undefined;
-    }
-    const error = parsed?.error;
-    throw new ApiError(
-      response.status,
-      error?.code ?? "request_failed",
-      error?.detail ?? "The request could not be completed.",
-      error?.error_id,
-    );
-  }
+  const response = await rawFetch(path, { ...requestInit, headers, body });
+  if (!response.ok) await throwApiError(response);
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
+}
+
+async function throwApiError(response: Response): Promise<never> {
+  let body: unknown;
+  try { body = await response.json(); } catch { body = undefined; }
+  const error: UnknownRecord | undefined = record(record(body)?.error);
+  if (response.status === 422 && Array.isArray(record(body)?.errors)) {
+    const errors = (record(body)?.errors as unknown[]).flatMap((item) => {
+      const value = record(item);
+      return typeof value?.path === "string" && typeof value.code === "string"
+        ? [{ path: value.path, code: value.code }] : [];
+    });
+    throw new WorkflowValidationError(errors);
+  }
+  const ruleClasses = Array.isArray(error?.rule_classes)
+    ? error.rule_classes.filter((item): item is string => typeof item === "string") : undefined;
+  throw new ApiError(
+    response.status,
+    typeof error?.code === "string" ? error.code : "request_failed",
+    typeof error?.detail === "string" ? error.detail : "The request could not be completed.",
+    typeof error?.error_id === "string" ? error.error_id : undefined,
+    ruleClasses,
+  );
+}
+
+function record(value: unknown): UnknownRecord | undefined {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as UnknownRecord : undefined;
 }
 
 function query(values: URLSearchParams): string {
@@ -77,126 +112,120 @@ function json(method: string, value?: JsonValue): ApiRequestInit {
   return value === undefined ? { method } : { method, json: value };
 }
 
-export const healthApi = {
-  get: (): Promise<Readonly<{ status: string }>> => apiFetch("/api/health"),
-};
+function normalizePage<T>(value: Readonly<{ items: T[]; next_cursor?: string | null }>): Page<T> {
+  return { items: value.items, next_cursor: value.next_cursor ?? null };
+}
+
+export const healthApi = { get: (): Promise<Readonly<{ status: string }>> => apiFetch("/api/health") };
 
 export const issuesApi = {
   list: (filters: URLSearchParams = new URLSearchParams()): Promise<Page<Issue>> => apiFetch(`/api/issues${query(filters)}`),
   get: (id: string): Promise<Issue> => apiFetch(`/api/issues/${encodeURIComponent(id)}`),
   events: (id: string, cursor?: string): Promise<Page<IssueEvent>> => {
-    const params = new URLSearchParams();
-    if (cursor !== undefined) params.set("cursor", cursor);
+    const params = new URLSearchParams(); if (cursor !== undefined) params.set("cursor", cursor);
     return apiFetch(`/api/issues/${encodeURIComponent(id)}/events${query(params)}`);
   },
   history: (id: string, cursor?: string): Promise<Page<IssueHistory>> => {
-    const params = new URLSearchParams();
-    if (cursor !== undefined) params.set("cursor", cursor);
+    const params = new URLSearchParams(); if (cursor !== undefined) params.set("cursor", cursor);
     return apiFetch(`/api/issues/${encodeURIComponent(id)}/history${query(params)}`);
   },
-  stats: (id: string): Promise<IssueStats> => apiFetch(`/api/issues/${encodeURIComponent(id)}/stats`),
+  stats: (params: Readonly<{ bucket: "day" | "hour"; days: number }>): Promise<IssueStatsBuckets> => {
+    const search = new URLSearchParams({ bucket: params.bucket, days: String(params.days) });
+    return apiFetch(`/api/issues/stats${query(search)}`);
+  },
   update: (id: string, patch: Readonly<{ status?: string; assignee_ref?: string | null }>): Promise<Issue> => apiFetch(`/api/issues/${encodeURIComponent(id)}`, json("PATCH", patch)),
-  comment: (id: string, body: string): Promise<Comment> => apiFetch(`/api/issues/${encodeURIComponent(id)}/comments`, json("POST", { body })),
+  comment: (id: string, body: string): Promise<Readonly<{ accepted: boolean }>> => apiFetch(`/api/issues/${encodeURIComponent(id)}/comments`, json("POST", { body })),
 };
 
 export const workflowsApi = {
-  list: (): Promise<Page<Workflow>> => apiFetch("/api/workflows"),
-  get: (name: string): Promise<Workflow> => apiFetch(`/api/workflows/${encodeURIComponent(name)}`),
+  list: async (): Promise<Page<WorkflowVersionRef>> => normalizePage(await apiFetch<{ items: WorkflowVersionRef[] }>("/api/workflows")),
+  get: (name: string): Promise<Readonly<{ items: WorkflowVersionRef[] }>> => apiFetch(`/api/workflows/${encodeURIComponent(name)}`),
   version: (name: string, version: number): Promise<WorkflowVersion> => apiFetch(`/api/workflows/${encodeURIComponent(name)}/versions/${version}`),
-  schema: (): Promise<WorkflowSchema> => apiFetch("/api/workflows/schema"),
-  create: (source_format: "yaml" | "json", source_text: string): Promise<WorkflowVersion> => apiFetch("/api/workflows", json("POST", { source_format, source_text })),
+  schema: async (): Promise<string> => (await rawFetch("/api/workflows/schema")).text(),
+  create: (source_format: "yaml" | "json", source_text: string): Promise<WorkflowVersionRef> => apiFetch("/api/workflows", json("POST", { source_format, source_text })),
   validate: (source_format: "yaml" | "json", source_text: string): Promise<ValidateResponse> => apiFetch("/api/workflows/validate", json("POST", { source_format, source_text })),
-  activate: (name: string, version: number): Promise<Workflow> => apiFetch(`/api/workflows/${encodeURIComponent(name)}/activate`, json("POST", { version })),
-  startRun: (name: string, issue_id?: string): Promise<WorkflowRun> => apiFetch(`/api/workflows/${encodeURIComponent(name)}/runs`, json("POST", issue_id === undefined ? {} : { issue_id })),
+  activate: (name: string, version: number): Promise<WorkflowVersionRef> => apiFetch(`/api/workflows/${encodeURIComponent(name)}/activate`, json("POST", { version })),
+  startRun: (name: string, issue_id?: string): Promise<Readonly<{ run_id: string }>> => apiFetch(`/api/workflows/${encodeURIComponent(name)}/runs`, json("POST", issue_id === undefined ? {} : { issue_id })),
 };
 
 export const runsApi = {
-  list: (filters: URLSearchParams = new URLSearchParams()): Promise<Page<WorkflowRun>> => apiFetch(`/api/runs${query(filters)}`),
-  get: (id: string): Promise<WorkflowRunDetail> => apiFetch(`/api/runs/${encodeURIComponent(id)}`),
-  cancel: (id: string): Promise<WorkflowRun> => apiFetch(`/api/runs/${encodeURIComponent(id)}/cancel`, json("POST")),
+  list: async (filters: URLSearchParams = new URLSearchParams()): Promise<Page<RunSummary>> => normalizePage(await apiFetch<{ items: RunSummary[] }>(`/api/runs${query(filters)}`)),
+  get: (id: string): Promise<RunDetail> => apiFetch(`/api/runs/${encodeURIComponent(id)}`),
+  cancel: (id: string): Promise<Readonly<{ run_id: string; status: string }>> => apiFetch(`/api/runs/${encodeURIComponent(id)}/cancel`, json("POST")),
 };
 
 export const humanTasksApi = {
-  list: (filters: URLSearchParams = new URLSearchParams()): Promise<Page<HumanTask>> => apiFetch(`/api/human-tasks${query(filters)}`),
-  complete: (id: string, outcome: string, comment?: string): Promise<HumanTask> => apiFetch(`/api/human-tasks/${encodeURIComponent(id)}/complete`, json("POST", comment === undefined ? { outcome } : { outcome, comment })),
+  list: async (filters: URLSearchParams = new URLSearchParams()): Promise<Page<HumanTask>> => normalizePage(await apiFetch<{ items: HumanTask[] }>(`/api/human-tasks${query(filters)}`)),
+  complete: (id: string, outcome: string, comment?: string): Promise<Readonly<{ id: string; status: string }>> => apiFetch(`/api/human-tasks/${encodeURIComponent(id)}/complete`, json("POST", comment === undefined ? { outcome } : { outcome, comment })),
 };
 
 export const evidenceApi = {
-  upload: (file: Blob, issueId: string, filename: string, stepRunId?: string): Promise<Evidence> => {
+  upload: async (file: Blob, issueId: string, filename: string, stepRunId?: string): Promise<Evidence> => {
     const params = new URLSearchParams({ issue_id: issueId, filename });
     if (stepRunId !== undefined) params.set("step_run_id", stepRunId);
-    return apiFetch(`/api/evidence${query(params)}`, { method: "PUT", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file });
+    const response = await rawFetch(`/api/evidence${query(params)}`, { method: "PUT", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file });
+    if (!response.ok) await throwApiError(response);
+    return await response.json() as Evidence;
   },
-  list: (filters: URLSearchParams): Promise<Page<Evidence>> => apiFetch(`/api/evidence${query(filters)}`),
+  list: async (filters: URLSearchParams): Promise<Page<Evidence>> => normalizePage(await apiFetch<{ items: Evidence[]; next_cursor?: string | null }>(`/api/evidence${query(filters)}`)),
   get: (id: string): Promise<Evidence> => apiFetch(`/api/evidence/${encodeURIComponent(id)}`),
-  content: (id: string): Promise<Blob> => fetchEvidenceBlob(`/api/evidence/${encodeURIComponent(id)}/content`),
+  content: async (id: string): Promise<Blob> => {
+    const response = await rawFetch(`/api/evidence/${encodeURIComponent(id)}/content`);
+    if (!response.ok) await throwApiError(response);
+    return response.blob();
+  },
 };
 
-async function fetchEvidenceBlob(path: string): Promise<Blob> {
-  const headers = new Headers();
-  const token = getToken();
-  if (token !== null) headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetch(path, { headers });
-  if (!response.ok) throw new ApiError(response.status, "request_failed", "The request could not be completed.");
-  return response.blob();
-}
-
 export const escalationApi = {
-  list: (): Promise<Page<EscalationPolicy>> => apiFetch("/api/escalation-policies"),
-  create: (value: Readonly<{ name: string; tiers: EscalationTier[] }>): Promise<EscalationPolicy> => apiFetch("/api/escalation-policies", json("POST", value)),
-  update: (name: string, value: Readonly<{ tiers: EscalationTier[] }>): Promise<EscalationPolicy> => apiFetch(`/api/escalation-policies/${encodeURIComponent(name)}`, json("PUT", value)),
+  list: async (): Promise<Page<EscalationPolicy>> => normalizePage(await apiFetch<{ items: EscalationPolicy[] }>("/api/escalation-policies")),
+  create: (name: string, tiers_json: string, source_format: "json" | "yaml" = "json"): Promise<EscalationPolicy> => apiFetch("/api/escalation-policies", json("POST", { name, tiers_json, source_format })),
+  update: (name: string, tiers_json: string, source_format: "json" | "yaml" = "json"): Promise<EscalationPolicy> => apiFetch(`/api/escalation-policies/${encodeURIComponent(name)}`, json("PUT", { tiers_json, source_format })),
 };
 
 export const directoryApi = {
-  members: (): Promise<Page<Member>> => apiFetch("/api/members"),
-  createMember: (value: Readonly<{ handle: string; display_name: string; email?: string }>): Promise<Member> => apiFetch("/api/members", json("POST", value)),
-  teams: (): Promise<Page<Team>> => apiFetch("/api/teams"),
-  createTeam: (value: Readonly<{ slug: string; name: string }>): Promise<Team> => apiFetch("/api/teams", json("POST", value)),
-  setTeamMembers: (slug: string, member_ids: string[]): Promise<Team> => apiFetch(`/api/teams/${encodeURIComponent(slug)}/members`, json("PUT", { member_ids })),
+  members: (filters: URLSearchParams = new URLSearchParams()): Promise<Page<Member>> => apiFetch(`/api/members${query(filters)}`),
+  createMember: (value: Readonly<{ handle: string; display_name: string; email?: string; slack_user_id?: string }>): Promise<Member> => apiFetch("/api/members", json("POST", value)),
+  teams: (filters: URLSearchParams = new URLSearchParams()): Promise<Page<Team>> => apiFetch(`/api/teams${query(filters)}`),
+  createTeam: (value: Readonly<{ slug: string; name: string; email?: string; slack_channel?: string }>): Promise<Team> => apiFetch("/api/teams", json("POST", value)),
+  setTeamMembers: async (slug: string, handles: string[]): Promise<void> => { await apiFetch<void>(`/api/teams/${encodeURIComponent(slug)}/members`, json("PUT", { handles })); },
 };
 
+type CollectorBody = Readonly<{ name: string; kind: string; trigger_mode: string; cron: string | null; sweep_cron: string | null; selector_json: string; credential_ref: string | null; enabled: boolean }>;
 export const collectorsApi = {
-  list: (): Promise<Page<CollectorConfig>> => apiFetch("/api/collectors"),
-  create: (value: Readonly<{ name: string; kind: string; trigger_mode: string; selector_json: string; cron?: string; credential_ref?: string }>): Promise<CollectorConfig> => apiFetch("/api/collectors", json("POST", value)),
-  update: (id: string, value: Readonly<{ enabled?: boolean; trigger_mode?: string; selector_json?: string; cron?: string | null }>): Promise<CollectorConfig> => apiFetch(`/api/collectors/${encodeURIComponent(id)}`, json("PATCH", value)),
-  run: (id: string): Promise<Readonly<{ scan_job_id: string }>> => apiFetch(`/api/collectors/${encodeURIComponent(id)}/run`, json("POST")),
-  sweep: (id: string): Promise<MapJob> => apiFetch(`/api/collectors/${encodeURIComponent(id)}/sweep`, json("POST")),
-  webhook: (kind: "slack" | "github" | "gdrive", payload: Blob): Promise<Readonly<{ accepted: boolean }>> => apiFetch(`/api/collectors/${kind}/webhook`, { method: "POST", headers: { "Content-Type": payload.type || "application/json" }, body: payload }),
+  list: async (): Promise<Page<CollectorConfig>> => normalizePage(await apiFetch<{ items: CollectorConfig[] }>("/api/collectors")),
+  create: (value: CollectorBody): Promise<Readonly<{ id: string }>> => apiFetch("/api/collectors", json("POST", value)),
+  update: (id: string, value: CollectorBody): Promise<Readonly<{ id: string }>> => apiFetch(`/api/collectors/${encodeURIComponent(id)}`, json("PATCH", value)),
+  run: (id: string): Promise<Readonly<{ id: string }>> => apiFetch(`/api/collectors/${encodeURIComponent(id)}/run`, json("POST")),
+  sweep: (id: string): Promise<Readonly<{ map_job_id: string }>> => apiFetch(`/api/collectors/${encodeURIComponent(id)}/sweep`, json("POST")),
 };
 
 export const mapJobsApi = {
-  list: (filters: URLSearchParams = new URLSearchParams()): Promise<Page<MapJob>> => apiFetch(`/api/map-jobs${query(filters)}`),
+  list: async (filters: URLSearchParams = new URLSearchParams()): Promise<Page<MapJobSummary>> => normalizePage(await apiFetch<{ items: MapJobSummary[]; next_cursor?: string | null }>(`/api/map-jobs${query(filters)}`)),
   get: (id: string): Promise<MapJob> => apiFetch(`/api/map-jobs/${encodeURIComponent(id)}`),
-  cancel: (id: string): Promise<MapJob> => apiFetch(`/api/map-jobs/${encodeURIComponent(id)}/cancel`, json("POST")),
-  retryFailed: (id: string): Promise<MapJob> => apiFetch(`/api/map-jobs/${encodeURIComponent(id)}/retry-failed`, json("POST")),
+  cancel: (id: string): Promise<Readonly<{ id: string; status: string }>> => apiFetch(`/api/map-jobs/${encodeURIComponent(id)}/cancel`, json("POST")),
+  retryFailed: (id: string): Promise<Readonly<{ id: string; status: string }>> => apiFetch(`/api/map-jobs/${encodeURIComponent(id)}/retry-failed`, json("POST")),
 };
 
 export const policeApi = {
   workers: (): Promise<Page<PoliceWorker>> => apiFetch("/api/police/workers"),
-  disable: (id: string): Promise<PoliceWorker> => apiFetch(`/api/police/workers/${encodeURIComponent(id)}/disable`, json("POST")),
+  disable: (id: string): Promise<Readonly<{ id: string; status: "disabled" }>> => apiFetch(`/api/police/workers/${encodeURIComponent(id)}/disable`, json("POST")),
   openapi: (): Promise<JsonValue> => apiFetch("/api/police/v1/openapi.json"),
   register: (value: PoliceManifest): Promise<PoliceCredentials> => apiFetch("/api/police/v1/workers/register", json("POST", value)),
   claim: (workerId: string, value: JsonValue): Promise<PoliceClaim> => apiFetch(`/api/police/v1/workers/${encodeURIComponent(workerId)}/claim`, json("POST", value)),
   heartbeat: (workerId: string, value: PoliceHeartbeat): Promise<PoliceHeartbeatResponse> => apiFetch(`/api/police/v1/workers/${encodeURIComponent(workerId)}/heartbeat`, json("POST", value)),
-  result: (taskId: string, value: PoliceResult): Promise<Readonly<{ accepted: boolean }>> => apiFetch(`/api/police/v1/tasks/${encodeURIComponent(taskId)}/result`, json("POST", value)),
-  callback: (taskId: string, value: PoliceResult): Promise<Readonly<{ accepted: boolean }>> => apiFetch(`/api/police/v1/callbacks/${encodeURIComponent(taskId)}`, json("POST", value)),
+  result: (taskId: string, value: PoliceResult): Promise<void> => apiFetch(`/api/police/v1/tasks/${encodeURIComponent(taskId)}/result`, json("POST", value)),
+  callback: (taskId: string, value: PoliceResult): Promise<void> => apiFetch(`/api/police/v1/callbacks/${encodeURIComponent(taskId)}`, json("POST", value)),
 };
 
 export const auditApi = {
-  search: (filters: URLSearchParams = new URLSearchParams()): Promise<Page<AuditRecord>> => apiFetch(`/api/audit/search${query(filters)}`),
+  search: (filters: URLSearchParams = new URLSearchParams()): Promise<AuditSearchResponse> => apiFetch(`/api/audit/search${query(filters)}`),
   verify: (): Promise<AuditVerify> => apiFetch("/api/audit/verify"),
 };
 
-export const searchApi = {
-  search: (filters: URLSearchParams): Promise<SearchResponse> => apiFetch(`/api/search${query(filters)}`),
-};
-
-export const chatApi = {
-  send: (messages: ApiMessage[]): Promise<ChatResponse> => apiFetch("/api/chat", json("POST", { messages })),
-};
-
+export const searchApi = { search: (filters: URLSearchParams): Promise<SearchResponse> => apiFetch(`/api/search${query(filters)}`) };
+export const chatApi = { send: (messages: ApiMessage[]): Promise<ChatResponse> => apiFetch("/api/chat", json("POST", { messages })) };
 export const ingestApi = {
-  scan: (value: JsonValue): Promise<IngestResult> => apiFetch("/api/ingest/v1/scan", json("POST", value)),
-  findings: (value: JsonValue): Promise<IngestResult> => apiFetch("/api/ingest/v1/findings", json("POST", value)),
+  scan: (value: JsonValue): Promise<IngestScanResult> => apiFetch("/api/ingest/v1/scan", json("POST", value)),
+  findings: (value: JsonValue): Promise<IngestFindingsResult> => apiFetch("/api/ingest/v1/findings", json("POST", value)),
   sourceConfig: (name: string): Promise<JsonValue> => apiFetch(`/api/ingest/v1/sources/${encodeURIComponent(name)}/config`),
 };

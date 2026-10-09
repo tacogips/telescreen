@@ -1,6 +1,6 @@
 # P28 Assembly (Wiring, App, CLI, End-to-End and Leak Tests) Implementation Plan
 
-**Status**: Ready
+**Status**: In Progress
 **Design Reference**: design-docs/specs/command.md, design-docs/specs/architecture.md sections 3, 4, 9, design-docs/specs/design-masking.md (Leak test matrix), design-docs/specs/design-api-and-ui.md (Serving), design-docs/specs/design-ui-sentry.md sections 8.3 (fixture leak check) and 8.6 (serving the built UI)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09 (run B, session 341)
@@ -207,13 +207,13 @@ Record `echo "exit=$?"` after each command. Every command exits 0.
 ## Completion Criteria
 
 - [ ] Container, create_app and the CLI deliver every command in command.md with the documented exit codes
-- [ ] `telescreen serve` serves the built UI per design-ui-sentry.md 8.6 (static tests pass; missing index.html exits 3)
-- [ ] UI fixture leak test passes
+- [x] `telescreen serve` serves the built UI per design-ui-sentry.md 8.6 (static tests pass; missing index.html exits 3)
+- [x] UI fixture leak test passes
 - [ ] E2E GitHub remediation, sweep, ingestion and chat tests pass
 - [ ] The leak matrix passes over every sink
-- [ ] Full-repository verification passes (logs recorded)
-- [ ] Reconciliation requests (if any) listed for serial repair
-- [ ] Progress Log updated
+- [x] Full-repository verification passes (logs recorded)
+- [x] Reconciliation requests (if any) listed for serial repair
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -222,3 +222,34 @@ Record `echo "exit=$?"` after each command. Every command exits 0.
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-09 18:10
+**Tasks Completed**: Added shared runtime primitives and API composition for health, directory, audit, search and assistant chat; added optional built-UI static serving with safe SPA fallback, API 404 behavior, path containment and missing-index validation; implemented CLI parsing, offline workflow validation, migrate, serve, MCP, token creation, police listing and search reindex; added static serving, CLI, and UI fixture leak tests.
+**Tasks In Progress**: Full composition of issue ingestion, collectors, workflow, evidence and Police services; worker and collector CLI commands; remediation/sweep/ingestion/chat E2E and full sink leak matrix.
+**Blockers**: None external. Implementation remains incomplete because assigned service wiring and E2E/leak criteria are not yet delivered.
+**Reconciliation requests**: None. The remaining work is within p28 writePaths.
+**Hashes**: `src/telescreen/cli.py` before=48199c7f4e506f05a0f92bade49596086f5a7cc498f44492402792db385eeb05 after=a48aeae1e9dc689de745744e13493daf02a0cff50320de5fad1b6f21c1353b4d; `src/telescreen/wiring.py` before=absent after=d52b0d853617b8a8b98108ff3503560c3c52f175d62aeae114a261c7e3aa03bb; `src/telescreen/wiring_builders.py` before=absent after=1ebcffb4e8de8b03a868b4389f67fde9e101830b915df70b3241b2b466d57096; `src/telescreen/api/app.py` before=absent after=f19472e4582a51b6c7683d38be2bbef0f320ffc99c1f0179d195c809c5e71407; `tests/test_package.py` before=23c60338dccf5285b920361cc619db517c0975bcfbe0bea206816da97cbb467f after=20b7b020da7b5f79d62f43292211dc97fd26719b62859f794ede510ab64e415e; `tests/e2e/test_serve_static.py` before=absent after=3edf4db626baa2baf781834757e8f2f25945f5dee7e0b4d64f955a84b2dc5620; `tests/leak/test_ui_fixtures.py` before=absent after=2bd5e05a79396651a8129873acd8378f6c3cdfd9fd442191a43e17f77ce7f5e5; plan before=ccc7201649f418877919f3a33519c1aab13fc6e17e923508b4304558d1adb8d3 after=recorded in `tmp/telescreen-v1-20261009-s341/p28-assembly/final-source-sha256.json`.
+**Verification**: Final-source full repository format -> exit 0 (log `/tmp/telescreen-p28-assembly-format-final2.log`); ruff -> exit 0 (`/tmp/telescreen-p28-assembly-ruff-final2.log`); typelint -> exit 0 (`/tmp/telescreen-p28-assembly-typelint-final2.log`); ty -> exit 0 (`/tmp/telescreen-p28-assembly-ty-final2.log`); pytest -> exit 0, 363 passed/4 offline skips (`/tmp/telescreen-p28-assembly-pytest-final2.log`); wheel/sdist build -> exit 0 (`/tmp/telescreen-p28-assembly-build-final2.log`); 1000-line gate -> exit 0, no matches (`/tmp/telescreen-p28-assembly-line-limit-final2.log`); dependency diff -> exit 0 (`/tmp/telescreen-p28-assembly-dependencies-final2.log`); `git diff --check` -> exit 0.
+**Notes**: The whole-repository Python gates pass on this shared source tree. The complete planned Container/router/worker assembly, all-command CLI behavior, remediation/sweep E2E and raw-value sink matrix remain outstanding; therefore Status stays In Progress and their completion criteria stay unchecked. The separate focused static/CLI/fixture run passed 8 tests before the final shutdown-lifecycle adjustment; final-source counts are covered by the full pytest run.
+
+### Session: 2026-10-09 continuation 2
+**Tasks Completed**: Moved `workflow validate` dispatch before runtime settings loading so the documented offline validator does not require unrelated service configuration. Extended the CLI test to prove validation succeeds with an invalid Codex-provider configuration and no database settings.
+**Tasks In Progress**: Complete service/router composition and command execution for worker and collector commands; GitHub remediation, sweep, ingestion and chat E2E; full raw-value sink leak matrix.
+**Blockers**: None external. The remaining work is assigned to p28 and stays within its writePaths.
+**Verification**: CLI behavior `uv run --frozen pytest -p no:cacheprovider tests/test_package.py` -> exit 0, 5 passed (`/tmp/telescreen-p28-assembly-cli-attempt2.log`); full `uv run --frozen pytest -p no:cacheprovider` -> exit 0, 363 passed/4 expected offline skips (`/tmp/telescreen-p28-assembly-pytest-attempt2.log`); format, ruff, typelint, ty and `uv build --out-dir /tmp/telescreen-p28-assembly-dist-attempt2` -> exit 0 (`/tmp/telescreen-p28-assembly-{format,ruff,typelint,ty,build}-attempt2.log`); 1000-line, dependency and diff checks -> exit 0. Prior continuation-1 full-gate results are not reused as final-source verification after this edit.
+**Hashes**: Continuation-2 `src/telescreen/cli.py` SHA-256 `657b4778179518163f4bb9c1368235fdf58b34637a09a6a68aa109501372c94e`; `tests/test_package.py` SHA-256 `8a01540627d6bf93e0137bc458f56e5d67f5e106d380e3e942b950a23a949ab2`; source and plan hash inventory: `tmp/telescreen-v1-20261009-s341/p28-assembly/final-source-sha256.json`.
+**Review Decisions**: None for p28; test-integrity, adversarial and integration reviews remain downstream.
+
+### Session: 2026-10-09 integration repair attempt 3
+**Tasks Completed**: Expanded `Container.routers` to include all 15 required routers; assembled issue ingestion, workflow/run services, evidence, escalation, police, map-reduce, worker/scheduler handlers, and connected deferred issue events. Added `tests/e2e/test_api_routes.py`, which authenticates as admin and verifies 200 responses from issues, workflows, runs, police workers, collectors, escalation policies and map jobs. Replaced the unavailable worker and collector CLI paths with worker run-once/continuous, collector run/watch and sweep dispatch. Existing token and police commands use their assembled services.
+**Tasks In Progress**: Register the built-in GitHub, Slack and Google adapters/sweepers in `CollectorRegistry`; the runtime collector run/watch and sweep commands depend on those registrations. Implement the planned GitHub remediation, collector sweep, push-ingestion and chat end-to-end flows, plus the design-masking sink matrix across database text columns, logs, search documents, outbound bodies, evidence files, API responses and forced tracebacks.
+**Blockers**: None external. The remaining work is assigned to p28 and remains within its writePaths.
+**Verification**: Focused static/API/CLI/UI-fixture tests -> exit 0, 9 passed (`/tmp/telescreen-p28-assembly-focused-attempt3.log`); final-source full pytest -> exit 0, 364 passed and 4 expected offline integration skips (`/tmp/telescreen-p28-assembly-pytest-attempt3-final.log`); repository format -> exit 0 (`/tmp/telescreen-p28-assembly-format-attempt3-final.log`); ruff -> exit 0 (`/tmp/telescreen-p28-assembly-ruff-attempt3-final.log`); typelint -> exit 0, 275 files clean (`/tmp/telescreen-p28-assembly-typelint-attempt3-final.log`); ty -> exit 0 (`/tmp/telescreen-p28-assembly-ty-attempt3-final.log`); package build -> exit 0 (`/tmp/telescreen-p28-assembly-build-attempt3-final.log`); Python file line-limit (`/tmp/telescreen-p28-assembly-line-limit-attempt3-final.log`), dependency (`/tmp/telescreen-p28-assembly-dependencies-attempt3-final.log`), and whitespace (`/tmp/telescreen-p28-assembly-diff-check-attempt3-final.log`) checks -> exit 0.
+**Hashes**: Current `src/telescreen/wiring.py` `ed9bcad5c8bc659a874780f773e138b2e87e7a889f2d9598d36314d8829ef9fa`; `src/telescreen/cli.py` `852a9e5bac0f5cf280ef87454710a35dd484ef46e1424a739e8ce685528bfc02`; `tests/e2e/test_api_routes.py` `245283ddb6e325cd861e58dcef0d0b8efef5c197d8cf649dc2c488e642dc90f1`. Additional modified source and test hashes are in the attempt 3 evidence inventory.
+**Notes**: Container wiring and the required list routes are now covered. The adapter registry and required behavior-level E2E and leak-matrix tests remain incomplete. Do not check the remaining completion criteria or mark the plan complete.
+
+**Owner note (2026-10-09)**: Remaining scope is real work (register built-in Slack, Google
+and GitHub adapters and sweepers in the container; worker and collector commands; GitHub
+remediation, sweep, ingestion and chat E2E; full raw-value leak matrix). Continue it. When
+reporting, list only genuinely open items in `risks`/`findings`; fixed review findings go
+only in `addressedFeedback` (the gate ignores status; conventions 7a).

@@ -5,5 +5,9 @@ import { IssueList } from "./IssueList";
 
 export default function IssuesPage(): JSX.Element {
   const params = useParams<{ id?: string }>();
-  return params.id === undefined ? <IssueList /> : <IssueDetail id={params.id} />;
+  return params.id === undefined ? (
+    <IssueList />
+  ) : (
+    <IssueDetail id={params.id} />
+  );
 }

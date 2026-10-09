@@ -1,0 +1,11 @@
+.search-page {
+  max-width: 1200px;
+}
+
+.search-page .ui-table tbody tr:hover {
+  background: var(--hover-bg);
+}
+
+.search-page .ui-table td:first-child {
+  min-width: 320px;
+}

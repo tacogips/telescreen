@@ -3,11 +3,18 @@ import { describe, expect, it } from "vitest";
 import { StatusBadge } from "./StatusBadge";
 
 describe("StatusBadge", () => {
-  it("formats status names and adds a status class", () => {
-    const view = render(() => <StatusBadge status="in_progress" />);
-    expect(screen.getByText("in progress")).toHaveClass("status-in-progress");
-    view.unmount();
-    render(() => <StatusBadge status="online" />);
-    expect(screen.getByText("online")).toHaveClass("status-online");
+  it.each([
+    ["unresolved", "danger"],
+    ["regressed", "danger"],
+    ["in_progress", "info"],
+    ["running", "info"],
+    ["resolved", "success"],
+    ["succeeded", "success"],
+    ["ignored", "muted"],
+    ["online", "muted"],
+  ] as const)("maps %s to the %s tag variant", (status, variant) => {
+    render(() => <StatusBadge status={status} />);
+    const label = status.replaceAll("_", " ");
+    expect(screen.getByText(label).closest(".ui-tag")).toHaveClass(variant);
   });
 });

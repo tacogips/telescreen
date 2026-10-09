@@ -1,6 +1,6 @@
 # P12 UI Issues and Search Pages Implementation Plan
 
-**Status**: Ready (run B revision; the run A implementation below is the starting point)
+**Status**: Completed (run B, Step 6 implementation)
 **Design Reference**: design-docs/specs/design-ui-sentry.md sections 4, 5, 6 (Search), 7, 8.1, 8.1a, 8.2; design-docs/specs/design-api-and-ui.md (Issues, Evidence, Search endpoints)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09 (run B, session 341)
@@ -179,12 +179,13 @@ run by p29.
 
 ## Completion Criteria
 
-- [ ] Issues list per this plan (query builder, URL state, views, sort, chart, columns, bulk bar, empty states)
-- [ ] Issue detail per this plan (header, action bar, graph, tag bars, navigation, fold sections, sidebar)
-- [ ] Search page restyled; run-A behaviors kept
-- [ ] Tests listed above pass; verification commands pass with logs recorded
-- [ ] No edits outside the two page directories and this plan
-- [ ] Progress Log updated
+- [x] Issues list per this plan (query builder, URL state, views, sort, chart, columns, bulk bar, empty states)
+- [x] Issue detail per this plan (header, action bar, graph, tag bars, navigation, fold sections, sidebar)
+- [x] Search page restyled; run-A behaviors kept
+- [x] Tests listed above pass; verification commands pass with logs recorded
+- [x] Issue and search error banners update reactively; real-envelope HTTP 500 regression tests pass
+- [x] No p12 edits outside the two page directories and this plan
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -228,3 +229,32 @@ run by p29.
 **Verification**: `set -o pipefail; cd src/web && bun run typecheck 2>&1 | tee /tmp/telescreen-p12-ui-issues-typecheck.log` -> exit 0; `set -o pipefail; cd src/web && bunx vitest run src/pages/issues src/pages/search 2>&1 | tee /tmp/telescreen-p12-ui-issues-test.log` -> exit 0, 8 passed across 3 files, 0 failed; `set -o pipefail; cd src/web && bun run build --outDir /tmp/telescreen-p12-ui-issues-web --emptyOutDir 2>&1 | tee /tmp/telescreen-p12-ui-issues-build.log` -> exit 0, 53 modules transformed.
 **Hashes**: `src/web/src/pages/search/index.tsx` before=d8617dd050ed9bb4dbe5efcc973c6f203e370bf74f823bba1936d1b75667623f after=8dd5a992af5ea20685c4b374f9c559df7ddb582a233101adb058affcc571bbb8; `src/web/src/pages/search/index.test.tsx` before=dd9c282b9ede67d6efbb37ad018817f0c4c6ebf01c87447852a2273620f410fc after=8e3f7e4345f5cede01d2a3707d3f7c37c65d507b854aaed3433f41390c597fe6; plan before=625bb5f40bc510646058f9db88b21b3b6a0c44b02558c125a4940610126752c0; final plan hash is recorded in `tmp/telescreen-v1-20261008-s319/p12-ui-issues/repair-comm-005500/final-sha256.txt`.
 **Notes**: Prior findings-search hits used the finding row id as an issue id and always opened an unavailable issue. Current behavior preserves the results while preventing the incorrect navigation. p15/p07 contract work is deferred to its owners; no files outside p12 write paths were changed.
+
+### Session: 2026-10-09 Step 6 run B implementation
+**Tasks Completed**: Rebuilt the issues list around URL-backed query/sort, saved views, source filters, global 14-day chart, responsive loaded-row selection, cursor paging and bulk actions. Rebuilt issue detail with supported API data, status/assignee/workflow actions, masked display/copy, findings graph/tags/navigation/fold sections, evidence rejection, activity and sidebar. Restyled cross-index Search with masked snippets and valid issue/run links. Split page modules and CSS to stay below 400 lines; added/retained page tests.
+**Tasks In Progress**: Independent test-integrity and adversarial review, then serial combined-tree integration review (downstream workflow steps).
+**Blockers**: None for p12 implementation. p30 and p31 are accepted dependencies in the runtime `acceptedPlanIds`.
+**Verification**: `set -o pipefail; cd src/web && bun run typecheck 2>&1 | tee /tmp/telescreen-p12-ui-issues-typecheck-final2.log` -> exit 0; `set -o pipefail; cd src/web && bunx vitest run src/pages/issues src/pages/search 2>&1 | tee /tmp/telescreen-p12-ui-issues-test-final2.log` -> exit 0, 4 files / 16 tests passed / 0 failed; `set -o pipefail; cd src/web && bun run build --outDir /tmp/telescreen-p12-ui-issues-web-final2 --emptyOutDir 2>&1 | tee /tmp/telescreen-p12-ui-issues-build-final2.log` -> exit 0, 2321 modules transformed; exact p12 `prettier --check` command -> exit 0 (`/tmp/telescreen-p12-ui-issues-format-final2.log`); `! rg -n 'innerHTML|<h1' src/web/src/pages/issues src/web/src/pages/search` -> exit 0 (`/tmp/telescreen-p12-ui-issues-static-patterns-final2.log`); TypeScript and CSS page line-limit checks -> exit 0 (`/tmp/telescreen-p12-ui-issues-line-limit-final2.log`, `/tmp/telescreen-p12-ui-issues-css-line-limit-final2.log`).
+**Source Identity**: SHA-256 inventory for all p12 page files: `tmp/telescreen-v1-20261009-s341/p12-ui-issues/step6-implement/final-source-sha256.txt`.
+**Prior Attempts**: `/tmp/telescreen-p12-ui-issues-typecheck-final.log` captured a type error because an event callback returned the signal setter's array; fixed by a block-bodied void callback, then the final2 typecheck passed. `/tmp/telescreen-p12-ui-issues-format-final.log` reported ten unformatted files; the exact p12-owned files were formatted, and final2 Prettier check passed. Earlier focused test attempts are recorded in the Step 6 evidence directory; the final2 16/16 run is current-source evidence.
+**Notes**: No p12 implementation edits were made outside `src/web/src/pages/issues/**`, `src/web/src/pages/search/**`, and this plan. The working tree contains other plans' concurrent changes, which are not attributed to p12. Formal review and combined-tree integration checks are pending downstream and are not claimed complete here.
+
+### Session: 2026-10-09 P12-ADV-01 repair
+**Finding**: `P12-ADV-01` from step7-adversarial-review, communication `comm-005744` (mid).
+**Resolution**: The default query/sort normalization now runs once when either URL parameter is missing and calls `setSearchParams({ query: query(), sort: sort() }, { replace: true })`. User-initiated query, sort and saved-view handlers remain unchanged and continue to push history. Added an IssueList memory-history regression test: after `/issues` normalizes, `history.go(-1)` returns to `/`.
+**Verification**: `set -o pipefail; cd src/web && bun run typecheck 2>&1 | tee /tmp/telescreen-p12-ui-issues-typecheck-adv1.log` -> exit 0; `set -o pipefail; cd src/web && bunx vitest run src/pages/issues src/pages/search 2>&1 | tee /tmp/telescreen-p12-ui-issues-test-adv1.log` -> exit 0, 4 files / 17 tests passed / 0 failed; `set -o pipefail; cd src/web && bun run build --outDir /tmp/telescreen-p12-ui-issues-web-adv1 --emptyOutDir 2>&1 | tee /tmp/telescreen-p12-ui-issues-build-adv1.log` -> exit 0, 2321 modules transformed; Prettier on `IssueList.tsx` and `IssueList.test.tsx` -> exit 0 (`/tmp/telescreen-p12-ui-issues-format-adv1-final.log`); no `<h1>`/`innerHTML` -> exit 0 (`/tmp/telescreen-p12-ui-issues-static-patterns-adv1.log`); TS file-size gate -> exit 0 (`/tmp/telescreen-p12-ui-issues-line-limit-adv1.log`); source hash verification -> all 21 entries match (`tmp/telescreen-v1-20261009-s341/p12-ui-issues/step6-implement-adv1/source-sha256-check-adv1.log`).
+**Review Decision**: P12-ADV-01 is addressed in source and behaviorally verified. Independent Opus adversarial re-review is pending; no review acceptance is claimed.
+
+**Owner resolution (2026-10-09)**: P12-ADV-01 is fixed (history replace on default
+normalization, regression test). Report it ONLY in `addressedFeedback`; do NOT list it in
+`findings` or `risks` (conventions section 7a). Low notes that need no action are not risks.
+
+### Session: 2026-10-09 P12-INT-01 repair
+**Finding**: `P12-INT-01` from integration review, requiring fresh verification and independent re-review of the prior `P12-ADV-01` repair, plus reactive p12 error banners.
+**Tasks Completed**: Wrapped the issues-list `ErrorBanner` in keyed `<Show>` so a server error set after initial mount is rendered. Added post-mount HTTP 500 regression tests for issues list and search using `{error:{code:'internal_error',detail:'failed'}}`. Search and issue-detail banners were already reactive.
+**Tasks In Progress**: Independent test-integrity and adversarial re-review, followed by serial integration review (downstream workflow steps).
+**Blockers**: None for p12 implementation.
+**Reconciliation requests**: None.
+**Verification**: `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; cd src/web && bun run typecheck 2>&1 | tee /tmp/telescreen-p12-ui-issues-typecheck-int1-final.log` -> exit 0; `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; cd src/web && bunx vitest run src/pages/issues src/pages/search 2>&1 | tee /tmp/telescreen-p12-ui-issues-test-int1-final.log` -> exit 0, 4 files / 19 tests passed / 0 failed; `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; cd src/web && bun run test 2>&1 | tee /tmp/telescreen-p12-ui-issues-test-all-int1-final.log` -> exit 0, 26 files / 109 tests passed / 0 failed; `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; cd src/web && bun run build --outDir /tmp/telescreen-p12-ui-issues-web-int1-final --emptyOutDir 2>&1 | tee /tmp/telescreen-p12-ui-issues-build-int1-final.log` -> exit 0, 2321 modules transformed; exact-file Prettier check -> exit 0 (`/tmp/telescreen-p12-ui-issues-format-int1-final.log`); no forbidden `<h1>`/`innerHTML` -> exit 0 (`/tmp/telescreen-p12-ui-issues-static-int1-final.log`); file-size and plan completion gate -> exit 0.
+**Hashes**: `IssueList.tsx` before=2749edefa6477daeb05811540909c5cb947271587ea6f1e18aad5be5a8533d3e after=fd079f5a74e83d3e92ed0e24f09c58af70e73f09d9a62b048901878c322de0d9; `IssueList.test.tsx` before=9303ba56099e0b03dcefd6a08e896fbff0e6529c98481e2cc26775b34463a8c4 after=feedbb0da8170207d36112920f5fcea65fd544cf3f602583c0afc2213afce150; `search/index.test.tsx` before=ecda796c0b61a264b8f7985aa05bed9d50fb700a944761ed62191e1885a3e134 after=d984b696a95aed3b30a5cc73bbbc724a9390c258ef3a957e7f9850724b0703e6; search/index.tsx unchanged=98dd43a5095931f22931d471fa65bdfcb788285a887487128811da64052eeba8.
+**Notes**: P12-ADV-01's replace-normalization and memory-history Back regression were re-run as part of the 19-test focused suite. No page source outside p12's assigned page directories was changed. The initial formatter check found style-only differences in the two new test files (`/tmp/telescreen-p12-ui-issues-format-int1.log`, exit 1); only those files were formatted, then the final exact-file check passed (`/tmp/telescreen-p12-ui-issues-format-int1-final.log`). All behavioral/build gates were rerun after formatting. No formal review acceptance is claimed.

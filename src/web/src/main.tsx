@@ -1,11 +1,10 @@
 import { render } from "solid-js/web";
 import App from "./App";
+import { applyTheme } from "./components/shell/theme";
+import "./components/shell/shell.css";
+import "./components/ui/ui.css";
 import "./styles/app.css";
-
 const root = document.getElementById("root");
-
-if (root === null) {
-  throw new Error("Application root element is missing");
-}
-
+if (root === null) throw new Error("Application root element is missing");
+applyTheme();
 render(() => <App />, root);
