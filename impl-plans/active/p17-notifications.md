@@ -1,6 +1,6 @@
 # P17 Notifications and Outbound DLP Gate Implementation Plan
 
-**Status**: Completed
+**Status**: In Progress (run A resume, session 338)
 **Design Reference**: design-docs/specs/design-masking.md (DLP gate), design-docs/specs/design-data-model.md (notifications), design-docs/specs/design-workflow-engine.md (Recipient resolution)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -124,12 +124,39 @@ uv run --frozen pytest -p no:cacheprovider tests/notifications 2>&1 | tee /tmp/t
 uv run --frozen python tools/typelint.py > /tmp/telescreen-p17-notifications-typelint.log 2>&1; grep -E '^(src/telescreen/notifications|tests/notifications)' /tmp/telescreen-p17-notifications-typelint.log   # prints nothing
 ```
 
+## Run A Resume (2026-10-09, session 338)
+
+State: interrupted at s319; most deliverables exist in tree. Dispatch:
+`impl-plans/active/telescreen-v1-20261009-s338-dispatch.json`, wave A1. Resume from the
+in-tree code; do not rewrite working modules. Static gap review (s338 planning) found:
+
+- [ ] R0 Baseline: run the Verification block on the untouched tree; log exit codes to
+  `/tmp/telescreen-p17-notifications-baseline-*.log` before any edit.
+- [ ] R1 `delivery.py:NotificationDeliveryHandler.handle` resolves recipients outside the
+  failure handling, so `recipient_unknown` at delivery time escapes as an exception. A
+  recipient that no longer resolves -> status `failed`, audit `notification.failed`,
+  `TaskResult.dead(...)` with a static code; never raise out of the handler. Test it.
+- [ ] R2 The same handler keeps the DB transaction open across the network send. Split
+  it: transaction 1 loads and checks the row; the send happens with no open transaction;
+  transaction 2 records the outcome (re-checking status is still `queued`). Keep
+  idempotency: a row already `sent` is skipped. Test: the sent-row skip still passes, and
+  a fake notifier sees no open session (for example, it asserts a flag the test sets).
+- [ ] R3 Accepted plan deviation (no code change): `NotificationService` and
+  `NotificationDeliveryHandler` take an extra `repository: NotificationRepository` field.
+  Record it in the Progress Log so assembly (run B, p28) wires it.
+- [ ] R4 Strengthen tests to match the Tests section: the residual-hit case uses a
+  redactor fake whose masked output still matches; "repeated 500 until max attempts" drives
+  the handler attempt by attempt to `failed` and dead; the email test asserts the masked
+  body is present AND there is no leak.
+- [ ] R5 Re-run the full Verification block; every command exits 0; log paths recorded.
+
 ## Completion Criteria
 
 - [x] DlpGate, CensoredMessage guard, NotificationService, delivery handler, Slack and email notifiers delivered with the exact names
-- [x] DLP mask, block and residual tests and delivery idempotency tests pass
-- [x] Scoped verification passes; logs recorded
-- [x] Progress Log updated
+- [ ] DLP mask, block and residual tests and delivery idempotency tests pass (after R1-R4)
+- [ ] Run A Resume items R0-R5 checked with evidence
+- [ ] Scoped verification passes on the final tree; logs recorded
+- [ ] Progress Log updated (run A session)
 
 ## Progress Log
 

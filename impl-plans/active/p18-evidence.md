@@ -1,6 +1,6 @@
 # P18 Evidence Upload, Scan-and-Reject, Image Scanner and Metadata Stripper Implementation Plan
 
-**Status**: Completed
+**Status**: In Progress (run A resume, session 338)
 **Design Reference**: design-docs/specs/design-api-and-ui.md (Evidence), design-docs/specs/command.md (Dependencies decisions: stdlib stripper), design-docs/user-qa/qa-evidence-file-types.md, design-docs/specs/design-masking.md (leak test matrix, image cases)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-08
@@ -140,12 +140,40 @@ uv run --frozen pytest -p no:cacheprovider tests/evidence 2>&1 | tee /tmp/telesc
 uv run --frozen python tools/typelint.py > /tmp/telescreen-p18-evidence-typelint.log 2>&1; grep -E '^(src/telescreen/evidence|src/telescreen/api/routers/evidence.py|tests/evidence)' /tmp/telescreen-p18-evidence-typelint.log   # prints nothing
 ```
 
+## Run A Resume (2026-10-09, session 338)
+
+State: passed per-branch test-integrity and adversarial review at s319; integration review
+pending. Dispatch: `impl-plans/active/telescreen-v1-20261009-s338-dispatch.json`, wave A1.
+Resume from the in-tree code; do not rewrite working modules. The static gap review found
+no source defect in scope, only test coverage gaps against the Tests section:
+
+- [ ] R0 Baseline: run the Verification block on the untouched tree; log exit codes to
+  `/tmp/telescreen-p18-evidence-baseline-*.log` before any edit.
+- [ ] R1 Stripped PNG: walk the chunks of the stored bytes (length, type, CRC32 of
+  type+data) through `IEND`; every CRC matches and no `tEXt`/`iTXt`/`zTXt`/`eXIf` chunk
+  remains.
+- [ ] R2 Truncated PNG uploaded through `EvidenceService.upload` -> `evidence_rejected`;
+  the rejected row's rule classes include `malformed_image`; nothing under the store root.
+- [ ] R3 HTTP-level 415: through the router (in-process ASGI app), a `.png` filename with
+  JPEG magic -> 415 and an `.exe` -> 415; neither response echoes the filename or body.
+- [ ] R4 WebP through `upload` with a clean fake scanner: put a sample secret in the
+  EXIF/XMP fixture; the stored bytes have no leak (`find_leaks` on latin-1 decode), VP8X
+  flags cleared, RIFF size correct.
+- [ ] R5 Accepted plan deviation (no code change): `EvidenceQueryImpl.accepted_count`
+  takes `session` first, matching the `EvidenceQuery` port in `src/telescreen/ports`.
+  Confirm against the port and record it in the Progress Log.
+- [ ] R6 Re-run the full Verification block; every command exits 0; log paths recorded.
+
+Out of scope here (not accepted requirements): async file I/O in the store and orphan-file
+cleanup after a failed commit (the stored bytes are scanned and stripped, so no leak).
+
 ## Completion Criteria
 
 - [x] Classifier, stripper (JPEG, PNG, WebP), image scanner, store, service, query and router delivered with the exact names
-- [x] Every evidence case in the design-masking leak matrix is covered by a test here
-- [x] Scoped verification passes; logs recorded
-- [x] Progress Log updated
+- [ ] Every evidence case in the design-masking leak matrix is covered by a test here (after R1-R4)
+- [ ] Run A Resume items R0-R6 checked with evidence
+- [ ] Scoped verification passes on the final tree; logs recorded
+- [ ] Progress Log updated (run A session)
 
 ## Progress Log
 

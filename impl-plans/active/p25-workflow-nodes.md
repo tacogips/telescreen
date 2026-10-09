@@ -1,6 +1,6 @@
 # P25 Workflow Node Executors (detect, ai_agent, notify, police_verify) Implementation Plan
 
-**Status**: Completed
+**Status**: In Progress (run A verify-only, session 338)
 **Design Reference**: design-docs/specs/design-workflow-engine.md (Node executors with external effects, Ports used by executors), design-docs/specs/design-police-contract.md (Inputs by task type: verify_remediation)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -125,6 +125,23 @@ uv run --frozen python tools/typelint.py src/telescreen/workflow/executors/detec
 - [x] Tests above pass
 - [x] Scoped verification passes; logs recorded
 - [x] Progress Log updated
+
+## Run A Resume (2026-10-09, session 338)
+
+State: passed per-branch test-integrity and adversarial review at s319; integration review
+pending. Dispatch: `impl-plans/active/telescreen-v1-20261009-s338-dispatch.json`, wave A2.
+Verify only: the static gap review found every Tests bullet covered and no in-scope
+defect. Do not edit source unless a gate fails.
+
+- [ ] R0 Run the full Verification block on the untouched tree; log exit codes to
+  `/tmp/telescreen-p25-workflow-nodes-runA-*.log`.
+- [ ] R1 If any command fails (for example because a wave-A2 sibling changed a port it
+  uses), fix only the failing cause inside this plan's writePaths and re-run the whole
+  block; a needed change outside writePaths becomes a Reconciliation request.
+- [ ] R2 Record these accepted deviations in the Progress Log (no code change):
+  `NotifyExecutor` and `PoliceVerifyExecutor` take an extra `redactor`; `detect` and
+  `ai_agent` map unexpected exceptions to `fetch_failed` / `provider_error` with static
+  details.
 
 ## Progress Log
 

@@ -1,6 +1,6 @@
 # P20 Collectors Core (Configs, Webhooks, Scheduling, Scans, Rescans, Sweeper) Implementation Plan
 
-**Status**: Completed
+**Status**: In Progress (run A resume, session 338)
 **Design Reference**: design-docs/specs/design-collectors-and-ingestion.md (Collector adapters, Resource identity, Per-kind behavior, Full sweeps), design-docs/specs/design-map-reduce-sweeps.md (Map: collector shards, Ports)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -217,13 +217,57 @@ uv run --frozen pytest -p no:cacheprovider tests/collectors/core 2>&1 | tee /tmp
 uv run --frozen python tools/typelint.py > /tmp/telescreen-p20-collectors-core-typelint.log 2>&1; grep -E '^(src/telescreen/collectors/(__init__|service|repository|codec|registry|scheduler|rescanner|police|tasks|sweep)\.py|src/telescreen/api/routers/collectors.py|tests/collectors/core)' /tmp/telescreen-p20-collectors-core-typelint.log   # prints nothing
 ```
 
+## Run A Resume (2026-10-09, session 338)
+
+State: interrupted at s319; all modules exist. Dispatch:
+`impl-plans/active/telescreen-v1-20261009-s338-dispatch.json`, wave A2. Resume from the
+in-tree code; do not rewrite working modules. Static gap review (s338 planning) found:
+
+- [ ] R0 Baseline: run the Verification block on the untouched tree; log exit codes to
+  `/tmp/telescreen-p20-collectors-core-baseline-*.log` before any edit.
+- [ ] R1 `tasks.py:CollectorScanHandler._changes`: `has_more` after `max_pages` must enqueue
+  a continuation `collector_scan` (mode `changes`, key
+  `collector:<config>:changes-cont:<sha256(cursor)[:16]>`). Add a `queue: TaskQueue` field
+  to the handler (record the constructor change for assembly in run B). Test: 3 pages with
+  `max_pages=2` -> cursor saved after page 2 and exactly one continuation task.
+- [ ] R2 Scan-job trigger comes from the payload: add an optional `trigger` member to the
+  task payload (`event` from webhooks, `manual` from `enqueue_run`, `schedule` from the
+  scheduler; default `event` when absent). Test: a scheduler-enqueued scan creates a scan
+  job with trigger `schedule`; `enqueue_run` -> `manual`.
+- [ ] R3 Non-rate-limit errors retry with backoff `10 s * 2^(attempt-1)` (the engine
+  worker's formula), not a flat 5 s; the scan job is finished `failed` (or `partial` when
+  some refs were scanned). Test with a fake adapter raising on fetch.
+- [ ] R4 `routers/collectors.py` sweep endpoint returns `{map_job_id}` (not `{id}`); a
+  launcher `TelescreenError(conflict)` -> 409 through the common handler. Test both.
+- [ ] R5 Missing tests from the Tests section: `config_hint` routing picks only the config
+  whose watch `channel_id` matches; scheduler tolerates a launcher conflict and still
+  stores `last_sweep_fire`; a `police`-kind config with a due cron -> one
+  `PoliceCollector.dispatch_detect` call (fake gateway) and no `collector_scan`; router
+  `POST /api/collectors` with an invalid cron, a non-ref credential and a sample selector
+  -> 422 with no echo.
+- [ ] R6 No-raw-locator test on persisted rows: use a recording fake `TaskQueue` that
+  inserts `EngineTaskRow` rows and the SQLite audit rows (or a fake that stores the
+  serialized details). Run `find_leaks` over every stored payload and audit details text
+  after a webhook, a scheduled scan and a removal (raw locator holds a sample email).
+- [ ] R7 Accepted deviations to record (no code change): `scheduler.py` calls the
+  `SweepLauncher` port, which opens its own transaction (the port has no session
+  parameter), so the launch and `last_sweep_fire` are not atomic; a repeat launch is
+  refused by the launcher's `conflict` check. Removal empty scans use
+  `sweep_covered=True` because `ResourceContent.sweep_covered` is only known after a fetch.
+  Extra constructor fields (`repository`, `fingerprinter`, `redactor`) are kept.
+- [ ] R8 Re-run the full Verification block; every command exits 0; log paths recorded.
+
+Not in scope: per-rule-class counts in `sweep.py` (needs a `ResourceScanner` port change
+owned by accepted plan p04; file a Reconciliation request only if a test requires it).
+
 ## Completion Criteria
 
 - [x] All modules above delivered with the exact names; the ports are implemented
-- [x] Webhook, scan modes, scheduling, rescans, police dispatch and sweeper tested
-- [x] The no-raw-locator test passes
-- [x] Scoped verification passes; logs recorded
-- [x] Progress Log updated
+- [ ] Webhook, scan modes, scheduling, rescans, police dispatch and sweeper tested (after R1-R5)
+- [ ] The no-raw-locator test passes on persisted rows (R6)
+- [ ] Run A Resume items R0-R8 checked with evidence
+- [ ] Scoped verification passes on the final tree; logs recorded
+- [ ] Progress Log updated (run A session)
 
 ## Progress Log
 

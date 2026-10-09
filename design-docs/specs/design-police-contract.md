@@ -152,7 +152,7 @@ class PoliceGateway(Protocol):
 | `client.py` | `BureauClient` (httpx.AsyncClient): register, claim, heartbeat, submit_result, callback |
 | `worker.py` | `PullWorker`: handler registry by task type, concurrency semaphore, heartbeat loop, graceful stop |
 | `webhook.py` | `WebhookHandler(handlers, secret, mode=sync|async)` with `handle(WebhookRequest(headers: tuple[tuple[str, str], ...], body: bytes)) -> WebhookReply(status, headers, body)`. It is framework-neutral: it verifies signatures, dispatches to handlers, replies 200/202 and posts signed callbacks. Unit tests call it directly |
-| `asgi.py` | `create_webhook_app(handler) -> AsgiApp`: a thin pure-ASGI adapter over `WebhookHandler`. ASGI scope, receive and send are typed with structural Protocols local to this file. If ty cannot accept dict-based ASGI messages through those Protocols, this single file is the third pre-approved `TL005` per-file-ignore candidate (the ASGI specification mandates dict scopes and messages), added through foundation reconciliation |
+| `asgi.py` | `create_webhook_app(handler) -> AsgiApp`: a thin pure-ASGI adapter over `WebhookHandler`. ASGI scope, receive and send are typed with structural Protocols local to this file, with no per-file-ignore. An ASGI `TL005` ignore is not pre-approved; it would need serial reconciliation through the foundation owner and a review call-out (`architecture.md`, Strict Typing Boundary Decisions) |
 | `masking.py` | `mask_value(value, keep_prefix)` helper so police never send raw values |
 
 Dependencies: stdlib and httpx only. Tests use httpx MockTransport and an in-process ASGI

@@ -1,6 +1,6 @@
 # P27 Assistant (MCP Server and Agent Chat) Implementation Plan
 
-**Status**: Completed
+**Status**: In Progress (run A resume, session 338)
 **Design Reference**: design-docs/specs/design-api-and-ui.md (Assistant), design-docs/specs/architecture.md section 7 item 7
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -123,12 +123,44 @@ uv run --frozen pytest -p no:cacheprovider tests/assistant 2>&1 | tee /tmp/teles
 uv run --frozen python tools/typelint.py > /tmp/telescreen-p27-assistant-typelint.log 2>&1; ! grep -E '(/src/telescreen/assistant/|/src/telescreen/api/routers/chat\.py|/tests/assistant/)' /tmp/telescreen-p27-assistant-typelint.log   # typelint prints absolute paths; prints nothing for p27
 ```
 
+## Run A Resume (2026-10-09, session 338)
+
+State: interrupted at s319; all deliverables exist in tree. Dispatch:
+`impl-plans/active/telescreen-v1-20261009-s338-dispatch.json`, wave A2. Resume from the
+in-tree code; do not rewrite working modules. Static gap review (s338 planning) found:
+
+- [ ] R0 Baseline: run the Verification block on the untouched tree; log exit codes to
+  `/tmp/telescreen-p27-assistant-baseline-*.log` before any edit.
+- [ ] R1 BUG `chat.py:ChatToolStep.arguments` is an untagged union. `{query, limit}` for
+  `audit_search` validates as `SearchIssuesArgs`, so `_run_tool` fails its `isinstance`
+  check and `audit_search` cannot be reached from chat. Fix it so the argument class is
+  chosen by `tool`. Recommended: one step dataclass per tool with
+  `tool: Literal["<tool name>"]` and the matching `arguments` class, combined as a pydantic
+  discriminated union on `tool`, nested inside the existing `action` discriminator. Keep
+  the `ChatStep` name and the JSON wire shape `{action, tool, arguments}`. Test: a fake LLM
+  returns an `audit_search` tool step, then an answer -> the second request's prompt
+  contains the audit result JSON (not the invalid-step note).
+- [ ] R2 Test: an MCP tool invoked through the FastMCP call API (or the registered
+  function) on a seeded raw title returns output with no leak (`assert_no_leaks`).
+- [ ] R3 Tests from the Tests section that are missing: the `search_issues` limit (limit
+  clamp 1-50); `incident_report` asserts the by-severity numbers and the top-resources
+  table; the router rejects 51 messages and a 20001-character message with a 4xx and no
+  echo.
+- [ ] R4 Accepted plan deviations (no code change): `ChatService` has an extra
+  `clock: Clock` field (needed for the date in the system prompt), and `render_json` is an
+  `AssistantTools` method. Record both in the Progress Log for assembly (run B, p28).
+- [ ] R5 Re-run the full Verification block; every command exits 0; log paths recorded.
+
+Not in scope: escaping `%`/`_` in `LIKE` filters (read-only, masked output; no accepted
+requirement).
+
 ## Completion Criteria
 
 - [x] AssistantTools (six tools), MCP server builder, ChatService and the chat router delivered with the exact names
-- [x] Leak guard and tool-loop tests pass
-- [x] Scoped verification passes; logs recorded
-- [x] Progress Log updated
+- [ ] Leak guard and tool-loop tests pass (after R1-R3)
+- [ ] Run A Resume items R0-R5 checked with evidence
+- [ ] Scoped verification passes on the final tree; logs recorded
+- [ ] Progress Log updated (run A session)
 
 ## Progress Log
 

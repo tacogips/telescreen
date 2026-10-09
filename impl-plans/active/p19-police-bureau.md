@@ -1,6 +1,6 @@
 # P19 Police Bureau Side (Gateway, Pull and Push Transports, Result Acceptance) Implementation Plan
 
-**Status**: Ready
+**Status**: Ready (run A wave A2, session 338)
 **Design Reference**: design-docs/specs/design-police-contract.md (Endpoints, Push signing, Bureau side), design-docs/specs/design-map-reduce-sweeps.md (Police contract additions), design-docs/specs/design-masking.md (Re-scan of inbound masked data)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-08
@@ -134,6 +134,56 @@ and re-scanned; raw values are rejected.
   Responses are written with `dump_json` as `application/json`.
 - Admin endpoints: `GET /api/police/workers` (read) and
   `POST /api/police/workers/{id}/disable` (admin).
+
+## Run A Interface Notes (2026-10-09, session 338)
+
+Not started at s319; implement from this plan in wave A2 of
+`impl-plans/active/telescreen-v1-20261009-s338-dispatch.json`. The in-tree contracts below
+were checked during s338 planning; use them exactly and do not edit them (Reconciliation
+request if one is wrong):
+
+- `src/telescreen/ports/police.py`: `PoliceGateway.dispatch(session, request) -> str` and
+  `cancel(session, task_id) -> None` take `session` first. `PoliceTaskRequest.labels` is
+  `tuple[str, ...]`; join it into the comma-separated column. Callers already exist in
+  `workflow/executors/police_verify.py`, `workflow/mapreduce/` and `collectors/police.py`.
+- `src/telescreen/db/models/police.py:PoliceTaskRow.attempt` defaults to 1. `dispatch` must
+  insert `attempt=0` so the first claim or delivery is attempt 1 (key
+  `police-push:<task_id>:1`, backoff `10 s * 2^0`). There is no next-retry column: push
+  retries return `TaskResult.retry(available_at, error_code)` from the delivery handler.
+- Replay: `src/telescreen/db/replay.py:ReplayNonceStore.remember(session, scope, nonce,
+  expires_at, now) -> bool` (in `db`, not `ports`); pass `expires_at = now + 600 s`.
+- `src/telescreen/ports/workflow.py`: `RunSignaler.signal(session, step_run_id,
+  StepSignal)`; `StepSignal(kind=POLICE_RESULT, outcome, data)`; `TaskHandler` has
+  `kind: EngineTaskKind` and `handle(task: ClaimedTask) -> TaskResult`;
+  `ScheduleProvider.tick(session, now) -> int`. `PolicePushDeliveryHandler.kind` is
+  `EngineTaskKind.POLICE_PUSH_DELIVERY` (nothing enqueues or handles it yet; this plan
+  does both). Registration into the engine worker is assembly (run B, p28); tests drive
+  the handler directly with a `ClaimedTask`.
+- `src/telescreen/ports/findings.py:ExternalScan` also needs `scan_job_id` (use `None`)
+  and `observed_at` (`clock.now()`). `source` is `"police:" + config.name` when the task has
+  `collector_config_id`, otherwise `"police:" + worker.name`. SDK `MaskedFinding` fields map
+  one-to-one onto `ExternalFinding`.
+- `src/telescreen/ports/sweeps.py`: `ShardSummary` needs every field: `resources_scanned`
+  and `resources_failed` and `bytes_scanned` from the result `stats`; `resources_skipped=0`;
+  `findings_inserted`, `issues_opened`, `issues_auto_resolved` from `RecordOutcome`;
+  `findings_by_rule_class` counted from the result findings. `PartitionPage.sub_corpora`
+  is `tuple[SubCorpus, ...]`: wrap each wire string. `ShardFailure(error_code,
+  retry_after_seconds)`.
+- `src/telescreen/masking/redact.py:Redactor.has_hits(text)` checks one string; walk the
+  parsed `JsonValue` and check every string leaf (summary, finding fields,
+  `complete_locators`, error detail, payload).
+- `src/telescreen/contracts/validator.py:validate(name, raw: bytes) -> list[SchemaError]`
+  with names like `"result-envelope.schema.json"`; `openapi_document() -> str`.
+- `src/telescreen/api/common`: `ApiContext(sessions, clock, audit)`;
+  `read_limited_body(request, max_bytes)`; `require_scope` handles API tokens only, so
+  enrollment and worker bearer checks are written in this plan (reuse `hash_token`,
+  compare with `hmac.compare_digest`). `SecretValue.value` is `str`: `.encode()` before
+  HMAC.
+- Existing pattern to imitate for routers: `src/telescreen/api/routers/evidence.py`
+  (`<Area>RouterDeps`, raw body, dedicated error response). For services:
+  `src/telescreen/notifications/sender.py:NotificationService`.
+- Put tests in several files under `tests/police/` (for example `test_registration.py`,
+  `test_claims.py`, `test_results.py`, `test_push.py`) so none reaches 1000 lines.
 
 ## Key Pitfalls
 

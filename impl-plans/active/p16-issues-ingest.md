@@ -1,6 +1,6 @@
 # P16 Issues (Grouping, Lifecycle, Scan Pipeline) and Push Ingestion Implementation Plan
 
-**Status**: Completed
+**Status**: In Progress (run A resume, session 338)
 **Design Reference**: design-docs/specs/design-collectors-and-ingestion.md (Scan pipeline, Issue grouping and lifecycle, Resource identity, Push ingestion API), design-docs/specs/design-data-model.md (Findings and issues, Keys, Issue status machine), design-docs/specs/design-map-reduce-sweeps.md (Reduce: resolve_unchecked)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -189,12 +189,51 @@ uv run --frozen pytest -p no:cacheprovider tests/issues 2>&1 | tee /tmp/telescre
 uv run --frozen python tools/typelint.py src/telescreen/issues src/telescreen/api/routers/issues.py src/telescreen/api/routers/ingest.py tests/issues
 ```
 
+## Run A Resume (2026-10-09, session 338)
+
+State: s319 recorded p16 as BLOCKED, but no cause is written in-tree. Dispatch:
+`impl-plans/active/telescreen-v1-20261009-s338-dispatch.json`, wave A1. Resume from the
+in-tree code; keep every public name. Treat any failing gate in R0 as the probable block
+cause and fix it first. `tests/issues/test_issues.py` is 884 lines, so put new tests in
+`tests/issues/test_issues_api.py` (and further files if needed). Static gap review (s338
+planning) found:
+
+- [ ] R0 Baseline: run the Verification block on the untouched tree; log exit codes to
+  `/tmp/telescreen-p16-issues-ingest-baseline-*.log` before any edit.
+- [ ] R1 Audit actor: `issues/service.py:_audit` records every entry as
+  `ActorKind.SYSTEM`/`system:issues`. For `change_status`, assignment and comments, pass the
+  caller's `actor_ref` and actor kind so the audit trail shows who acted (requirement 11).
+  Scan-driven events stay `system`. Test: PATCH by a user token -> the audit row actor is
+  that user ref.
+- [ ] R2 `routers/ingest.py` findings endpoint: read the raw body with
+  `read_limited_body` and parse with `TypeAdapter(...).validate_json`, the same as the scan
+  endpoint (bounded body, static `validation_error`, no echo). Test: an oversized body ->
+  413; a malformed body -> 422 whose response holds no request text.
+- [ ] R3 `issues/ingest.py:IngestService.scan_push`: if the scanner raises mid-loop, finish
+  the scan job `failed` with a static error code before re-raising. Test with a fake
+  scanner that raises on the second resource.
+- [ ] R4 Missing tests from the Tests section: `TELE-2` is assigned and email
+  `times_seen == 2` after the first scan; PATCH `/api/issues/{id}` with an allowed
+  transition -> history and audit, a disallowed one -> 409 `invalid_transition`; list
+  filters `source`, `rule_class`, `severity`, `assignee`, `q`, `sort=times_seen`, keyset
+  cursor paging over 3+ issues, and `/events` paging; stats zero-fill returns exactly
+  `days` buckets with zeros for empty days.
+- [ ] R5 Accepted deviations to record (no code change): ingest responses are built with
+  `json.dumps` over a literal dict passed inline (allowed by conventions section 3);
+  `findings_push` records with `scan_job_id=None` and `DetectorKind.POLICE`.
+- [ ] R6 Re-run the full Verification block and `wc -l` on every p16 Python file (each
+  under 1000); every command exits 0; log paths recorded.
+
+Not in scope: escaping `%`/`_` in the `q` filter (masked columns only, no accepted
+requirement).
+
 ## Completion Criteria
 
 - [x] IssueService (recorder, reader, transitions), ResourceScannerImpl, IngestService and both routers delivered with the exact names
-- [x] Lifecycle, regression, auto-resolve, skip, resolve_unchecked and leak tests pass
-- [x] Scoped verification passes; logs recorded
-- [x] Progress Log updated
+- [ ] Lifecycle, regression, auto-resolve, skip, resolve_unchecked and leak tests pass (after R1-R4)
+- [ ] Run A Resume items R0-R6 checked with evidence
+- [ ] Scoped verification passes on the final tree; logs recorded
+- [ ] Progress Log updated (run A session)
 
 ## Progress Log
 

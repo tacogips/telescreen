@@ -1,6 +1,6 @@
 # P24 Durable Workflow Engine, Queue, Scheduler, Human Tasks, Escalation and Workflow APIs Implementation Plan
 
-**Status**: Completed
+**Status**: In Progress (run A resume, session 338)
 **Design Reference**: design-docs/specs/design-workflow-engine.md (Engine semantics, Queue and worker, Human tasks SLA and escalation, Triggers), design-docs/specs/notes.md (polling queue rationale), design-docs/specs/design-api-and-ui.md (Endpoints: Workflows, Runs, Human tasks, Escalation)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -260,13 +260,61 @@ uv run --frozen pytest -p no:cacheprovider tests/workflow/engine 2>&1 | tee /tmp
 uv run --frozen python tools/typelint.py > /tmp/telescreen-p24-workflow-engine-typelint.log 2>&1; grep -E '^(src/telescreen/workflow/(engine|queue|scheduler|escalation|triggers)|src/telescreen/workflow/executors/(__init__|flow|human)\.py|src/telescreen/api/routers/(workflows|runs|human_tasks|escalation)\.py|tests/workflow/engine)' /tmp/telescreen-p24-workflow-engine-typelint.log   # prints nothing
 ```
 
+## Run A Resume (2026-10-09, session 338)
+
+State: interrupted at s319; all modules exist (19 tests). Dispatch:
+`impl-plans/active/telescreen-v1-20261009-s338-dispatch.json`, wave A2. Resume from the
+in-tree code; do not rewrite `engine.py`. If an edit would push `engine.py` (712 lines)
+near 1000, move send-back/join helpers into a new `workflow/engine/flow_ops.py`. New tests
+go into new files (for example `tests/workflow/engine/test_engine_runA.py`,
+`test_routers.py`). Static gap review (s338 planning) found:
+
+- [ ] R0 Baseline: run the Verification block on the untouched tree; log exit codes to
+  `/tmp/telescreen-p24-workflow-engine-baseline-*.log` before any edit.
+- [ ] R1 Send-back (Task 3) must cancel open `human_tasks` (and their `sla_check` tasks via
+  `cancel_by_ref`) of steps visited after the target. Test: triage -> review (human open)
+  -> send_back to triage -> the review human task is `cancelled`, no SLA check stays ready.
+- [ ] R2 Optimistic lock (Task 3 step 5): run updates must be conditional on the loaded
+  `lock_version` (`UPDATE ... WHERE id = :id AND lock_version = :expected`); zero rows ->
+  roll back and return `TaskResult.retry(now + 1 s, conflict)`. Test: bump
+  `lock_version` with raw SQL between load and apply (a test hook or a fake repository
+  method) -> handler returns retry and no transition is written.
+- [ ] R3 Retry policy: `_failed` must use the step's `retry` (`RetrySpec.max_attempts`,
+  `backoff`) or the workflow default from `src/telescreen/workflow/dsl/model.py`; fall back
+  to 5 attempts / 10 s only when neither is set. Test: `retry: {max_attempts: 2,
+  backoff: 30s}` -> one retry at +30 s, then `on_error`.
+- [ ] R4 Child runs: every terminal path of a child run (including `loop_limit_exceeded`
+  and a missing route target) calls `_notify_parent_finished`. Test: a child that hits the
+  loop guard -> the parent routes `failed`.
+- [ ] R5 Dead hook: `queue/worker.py` must call `dead_hook.on_dead` whenever the applied
+  final status is `dead`, including a RETRY or exception converted to dead by
+  `apply_result` (have `apply_result` return the final status). Test through
+  `EngineWorker.run_until_idle`, not by calling `fail_dead_step` directly.
+- [ ] R6 Triggers (Task 5): dedupe by workflow NAME across versions (join definitions), not
+  by `definition_id`. Test: an active run of v1 for the issue blocks a v2 start. (The
+  severity order `(MEDIUM, HIGH)` already covers every `Severity` member; no change.)
+- [ ] R7 Smaller fixes: `human.py` stores the rendered assignee ref; `ConditionExecutor`
+  records `type_mismatch` in the transition reason; `definitions.upload` checks the map
+  collector kind is sweep-capable (`sweep_unsupported`); `sql_queue.reclaim_expired` takes
+  `now` per Task 1.
+- [ ] R8 Missing tests: send-back reason containing a sample is stored masked; workflow
+  upload with a sample through `upload` and through the router -> 422 with no echo; join
+  `any` asserts exactly one continuation and the other branch cancelled; router tests for
+  workflows (create/validate/activate/start), runs (list/get/cancel) and escalation
+  policies (create/put with admin; read with read scope); `EscalationPolicyService`
+  rejects a `tiers_json` containing a sample (`redactor.has_hits`) and the
+  `workflow.uploaded` audit details hold ids and version only (not the compiled workflow).
+- [ ] R9 Re-run the full Verification block and `wc -l` on every p24 file; every command
+  exits 0; log paths recorded.
+
 ## Completion Criteria
 
 - [x] Queue, worker, scheduler, engine, definitions, flow and human executors, escalation, triggers and the four routers delivered with the exact names
-- [x] Every test case above passes
-- [x] No file over 1000 lines (`wc -l` recorded)
-- [x] Scoped verification passes; logs recorded
-- [x] Progress Log updated
+- [ ] Every test case above passes, plus R1-R8
+- [ ] No file over 1000 lines (`wc -l` recorded on the final tree)
+- [ ] Run A Resume items R0-R9 checked with evidence
+- [ ] Scoped verification passes on the final tree; logs recorded
+- [ ] Progress Log updated (run A session)
 
 ## Progress Log
 

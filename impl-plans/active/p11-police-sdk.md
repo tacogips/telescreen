@@ -1,6 +1,6 @@
 # P11 Police SDK, Examples (Python and n8n) Implementation Plan
 
-**Status**: Completed
+**Status**: In Progress (run A resume, session 338)
 **Design Reference**: design-docs/specs/design-police-contract.md (Push signing, Python SDK, Examples), design-docs/specs/design-map-reduce-sweeps.md (Police contract additions)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -130,13 +130,56 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p11-police-sdk-typeli
 grep -rn "from telescreen\.\|import telescreen$" src/telescreen_police_sdk   # prints nothing
 ```
 
+## Run A Resume (2026-10-09, session 338)
+
+State: s319 recorded p11 as BLOCKED, but no cause is written in-tree. Dispatch:
+`impl-plans/active/telescreen-v1-20261009-s338-dispatch.json`, wave A1 (p19 in wave A2
+depends on this plan through `tests/contract/test_bureau_contract.py`). Resume from the
+in-tree code; keep every public name. Treat any failing gate in R0 as the probable block
+cause and fix it first. Static gap review (s338 planning) found:
+
+- [ ] R0 Baseline: run the Verification block on the untouched tree; log exit codes to
+  `/tmp/telescreen-p11-police-sdk-baseline-*.log` before any edit. Also confirm
+  `pyproject.toml` has no `asgi.py` per-file-ignore (design: NOT pre-approved).
+- [ ] R1 `webhook.py:WebhookHandler._run_and_callback`: catch `BureauError` and `httpx`
+  errors from the callback and log them with the status code (or error class name) only;
+  never let a background task end with an unretrieved exception. Test: async mode with a
+  MockTransport returning 500 on the callback -> 202 reply, one warning log with no task
+  input, no "exception was never retrieved".
+- [ ] R2 `sweep.py:SweepHandler`: the design (`design-police-contract.md`, scan_shard) says
+  a resource counts as failed "whenever its handler raises", and the Tests section expects
+  "3 resources, one raising -> 2 `complete_locators`, `resources_failed == 1`". Replace
+  `scan_fn` with `enumerate_fn: Callable[[Json], AsyncIterator[str]]` (yields locators) plus
+  `scan_resource_fn: Callable[[str], Awaitable[ResourceOutcome]]`. A per-resource exception
+  adds 1 to `resources_failed` and continues; an exception from `enumerate_fn` adds 1 and
+  stops; the status stays `completed`. Use PEP 695 `type` statements for both aliases.
+  Update the existing sweep test and add the 3-resource case; the 1200-shard case asserts
+  error code `partition_too_large`.
+- [ ] R3 `tests/contract/test_sdk_contract.py`: round-trip EVERY contract example file
+  (read via `importlib.resources` from `telescreen.contracts`): `from_json` then `to_json`
+  equals the original after canonical `_json.dump`. Validate with
+  `telescreen.contracts.validator.validate` every SDK model the tests build: TaskEnvelope,
+  Registration, a failed ResultEnvelope, a scan_shard result with stats and
+  `complete_locators`, the async callback body with `result_token`, and the heartbeat body.
+- [ ] R4 ASGI: add a bad-signature request through `create_webhook_app` -> 401. Replace
+  `httpx.__dict__["ASGITransport"]` in `tests/police_sdk/test_sdk.py` with a normal
+  import; if ty rejects the normal import, keep the workaround and add a one-line comment
+  saying why.
+- [ ] R5 Private DB example test: drive the example's handler through `PullWorker` with a
+  MockTransport fake Bureau (as in the Tests section) and assert the submitted result is
+  `failed` with a masked finding and no leak.
+- [ ] R6 Accepted deviations to record (no code change): `signing.verify` takes
+  `tuple | list` headers; `BureauClient.callback` reads `time.time()` directly.
+- [ ] R7 Re-run the full Verification block; every command exits 0; log paths recorded.
+
 ## Completion Criteria
 
 - [x] All SDK modules delivered; no `telescreen.*` imports in the SDK (`src/telescreen_police_sdk/`; import scan passed)
-- [x] Pull and push modes tested, including cancellation, replay and the async callback (`tests/police_sdk/test_sdk.py`; 15 focused tests passed)
+- [ ] Pull and push modes tested, including cancellation, replay and the async callback (after R1-R5)
 - [x] Python and n8n examples plus READMEs delivered, with no secrets (`examples/police/`)
-- [x] Scoped verification passes; logs recorded (2026-10-09 final logs under `/tmp/telescreen-p11-police-sdk-*-final.log`; global typelint remains nonzero only for unrelated shared-tree files)
-- [x] Progress Log updated
+- [ ] Run A Resume items R0-R7 checked with evidence
+- [ ] Scoped verification passes on the final tree; logs recorded
+- [ ] Progress Log updated (run A session)
 
 ## Progress Log
 

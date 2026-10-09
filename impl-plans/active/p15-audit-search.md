@@ -1,6 +1,6 @@
 # P15 Audit Log and Search Implementation Plan
 
-**Status**: Completed (implementation; formal review pending)
+**Status**: In Progress (run A resume, session 338)
 **Design Reference**: design-docs/specs/design-data-model.md (Audit), design-docs/specs/design-api-and-ui.md (Search, Endpoints: Audit, Search), design-docs/specs/design-masking.md (IndexGuard), design-docs/specs/architecture.md section 5 item 8
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -174,13 +174,45 @@ uv run --frozen pytest -p no:cacheprovider tests/audit tests/search 2>&1 | tee /
 uv run --frozen python tools/typelint.py > /tmp/telescreen-p15-audit-search-typelint.log 2>&1; grep -E '^(src/telescreen/(audit|search)|src/telescreen/api/routers/(audit|search)\.py|tests/(audit|search))' /tmp/telescreen-p15-audit-search-typelint.log   # prints nothing
 ```
 
+## Run A Resume (2026-10-09, session 338)
+
+State: passed per-branch test-integrity and adversarial review at s319; integration review
+pending. Dispatch: `impl-plans/active/telescreen-v1-20261009-s338-dispatch.json`, wave A1.
+Resume from the in-tree code. Do not rewrite or reformat working modules. Change only what
+an item below or a failing gate requires. Static gap review (s338 planning) found:
+
+- [ ] R0 Baseline: run the Verification block on the untouched tree; log exit codes to
+  `/tmp/telescreen-p15-audit-search-baseline-*.log` before any edit.
+- [ ] R1 `search/memory.py:InMemorySearchBackend.search` sorts by `str(value)`, so
+  `seq:desc` puts 9 before 10 and breaks the `audit_tick.py` watermark. Sort numbers
+  numerically (keep string sort for strings). Test: 12 audit records -> `seq:desc` limit 1
+  returns seq 12; a tick after 12 indexed records indexes nothing new.
+- [ ] R2 `search/indexer.py:DocumentIndexer.index_*` load the row outside the `try`; the
+  plan says the indexer never raises. Move loading inside the guarded block. Test: a
+  session factory that raises on load -> no exception, warning logged with ids only.
+- [ ] R3 `search/meili.py:MeiliSearchBackend.ensure_indexes` ignores the settings `PUT`
+  status. Treat a non-2xx as a `TelescreenError` with a static detail. Test with
+  MockTransport returning 500 on the settings call.
+- [ ] R4 `audit/query.py` converts `from`/`to` with `int(start.timestamp())` on possibly
+  naive datetimes. Normalize with `telescreen.core.clock.ensure_utc` first. Test: a naive
+  bound equals the same UTC-aware bound.
+- [ ] R5 Add the two missing `@pytest.mark.integration` tests from Tests (PostgreSQL UPDATE
+  of `audit_records` raises; Meili round trip). They must skip when
+  `TELESCREEN_TEST_DATABASE_URL` / `TELESCREEN_TEST_MEILI_URL` are unset.
+- [ ] R6 Extend the chain test to 3 appends and assert seq values 1, 2, 3.
+- [ ] R7 Accepted plan deviation (no code change): `audit/query.py:search_audit` returns the
+  shared `telescreen.search.backend.SearchPage`; no `AuditSearchPage` type exists or is
+  needed. Record it in the Progress Log.
+- [ ] R8 Re-run the full Verification block; every command exits 0; log paths recorded.
+
 ## Completion Criteria
 
 - [x] AuditLogService, verify_chain, the search backends, DocumentIndexer, AuditIndexSchedule, reindex_all and both routers delivered with the exact names
 - [x] Guard rejection, tamper detection and leak tests pass
 - [x] Audit API search and verify are exercised through an authenticated in-process ASGI app, including action, actor, from/to, response mapping, and missing-token assertions
-- [x] Scoped verification passes; logs recorded
-- [x] Progress Log updated
+- [ ] Run A Resume items R0-R8 checked with evidence
+- [ ] Scoped verification passes on the final tree; logs recorded
+- [ ] Progress Log updated (run A session)
 
 ## Progress Log
 

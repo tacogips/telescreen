@@ -1,6 +1,6 @@
 # P21 Slack Collector Adapter Implementation Plan
 
-**Status**: Completed
+**Status**: In Progress (run A verify-only, session 338)
 **Design Reference**: design-docs/specs/design-collectors-and-ingestion.md (Collector adapters, Resource identity, Per-kind behavior: slack), design-docs/specs/design-map-reduce-sweeps.md (Built-in sweep implementations: slack)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-08
@@ -138,6 +138,24 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p21-collectors-slack-
 - [x] Progress Log updated
 - [x] Slack integer file timestamps parse in schedule/fetch/sweep paths; schedule cursor stores the file timestamp as a string
 - [x] Event thread replies retain optional `thread_ts`, fetch through `conversations.replies`, preserve `raw_locator`, and round-trip with legacy refs
+
+## Run A Resume (2026-10-09, session 338)
+
+State: passed per-branch test-integrity and adversarial review at s319; integration review
+pending. Dispatch: `impl-plans/active/telescreen-v1-20261009-s338-dispatch.json`, wave A1.
+Verify only: the static gap review found every Tests bullet covered and no in-scope
+defect. Do not edit source unless a gate fails.
+
+- [ ] R0 Run the full Verification block on the untouched tree; log exit codes to
+  `/tmp/telescreen-p21-collectors-slack-runA-*.log`.
+- [ ] R1 If any command fails, fix only the failing cause inside this plan's writePaths,
+  then re-run the whole block. Otherwise record "no change".
+- [ ] R2 Record these accepted deviations in the Progress Log (no code change):
+  `SlackApi.download` takes `max_bytes`; `conversations_replies` was added; HTTP 404 maps to
+  `ResourceGoneError`; `list_changed` returns all history pages of one call in a single
+  `ChangePage` with `has_more=False` (Slack history pages newest-first, so a
+  `{channel_id: last_ts}` cursor cannot hold partial progress); `file_deleted` is not
+  filtered by channel; thread replies are not enumerated by schedule or sweep.
 
 ## Progress Log
 
