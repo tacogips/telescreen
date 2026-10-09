@@ -36,6 +36,22 @@ describe("WorkflowEditor", () => {
     expect(screen.getByRole("button", { name: "Start run" })).toBeDisabled();
   });
 
+  it("updates the versions alert after navigating from a 404 to a 500", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/workflows/a") return Response.json({ error: { code: "not_found", detail: "workflow not found" } }, { status: 404 });
+      if (url === "/api/workflows/b") return Response.json({ error: { code: "internal", detail: "request failed" } }, { status: 500 });
+      return okResponse(url, init);
+    }));
+    const history = createMemoryHistory();
+    history.set({ value: "/workflows/a" });
+    render(() => <MemoryRouter history={history}><Route path="/workflows/:name" component={() => <WorkflowEditor name={useParams<{ name: string }>().name} />} /></MemoryRouter>);
+    expect(await screen.findByRole("alert")).toHaveTextContent("not_found");
+    history.set({ value: "/workflows/b" });
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("internal"));
+    expect(screen.getByRole("alert")).not.toHaveTextContent("not_found");
+  });
+
   it("renders validation paths returned by the API", async () => {
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => okResponse(String(input), init)));
     renderEditor();

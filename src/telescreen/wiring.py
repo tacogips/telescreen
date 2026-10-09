@@ -80,13 +80,17 @@ from telescreen.police.registration import RegistrationService
 from telescreen.police.repository import PoliceRepository
 from telescreen.police.results import ResultService
 from telescreen.ports.audit import AuditLog
-from telescreen.ports.collectors import CollectorSecrets
 from telescreen.ports.issues import IssueEvent, IssueEventSink
 from telescreen.ports.workflow import TaskHandler
 from telescreen.search.audit_tick import AuditIndexSchedule
 from telescreen.search.backend import SearchBackend
 from telescreen.search.indexer import DocumentIndexer
 from telescreen.wiring_builders import RuntimePrimitives, build_primitives
+from telescreen.wiring_collectors import (
+    build_collector_registry,
+    build_webhook_secrets,
+    drive_channel_key,
+)
 from telescreen.workflow.engine.child import ChildRunFinishedHandler
 from telescreen.workflow.engine.definitions import WorkflowService
 from telescreen.workflow.engine.engine import AdvanceStepHandler, RunEngine, TimerFiredHandler
@@ -158,6 +162,7 @@ class Container:
     queue: SqlTaskQueue
     worker: EngineWorker
     collector: CollectorService
+    collector_registry: CollectorRegistry
     sweep_launcher: MapSweepLauncher
     sweeper: CollectorSweeperImpl
     ingest: IngestService
@@ -211,7 +216,10 @@ def build_container(
     )
     collector_repository: CollectorRepository = CollectorRepository()
     scan_jobs: ScanJobStoreImpl = ScanJobStoreImpl(collector_repository)
-    collector_registry: CollectorRegistry = CollectorRegistry()
+    channel_key: bytes = drive_channel_key(primitives.fingerprint_key)
+    collector_registry: CollectorRegistry = build_collector_registry(
+        settings, env, http, primitives.clock, channel_key
+    )
     scanner: ResourceScannerImpl = ResourceScannerImpl(
         primitives.sessions,
         detector,
@@ -544,9 +552,7 @@ def build_container(
         primitives.audit,
         primitives.clock,
     )
-    collector_secrets: WebhookSecrets = WebhookSecrets(
-        CollectorSecrets(None, None), CollectorSecrets(None, None), CollectorSecrets(None, None)
-    )
+    collector_secrets: WebhookSecrets = build_webhook_secrets(settings, env, channel_key)
     routers: tuple[APIRouter, ...] = (
         build_health_router(),
         build_directory_router(DirectoryRouterDeps(ctx, directory)),
@@ -600,6 +606,7 @@ def build_container(
         queue,
         worker,
         collector,
+        collector_registry,
         sweep_launcher,
         sweeper,
         ingest,

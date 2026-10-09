@@ -31,6 +31,7 @@ export function WorkflowEditor(props: Readonly<{ name?: string; onChanged?: () =
       return { versions: records, active_version: records.find((item) => item.active)?.version ?? null };
     },
   );
+  const versionsError = (): ApiError | undefined => versions.error === undefined ? undefined : versions.error instanceof ApiError ? versions.error : new ApiError(0, "request_failed", "Versions could not be loaded.");
   const [selectedVersion, setSelectedVersion] = createSignal<WorkflowVersion | null>(null);
   const versionIndex = (): WorkflowVersionIndex | undefined => versions.error ? undefined : versions.latest;
   const graph = (): ReturnType<typeof parseWorkflowGraph> => parseWorkflowGraph(source(), format());
@@ -110,7 +111,7 @@ export function WorkflowEditor(props: Readonly<{ name?: string; onChanged?: () =
       </div>
     </Panel>
     <Show when={props.name !== undefined && props.name !== "new"}>
-      <Panel><h2>Versions</h2><Show when={!versions.error} fallback={<ErrorBanner error={versions.error instanceof ApiError ? versions.error : new ApiError(0, "request_failed", "Versions could not be loaded.")} />}><Show when={!versions.loading} fallback={<p>Loading versions...</p>}><Show when={versionIndex()?.versions.length} fallback={<p>No versions saved yet.</p>}>
+      <Panel><h2>Versions</h2><Show when={versionsError()} keyed>{(value) => <ErrorBanner error={value} />}</Show><Show when={!versions.error}><Show when={!versions.loading} fallback={<p>Loading versions...</p>}><Show when={versionIndex()?.versions.length} fallback={<p>No versions saved yet.</p>}>
         <ul class="version-list"><For each={versionIndex()?.versions ?? []}>{(version) => <li><span>Version {version.version} {version.active ? <strong>(active)</strong> : ""}</span><span><Button size="sm" disabled={busy()} onClick={() => void loadVersion(version.version)}>Open</Button>{!version.active && <Button size="sm" disabled={busy()} onClick={() => { setSelectedVersion(version); void activate(version.version); }}>Activate</Button>}</span></li>}</For></ul>
       </Show></Show></Show></Panel>
       <Panel><h2>Start a run</h2><label class="field">Issue ID (optional)<input value={issueId()} onInput={(event) => setIssueId(event.currentTarget.value)} placeholder="Issue ID" /></label><Button variant="primary" disabled={busy() || versionIndex()?.active_version == null} onClick={() => void startRun()}>Start run</Button><Show when={startedRun()}>{(id) => <A href={`/runs/${encodeURIComponent(id())}`}>View run {id()}</A>}</Show><Show when={selectedVersion()}>{(version) => <span class="muted"> Editing version {version().version}</span>}</Show></Panel>

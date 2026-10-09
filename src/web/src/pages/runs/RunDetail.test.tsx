@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
-import { MemoryRouter, Route } from "@solidjs/router";
+import { createMemoryHistory, MemoryRouter, Route, useParams } from "@solidjs/router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RunDetail } from "./RunDetail";
 
@@ -44,6 +44,30 @@ describe("RunDetail", () => {
     expect(screen.getByText("Workflow run · run-404")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel run" })).toBeDisabled();
     const runFetches = (): number => fetchMock.mock.calls.filter(([input]) => String(input) === "/api/runs/run-404").length;
+    expect(runFetches()).toBe(1);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(runFetches()).toBe(1);
+  });
+
+  it("updates the run alert after navigating from a 404 to a 500 without polling", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/runs/r1") return Response.json({ error: { code: "not_found", detail: "run not found" } }, { status: 404 });
+      if (url === "/api/runs/r2") return Response.json({ error: { code: "internal", detail: "request failed" } }, { status: 500 });
+      return responseFor(input);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const history = createMemoryHistory();
+    history.set({ value: "/runs/r1" });
+    render(() => <MemoryRouter history={history}><Route path="/runs/:id" component={() => <RunDetail runId={useParams<{ id: string }>().id} />} /></MemoryRouter>);
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(screen.getByRole("alert")).toHaveTextContent("not_found");
+    history.set({ value: "/runs/r2" });
+    await vi.waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("internal"));
+    expect(screen.getByRole("alert")).not.toHaveTextContent("not_found");
+    const runFetches = (): number => fetchMock.mock.calls.filter(([input]) => String(input) === "/api/runs/r2").length;
     expect(runFetches()).toBe(1);
     await vi.advanceTimersByTimeAsync(5000);
     expect(runFetches()).toBe(1);

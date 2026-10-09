@@ -1,9 +1,9 @@
 # P13 UI Workflows and Runs Pages Implementation Plan
 
-**Status**: In Progress (run B2: keyed ErrorBanner wrap and re-verification; run B implementation complete)
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-ui-sentry.md sections 6 (Workflows, Runs), 7, 8.1, 8.1a, 8.2; design-docs/specs/design-workflow-engine.md (DSL step fields); design-docs/specs/design-map-reduce-sweeps.md (API and UI); design-docs/specs/architecture.md section 8 (Run B2)
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-09 (run B2, session 342)
+**Last Updated**: 2026-10-09 (run B2, Step 6)
 
 ## Plan Metadata
 
@@ -241,7 +241,7 @@ run by p29.
 - [x] No source edits outside the two page directories and this plan
 - [x] Progress Log updated
 - [x] P13-ADV-02: primary run-resource failures show the ErrorBanner without unhandled reads or polling
-- [ ] Run B2: every page `ErrorBanner` render is keyed (`<Show when={...} keyed>`), the two route-change regressions pass, and the Verification block passes on the final source (logs recorded)
+- [x] Run B2: every page `ErrorBanner` render is keyed (`<Show when={...} keyed>`), the two route-change regressions pass, and the Verification block passes on the final source (logs recorded)
 
 ## Progress Log
 
@@ -330,3 +330,12 @@ formatting notes are not risks.
 with a regression test. Your step result `findings`, `risks` and `authorSelfCheck` lists
 must contain NO entry with severity high/mid for fixed items, even marked "Fixed"; the
 gate ignores status (conventions 7a). Put P13-ADV-01/02 only in `addressedFeedback`.
+
+### Session: 2026-10-09 — run B2 Step 6 keyed error repair
+**Tasks Completed**: Wrapped the workflow versions and run-detail resource ErrorBanner renders in keyed Show children while preserving their generic ApiError fallbacks and success-content gates. Added route-change regressions for workflow a (404) to b (500) and run r1 (404) to r2 (500); the run test also confirms no repeat fetch after five seconds. Existing tests and assertions remain. Updated the run B2 completion criterion; all implementation-owned criteria are checked.
+**Tasks In Progress**: None for p13 implementation. Formal independent reviews and serial integration are downstream workflow steps.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `WorkflowEditor.tsx` before=b1ef6381388b7694479cee1995347c99d5d7a7badcaad8d9055a437970de1bf2 after=5587cbfa1d91f1b7bf4e011f86ef720e51418c326142e1c569923f21b936bbaf; `WorkflowEditor.test.tsx` before=39390a6e81a41ec0543332a28046f58319a29637801d993fac3069103ed7881b after=44d6e3b94743f484bef3c0df240c746f75fefb3e220708fb1657f118728ffd26; `RunDetail.tsx` before=fa013fbffb6532bc503761c089621c0067f1ce84a502a0e194cc1c49ed2d7e4f after=38d1db8073964fa0e8ca8bc7123ea9ccabd7d465cfaa8c7cd5a8213082dd3349; `RunDetail.test.tsx` before=b6bd22179d79d2f7294c44b28d7a2b3bba46394f06521dbb9cad7cdd5b4c32c0 after=7ec2507311b988450a916d553b8eb217d7e91e4cb48b55752efeb438ba0d3aba; plan before=1df4b6cdd1bdc9b9bed4d6424f8ee55fdd1bc5966c34c34496f46aba1082c896; plan after hash is captured in the plan-local Step 6 evidence manifest.
+**Verification**: `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; (cd src/web && bun run typecheck) 2>&1 | tee /tmp/telescreen-p13-ui-workflows-typecheck-b2.log` -> exit 0 (log: `/tmp/telescreen-p13-ui-workflows-typecheck-b2.log`); `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; (cd src/web && bunx vitest run src/pages/workflows src/pages/runs) 2>&1 | tee /tmp/telescreen-p13-ui-workflows-test-b2.log` -> exit 0, 22 passed, 0 failed across 4 files (log: `/tmp/telescreen-p13-ui-workflows-test-b2.log`); `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; (cd src/web && bun run test) 2>&1 | tee /tmp/telescreen-p13-ui-workflows-test-all-b2.log` -> exit 0, 114 passed, 0 failed across 26 files (log: `/tmp/telescreen-p13-ui-workflows-test-all-b2.log`); `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; (cd src/web && bun run build --outDir /tmp/telescreen-p13-ui-workflows-web-b2 --emptyOutDir) 2>&1 | tee /tmp/telescreen-p13-ui-workflows-build-b2.log` -> exit 0 (log: `/tmp/telescreen-p13-ui-workflows-build-b2.log`); keyed ErrorBanner, forbidden markup and 400-line structural gates -> exit 0 (log: `/tmp/telescreen-p13-ui-workflows-structural-b2.log`); `test "$(grep -c '^- \[ \]' impl-plans/active/p13-ui-workflows.md)" -eq 0 && git diff --check -- impl-plans/active/p13-ui-workflows.md src/web/src/pages/workflows src/web/src/pages/runs` -> exit 0 (log: `/tmp/telescreen-p13-ui-workflows-plan-diff-b2.log`).
+**Notes**: The shared tree also contains p28 assembly edits in `src/telescreen/wiring.py`, `src/telescreen/wiring_builders.py` and `src/telescreen/wiring_collectors.py`; these are outside p13 write paths and were preserved. Independent reviews and combined-tree integration remain downstream.

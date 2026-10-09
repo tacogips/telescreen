@@ -1,6 +1,6 @@
 # P28 Assembly (Container, Collector Bindings, CLI, Serve) Implementation Plan
 
-**Status**: In Progress (run B2: p28a role)
+**Status**: Completed (run B2: p28a role)
 **Design Reference**: design-docs/specs/design-collectors-and-ingestion.md (Assembly bindings, run B2), design-docs/specs/command.md, design-docs/specs/architecture.md sections 3, 4, 8 (Run B2), design-docs/specs/design-ui-sentry.md 8.6
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09 (run B2, session 342)
@@ -268,14 +268,14 @@ Expected results:
 
 ## Completion Criteria
 
-- [ ] `RuntimePrimitives.fingerprint_key` added; `wiring_collectors.py` provides the four functions
-- [ ] All five built-in kinds registered with sweeps; `Container.collector_registry` exposed
-- [ ] Webhook secrets resolved per design (unset fails closed with 401; an unresolvable ref raises `ConfigError`); one Drive channel key shared by watch creation and verification
-- [ ] `tests/e2e/test_wiring_collectors.py` and `tests/e2e/test_wiring_cli.py` pass; existing assembly tests stay green
+- [x] `RuntimePrimitives.fingerprint_key` added; `wiring_collectors.py` provides the four functions
+- [x] All five built-in kinds registered with sweeps; `Container.collector_registry` exposed
+- [x] Webhook secrets resolved per design (unset fails closed with 401; an unresolvable ref raises `ConfigError`); one Drive channel key shared by watch creation and verification
+- [x] `tests/e2e/test_wiring_collectors.py` and `tests/e2e/test_wiring_cli.py` pass; existing assembly tests stay green
 - [x] `telescreen serve` serves the built UI per design-ui-sentry.md 8.6 (static tests pass; missing index.html exits 3)
 - [x] UI fixture leak test passes (file now owned by p28c)
-- [ ] Full-repository verification above passes on the final source (logs recorded)
-- [ ] Progress Log updated
+- [x] Full-repository verification above passes on the final source (logs recorded)
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -320,3 +320,37 @@ only in `addressedFeedback` (the gate ignores status; conventions 7a).
 This plan keeps the container, collector bindings, CLI and serve. The E2E flows moved to
 `impl-plans/active/p28b-e2e-flows.md` and the leak matrix (including
 `tests/leak/test_ui_fixtures.py`) to `impl-plans/active/p28c-leak-matrix.md`.
+
+### Session: 2026-10-09 run B2 implementation
+**Tasks Completed**: Added the once-resolved fingerprint key to runtime primitives without exposing it in repr; implemented `wiring_collectors.py` with a shared HMAC-derived Drive channel key, fail-closed webhook secrets, lazy per-config Slack/GitHub credentials, shared Google auth, host normalization, and Slack/Google/GitHub adapter plus sweeper registration; exposed `Container.collector_registry`; added webhook, registry, key-sharing, lazy-credential, host, worker and collector-sweep CLI tests.
+**Tasks In Progress**: None within p28-assembly. GitHub remediation, sweep, ingestion and chat E2E flows and the complete sink leak matrix are assigned to downstream p28b and p28c.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `src/telescreen/wiring.py` before=`ed9bcad5c8bc659a874780f773e138b2e87e7a889f2d9598d36314d8829ef9fa`; `src/telescreen/wiring_builders.py` before=`1ebcffb4e8de8b03a868b4389f67fde9e101830b915df70b3241b2b466d57096`; `src/telescreen/wiring_collectors.py` before=absent; `tests/e2e/test_wiring_collectors.py` before=absent; `tests/e2e/test_wiring_cli.py` before=absent; this plan's before hash and all final hashes are recorded in `tmp/telescreen-v1-20261009-s342/p28-assembly/final-source-sha256.txt`.
+**Verification**: `uv run --frozen pytest -p no:cacheprovider tests/e2e/test_wiring_collectors.py tests/e2e/test_wiring_cli.py tests/e2e/test_api_routes.py tests/e2e/test_serve_static.py tests/test_package.py` -> exit 0, 16 passed, 0 skipped (`/tmp/telescreen-p28-assembly-focused-final.log`); `uv run --frozen ruff format --check --no-cache .` -> exit 0 (`/tmp/telescreen-p28-assembly-format-final.log`); `uv run --frozen ruff check --no-cache .` -> exit 0 (`/tmp/telescreen-p28-assembly-ruff-final.log`); `uv run --frozen python tools/typelint.py` -> exit 0, 278 files clean (`/tmp/telescreen-p28-assembly-typelint-final.log`); `uv run --frozen ty check` -> exit 0 (`/tmp/telescreen-p28-assembly-ty-final.log`); `uv run --frozen pytest -p no:cacheprovider` -> exit 0, 372 passed/4 offline integration skips (`/tmp/telescreen-p28-assembly-pytest-final.log`); `uv build --out-dir /tmp/telescreen-p28-assembly-dist` -> exit 0, wheel and sdist built (`/tmp/telescreen-p28-assembly-build-final.log`); 1000-line check, no dependency changes, no `CollectorSecrets(None, None)` placeholder and `git diff --check` -> exit 0 (`/tmp/telescreen-p28-assembly-line-limit-final.log`, `/tmp/telescreen-p28-assembly-dependencies-final.log`, `/tmp/telescreen-p28-assembly-placeholder-final.log`, `/tmp/telescreen-p28-assembly-diff-check-final.log`).
+**Notes**: The final implementation follows the accepted assembly design. `ty` initially identified the frozen GitHub adapter's writable protocol mismatch and strict tests identified unannotated bindings; the composition boundary uses an explicit typed cast and all test bindings are typed. Earlier local format, import-order and type-lint failures were corrected before final passing gates. Unrelated pending user QA files and parallel p13 UI page edits were preserved.
+
+### Session: 2026-10-10 run B2 final CLI assertion
+**Tasks Completed**: Added an assertion that a repeated active collector sweep returns exit 1 and prints the static `collector sweep already active` conflict detail to stderr.
+**Tasks In Progress**: None within p28-assembly.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `tests/e2e/test_wiring_cli.py` before=`48b50abc31f1958e8b26fec477d844480bc2ccb176b5975f7f7711c4b5a7408d`; final hashes for all plan-owned source/tests and this plan are in `tmp/telescreen-v1-20261009-s342/p28-assembly/final-source-sha256.txt`.
+**Verification**: Focused assembly tests -> exit 0, 16 passed/0 skipped (`/tmp/telescreen-p28-assembly-focused-final2.log`); full pytest -> exit 0, 372 passed/4 expected offline integration skips (`/tmp/telescreen-p28-assembly-pytest-final2.log`); format -> exit 0 (`/tmp/telescreen-p28-assembly-format-final2.log`); Ruff -> exit 0 (`/tmp/telescreen-p28-assembly-ruff-final2.log`); typelint -> exit 0, 278 files clean (`/tmp/telescreen-p28-assembly-typelint-final2.log`); ty -> exit 0 (`/tmp/telescreen-p28-assembly-ty-final2.log`); `uv build --out-dir /tmp/telescreen-p28-assembly-dist-final2` -> exit 0 (`/tmp/telescreen-p28-assembly-build-final2.log`).
+**Notes**: This follow-up replaces the earlier focused and full-suite evidence with runs against the final test source; p28-assembly remains complete. Downstream p28b/p28c own the flow E2E suite and comprehensive sink leak matrix.
+
+### Session: 2026-10-10 reconciliation of RECON-B2-1-P28-FAILED
+**Tasks Completed**: Re-read `tests/e2e/test_wiring_collectors.py` and retained the P28A-TI-01 regression coverage for all five adapter/sweeper registrations, deterministic Drive-key derivation and sharing, GitHub/Slack webhook signature outcomes, unresolved webhook refs, safe missing GitHub credentials, and GitHub host mapping. Verified that injecting a mismatched Drive verification key makes the real-container webhook test fail at its expected 200 assertion.
+**Tasks In Progress**: None within p28-assembly. Step 7 must independently rerun test-integrity and adversarial review on this final source before downstream waves are released.
+**Blockers**: None.
+**Review Decision**: `RECON-B2-1-P28-FAILED` implementation criteria are met; formal review remains downstream and is not claimed here.
+**Verification**: Focused assembly suite -> exit 0, 16 passed/0 skipped (`/tmp/telescreen-p28-assembly-reconcile-focused.log`); deliberate Drive-key mutation check -> expected exit 1 at the webhook status assertion, 1 failed (`/tmp/telescreen-p28-assembly-reconcile-mutation.log`); Ruff format -> exit 0 (`/tmp/telescreen-p28-assembly-reconcile-format.log`); Ruff -> exit 0 (`/tmp/telescreen-p28-assembly-reconcile-ruff.log`); typelint -> exit 0, 278 files clean (`/tmp/telescreen-p28-assembly-reconcile-typelint.log`); ty -> exit 0 (`/tmp/telescreen-p28-assembly-reconcile-ty.log`); full pytest -> exit 0, 372 passed/4 expected offline skips (`/tmp/telescreen-p28-assembly-reconcile-pytest.log`); package build -> exit 0 (`/tmp/telescreen-p28-assembly-reconcile-build.log`); Python line limit, dependency diff and placeholder checks -> exit 0 (`/tmp/telescreen-p28-assembly-reconcile-line-limit.log`, command `git diff --quiet -- pyproject.toml uv.lock`, and command `! grep -n 'CollectorSecrets(None, None)' src/telescreen/wiring.py`).
+**Hashes**: Reconciliation inventory is `tmp/telescreen-v1-20261009-s342/p28-assembly/final-source-sha256-reconcile-b2-1.txt`; this is a new file so the earlier failed inventory remains preserved.
+
+**Owner resolution (2026-10-10)**: The reconciled p28 source passes all gates (372 tests,
+ruff, typelint, ty, build). The previous dispatch was blocked ONLY because the step result
+listed (a) the expected-failure Drive key-mismatch mutation run and (b) the superseded
+hash-inventory check in `verification` / `priorVerification`. The gate treats any non-zero
+exit there as a failed test. In your next step result: list ONLY final passing commands in
+`verification`; leave `priorVerification` empty or with passing entries only; record mutation
+evidence and superseded attempts in this Progress Log only (conventions 7a).

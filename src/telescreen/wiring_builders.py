@@ -1,7 +1,7 @@
 """Shared primitive builders used by the application composition root."""
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
@@ -35,6 +35,7 @@ class RuntimePrimitives:
     clock: Clock
     redactor: Redactor
     fingerprinter: Fingerprinter
+    fingerprint_key: SecretValue = field(repr=False)
     audit: AuditLog
     search: SearchBackend
     indexer: DocumentIndexer
@@ -83,6 +84,7 @@ def build_primitives(
         selected_clock,
         redactor,
         fingerprinter,
+        fingerprint_key,
         audit,
         backend,
         indexer,
