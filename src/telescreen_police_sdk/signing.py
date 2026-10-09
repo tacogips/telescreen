@@ -1,4 +1,8 @@
-"""Webhook request signing and replay protection for Police push mode."""
+"""Webhook signing uses UTF-8 bytes of the registration signing_secret string.
+
+The secret is never base64-decoded; this module also provides replay protection for
+Police push mode.
+"""
 
 from __future__ import annotations
 

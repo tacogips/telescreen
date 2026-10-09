@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
 import sqlite3
 import time
@@ -117,6 +118,22 @@ def test_signing_detects_tamper_staleness_and_replay() -> None:
     assert verify(headers, body, secret, 1301, NonceCache()) is VerifyResult.STALE
     assert verify((), body, secret, 1000, NonceCache()) is VerifyResult.MISSING
     assert sign(secret, body, 1000, "nonce-a").startswith("v1=")
+
+
+def test_registration_signing_secret_is_used_as_utf8_not_base64() -> None:
+    """Push signing uses the registration secret string bytes without decoding."""
+    registration: Registration = Registration("worker-a", 60, 20, 30, signing_secret="c2VjcmV0")
+    signing_secret: str | None = registration.signing_secret
+    assert signing_secret is not None
+    body: bytes = b'{"task_id":"one"}'
+    headers: tuple[tuple[str, str], ...] = signature_headers(
+        signing_secret.encode("utf-8"), body, 1000, "registration-secret"
+    )
+    decoded_secret: bytes = base64.urlsafe_b64decode(signing_secret)
+    assert verify(headers, body, signing_secret.encode("utf-8"), 1000, NonceCache()) is (
+        VerifyResult.OK
+    )
+    assert verify(headers, body, decoded_secret, 1000, NonceCache()) is VerifyResult.BAD_SIGNATURE
 
 
 def test_nonce_cache_expires_entries() -> None:
@@ -626,3 +643,101 @@ def test_n8n_workflow_is_importable_shaped_json_without_secrets() -> None:
         if target.get("node") is not None
     )
     assert not find_leaks(path.read_bytes().decode())
+
+
+def test_n8n_workflow_signs_delivery_and_result_callback_per_contract() -> None:
+    """Workflow verifies exact signed bytes and sends a signed result envelope."""
+    path: Path = Path("examples/police/n8n/telescreen-push-police.json")
+    document: _json.Json = _json.parse(path.read_bytes())
+    nodes_value: _json.Json | None = document.get("nodes")
+    nodes: tuple[_json.Json, ...] | None = nodes_value.as_list() if nodes_value else None
+    assert nodes is not None
+
+    webhook_node: _json.Json = next(
+        node for node in nodes if _json_string(node, "name") == "Receive task"
+    )
+    webhook_parameters: _json.Json | None = webhook_node.get("parameters")
+    webhook_options: _json.Json | None = (
+        webhook_parameters.get("options") if webhook_parameters is not None else None
+    )
+    assert webhook_options is not None
+    raw_body_option: _json.Json | None = webhook_options.get("rawBody")
+    assert raw_body_option is not None
+    assert raw_body_option.as_bool() is True
+
+    verify_node: _json.Json = next(
+        node for node in nodes if _json_string(node, "name") == "Verify HMAC"
+    )
+    verify_parameters: _json.Json | None = verify_node.get("parameters")
+    assert verify_parameters is not None
+    verify_code: str | None = _json_string(verify_parameters, "jsCode")
+    assert verify_code is not None
+    assert "x-telescreen-timestamp" in verify_code
+    assert "x-telescreen-nonce" in verify_code
+    assert "x-telescreen-signature" in verify_code
+    assert "rawBodyBase64" in verify_code
+    assert "`${timestamp}.${nonce}.`" in verify_code
+    assert "Buffer.from(secret, 'utf8')" in verify_code
+    assert ".update(rawBody)" in verify_code
+    assert "digest('hex')" in verify_code
+    assert "digest('base64')" not in verify_code
+    assert "v1=${digest}" in verify_code
+    assert "crypto.timingSafeEqual" in verify_code
+    assert "Math.abs(nowSeconds - timestampSeconds) <= 300" in verify_code
+    assert "$getWorkflowStaticData('global')" in verify_code
+    assert "nowSeconds + 600" in verify_code
+
+    signature_node: _json.Json = next(
+        node for node in nodes if _json_string(node, "name") == "Signature valid?"
+    )
+    signature_parameters: _json.Json | None = signature_node.get("parameters")
+    assert signature_parameters is not None
+    assert "$json.valid" in _json.dump(signature_parameters)
+
+    scan_node: _json.Json = next(
+        node for node in nodes if _json_string(node, "name") == "Scan locally"
+    )
+    scan_parameters: _json.Json | None = scan_node.get("parameters")
+    assert scan_parameters is not None
+    scan_code: str | None = _json_string(scan_parameters, "jsCode")
+    assert scan_code is not None
+    assert "result_token: callback.result_token" in scan_code
+    assert "const resultBody = JSON.stringify(result)" in scan_code
+    assert "signingInput: `${timestamp}.${nonce}.${resultBody}`" in scan_code
+
+    signer_node: _json.Json = next(
+        node for node in nodes if _json_string(node, "name") == "Sign callback"
+    )
+    signer_parameters: _json.Json | None = signer_node.get("parameters")
+    assert signer_parameters is not None
+    assert _json_string(signer_parameters, "action") == "hmac"
+    assert _json_string(signer_parameters, "encoding") == "hex"
+    assert _json_string(signer_parameters, "dataPropertyName") == "signatureHex"
+    assert _json_string(signer_parameters, "value") == "={{$json.signingInput}}"
+
+    callback_node: _json.Json = next(
+        node for node in nodes if _json_string(node, "name") == "Submit signed result"
+    )
+    callback_parameters: _json.Json | None = callback_node.get("parameters")
+    assert callback_parameters is not None
+    assert _json_string(callback_parameters, "url") == "={{$json.callbackUrl}}"
+    assert _json_string(callback_parameters, "body") == "={{$json.resultBody}}"
+    header_parameters: _json.Json | None = callback_parameters.get("headerParameters")
+    header_items: _json.Json | None = (
+        header_parameters.get("parameters") if header_parameters is not None else None
+    )
+    headers: tuple[_json.Json, ...] | None = header_items.as_list() if header_items else None
+    assert headers is not None
+    header_names: set[str] = {
+        name.lower() for header in headers if (name := _json_string(header, "name")) is not None
+    }
+    assert header_names == {
+        "content-type",
+        "x-telescreen-timestamp",
+        "x-telescreen-nonce",
+        "x-telescreen-signature",
+    }
+    signature_header: _json.Json = next(
+        header for header in headers if _json_string(header, "name") == "X-Telescreen-Signature"
+    )
+    assert _json_string(signature_header, "value") == "={{'v1=' + $json.signatureHex}}"

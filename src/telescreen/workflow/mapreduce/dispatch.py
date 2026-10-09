@@ -44,10 +44,10 @@ class MapDispatchHandler:
 
     async def handle(self, task: ClaimedTask) -> TaskResult:
         """Handle a claimed dispatcher task through the durable queue contract."""
-        await self._handle_id(task.ref_id)
+        await self._handle_id(task.ref_id, task.idempotency_key)
         return TaskResult.done()
 
-    async def _handle_id(self, job_id: str) -> int:
+    async def _handle_id(self, job_id: str, dispatch_key: str | None = None) -> int:
         """Dispatch one tick and return the number of new shard tasks."""
         async with self.sessions.begin() as session:
             job: MapJobRow | None = await session.scalar(
@@ -112,7 +112,7 @@ class MapDispatchHandler:
                         job.id,
                         json_str(job.id),
                         now,
-                        f"mapreduce:{job.id}",
+                        f"mapreduce:{job.id}:{int(now.timestamp())}:{dispatch_key or 'timeout'}",
                     ),
                 )
                 return 0
@@ -218,7 +218,7 @@ class MapDispatchHandler:
                         job.id,
                         json_str(job.id),
                         now,
-                        f"mapreduce:{job.id}",
+                        f"mapreduce:{job.id}:{int(now.timestamp())}:{dispatch_key or 'dispatch'}",
                     ),
                 )
             else:

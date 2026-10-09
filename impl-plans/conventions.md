@@ -179,6 +179,13 @@ The progress gate treats every high or medium entry in your step result `finding
 - Integration tests marked `integration` that are skipped because
   `TELESCREEN_TEST_DATABASE_URL` / `TELESCREEN_TEST_MEILI_URL` are unset are skipped by
   design (offline suite). This is expected, not a risk, and must not be listed.
+- The step result `verification` (and `priorVerification`) list is read by the progress
+  gate as behavioral evidence: every entry with a non-zero exit code or a failure count is
+  treated as a FAILED test and blocks the plan. Therefore list there only the final,
+  passing commands run against the current source. Deliberate mutation checks (expected
+  failures that prove a test detects a defect) and superseded intermediate attempts go in
+  the plan Progress Log and in `addressedFeedback` evidence text, never as `verification`
+  entries.
 - If a repair brief forbids editing a file that a mutation check would need, document the
   equivalent in-memory mutation evidence in the plan Progress Log and in
   `addressedFeedback`; this is not a blocker or a risk.

@@ -42,41 +42,46 @@ progress-log rules). Wave = 1 + max(wave of dependencies).
 
 | Plan | Wave | Status | Design Reference | Last Updated |
 |------|------|--------|------------------|--------------|
-| `active/p01-foundation.md` | 1 | Ready | architecture.md s4-s8, command.md | 2026-10-08 |
-| `active/p02-db-schema.md` | 2 | Ready | design-data-model.md | 2026-10-08 |
-| `active/p03-detection-rules.md` | 2 | Ready | design-detectors.md | 2026-10-08 |
-| `active/p04-ports.md` | 2 | Ready | architecture.md s4 | 2026-10-08 |
-| `active/p05-police-contract.md` | 2 | Ready | design-police-contract.md | 2026-10-08 |
-| `active/p07-web-shell.md` | 2 | Ready | design-api-and-ui.md | 2026-10-08 |
-| `active/p06-workflow-dsl.md` | 3 | Ready | design-workflow-engine.md | 2026-10-08 |
-| `active/p08-masking.md` | 3 | Ready | design-masking.md | 2026-10-08 |
-| `active/p09-detection-llm-ml.md` | 3 | Ready | design-detectors.md | 2026-10-08 |
-| `active/p10-api-common.md` | 3 | Ready | design-api-and-ui.md | 2026-10-08 |
-| `active/p11-police-sdk.md` | 3 | Ready | design-police-contract.md | 2026-10-08 |
-| `active/p12-ui-issues.md` | 3 | Ready | design-api-and-ui.md | 2026-10-08 |
-| `active/p13-ui-workflows.md` | 3 | Ready | design-api-and-ui.md | 2026-10-08 |
-| `active/p14-ui-ops.md` | 3 | Ready | design-api-and-ui.md | 2026-10-08 |
-| `active/p21-collectors-slack.md` | 3 | Ready | design-collectors-and-ingestion.md | 2026-10-08 |
-| `active/p22-collectors-google.md` | 3 | Ready | design-collectors-and-ingestion.md, design-map-reduce-sweeps.md | 2026-10-08 |
-| `active/p23-collectors-github.md` | 3 | Ready | design-collectors-and-ingestion.md | 2026-10-08 |
-| `active/p15-audit-search.md` | 4 | Ready | design-data-model.md, design-api-and-ui.md | 2026-10-08 |
-| `active/p16-issues-ingest.md` | 4 | Ready | design-collectors-and-ingestion.md | 2026-10-08 |
-| `active/p17-notifications.md` | 4 | Ready | design-masking.md | 2026-10-08 |
-| `active/p18-evidence.md` | 4 | Ready | design-api-and-ui.md | 2026-10-08 |
-| `active/p19-police-bureau.md` | 4 | Ready | design-police-contract.md | 2026-10-08 |
-| `active/p20-collectors-core.md` | 4 | Ready | design-collectors-and-ingestion.md | 2026-10-08 |
-| `active/p24-workflow-engine.md` | 4 | Ready | design-workflow-engine.md | 2026-10-08 |
-| `active/p25-workflow-nodes.md` | 4 | Ready | design-workflow-engine.md | 2026-10-08 |
-| `active/p26-workflow-mapreduce.md` | 4 | Ready | design-map-reduce-sweeps.md | 2026-10-08 |
-| `active/p27-assistant.md` | 4 | Ready | design-api-and-ui.md | 2026-10-08 |
-| `active/p29-examples-compose.md` | 4 | Ready | architecture.md s3 | 2026-10-08 |
-| `active/p28-assembly.md` | 5 | Ready (depends on every wave-3/4 feature plan, including the UI plans p07, p12, p13, p14) | command.md, design-masking.md | 2026-10-08 |
+"Integration-accepted" plans were accepted by an earlier run's integration review
+(sessions up to 339) and are committed. Each still lives in `active/` until a later serial
+cleanup archives it.
+
+| Plan | Wave | Status | Design Reference | Last Updated |
+|------|------|--------|------------------|--------------|
+| `active/p01-foundation.md` | 1 | Integration-accepted (archival pending) | architecture.md s4-s8, command.md | 2026-10-09 |
+| `active/p02-db-schema.md` | 2 | Integration-accepted (archival pending) | design-data-model.md | 2026-10-09 |
+| `active/p03-detection-rules.md` | 2 | Integration-accepted (archival pending) | design-detectors.md | 2026-10-09 |
+| `active/p04-ports.md` | 2 | Integration-accepted (archival pending) | architecture.md s4 | 2026-10-09 |
+| `active/p05-police-contract.md` | 2 | Integration-accepted (archival pending) | design-police-contract.md | 2026-10-09 |
+| `active/p07-web-shell.md` | 2 | Integration-accepted (archival pending) | design-api-and-ui.md | 2026-10-09 |
+| `active/p06-workflow-dsl.md` | 3 | Integration-accepted (archival pending) | design-workflow-engine.md | 2026-10-09 |
+| `active/p08-masking.md` | 3 | Integration-accepted (archival pending) | design-masking.md | 2026-10-09 |
+| `active/p09-detection-llm-ml.md` | 3 | Integration-accepted (archival pending) | design-detectors.md | 2026-10-09 |
+| `active/p10-api-common.md` | 3 | Integration-accepted (archival pending) | design-api-and-ui.md | 2026-10-09 |
+| `active/p12-ui-issues.md` | 3 | Ready (UI rework to design-ui-sentry.md, later run) | design-api-and-ui.md | 2026-10-08 |
+| `active/p13-ui-workflows.md` | 3 | Ready (UI rework to design-ui-sentry.md, later run) | design-api-and-ui.md | 2026-10-08 |
+| `active/p14-ui-ops.md` | 3 | Ready (UI rework to design-ui-sentry.md, later run) | design-api-and-ui.md | 2026-10-08 |
+| `active/p22-collectors-google.md` | 3 | Integration-accepted (archival pending) | design-collectors-and-ingestion.md, design-map-reduce-sweeps.md | 2026-10-09 |
+| `active/p23-collectors-github.md` | 3 | Integration-accepted (archival pending) | design-collectors-and-ingestion.md | 2026-10-09 |
+| `active/p15-audit-search.md` | 4 | Integration-accepted (archival pending) | design-data-model.md, design-api-and-ui.md | 2026-10-09 |
+| `active/p16-issues-ingest.md` | 4 | Integration-accepted (archival pending) | design-collectors-and-ingestion.md | 2026-10-09 |
+| `active/p18-evidence.md` | 4 | Integration-accepted (archival pending) | design-api-and-ui.md | 2026-10-09 |
+| `active/p20-collectors-core.md` | 4 | Integration-accepted (archival pending) | design-collectors-and-ingestion.md | 2026-10-09 |
+| `active/p24-workflow-engine.md` | 4 | Integration-accepted (archival pending) | design-workflow-engine.md | 2026-10-09 |
+| `active/p25-workflow-nodes.md` | 4 | Integration-accepted (archival pending) | design-workflow-engine.md | 2026-10-09 |
+| `active/p27-assistant.md` | 4 | Integration-accepted (archival pending) | design-api-and-ui.md | 2026-10-09 |
+| `active/p29-examples-compose.md` | 4 | Ready (later run) | architecture.md s3 | 2026-10-08 |
+| `active/p28-assembly.md` | 5 | Ready (depends on every wave-3/4 feature plan, including the UI plans p07, p12, p13, p14). It also owns police router mounting and POLICE_PUSH_DELIVERY engine registration. | command.md, design-masking.md | 2026-10-09 |
 
 ## Completed Plans
 
-| Plan | Completed | Design Reference |
-|------|-----------|------------------|
-| (No completed plans yet) | - | - |
+| Plan | Wave | Completed | Design Reference |
+|------|------|-----------|------------------|
+| `completed/p11-police-sdk.md` | 3 | 2026-10-09 (run A2, session 340) | design-police-contract.md |
+| `completed/p21-collectors-slack.md` | 3 | 2026-10-09 (run A2, session 340) | design-collectors-and-ingestion.md |
+| `completed/p17-notifications.md` | 4 | 2026-10-09 (run A2, session 340) | design-masking.md |
+| `completed/p19-police-bureau.md` | 4 | 2026-10-09 (run A2, session 340) | design-police-contract.md |
+| `completed/p26-workflow-mapreduce.md` | 4 | 2026-10-09 (run A2, session 340) | design-map-reduce-sweeps.md |
 
 ## Phase Dependencies (for impl-exec-auto)
 
@@ -87,11 +92,11 @@ Only plans from eligible phases should be read to minimize context loading.
 
 | Phase | Status | Depends On |
 |-------|--------|------------|
-| 1 | NOT_STARTED | - |
-| 2 | BLOCKED | Phase 1 |
-| 3 | BLOCKED | Phase 2 (per-plan dependencies) |
-| 4 | BLOCKED | Phase 3 (per-plan dependencies) |
-| 5 | BLOCKED | Phase 4 |
+| 1 | COMPLETED | - |
+| 2 | COMPLETED | Phase 1 |
+| 3 | IN_PROGRESS (remaining: p12, p13, p14) | Phase 2 (per-plan dependencies) |
+| 4 | IN_PROGRESS (remaining: p29) | Phase 3 (per-plan dependencies) |
+| 5 | BLOCKED (p28 waits for p12, p13, p14, p29) | Phase 4 |
 
 ### Phase to Plans Mapping
 

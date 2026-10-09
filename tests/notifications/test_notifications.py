@@ -265,6 +265,69 @@ async def test_block_policy_stores_placeholder_and_does_not_enqueue() -> None:
     await harness.close()
 
 
+@pytest.mark.parametrize("policy", (DlpPolicy.MASK, DlpPolicy.BLOCK))
+@pytest.mark.parametrize("channel", (NotificationChannel.SLACK, NotificationChannel.EMAIL))
+async def test_raw_sample_never_reaches_rows_providers_or_logs(
+    policy: DlpPolicy,
+    channel: NotificationChannel,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Keep a sensitive sample out of stored, logged, and delivered text."""
+    harness: SqliteHarness = await make_sqlite_harness()
+    queue: RecordingQueue = RecordingQueue()
+    audit: RecordingAudit = RecordingAudit()
+    clock: FakeClock = FakeClock(datetime(2026, 10, 9, tzinfo=UTC))
+    service: NotificationService = make_service(queue, audit, FakeResolver(), clock, policy)
+    token: str = github_token().value
+    async with harness.sessions.begin() as session:
+        receipt: NotificationReceipt = await service.send(
+            session, request("Sensitive notice", f"Token: {token}", channel=channel)
+        )
+    async with harness.sessions() as session:
+        row: NotificationRow = (await session.scalars(select(NotificationRow))).one()
+    assert_no_leaks(row.subject + row.body, "notification row")
+    assert_no_leaks(caplog.text, "notification logs")
+
+    posted: list[bytes] = []
+
+    def handler(request_value: httpx.Request) -> httpx.Response:
+        posted.append(request_value.content)
+        return httpx.Response(200, json={"ok": True})
+
+    smtp: RecordingSmtp = RecordingSmtp()
+    if policy is DlpPolicy.BLOCK:
+        assert receipt.verdict is DlpVerdict.BLOCKED
+        assert queue.specs == []
+        assert posted == []
+        assert smtp.messages == []
+    else:
+        assert receipt.verdict is DlpVerdict.MASKED
+        assert len(queue.specs) == 1
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            delivery: NotificationDeliveryHandler = NotificationDeliveryHandler(
+                harness.sessions,
+                FakeResolver(),
+                SlackNotifier(client, SecretValue("test-slack-token")),
+                EmailNotifier(smtp, "noreply@example.invalid"),
+                audit,
+                clock,
+                NotificationRepository(),
+            )
+            result: TaskResult = await delivery.handle(_claimed(row.id, 1, 5))
+        assert result.kind is TaskResultKind.DONE
+        if channel is NotificationChannel.SLACK:
+            assert len(posted) == 2
+            for payload in posted:
+                assert_no_leaks(payload.decode(), "Slack request")
+            assert smtp.messages == []
+        else:
+            assert posted == []
+            assert len(smtp.messages) == 1
+            assert_no_leaks(smtp.messages[0].as_string(), "SMTP message")
+    assert_no_leaks(caplog.text, "notification logs")
+    await harness.close()
+
+
 async def test_mask_policy_blocks_if_rule_redactor_finds_residual_value() -> None:
     """Fail closed when a synthetic redactor finds a residual masked value."""
     gate: DlpGate = DlpGate(

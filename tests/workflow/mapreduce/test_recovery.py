@@ -555,13 +555,19 @@ async def test_retry_failed_reopens_partition_and_shard_work() -> None:
         async with harness.sessions() as session:
             retried_job: MapJobRow | None = await session.get(MapJobRow, "job")
             item: MapItemRow | None = await session.get(MapItemRow, "item")
-            partition: MapPartitionRow | None = await session.get(MapPartitionRow, "partition")
+            partition: MapPartitionRow | None = await session.scalar(
+                select(MapPartitionRow).where(
+                    MapPartitionRow.map_job_id == "job",
+                    MapPartitionRow.corpus_key == "failed-corpus",
+                )
+            )
             assert retried_job is not None and retried_job.partition_done is False
             assert retried_job.status == MapJobStatus.RUNNING.value
             assert item is not None and item.status == MapItemStatus.READY.value
             assert partition is not None and partition.status == MapPartitionStatus.READY.value
+            assert partition.id != "partition"
             assert partition.cursor is None and partition.attempt == 1
-        assert any(key.startswith("mappart:partition") for key in queue.keys)
+        assert any(key == f"mappart:{partition.id}:1:root" for key in queue.keys)
     finally:
         await harness.close()
 

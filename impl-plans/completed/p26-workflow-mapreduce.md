@@ -1,6 +1,6 @@
 # P26 Map-Reduce Sweeps (Map Step, Partition, Dispatch, Shards, Reduce) Implementation Plan
 
-**Status**: In Progress (run A2 verification, session 340)
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-map-reduce-sweeps.md (all sections), design-docs/specs/notes.md (Map step scope in v1; Sweep removal reconciliation by watermark)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -8,7 +8,7 @@
 ## Plan Metadata
 
 - planId: `p26-workflow-mapreduce`
-- planPath: `impl-plans/active/p26-workflow-mapreduce.md`
+- planPath: `impl-plans/completed/p26-workflow-mapreduce.md` (archived from `impl-plans/active/` after run A2 integration acceptance, session 340; writePaths below record the run-time location)
 - wave: 4
 - dependsOn: `p06-workflow-dsl`, `p08-masking`, `p10-api-common`
 - writePaths:
@@ -285,17 +285,17 @@ Not in scope: populating `findings_by_rule_class` in `collectors/sweep.py` (p20 
 Code is complete; this pass verifies it and proves the hard tests are meaningful. Fix
 only real gaps inside this plan's writePaths; never rewrite working code.
 
-- [ ] V0 Run the Verification block on the current tree before any edit; log every
+- [x] V0 Run the Verification block on the current tree before any edit; log every
   command, exit status and `/tmp/telescreen-p26-workflow-mapreduce-a2-*.log` path.
-- [ ] V1 Re-check Deliverables, Tests and items R1-R11 against the current source; list
+- [x] V1 Re-check Deliverables, Tests and items R1-R11 against the current source; list
   any gap in the Progress Log and fix it.
-- [ ] V2 Mutation evidence (one line each in the Progress Log): for (a) the 10,000-shard
+- [x] V2 Mutation evidence (one line each in the Progress Log): for (a) the 10,000-shard
   cap test, (b) crash recovery without duplicate shards, (c) 429 backpressure, (d) removal
   reconciliation blocked by `resources_failed > 0`: record sha256 of the guarded source
   file, apply a one-line mutation that disables the guard, run only that test (must FAIL),
   restore, and confirm the sha256 equals the original. A test that still passes under its
   mutation is a gap: strengthen it, then repeat.
-- [ ] V3 Re-run the Verification block on the final tree; every command exits 0. Report
+- [x] V3 Re-run the Verification block on the final tree; every command exits 0. Report
   fixed items only in `addressedFeedback` (conventions 7a).
 
 ## Progress Log
@@ -350,3 +350,37 @@ only real gaps inside this plan's writePaths; never rewrite working code.
 - `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-p26-workflow-mapreduce-typelint-integrity-final-source.log 2>&1; ! grep -E '^(src/telescreen/workflow/mapreduce|src/telescreen/workflow/executors/map.py|src/telescreen/api/routers/map_jobs.py|tests/workflow/mapreduce)' /tmp/telescreen-p26-workflow-mapreduce-typelint-integrity-final-source.log` -> exit 0.
 - Isolated mutation check in `/tmp/telescreen-p26-ti-mutation`: omitting only the MAP_SHARD enqueue makes `test_dispatch_caps_ten_thousand_shards_at_thirty_two` fail at the expected `len(first_shard_specs) == 32` assertion (exit 1; log: `/tmp/telescreen-p26-ti-p26-1-mutation.log`). The repository production file was not mutated.
 **Notes**: Focused repair tests plus the 10,000-shard test passed 4/4 in 21.64 s (log: `/tmp/telescreen-p26-workflow-mapreduce-repair-focused.log`). Earlier intermediate lint/type/format attempts exposed and then corrected test-only formatting/typing issues; final source gates above all pass. No independent review acceptance is claimed.
+
+### Session: 2026-10-09 14:32
+**Tasks Completed**: Completed Run A2 V0-V3. Rechecked the assigned deliverables, tests and R1-R11 against `design-docs/specs/design-map-reduce-sweeps.md`; no implementation gap remained. Mutation checks for concurrency cap, replay deduplication, 429 attempt restoration and DR-1 removal reconciliation each failed their targeted test as expected, then restored the guarded source hash exactly.
+**Tasks In Progress**: None for p26 implementation. Formal review and serial finalization are downstream workflow steps.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `dispatch.py` `972129e6b698d79ec2a5a97c7cbfcaffe6b83e2ae811ce084b6ae1bbe1ed93c8` restored equal; `partition.py` `5308ea992a38bf6a3fe770d7efff28b6b861a4921304d68eeb9312b92d86822b` restored equal; `shard.py` `e76d05955c28c87415ed62143d6663fea5574a01e23150b268b083a533302f53` restored equal; `reduce.py` `c9cd4e5725232616dbeb1acecdf295e0ab4ce4c79af692231a00a79fab8f16a2` restored equal; plan before `2530b57a3f9cd4988702acc0f748dd0ee2189d4df34b2f5b62ce21a2afc7cc6f`.
+**Verification**:
+- Corrected V0 format/check, ruff, ty and pytest commands all exited 0; logs: `/tmp/telescreen-p26-workflow-mapreduce-a2-v0-{format,ruff,ty,pytest}-corrected.log`. Pytest: 20 passed, 1 PostgreSQL integration test skipped because its DB URL was unset.
+- Corrected V0 whole-tree `uv run --frozen python tools/typelint.py` plus no-match scoped filter exited 0; 254 files clean (log: `/tmp/telescreen-p26-workflow-mapreduce-a2-v0-typelint-corrected.log`). The initial wrapper had passed the path variable as one path for format/ruff/ty; its logs are retained with `v0-` names and corrected V0 is authoritative.
+- V2 cap mutation -> targeted test failed (expected, exit 1); source hash restored (`dispatch.py`; `/tmp/telescreen-p26-workflow-mapreduce-a2-mutation-cap.log`).
+- V2 replay mutation -> targeted test failed (expected, exit 1); source hash restored (`partition.py`; `/tmp/telescreen-p26-workflow-mapreduce-a2-mutation-crash-replay.log`).
+- V2 429 mutation -> targeted test failed (expected, exit 1); source hash restored (`shard.py`; `/tmp/telescreen-p26-workflow-mapreduce-a2-mutation-429-backpressure.log`).
+- V2 DR-1 mutation -> targeted test failed (expected, exit 1); source hash restored (`reduce.py`; `/tmp/telescreen-p26-workflow-mapreduce-a2-mutation-dr1-reconciliation.log`). Per-edit intentions and restore results: `tmp/telescreen-v1-20261009-s340/p26-workflow-mapreduce/a2-mutations/`.
+- V3 format, ruff and ty exited 0; logs: `/tmp/telescreen-p26-workflow-mapreduce-a2-v3-{format,ruff,ty}.log`.
+- V3 `uv run --frozen pytest -p no:cacheprovider tests/workflow/mapreduce -q -rs` -> exit 0, 20 passed, 1 offline PostgreSQL integration test skipped (log: `/tmp/telescreen-p26-workflow-mapreduce-a2-v3-pytest.log`).
+- V3 whole-tree typelint and no-match scoped filter -> exit 0, 254 files clean (log: `/tmp/telescreen-p26-workflow-mapreduce-a2-v3-typelint.log`).
+**Notes**: All p26 implementation criteria are complete. No source or test change was needed. Independent review and serial finalization remain downstream; no review approval is claimed.
+
+### Step 6 continuation: final-source verification (2026-10-09)
+**Tasks Completed**: Re-ran the scoped final-source gates after the progress gate flagged the expected nonzero mutation-test exits. No source or test edits were needed; the four mutation failures remain intentional evidence that the guarded behavior tests detect disabled protections, and their source hashes were restored as recorded above.
+**Verification**:
+- `uv run --frozen ruff format --check --no-cache src/telescreen/workflow/mapreduce src/telescreen/workflow/executors/map.py src/telescreen/api/routers/map_jobs.py tests/workflow/mapreduce` -> exit 0 (`/tmp/telescreen-p26-step6-final-format.log`).
+- `uv run --frozen ruff check --no-cache src/telescreen/workflow/mapreduce src/telescreen/workflow/executors/map.py src/telescreen/api/routers/map_jobs.py tests/workflow/mapreduce` -> exit 0 (`/tmp/telescreen-p26-step6-final-ruff.log`).
+- `uv run --frozen ty check src/telescreen/workflow/mapreduce src/telescreen/workflow/executors/map.py src/telescreen/api/routers/map_jobs.py tests/workflow/mapreduce` -> exit 0 (`/tmp/telescreen-p26-step6-final-ty.log`).
+- `PYTHONDONTWRITEBYTECODE=1 uv run --frozen pytest -p no:cacheprovider tests/workflow/mapreduce -q -rs` -> exit 0, 20 passed, one offline PostgreSQL integration test skipped (`/tmp/telescreen-p26-step6-final-pytest.log`).
+- `uv run --frozen python tools/typelint.py` plus scoped no-match filter -> exit 0, 254 files clean (`/tmp/telescreen-p26-step6-final-typelint.log`).
+**Notes**: Implementation-phase criteria remain complete. Formal review and serial finalization remain downstream; no review approval is claimed.
+
+### Adversarial repair: P26-ADV-A2-RETRY-KEY-REUSE (2026-10-09)
+**Disposition**: Addressed within p26 writePaths. Dispatch reductions now key tasks by the originating dispatch key and timestamp. `retry_failed` rotates each failed partition row to a fresh UUID key space, and uses a fresh retry-dispatch key, so consumed task keys cannot strand reopened work. No queue semantics or schema changed.
+**Hashes**: checkpoint/current SHA-256: `dispatch.py` `972129e6b698d79ec2a5a97c7cbfcaffe6b83e2ae811ce084b6ae1bbe1ed93c8` -> `d8f3c59839ab130b49123ad54025ae1f2751911f3d09c7e10f4268308b033888`; `reduce.py` `c9cd4e5725232616dbeb1acecdf295e0ab4ce4c79af692231a00a79fab8f16a2` -> `144e9f84913eebf7279a70a552e6edc3d297d2d6a23d03e3df58296694ad6407`; `test_recovery.py` `c9fe3531d5ca09bdb0c808f77a7445f9e83bc1a1c40d332b2bba4bcbbf20b560` -> `757078987cdd8f658df98a3d45d3f3f72f20bb815d279522b2607a395bea65b0`; new `test_retry_reopen.py` SHA-256 `2c1573c44641dc496f2d8579a3336872357d7ca4a8b96a24c31b49934a01d381`.
+**Verification**: Real-`SqlTaskQueue` retry-to-completion test reaches SUCCEEDED with a non-null result and a second `MAP_FINISHED` signal. Partition test proves the same cursor continuation and a second retry each enqueue under fresh keys. Final suite: 22 passed, 1 offline PostgreSQL integration skip (`/tmp/telescreen-p26-a2-retry-fix-pytest-final.log`). Format, ruff and ty pass; scoped typelint filter is empty. Whole-tree typelint reports 27 diagnostics in sibling p19 paths outside p26 writePaths; p26 has none. Logs: `/tmp/telescreen-p26-a2-retry-fix-{format,ruff,ty,typelint-final}.log`.
+**Mutation evidence**: Restoring the old constant reduce key makes `test_retry_failed_job_reduces_again_with_real_sql_queue` fail at the second-reduce assertion (exit 1; `/tmp/telescreen-p26-a2-retry-key-mutation-final.log`). `dispatch.py` was restored to SHA-256 `d8f3c59839ab130b49123ad54025ae1f2751911f3d09c7e10f4268308b033888` before final gates. Per-edit intentions: `tmp/telescreen-v1-20261009-s340/p26-workflow-mapreduce/a2-mutations/retry-key-reuse-repair-intent*.md`.

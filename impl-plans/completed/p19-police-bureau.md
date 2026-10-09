@@ -1,6 +1,6 @@
 # P19 Police Bureau Side (Gateway, Pull and Push Transports, Result Acceptance) Implementation Plan
 
-**Status**: Ready (run A2 wave A2-2, session 340)
+**Status**: Completed (run A2 wave A2-2, session 340)
 **Design Reference**: design-docs/specs/design-police-contract.md (Endpoints, Push signing, Bureau side incl. the Attempts bullet revised in session 340), design-docs/specs/design-map-reduce-sweeps.md (Police contract additions), design-docs/specs/design-masking.md (Re-scan of inbound masked data)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -8,7 +8,7 @@
 ## Plan Metadata
 
 - planId: `p19-police-bureau`
-- planPath: `impl-plans/active/p19-police-bureau.md`
+- planPath: `impl-plans/completed/p19-police-bureau.md` (archived from `impl-plans/active/` after run A2 integration acceptance, session 340; writePaths below record the run-time location)
 - wave: 4
 - dependsOn: `p05-police-contract`, `p08-masking`, `p10-api-common`, `p11-police-sdk`
 - writePaths:
@@ -283,12 +283,12 @@ lines.
 
 ## Completion Criteria
 
-- [ ] Registration, gateway and transports, claims, results, push delivery, maintenance and router delivered with the exact names
-- [ ] Pull and push flows, replay, token one-time use and raw-value rejection tested
-- [ ] Attempt counting, push retry/exhaustion and signing-interop tests pass
-- [ ] The SDK-driven contract test (pull cycle and push case) passes
-- [ ] Scoped verification passes; logs recorded
-- [ ] Progress Log updated
+- [x] Registration, gateway and transports, claims, results, push delivery, maintenance and router delivered with the exact names
+- [x] Pull and push flows, replay, token one-time use and raw-value rejection tested
+- [x] Attempt counting, push retry/exhaustion and signing-interop tests pass
+- [x] The SDK-driven contract test (pull cycle and push case) passes
+- [x] Scoped verification passes; logs recorded
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -297,3 +297,86 @@ lines.
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-09 06:00
+**Tasks Completed**: Implemented Police registration, token hashing, independent push signing, repository and transport routing, attempt-zero dispatch, long-poll claims/heartbeats, result schema and DLP validation, external scan and sweep/workflow routing, signed webhook delivery with callback-token hashing, lease/deadline maintenance, Police contract/admin router, service tests, and SDK-driven pull/push/callback contract tests.
+**Tasks In Progress**: None
+**Blockers**: None
+**Reconciliation requests**: None
+**Hashes**:
+- `src/telescreen/police/__init__.py` before=absent after=49f5067f4359e6723b733d74aac3314189db4a4c3e29e8202687efb64d1028b2
+- `src/telescreen/police/claims.py` before=absent after=729f2a421cb2f992ebc85d2fb838a139350475fde878ee1285dae1ddc30e204c
+- `src/telescreen/police/delivery.py` before=absent after=6f25778487441b1401185f32cc77d541ca82cfde02814557fb42aa626317bbb4
+- `src/telescreen/police/gateway.py` before=absent after=c605d97f782b1687efea1d089247d026a3331b2d3571c624c770129e13acf3a3
+- `src/telescreen/police/maintenance.py` before=absent after=218d01d8733f9cf3ba061bbe6e7bb918a41d93326afa3c6b423733159731ea55
+- `src/telescreen/police/registration.py` before=absent after=dfc37b685ac74d79fac347a93213ccdd89746b67e480a6bc568a44fab09bb060
+- `src/telescreen/police/repository.py` before=absent after=6e587984fa6f9957a2eb3198e4bce7ae25070add65112ba665edb31363af221a
+- `src/telescreen/police/results.py` before=absent after=0fa8b43f42addf08ce09b101315f0c5cbf4b12b122844e034453b1ca5d4030d2
+- `src/telescreen/police/signing.py` before=absent after=a3d7c4e7356b28b0c4c178c30e98f72c107db7b39a8e794220e344c3a4f6d5b4
+- `src/telescreen/api/routers/police.py` before=absent after=98c01b4cb7f599247068304081bb604176acd0116115c1038682833a21eeae5b
+- `tests/police/fakes.py` before=absent after=639b6bdc8c366afdbd22373af4c8fca942f506fd537a19423c6be19056d8072c
+- `tests/police/test_services.py` before=absent after=5955cc8da82d0b9a16ad1333b6cd90104fa8c61b02f81ce467655b2aafae685b
+- `tests/contract/test_bureau_contract.py` before=absent after=dceacd8fc0b7150bf330bb6b50ce3e1e229c09dbb8fb3bba08534b47ff4e7f5d
+- `impl-plans/active/p19-police-bureau.md` before=e3a19791169c2490f4d228510b4337473a5890c111661cf09c1f1fb2b4e7a239 after=recorded in `/tmp/telescreen-p19-police-bureau-plan.sha256`
+**Verification**:
+- `uv run --frozen ruff format --check --no-cache src/telescreen/police src/telescreen/api/routers/police.py tests/police tests/contract/test_bureau_contract.py` -> exit 0 (log: `/tmp/telescreen-p19-final-format-gate.log`)
+- `uv run --frozen ruff check --no-cache src/telescreen/police src/telescreen/api/routers/police.py tests/police tests/contract/test_bureau_contract.py` -> exit 0 (log: `/tmp/telescreen-p19-final-ruff-gate.log`)
+- `uv run --frozen ty check src/telescreen/police src/telescreen/api/routers/police.py tests/police tests/contract/test_bureau_contract.py` -> exit 0 (log: `/tmp/telescreen-p19-final-ty-gate.log`)
+- `uv run --frozen pytest -p no:cacheprovider tests/police tests/contract/test_bureau_contract.py` -> exit 0, 9 passed (log: `/tmp/telescreen-p19-final-pytest-gate.log`)
+- `uv run --frozen python tools/typelint.py` -> exit 0, 268 files clean (log: `/tmp/telescreen-p19-final-typelint-gate.log`); scoped diagnostic scan `! grep -E '^(src/telescreen/police|src/telescreen/api/routers/police.py|tests/police|tests/contract/test_bureau_contract.py)' /tmp/telescreen-p19-final-typelint-gate.log` -> exit 0 (log: `/tmp/telescreen-p19-final-scope-gate.log`)
+- `! grep -rn 'telescreen_police_sdk' src/telescreen` -> exit 0 (log: `/tmp/telescreen-p19-final-imports-gate.log`)
+- `test -z "$(find src/telescreen/police tests/police -name '*.py' -exec wc -l {} + | awk '$1 >= 1000 && $2 != "total"')"` -> exit 0 (log: `/tmp/telescreen-p19-final-size-gate.log`)
+**Notes**: First verification iterations exposed type annotations and response-shape issues; corrections were applied before the passing final-source gates. The formal independent review and serial integration/finalization gates remain downstream workflow steps.
+
+### Session: 2026-10-09 p19 audit-commit correction
+**Tasks Completed**: Changed pull-result and signed-callback routes to catch only raw-value rejection inside the transaction, allowing the id-only rejection audit to commit while returning 422 and leaving task results and one-time callback state unchanged. Added a SQLite-backed contract-route test using the real `AuditLogService`; it confirms the task stays leased, `result_json` remains empty, and the stored audit row excludes the raw sample.
+**Tasks In Progress**: None for p19 implementation. Independent test-integrity/adversarial reviews and serial integration/finalization remain downstream.
+**Blockers**: None
+**Hashes**:
+- `src/telescreen/api/routers/police.py` after=`f7a18dac805629c4f2ed2e204cb5063b75e7fee155b5ec942534d60a31e036c2`
+- `tests/contract/test_bureau_contract.py` after=`1fd0cd7471f19d99a5161010759f73bcbdd62d4a05e15f2e20ef289a77538fb1`
+**Verification**:
+- `uv run --frozen ruff format --check --no-cache src/telescreen/police src/telescreen/api/routers/police.py tests/police tests/contract/test_bureau_contract.py` -> exit 0 (`/tmp/telescreen-p19-audit-final2-format.log`)
+- `uv run --frozen ruff check --no-cache src/telescreen/police src/telescreen/api/routers/police.py tests/police tests/contract/test_bureau_contract.py` -> exit 0 (`/tmp/telescreen-p19-audit-final2-ruff.log`)
+- `uv run --frozen ty check src/telescreen/police src/telescreen/api/routers/police.py tests/police tests/contract/test_bureau_contract.py` -> exit 0 (`/tmp/telescreen-p19-audit-final2-ty.log`)
+- `uv run --frozen pytest -p no:cacheprovider tests/police tests/contract/test_bureau_contract.py -q` -> exit 0, 10 passed, 0 failed (`/tmp/telescreen-p19-audit-final2-pytest.log`)
+- `uv run --frozen python tools/typelint.py` -> exit 0, 268 files clean; scoped diagnostic scan empty (`/tmp/telescreen-p19-audit-final2-typelint.log`, `/tmp/telescreen-p19-audit-final2-typelint-filter.log`)
+- `! grep -rn 'telescreen_police_sdk' src/telescreen` -> exit 0, no matches (`/tmp/telescreen-p19-audit-final2-imports.log`)
+- Python file-size check under `src/telescreen/police` and `tests/police` -> exit 0, no files at 1000+ lines (`/tmp/telescreen-p19-audit-final2-size.log`)
+- `grep -c '^- \[ \]' impl-plans/active/p19-police-bureau.md` -> 0 unchecked criteria (`/tmp/telescreen-p19-audit-final2-plan.log`)
+**Notes**: The SQLite test specifically verifies persistence across the request transaction boundary. Earlier intermediate Ruff/format and malformed size-check invocations were corrected; the final-source gates above all pass.
+
+### Session: 2026-10-09 test-integrity review repairs (`comm-005659`)
+**Tasks Completed**: Addressed `P19-TI-PUSH-MAP-EXHAUSTION`: push delivery now reports `FETCH_FAILED` to `MapResultSink.task_failed` for `partition`/`scan_shard` on both retry exhaustion and the missing-worker path. Added `tests/police/test_review_coverage.py` for label-mismatch long polling, heartbeat lease/cancellation, maintenance failure routing, passed workflow signal, scan-shard reconciliation and resource counts, 1001-shard rejection, push dispatch/202 delivery, and retry timing with both workflow and map task types. Added contract-route assertions for wrong enrollment, cross-worker and disabled-worker 401s and HTTP 422 on 1001 shards. Existing tests remain unchanged.
+**Tasks In Progress**: Independent test-integrity/adversarial review and serial integration/finalization remain downstream workflow steps.
+**Blockers**: None.
+**Review findings addressed**: `P19-TI-PUSH-MAP-EXHAUSTION`, `P19-TI-MISSING-PLAN-TESTS`.
+**Hashes**:
+- `src/telescreen/police/delivery.py` after=`ad6e58a02bd9bc80e098dcda8f097dea3c3ba22d3ffe1b7bd8169128834930b7`
+- `tests/police/test_review_coverage.py` after=`db39510fe4b45f5c4a421ef128c610a55276495f4c77c9466593a2e42179faef`
+- `tests/contract/test_bureau_contract.py` after=`9171b684f8c9713bd4f55b8265cd2e83cac02f6a277469325f9e1f41be4a453e`
+**Verification**:
+- `uv run --frozen ruff format --check --no-cache src/telescreen/police src/telescreen/api/routers/police.py tests/police tests/contract/test_bureau_contract.py` -> exit 0, 14 files formatted (`/tmp/telescreen-p19-review-final2-format.log`)
+- `uv run --frozen ruff check --no-cache src/telescreen/police src/telescreen/api/routers/police.py tests/police tests/contract/test_bureau_contract.py` -> exit 0 (`/tmp/telescreen-p19-review-final2-ruff.log`)
+- `uv run --frozen ty check src/telescreen/police src/telescreen/api/routers/police.py tests/police tests/contract/test_bureau_contract.py` -> exit 0 (`/tmp/telescreen-p19-review-final2-ty.log`)
+- `PYTHONDONTWRITEBYTECODE=1 uv run --frozen pytest -p no:cacheprovider tests/police tests/contract/test_bureau_contract.py -q` -> exit 0, 23 passed, 0 failed (`/tmp/telescreen-p19-review-final2-pytest.log`)
+- `uv run --frozen python tools/typelint.py` plus scoped diagnostic filter -> exit 0, 269 files clean and no scoped violations (`/tmp/telescreen-p19-review-final2-typelint.log`, `/tmp/telescreen-p19-review-final2-typelint-scope.log`)
+- SDK runtime import boundary, Python file size check (<1000 lines), and unchecked-plan-box check -> exit 0.
+**Notes**: Initial repair verification found assertion mismatches for SQLite's naive timestamps and the `ShardFailure.error_code` field; corrected using UTC normalization and the declared field. A subsequent lint pass found untyped captured results and constant-body style issues; corrected before the passing final-source gates. The prior failed run is recorded at `/tmp/telescreen-p19-review-repair-pytest-initial.log` (23 tests: 18 passed, 5 assertion failures); the final-source rerun passes all 23.
+
+### Session: 2026-10-09 adversarial review repair (`comm-005664`)
+**Tasks Completed**: Addressed `P19-ADV-PULL-LABEL-HOL` in `matching_pull_tasks`: query queued candidate IDs/labels without locks, filter label subsets in created-at/ID order before applying `limit`, then lock/recheck only the selected IDs. Added `test_claim_skips_older_nonmatching_task_for_newer_matching_task`; it verifies west-new is leased with attempt 1 while east-old remains queued at attempt 0. The existing long-poll mismatch test is unchanged.
+**Tasks In Progress**: Independent re-review and serial integration/finalization remain downstream.
+**Blockers**: None.
+**Review finding addressed**: `P19-ADV-PULL-LABEL-HOL`.
+**Hashes**:
+- `src/telescreen/police/gateway.py` before=`c605d97f782b1687efea1d089247d026a3331b2d3571c624c770129e13acf3a3` after=`8370a9e5f5096a90f63ae47e86fba6d90d09ea45f152963ff780683285dc0e0c`
+- `tests/police/test_review_coverage.py` before=`db39510fe4b45f5c4a421ef128c610a55276495f4c77c9466593a2e42179faef` after=`2c39785d85df3d47fc72444231fddf26a49058e189b1938a6383886e2242cf3f`
+**Verification**:
+- Regression before fix -> exit 1, expected assertion failure (`/tmp/telescreen-p19-hol-regression-before-fix.log`); after fix -> exit 0, 1 passed (`/tmp/telescreen-p19-hol-regression-after-fix.log`).
+- `/tmp/p19_adv_hol_repro.py` before fix -> `claimed with max_tasks=1: []`; after fix -> `claimed with max_tasks=1: ['west-new']` (logs `/tmp/telescreen-p19-hol-repair-before.log`, `/tmp/telescreen-p19-hol-final2-repro.log`, both exit 0).
+- `uv run --frozen ruff format --check --no-cache src/telescreen/police src/telescreen/api/routers/police.py tests/police tests/contract/test_bureau_contract.py` -> exit 0 (`/tmp/telescreen-p19-hol-final2-format.log`).
+- `uv run --frozen ruff check --no-cache src/telescreen/police src/telescreen/api/routers/police.py tests/police tests/contract/test_bureau_contract.py` -> exit 0 (`/tmp/telescreen-p19-hol-final2-ruff.log`).
+- `uv run --frozen ty check src/telescreen/police src/telescreen/api/routers/police.py tests/police tests/contract/test_bureau_contract.py` -> exit 0 (`/tmp/telescreen-p19-hol-final2-ty.log`).
+- `PYTHONDONTWRITEBYTECODE=1 uv run --frozen pytest -p no:cacheprovider tests/police tests/contract/test_bureau_contract.py -q -rs` -> exit 0, 24 passed, 0 failed (`/tmp/telescreen-p19-police-bureau-hol-fix-final-pytest.log`).
+- `uv run --frozen python tools/typelint.py` plus scoped diagnostic filter -> exit 0, 269 files clean and no scoped violations (`/tmp/telescreen-p19-hol-final2-typelint.log`, `/tmp/telescreen-p19-hol-final2-typelint-scope.log`). Import boundary, Python size and plan checklist gates also exit 0.

@@ -1,6 +1,6 @@
 # P17 Notifications and Outbound DLP Gate Implementation Plan
 
-**Status**: In Progress (run A2 verification, session 340)
+**Status**: Completed (run A2 implementation verification, session 340)
 **Design Reference**: design-docs/specs/design-masking.md (DLP gate), design-docs/specs/design-data-model.md (notifications), design-docs/specs/design-workflow-engine.md (Recipient resolution)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -8,7 +8,7 @@
 ## Plan Metadata
 
 - planId: `p17-notifications`
-- planPath: `impl-plans/active/p17-notifications.md`
+- planPath: `impl-plans/completed/p17-notifications.md` (archived from `impl-plans/active/` after run A2 integration acceptance, session 340; writePaths below record the run-time location)
 - wave: 4
 - dependsOn: `p02-db-schema`, `p04-ports`, `p08-masking`
 - writePaths:
@@ -164,15 +164,15 @@ in-tree code; do not rewrite working modules. Static gap review (s338 planning) 
 Code is complete; this pass verifies it against the current tree. Resume rule: fix only
 real gaps or failing causes inside this plan's writePaths; never rewrite working code.
 
-- [ ] V0 Run the Verification block on the current tree before any edit; log every
+- [x] V0 Run the Verification block on the current tree before any edit; log every
   command, exit status and `/tmp/telescreen-p17-notifications-a2-*.log` path.
-- [ ] V1 Re-check Deliverables, Tests and items R1-R5 against the current source; list
+- [x] V1 Re-check Deliverables, Tests and items R1-R5 against the current source; list
   any gap in the Progress Log and fix it.
-- [ ] V2 Leak coverage: tests must assert that a raw sample from `tests.support.samples`
+- [x] V2 Leak coverage: tests must assert that a raw sample from `tests.support.samples`
   never appears in (a) `notifications` rows, (b) the captured fake Slack request body,
   (c) the captured fake SMTP message, (d) caplog records, for both the `mask` and the
   `block` DLP policy. Add any missing assertion; `block` must send nothing.
-- [ ] V3 Re-run the Verification block on the final tree; every command exits 0. Report
+- [x] V3 Re-run the Verification block on the final tree; every command exits 0. Report
   fixed items only in `addressedFeedback` (conventions 7a).
 
 ## Progress Log
@@ -219,3 +219,12 @@ real gaps or failing causes inside this plan's writePaths; never rewrite working
 **Hashes**: `tests/notifications/test_notifications.py` unchanged=1f580da03afc63b4a23671acd8351029722de2155ba2dce45325f07466828f09; `src/telescreen/notifications/delivery.py` unchanged=cf3f8b6ea87b5e32f264ecc9cb1dfaf91db53c6d90d60039acd7ed4b9ffe13f0; `src/telescreen/notifications/dlp.py` unchanged=8dec399a7f312a1e295cad25b04bfaf8350851089460ccf4126fcf02e71ffb41; plan after hash recorded in `/tmp/telescreen-p17-notifications-evidence/plan-ti-01-redispatch.sha256`.
 **Verification**: scoped format -> exit 0 (`/tmp/telescreen-p17-notifications-format-redispatch-ti-01.log`); scoped ruff -> exit 0 (`/tmp/telescreen-p17-notifications-ruff-redispatch-ti-01.log`); scoped ty -> exit 0 (`/tmp/telescreen-p17-notifications-ty-redispatch-ti-01.log`); notifications pytest -> exit 0, 13 passed (`/tmp/telescreen-p17-notifications-pytest-redispatch-ti-01.log`); typelint -> exit 0, p17 filter empty (`/tmp/telescreen-p17-notifications-typelint-redispatch-ti-01.log`, `/tmp/telescreen-p17-notifications-typelint-filter-redispatch-ti-01.log`); checklist and diff checks -> exit 0.
 **Notes**: The current test SHA-256 matches the repaired source whose 13-test run passed; `delivery.py` and `dlp.py` remain unchanged.
+
+### Session: 2026-10-09 run A2 Step 6 implementation
+**Tasks Completed**: Verified the current deliverables and R1-R5 behavior; added four parameterized mask/block × Slack/email leak cases covering database rows, outbound provider payloads, logs, and blocked no-send behavior. Marked A2 V0-V3 complete.
+**Tasks In Progress**: None for p17 implementation. Independent test-integrity, adversarial and integration review are downstream workflow steps.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `tests/notifications/test_notifications.py` before=1f580da03afc63b4a23671acd8351029722de2155ba2dce45325f07466828f09 after=7bad498de4fea8065468be1043c39eb4b82043d902a3f9d220faa6d4cd0f4e07; plan before=ba8709659e8729d51c0a839b12df89d4c6c0359ed54358e375d9f3959c38967d after=recorded in plan-local evidence.
+**Verification**: Pre-edit V0 format, ruff, ty, pytest (13 passed), full typelint, and p17 diagnostic filter -> exit 0 (`/tmp/telescreen-p17-notifications-a2-{format,ruff,ty,pytest,typelint,typelint-filter}.log`). Final V3 `uv run --frozen ruff format --check --no-cache src/telescreen/notifications tests/notifications` -> exit 0 (`/tmp/telescreen-p17-notifications-a2-final-format.log`); `uv run --frozen ruff check --no-cache src/telescreen/notifications tests/notifications` -> exit 0 (`/tmp/telescreen-p17-notifications-a2-final-ruff.log`); `uv run --frozen ty check src/telescreen/notifications tests/notifications` -> exit 0 (`/tmp/telescreen-p17-notifications-a2-final-ty.log`); `uv run --frozen pytest -p no:cacheprovider tests/notifications` -> exit 0, 17 passed (`/tmp/telescreen-p17-notifications-a2-final-pytest.log`); `uv run --frozen python tools/typelint.py` -> exit 0 and p17 filter empty (`/tmp/telescreen-p17-notifications-a2-final-typelint.log`, `/tmp/telescreen-p17-notifications-a2-final-typelint-filter.log`). Final explicit no-diagnostic assertion: `! grep -E '^(src/telescreen/notifications|tests/notifications)' /tmp/telescreen-p17-notifications-a2-final-typelint.log` -> exit 0.
+**Notes**: V1 source re-check found only the V2 coverage gap; R1-R5 and the design's DLP/transaction/idempotency requirements are implemented and covered. Exact per-edit intention: `tmp/telescreen-v1-20261009-s340/p17-notifications/edits/V2-leak-coverage-intent.md`. No production code changed. Other concurrent changes are outside p17 writePaths and were preserved.

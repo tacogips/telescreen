@@ -11,6 +11,7 @@ import pytest
 
 from telescreen.collectors.slack.adapter import SlackAdapter
 from telescreen.collectors.slack.client import SlackApi
+from telescreen.core.errors import TelescreenError
 from telescreen.core.secrets import SecretValue
 from telescreen.core.vocabulary import CollectorKind, TriggerMode
 from telescreen.ports.collectors import (
@@ -183,6 +184,56 @@ async def test_selected_message_and_deleted_events_make_refs() -> None:
     assert not unselected.changed
     assert not removed.changed
     assert removed.removed[0].raw_locator == "slack:T1/C1/1700000000.000200"
+
+
+async def test_raw_event_text_never_appears_in_refs_cursors_errors_or_logs(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Keep message text out of collector metadata, errors, and logs."""
+    sample: Sample = slack_token()
+    event_body: bytes = (
+        b'{"type":"event_callback","team_id":"T1","event":'
+        b'{"type":"message","channel":"C1","ts":"1700000000.000100",'
+        b'"text":"' + sample.value.encode() + b'"}}'
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("auth.test"):
+            return httpx.Response(200, json={"ok": True, "team_id": "T1"})
+        if request.url.path.endswith("conversations.history"):
+            return httpx.Response(
+                200,
+                json={
+                    "ok": True,
+                    "messages": [{"ts": "1700000000.000100", "text": sample.value}],
+                },
+            )
+        return httpx.Response(500)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+        adapter: SlackAdapter = adapter_for(http)
+        event_resources: EventResources = await adapter.resources_from_event(
+            InboundWebhook(CollectorKind.SLACK, "POST", BASE_TIME, (), event_body), config()
+        )
+        page: ChangePage = await adapter.list_changed(config(False), None)
+        malformed: InboundWebhook = InboundWebhook(
+            CollectorKind.SLACK,
+            "POST",
+            BASE_TIME,
+            (),
+            b'{"type":"event_callback","text":"' + sample.value.encode(),
+        )
+        with pytest.raises(TelescreenError) as raised:
+            await adapter.resources_from_event(malformed, config())
+
+    ref: ResourceRef = event_resources.changed[0]
+    assert sample.value not in repr(ref)
+    assert sample.value not in ref.raw_locator
+    assert sample.value not in ref.ref_json
+    assert page.next_cursor is not None
+    assert sample.value not in page.next_cursor.value
+    assert sample.value not in str(raised.value)
+    assert sample.value not in caplog.text
 
 
 async def test_message_thread_events_preserve_thread_timestamp_in_refs() -> None:

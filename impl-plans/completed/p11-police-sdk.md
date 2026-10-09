@@ -1,6 +1,6 @@
 # P11 Police SDK, Examples (Python and n8n) Implementation Plan
 
-**Status**: In Progress (run A2 verification, session 340)
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-police-contract.md (Push signing, Python SDK, Examples), design-docs/specs/design-map-reduce-sweeps.md (Police contract additions)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -8,7 +8,7 @@
 ## Plan Metadata
 
 - planId: `p11-police-sdk`
-- planPath: `impl-plans/active/p11-police-sdk.md`
+- planPath: `impl-plans/completed/p11-police-sdk.md` (archived from `impl-plans/active/` after run A2 integration acceptance, session 340; writePaths below record the run-time location)
 - wave: 3
 - dependsOn: `p05-police-contract`
 - writePaths:
@@ -195,19 +195,19 @@ cause and fix it first. Static gap review (s338 planning) found:
 Code is complete; this pass verifies it against the current tree. Resume rule: fix only
 real gaps or failing causes inside this plan's writePaths; never rewrite working code.
 
-- [ ] V0 Run the Verification block on the current tree before any edit; log every
+- [x] V0 Run the Verification block on the current tree before any edit; log every
   command, exit status and `/tmp/telescreen-p11-police-sdk-a2-*.log` path.
-- [ ] V1 Re-check Deliverables, Tests and items R1-R7 against the current source; list
+- [x] V1 Re-check Deliverables, Tests and items R1-R7 against the current source; list
   any gap in the Progress Log and fix it.
-- [ ] V2 Push key (design D4, `design-police-contract.md` Push signing): the HMAC key is
+- [x] V2 Push key (design D4, `design-police-contract.md` Push signing): the HMAC key is
   the UTF-8 bytes of the registration `signing_secret` string, never its base64 decode.
   State this in the `signing.py` module docstring and in `examples/police/n8n/README.md`
   if absent. Add a test in `tests/police_sdk/`: `models.Registration.signing_secret`
   string -> `.encode("utf-8")` -> `signature_headers` then `verify` -> valid; the same
   headers verified with `base64.urlsafe_b64decode(secret + padding)` as key -> invalid.
-- [ ] V3 Confirm (no edit expected) `examples/police/n8n/README.md` still documents the
+- [x] V3 Confirm (no edit expected) `examples/police/n8n/README.md` still documents the
   push-mode `scan_shard` flow with count-only `stats` and `complete_locators`.
-- [ ] V4 Re-run the Verification block on the final tree; every command exits 0. Report
+- [x] V4 Re-run the Verification block on the final tree; every command exits 0. Report
   fixed items only in `addressedFeedback` (conventions 7a).
 
 ## Progress Log
@@ -256,3 +256,21 @@ real gaps or failing causes inside this plan's writePaths; never rewrite working
 **Hashes**: `tests/police_sdk/test_sdk.py` before=971f1f3d0f591f9c2ccb74ec3936c968febdb35bc01f8ffca1db3eaf3aa5eea4 after=d5326ba766405964fd98cc4b25e7e21880c72b70426944b4be13de8e1be5d443. Source `sweep.py` remained before=after=a97ebfea932a26d4c3bbd9cc9e44923c872998b847addadb55492702ad6c03de.
 **Verification**: Focused sweep test passed (1 passed; `/tmp/telescreen-p11-police-sdk-ti01-focused.log`). Mutation check injected an in-memory behavior equivalent to omitting the `completed=False` failure increment; test failed at the expected `ShardStats(1, 2, 0)` assertion (exit 1, `/tmp/telescreen-p11-police-sdk-ti01-mutation.log`). `src/telescreen_police_sdk/sweep.py` remained unchanged at sha256 `a97ebfea932a26d4c3bbd9cc9e44923c872998b847addadb55492702ad6c03de`; repair constraints restricted edits to this test and the plan, so no source-file mutation was performed. Final scoped format, Ruff, ty and typelint filter all exited 0 (`/tmp/telescreen-p11-police-sdk-{format,ruff,ty,typelint}-ti01.log`). Focused SDK/contract pytest exited 0 with 17 passed and zero failures (`/tmp/telescreen-p11-police-sdk-pytest-ti01.log`).
 **Notes**: The full workflow review finding TI-P11-01 is addressed; independent review must re-check the added coverage and mutation evidence before acceptance. Intentions: `tmp/telescreen-v1-20261009-s338/p11-police-sdk/edits/20261009-ti-p11-01.md`.
+
+### Session: 2026-10-09 — Run A2 Verify (session 340)
+**Tasks Completed**: Re-checked the SDK deliverables and R1-R7 against the current tree. Added the push signing key rule to the SDK module docstring and n8n README, plus a regression test proving the `Registration.signing_secret` UTF-8 bytes verify while the base64-decoded bytes fail. Confirmed the n8n README still describes count-only scan-shard stats and complete locators. Checked V0-V4 and all completion criteria.
+**Tasks In Progress**: None for p11 implementation; formal test-integrity, adversarial and serial integration review are downstream workflow steps.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `src/telescreen_police_sdk/signing.py` before=49c57a473d004fb4350cfa074645ce5d72a9bcdd3c8d130096c12964e9fcd3ef after=d78fd58593275cf8529a7a7ea6260176031b4cbf6f291bff22e20dd40518e8d2; `tests/police_sdk/test_sdk.py` before=d5326ba766405964fd98cc4b25e7e21880c72b70426944b4be13de8e1be5d443 after=61a148285e23f1e3a9e1152679dc8ef580db02bad57316ea3e6b480461412975; `examples/police/n8n/README.md` before=625bdd6e42bb342f627f21ad0edae5e2fb26a06653326ef598c556f950fd1c00 after=a03052167a51330d09647249d0e91b6aa9e76273cbeacc662f592a46e01fdc3e.
+**Verification**: V0 scoped format, Ruff, ty, typelint, import scan exited 0; SDK/contract pytest exited 0 with 17 passed. V0 checkbox probe exited 1 because V0-V4 were intentionally still unchecked before verification (resolved by the final checkbox gate). Final source: `uv run --frozen ruff format --check --no-cache src/telescreen_police_sdk tests/police_sdk tests/contract/test_sdk_contract.py examples/police/python` -> exit 0 (`/tmp/telescreen-p11-police-sdk-a2-source-final-format.log`); `uv run --frozen ruff check --no-cache src/telescreen_police_sdk tests/police_sdk tests/contract/test_sdk_contract.py examples/police/python` -> exit 0 (`/tmp/telescreen-p11-police-sdk-a2-source-final-ruff.log`); `uv run --frozen ty check src/telescreen_police_sdk tests/police_sdk tests/contract/test_sdk_contract.py examples/police/python` -> exit 0 (`/tmp/telescreen-p11-police-sdk-a2-source-final-ty.log`); `uv run --frozen pytest -p no:cacheprovider tests/police_sdk tests/contract/test_sdk_contract.py` -> exit 0, 18 passed, 0 failed (`/tmp/telescreen-p11-police-sdk-a2-source-final-pytest.log`); `uv run --frozen python tools/typelint.py` -> exit 0, 254 files clean (`/tmp/telescreen-p11-police-sdk-a2-source-final-typelint.log`); SDK no-import scan -> exit 0 (`/tmp/telescreen-p11-police-sdk-a2-source-final-imports.log`); focused V2 test -> exit 0, 1 passed (`/tmp/telescreen-p11-police-sdk-a2-source-final-v2.log`). The initial final format attempt exited 1 on a new test's line wrapping and was corrected; complete log: `/tmp/telescreen-p11-police-sdk-a2-final-format.log`. An isolated n8n test also passed (1 passed, 15 deselected; `/tmp/telescreen-p11-police-sdk-a2-final-n8n.log`).
+**Evidence**: Per-edit intentions: `tmp/telescreen-v1-20261009-s340/p11-police-sdk/edits/20261009-a2-v2.md`, `20261009-a2-v2-format.md` and `20261009-a2-plan.md`.
+
+### Session: 2026-10-09 — P11-ADV-N8N-SIGNING repair (comm-005639)
+**Tasks Completed**: Replaced the broken delivery signature check with raw-byte HMAC verification using the UTF-8 secret, `v1=<hex>`, constant-time comparison, a 300-second timestamp window, and 600-second replay storage. The callback now signs and posts one result-envelope body containing `result_token`, plus timestamp, nonce and signature headers. Updated n8n setup docs and added structural assertions without changing existing assertions.
+**Tasks In Progress**: Independent re-review of this repair and serial integration remain downstream workflow steps.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `examples/police/n8n/telescreen-push-police.json` before=57c3a8930510c359b48e8028c2cde7ae2414ae55dd288382f48339b9a8d9153c after=a54cd96863262d65aef7a861144f9c8d1de5c1a25cfe03ae013ef7b07507b177; `examples/police/n8n/README.md` before=a03052167a51330d09647249d0e91b6aa9e76273cbeacc662f592a46e01fdc3e after=6fb21d4b42032e022c22dc1fe22c7b23632d39af34810dbb3bcb410949af23a6; `tests/police_sdk/test_sdk.py` before=61a148285e23f1e3a9e1152679dc8ef580db02bad57316ea3e6b480461412975 after=b965bed771faa566ab262e4fc806d1ddda7f239c91c27e9c3429b1f0f6c9e085.
+**Verification**: `uv run --frozen ruff format --check --no-cache src/telescreen_police_sdk tests/police_sdk tests/contract/test_sdk_contract.py examples/police/python` -> exit 0 (`/tmp/telescreen-p11-police-sdk-a2-n8n-fix-format.log`); `uv run --frozen ruff check --no-cache src/telescreen_police_sdk tests/police_sdk tests/contract/test_sdk_contract.py examples/police/python` -> exit 0 (`/tmp/telescreen-p11-police-sdk-a2-n8n-fix-ruff.log`); `uv run --frozen ty check src/telescreen_police_sdk tests/police_sdk tests/contract/test_sdk_contract.py examples/police/python` -> exit 0 (`/tmp/telescreen-p11-police-sdk-a2-n8n-fix-ty.log`); scoped pytest -> exit 0, 19 passed, 0 failed (`/tmp/telescreen-p11-police-sdk-a2-n8n-fix-pytest.log`); full typelint -> exit 0, 254 files clean (`/tmp/telescreen-p11-police-sdk-a2-n8n-fix-typelint.log`), p11 filter -> exit 0 with no diagnostics (`/tmp/telescreen-p11-police-sdk-a2-n8n-fix-typelint-filter-final.log`); JSON parse -> exit 0 (`/tmp/telescreen-p11-police-sdk-a2-n8n-fix-json.log`); SDK import scan -> exit 0 with no imports (`/tmp/telescreen-p11-police-sdk-a2-n8n-fix-imports-final.log`); no unchecked boxes -> exit 0 (`/tmp/telescreen-p11-police-sdk-a2-n8n-fix-checkbox.log`); focused n8n tests -> exit 0, 2 passed (`/tmp/telescreen-p11-police-sdk-a2-n8n-fix-focused-final.log`). The first structural-test format check required a Ruff line wrap and passed on the final source. An early parallel typelint filter probe ran before its input log existed; it is not treated as evidence and was rerun after full typelint to the final filter log above.
+**Evidence**: Per-edit intentions are recorded in `tmp/telescreen-v1-20261009-s340/p11-police-sdk/edits/20261009-p11-adv-n8n-signing.md`, `20261009-p11-adv-n8n-test-strengthening.md`, `20261009-p11-adv-n8n-test-bool.md`, `20261009-p11-adv-n8n-test-format.md` and `20261009-p11-adv-n8n-plan-progress.md`.

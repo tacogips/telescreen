@@ -86,6 +86,31 @@ mode with signed task delivery and callbacks. The standalone Python SDK lives in
 `examples/police/`. Police integrations use the published contract and do not import
 Bureau internals.
 
+The Bureau side is implemented in `telescreen.police` with routes under
+`/api/police/v1` (`workers/register`, `workers/{id}/claim`, `workers/{id}/heartbeat`,
+`tasks/{id}/result`, and `callbacks/{id}`). Bureau components use a `PoliceGateway`
+protocol with two transports: `PullQueueTransport` and `WebhookTransport`.
+
+- Pull mode: registration returns a worker token, and the Bureau stores only its hash.
+  Each claim long-polls, filters tasks by the worker's labels, and leases them.
+- Push mode: deliveries and callbacks are signed with HMAC-SHA256. The key is the
+  UTF-8 bytes of the registration `signing_secret`, used as-is without base64 decoding.
+  The signed input is `<timestamp>.<nonce>.` followed by the raw body. The values go in
+  the `X-Telescreen-Timestamp`, `X-Telescreen-Nonce`, and `X-Telescreen-Signature: v1=<hex>`
+  headers.
+- Replay protection: timestamps more than 300 seconds old are rejected, and nonces are
+  remembered so reuse is rejected. Each delivery has a one-time `result_token` in its
+  body. The token can be used only once, and the callback needs no Authorization header.
+- Attempts: each claim or push POST counts as one attempt, up to `max_attempts` (default
+  3). When a lease expires, the task is re-queued without using up an attempt. A task
+  fails once its attempts or its deadline run out.
+- Raw values: results go through schema validation and a scan of every string. A result
+  containing a raw value is rejected with HTTP 422, and the task stays open, so the
+  Police can resubmit a clean result before the deadline.
+
+Registering the push-delivery engine task and mounting the Police router into the
+assembled application belong to the assembly plan (`p28-assembly`).
+
 ## Local compose environment
 
 The quick-start deployment is under `examples/compose/`. Start it with

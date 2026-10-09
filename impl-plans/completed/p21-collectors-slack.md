@@ -1,6 +1,6 @@
 # P21 Slack Collector Adapter Implementation Plan
 
-**Status**: In Progress (run A2 verification, session 340)
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-collectors-and-ingestion.md (Collector adapters, Resource identity, Per-kind behavior: slack), design-docs/specs/design-map-reduce-sweeps.md (Built-in sweep implementations: slack)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -8,7 +8,7 @@
 ## Plan Metadata
 
 - planId: `p21-collectors-slack`
-- planPath: `impl-plans/active/p21-collectors-slack.md`
+- planPath: `impl-plans/completed/p21-collectors-slack.md` (archived from `impl-plans/active/` after run A2 integration acceptance, session 340; writePaths below record the run-time location)
 - wave: 3
 - dependsOn: `p04-ports`
 - writePaths:
@@ -162,15 +162,15 @@ defect. Do not edit source unless a gate fails.
 Code is complete; this pass verifies it against the current tree. Resume rule: fix only
 real gaps or failing causes inside this plan's writePaths; never rewrite working code.
 
-- [ ] V0 Run the Verification block on the current tree before any edit; log every
+- [x] V0 Run the Verification block on the current tree before any edit; log every
   command, exit status and `/tmp/telescreen-p21-collectors-slack-a2-*.log` path.
-- [ ] V1 Re-check Deliverables, Tests and Completion Criteria against the current source;
+- [x] V1 Re-check Deliverables, Tests and Completion Criteria against the current source;
   list any gap in the Progress Log and fix it.
-- [ ] V2 Event-mode signature tests cover: valid -> accepted; wrong signature -> rejected;
+- [x] V2 Event-mode signature tests cover: valid -> accepted; wrong signature -> rejected;
   timestamp older than 300 s -> rejected; `url_verification` challenge handled. A raw
   message-text sample never appears in `ResourceRef`, cursors, returned errors or caplog.
   Add any missing case; all tests use fakes (no network).
-- [ ] V3 Re-run the Verification block on the final tree; every command exits 0. Report
+- [x] V3 Re-run the Verification block on the final tree; every command exits 0. Report
   fixed items only in `addressedFeedback` (conventions 7a).
 
 ## Progress Log
@@ -309,3 +309,17 @@ real gaps or failing causes inside this plan's writePaths; never rewrite working
 - `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py` -> exit 0, 250 files clean; scoped filter has no p21 diagnostics (complete log: `/tmp/telescreen-p21-parent-first/typelint.log`; filter output: `/tmp/telescreen-p21-parent-first/typelint-scope.log`).
 - `test "$(grep -c '^- \[ \]' impl-plans/active/p21-collectors-slack.md)" -eq 0` -> exit 0; no incomplete checklist items.
 **Notes**: `P21-ADV-THREAD-REPLY-PARENT-FIRST` is implemented and locally verified; independent re-review is pending and not claimed accepted.
+
+### Session: 2026-10-09 Run A2 verification
+**Tasks Completed**: Rechecked the Slack adapter and sweep deliverables against the accepted design and plan. Added a MockTransport regression proving that sample message text does not enter event refs, schedule cursors, validation errors, or captured logs. The existing signature tests cover valid, tampered, 301-second-old, and URL challenge cases; timestamp and thread-reply regressions remain present.
+**Tasks In Progress**: Independent test-integrity/adversarial and combined-tree integration review are downstream workflow steps.
+**Blockers**: None for p21 implementation or required verification.
+**Reconciliation requests**: None.
+**Hashes**: `tests/collectors/slack/test_adapter.py` before=81d3509fe11bd3dc3622efd4c6eb683f7021adf4382f83cb22d3c16dc260abdf after=b1ba70f63fe3186cf8d5d8c7fa14ecf8c5b6ce331e4dd775b8b963a3e1f6d62a; plan before=48ff2305bdb8cc311d441ad89001bdca732a391f30a4a99b0c43932640706c2b.
+**Verification**:
+- `uv run --frozen ruff format --check --no-cache src/telescreen/collectors/slack tests/collectors/slack` -> initial exit 0 (log: `/tmp/telescreen-p21-collectors-slack-a2-format.log`); final exit 0 (log: `/tmp/telescreen-p21-collectors-slack-a2-v3-format.log`). The first final attempt before formatting exited 1; the reported concatenation was formatted, then the final check passed (log: `/tmp/telescreen-p21-collectors-slack-a2-final-format.log`).
+- `uv run --frozen ruff check --no-cache src/telescreen/collectors/slack tests/collectors/slack` -> initial and final exit 0 (logs: `/tmp/telescreen-p21-collectors-slack-a2-ruff.log`, `/tmp/telescreen-p21-collectors-slack-a2-v3-ruff.log`).
+- `uv run --frozen ty check src/telescreen/collectors/slack tests/collectors/slack` -> initial and final exit 0 (logs: `/tmp/telescreen-p21-collectors-slack-a2-ty.log`, `/tmp/telescreen-p21-collectors-slack-a2-v3-ty.log`).
+- `uv run --frozen pytest -p no:cacheprovider tests/collectors/slack` -> initial exit 0, 20 passed; final exit 0, 21 passed, 0 failed (logs: `/tmp/telescreen-p21-collectors-slack-a2-pytest.log`, `/tmp/telescreen-p21-collectors-slack-a2-v3-pytest.log`).
+- `uv run --frozen python tools/typelint.py` -> initial and final exit 0, 254 files clean; p21 grep filter empty (logs: `/tmp/telescreen-p21-collectors-slack-a2-typelint.log`, `/tmp/telescreen-p21-collectors-slack-a2-v3-typelint.log`; empty final scoped output: `/tmp/telescreen-p21-collectors-slack-a2-v3-typelint-scope.log`).
+**Notes**: No source implementation changes were needed. Independent review and its decisions are not claimed here.

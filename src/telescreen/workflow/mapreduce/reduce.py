@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from telescreen.core.clock import Clock, ensure_utc
+from telescreen.core.ids import new_id
 from telescreen.core.json import JsonValue, dump_json, json_array, json_int, json_object, json_str
 from telescreen.core.vocabulary import (
     ActorKind,
@@ -282,6 +283,8 @@ class MapReduceHandler:
             )
         )
         for partition in failed_partitions:
+            await self.queue.cancel_by_ref(session, partition.id)
+            partition.id = new_id()
             partition.status = MapPartitionStatus.READY.value
             partition.cursor = None
             partition.attempt = 1
@@ -293,7 +296,7 @@ class MapReduceHandler:
                     partition.id,
                     json_str(partition.id),
                     self.clock.now(),
-                    f"mappart:{partition.id}:1:retry",
+                    f"mappart:{partition.id}:1:root",
                 ),
             )
         job.status = MapJobStatus.RUNNING.value
@@ -308,6 +311,6 @@ class MapReduceHandler:
                 job.id,
                 json_str(job.id),
                 now,
-                f"mapdisp:{job.id}:{int(now.timestamp())}",
+                f"mapdisp:{job.id}:retry:{new_id()}",
             ),
         )
