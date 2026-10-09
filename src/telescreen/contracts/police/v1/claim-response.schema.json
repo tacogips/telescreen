@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.telescreen.invalid/police/v1/claim-response.schema.json",
+  "type": "object",
+  "properties": {
+    "tasks": {
+      "type": "array",
+      "items": {
+        "$ref": "task-envelope.schema.json"
+      }
+    }
+  },
+  "required": [
+    "tasks"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,10 @@
+{
+  "contract_version": "1.0",
+  "task_id": "task-failed",
+  "status": "failed",
+  "error": {
+    "code": "rate_limited",
+    "detail": "Retry after the indicated delay.",
+    "retry_after_seconds": 5
+  }
+}

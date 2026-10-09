@@ -1,9 +1,9 @@
 # P17 Notifications and Outbound DLP Gate Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-masking.md (DLP gate), design-docs/specs/design-data-model.md (notifications), design-docs/specs/design-workflow-engine.md (Recipient resolution)
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-08
+**Last Updated**: 2026-10-09
 
 ## Plan Metadata
 
@@ -126,10 +126,10 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p17-notifications-typ
 
 ## Completion Criteria
 
-- [ ] DlpGate, CensoredMessage guard, NotificationService, delivery handler, Slack and email notifiers delivered with the exact names
-- [ ] DLP mask, block and residual tests and delivery idempotency tests pass
-- [ ] Scoped verification passes; logs recorded
-- [ ] Progress Log updated
+- [x] DlpGate, CensoredMessage guard, NotificationService, delivery handler, Slack and email notifiers delivered with the exact names
+- [x] DLP mask, block and residual tests and delivery idempotency tests pass
+- [x] Scoped verification passes; logs recorded
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -138,3 +138,13 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p17-notifications-typ
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-09 07:30
+**Tasks Completed**: Implemented the sealed DLP gate, transactional notification recording and idempotent task enqueue, retryable Slack/email delivery, and SQLite-backed behavioral tests. Clean, mask, block, residual, seal, recipient validation, delivery replay, retry-after, exponential retry/dead-letter, Slack and SMTP paths are covered.
+**Tasks In Progress**: None for p17 implementation. Formal review and combined-tree integration review remain downstream workflow steps.
+**Blockers**: None in p17 scope.
+**Notes**:
+- Scoped verification passed: ruff format/check, ty, pytest (11 passed), and typelint on `src/telescreen/notifications` plus `tests/notifications`. Complete logs: `/tmp/telescreen-p17-notifications-format-final.log`, `/tmp/telescreen-p17-notifications-ruff-final.log`, `/tmp/telescreen-p17-notifications-ty.log`, `/tmp/telescreen-p17-notifications-pytest-final.log`, `/tmp/telescreen-p17-notifications-typelint-scoped.log`.
+- Full-tree `uv run --frozen python tools/typelint.py` exited 1 with 119 diagnostics outside p17; `/tmp/telescreen-p17-notifications-typelint-full-final.log`. The p17 path filter found no diagnostics; `/tmp/telescreen-p17-notifications-typelint-filter-final.log`. This is not a passing full-tree gate.
+- Final source/test SHA-256 inventory: `/tmp/telescreen-p17-notifications-evidence/final-hashes.txt`. Hashes: `__init__.py` 1f25d6c00bfb056b3131c510777bf8ebfa0f8f906ed3622c105fab6d007fdac8; `dlp.py` 8dec399a7f312a1e295cad25b04bfaf8350851089460ccf4126fcf02e71ffb41; `repository.py` fea524018a56e23941c5cf792f465b814a591d283fcd248982a64491f8b762e1; `sender.py` 6cf362a79385ec0369dd403d01fd8e64fe55c9734b7c246707b9dfa5c6dd17f4; `delivery.py` 7d228dbefb7a7e175b76b3e81ceac174cb66692aa0b253937a8806165dadafeb; `slack.py` 93ec1baeee3197e77347ea4b58a60639f5b624a2b428c5cc5d0684b60e92bc60; `email.py` 29bfb3f473d1a8be20f2b6c578177da9a4ddea6c0b05b0d11fa04dba49f7c9dc; `test_notifications.py` cdfe3e11f2f918f27ed50022814f2f39c84b06d00024e37d2989850e4cc7d2ee.
+- Earlier verification failures and their corrections are preserved in `/tmp/telescreen-p17-notifications-evidence/edit-intentions.md` and the original attempt logs; the final source-matched pytest run passed all 11 tests.

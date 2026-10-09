@@ -1,9 +1,9 @@
 # P20 Collectors Core (Configs, Webhooks, Scheduling, Scans, Rescans, Sweeper) Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-collectors-and-ingestion.md (Collector adapters, Resource identity, Per-kind behavior, Full sweeps), design-docs/specs/design-map-reduce-sweeps.md (Map: collector shards, Ports)
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-08
+**Last Updated**: 2026-10-09
 
 ## Plan Metadata
 
@@ -219,11 +219,11 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p20-collectors-core-t
 
 ## Completion Criteria
 
-- [ ] All modules above delivered with the exact names; the ports are implemented
-- [ ] Webhook, scan modes, scheduling, rescans, police dispatch and sweeper tested
-- [ ] The no-raw-locator test passes
-- [ ] Scoped verification passes; logs recorded
-- [ ] Progress Log updated
+- [x] All modules above delivered with the exact names; the ports are implemented
+- [x] Webhook, scan modes, scheduling, rescans, police dispatch and sweeper tested
+- [x] The no-raw-locator test passes
+- [x] Scoped verification passes; logs recorded
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -232,3 +232,9 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p20-collectors-core-t
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-09 07:42 JST
+**Tasks Completed**: Implemented the source-agnostic collector config, webhook, scan task, watch renewal, scheduling, rescan, Police dispatch, and map-reduce sweep modules and API router. Added SQLite-backed tests for selector/cursor encoding, config validation, webhook valid/invalid/challenge/polling/idempotency and raw-locator exclusion, paged changes and cursor updates, removed/gone/full-listing reconciliation behavior, rate-limit retry timing, cron/sweep/watch scheduling, Police task shape, rescan found/clean/gone/no-ref outcomes, and shard scanned/skipped/removed/failed counts.
+**Tasks In Progress**: Independent test-integrity, adversarial, and branch-evidence reviews are downstream workflow steps.
+**Blockers**: None.
+**Notes**: `tests/collectors/core` passed 10 tests. Scoped format, Ruff, ty, and typelint checks passed. Full-tree typelint passed for 248 files. A router import smoke check passed. Final logs are under `tmp/telescreen-v1-20261008-s319/p20-collectors-core/verification/` (`format-final.log`, `ruff-final.log`, `ty-final.log`, `pytest-final.log`, `typelint-scoped-final.log`, `typelint-full-final.log`, `router-import-final.log`). An earlier test assertion failure and an initial router import schema failure were corrected before these final gates.

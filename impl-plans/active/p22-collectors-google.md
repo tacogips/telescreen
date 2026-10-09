@@ -1,9 +1,9 @@
 # P22 Google Drive, Docs and Sheets Collector Adapters Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-collectors-and-ingestion.md (Per-kind behavior: gdrive, gdocs, gsheets; Resource identity; Google auth), design-docs/specs/design-map-reduce-sweeps.md (Built-in sweep implementations: Drive single enumeration)
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-08
+**Last Updated**: 2026-10-09
 
 ## Plan Metadata
 
@@ -164,10 +164,10 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p22-collectors-google
 
 ## Completion Criteria
 
-- [ ] GoogleAuth, the Drive, Sheets and Admin clients, GoogleAdapter (3 kinds) and GoogleSweep delivered with the exact names
-- [ ] Event, schedule and sweep tests, including single enumeration, pass
-- [ ] Scoped verification passes; logs recorded
-- [ ] Progress Log updated
+- [x] GoogleAuth, the Drive, Sheets and Admin clients, GoogleAdapter (3 kinds) and GoogleSweep delivered with the exact names
+- [x] Event, schedule and sweep tests, including single enumeration, pass
+- [x] Scoped verification passes; logs recorded
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -176,3 +176,21 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p22-collectors-google
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-09 06:57
+**Tasks Completed**: Repaired the Google sweep fakes for Admin user-detail lookups and shared-drive metadata, added an explicit optional descriptor guard, retained single-enumeration coverage, asserted each shard resource's removed/failed/fetched classification, annotated all p22 test bindings, and formatted/fixed p22 Ruff diagnostics.
+**Tasks In Progress**: None
+**Blockers**: None
+**Reconciliation requests**: The prior wave-reconciliation filter logs are outside p22 writePaths; this session recorded its own non-empty typelint filter evidence under `tmp/telescreen-v1-20261008-s319/p22-collectors-google/` for serial reconciliation to consume.
+**Hashes**: `src/telescreen/collectors/google/adapter.py` before=d96ba04b7bed83d39b14e805a479849e25539aba7b3b6e84c2b3947ffbe79833 after=99ce5badb3b67d36f8cb086a96e37240606c855f647ef460aac7399522408237; `src/telescreen/collectors/google/auth.py` before=27098b4b544e8cffb4a24f5f784cf6d4a54b67deba7a68d9ce1cdc9b660a8d66 after=5dd96555bcbf9571f2692d5ece9793c6b8060825cdbd6b35f421f9b242086725; `src/telescreen/collectors/google/drive.py` before=2a96d78d7ca0ea389ab55d5e53b6bca61a154618a799b4010ae62f053b73de37 after=834f0fe4526a43b243a0ffbea0a3fbbe87250d45751942f1fc35d0a59725206e; `src/telescreen/collectors/google/sheets.py` before=38cb5a727268287052b98644be55e48ae3cb3b2f53ea5445b9a691f084dd6e29 after=3c7ca46a320eb677759ad8cbfe037bf2168cb8fa5aaa995db47acae54f888d6e; `src/telescreen/collectors/google/sweep.py` before=d9f645a69fa877d4a63a4dd98f380f508f0f982c96f1167f67c4345adc0b99d0 after=de8398d7765a6bf84824cd9ef3e9d0d9d805f39cb5c8790773debfa4b1e6d47b; `tests/collectors/google/support.py` before=e4413703fbd1659e332d9e95a6bba51195c1c2b9c89990879481e21549182a94 after=11cff7a8db4d728766658d193367d45891c3c156f5932b92166cad0e70407df3; `tests/collectors/google/test_adapter.py` before=940a4168559c47fdf3ac4c78a0613efcbbda1de2e628cd35f585189e33eb5959 after=c748cf15a4d6e55ff0565e903f57b04556918f853f64b03a185771cc1bb163d3; `tests/collectors/google/test_auth.py` before=ff6b121eea502f5a614c8c4f77dc322095756c9097af358890e4209c9c59658b after=ca88d2b94107109f763bf0643664e481a911a437215cf09310d8de0696303e55; `tests/collectors/google/test_sweep.py` before=ee7bc81fdd1bff2af6ea721c9739f556453c4cd8f9db3dffeb88d27b131119f8 after=efc832df1dffdf622d7481056d11ab8bd87fce42b80f89d95e8532daea76ec2c.
+**Verification**: `uv run --frozen ruff format --check --no-cache src/telescreen/collectors/google tests/collectors/google` -> exit 0 (log: `/tmp/telescreen-p22-final-format.log`); `uv run --frozen ruff check --no-cache src/telescreen/collectors/google tests/collectors/google` -> exit 0 (log: `/tmp/telescreen-p22-final-ruff.log`); `uv run --frozen ty check src/telescreen/collectors/google tests/collectors/google` -> exit 0 (log: `/tmp/telescreen-p22-final-ty.log`); `uv run --frozen python tools/typelint.py` plus `! grep -E '(^|/)src/telescreen/collectors/google|(^|/)tests/collectors/google' /tmp/telescreen-p22-final-typelint-gate.log` -> exit 0, no p22 diagnostics (full log: `/tmp/telescreen-p22-final-typelint-gate.log`); `uv run --frozen pytest -p no:cacheprovider tests/collectors/google` -> exit 0, 13 passed, 0 failed (log: `/tmp/telescreen-p22-final-pytest.log`).
+**Notes**: Initial reproduction `/tmp/telescreen-p22-reproduce.log` showed 2 failing sweep tests; the first combined verification attempt `/tmp/telescreen-p22-final-pytest.log` was subsequently replaced only after the fixture corrections and now records the passing current-source run. Formal test-integrity and adversarial reviews remain downstream gates.
+
+### Session: 2026-10-09 07:05
+**Tasks Completed**: Addressed `P22-SWEEP-SIZE-SKIP-FAILED`: extracted `GoogleAdapter._fetch_content` so size/type skips return incomplete content while fetch, export and UTF-8 errors raise typed failures; retained `fetch_as` event-path error handling; changed `GoogleSweep.shard_resources` to emit any returned content as `FETCHED`; added oversized Drive/Docs, export-500, invalid-UTF-8, entry-count and rate-limit propagation coverage.
+**Tasks In Progress**: None
+**Blockers**: None
+**Reconciliation requests**: The earlier `EVIDENCE-EMPTY-FILTER-LOGS` artifacts remain owned by serial reconciliation. Current p22 verification logs are stored under `tmp/telescreen-v1-20261008-s319/p22-collectors-google/`.
+**Hashes**: `src/telescreen/collectors/google/adapter.py` before=99ce5badb3b67d36f8cb086a96e37240606c855f647ef460aac7399522408237 after=recorded in `tmp/telescreen-v1-20261008-s319/p22-collectors-google/final-source-hashes.sha256`; `src/telescreen/collectors/google/sweep.py` before=de8398d7765a6bf84824cd9ef3e9d0d9d805f39cb5c8790773debfa4b1e6d47b after=recorded in the same manifest; `tests/collectors/google/test_sweep.py` before=efc832df1dffdf622d7481056d11ab8bd87fce42b80f89d95e8532daea76ec2c after=recorded in the same manifest; package `__init__.py`, `admin.py`, and the plan file are included in the refreshed manifest.
+**Verification**: `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/collectors/google tests/collectors/google` -> exit 0 (log: `tmp/telescreen-v1-20261008-s319/p22-collectors-google/ruff-format-final.log`); `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/collectors/google tests/collectors/google` -> exit 0 (log: `tmp/telescreen-v1-20261008-s319/p22-collectors-google/ruff-check-final.log`); `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/collectors/google tests/collectors/google` -> exit 0 (log: `tmp/telescreen-v1-20261008-s319/p22-collectors-google/ty-final.log`); `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > tmp/telescreen-v1-20261008-s319/p22-collectors-google/typelint-final.log 2>&1; ! grep -E '(^|/)(src/telescreen/collectors/google|tests/collectors/google)' tmp/telescreen-v1-20261008-s319/p22-collectors-google/typelint-final.log` -> exit 0, repository reports 134 files clean; `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/collectors/google 2>&1 | tee tmp/telescreen-v1-20261008-s319/p22-collectors-google/pytest-final-size-skip.log` -> exit 0, 15 passed, 0 failed.
+**Notes**: Event-path tests remained unchanged and pass within the 15-test run. Regression checks compare emitted counts to fixture file-id tuple lengths. Independent adversarial re-review and serial reconciliation are pending downstream.

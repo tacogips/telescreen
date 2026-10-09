@@ -1,9 +1,9 @@
 # P24 Durable Workflow Engine, Queue, Scheduler, Human Tasks, Escalation and Workflow APIs Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-workflow-engine.md (Engine semantics, Queue and worker, Human tasks SLA and escalation, Triggers), design-docs/specs/notes.md (polling queue rationale), design-docs/specs/design-api-and-ui.md (Endpoints: Workflows, Runs, Human tasks, Escalation)
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-08
+**Last Updated**: 2026-10-09
 
 ## Plan Metadata
 
@@ -262,11 +262,11 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p24-workflow-engine-t
 
 ## Completion Criteria
 
-- [ ] Queue, worker, scheduler, engine, definitions, flow and human executors, escalation, triggers and the four routers delivered with the exact names
-- [ ] Every test case above passes
-- [ ] No file over 1000 lines (`wc -l` recorded)
-- [ ] Scoped verification passes; logs recorded
-- [ ] Progress Log updated
+- [x] Queue, worker, scheduler, engine, definitions, flow and human executors, escalation, triggers and the four routers delivered with the exact names
+- [x] Every test case above passes
+- [x] No file over 1000 lines (`wc -l` recorded)
+- [x] Scoped verification passes; logs recorded
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -275,3 +275,18 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p24-workflow-engine-t
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-09 Workflow Engine Implementation
+**Tasks Completed**: Delivered the durable SQL queue and worker, scheduler, workflow repository/definition service/engine/context/child handler, flow and human executors, escalation and trigger services, and workflow/run/human-task/escalation routers. Added SQLite queue and workflow behavior tests for idempotent/due claims and expired leases, linear transitions, wait/parallel joins, raw-value rejection, retry/redaction and duplicate delivery.
+**Tasks In Progress**: Add the remaining plan-listed behavior tests, including both condition routes, send-back/exhaustion, loop guard, human-task authorization/evidence and SLA escalation, child workflow completion, dead-task/on-error routing, issue triggers, and run cancellation.
+**Blockers**: None.
+**Notes**: Scoped format, Ruff, ty, pytest (6 passed), and typelint checks passed. Full-tree typelint passed (248 files). `wc -l` recorded 3,573 total lines across the p24 Python/test files and plan; largest Python file is `src/telescreen/workflow/engine/engine.py` at 711 lines, and plan is 277 lines. Logs are in `tmp/telescreen-v1-20261008-s319/p24-workflow-engine/`; branch reviews and final integration checks are downstream workflow steps.
+
+### Session: 2026-10-09 Workflow Engine Test Completion
+**Tasks Completed**: Added regression tests for both condition routes, human rejection/send-back and exhaustion, loop limits, SLA tier escalation and final breach, evidence authorization and accepted-file gates, raw comment redaction, child completion, issue trigger deduplication, dead-task error routing, run cancellation (including human-task SLA work), and unknown sub-workflow rejection. Added `EvidenceUploadExecutor` under `StepType.EVIDENCE_UPLOAD`. Fixed cancellation to cancel queued SLA tasks by human-task id.
+**Tasks In Progress**: None. Formal branch and adversarial reviews and combined-tree integration checks are downstream workflow steps.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: Before: plan `0d06ac1353d3fad03f2aae0611a4ab838ec841c6b35177b69a41b37d124fa2de`; engine `8d62bede2c91e4590b5719230353a1479ddb1966810994abc6ff2af12e9abd66`; human executor `b77492d5e196ae1ffc00e94760086c54efc98f483c7dd92c336ed7aba35115da`; extended tests `68290b8f2e60391424fd035b358c6fc425d3299fbb7d3d48bff75ca6465463d8`. After hashes are recorded in `tmp/telescreen-v1-20261008-s319/p24-workflow-engine/source-hashes-continuation-final.sha256`.
+**Verification**: Using the exact p24 `P` scope from the Verification section: `uv run --frozen ruff format --check --no-cache $P` -> exit 0 (`ruff-format-continuation-final.log`); `uv run --frozen ruff check --no-cache $P` -> exit 0 (`ruff-check-continuation-final.log`); `uv run --frozen ty check $P` -> exit 0 (`ty-continuation-final.log`); `uv run --frozen python tools/typelint.py <p24 scope>` -> exit 0, 20 files clean (`typelint-scoped-continuation-final.log`); `uv run --frozen python tools/typelint.py` -> exit 0, 249 files clean (`typelint-full-continuation-final.log`); `uv run --frozen pytest -p no:cacheprovider tests/workflow/engine` -> exit 0, 19 passed (`pytest-continuation-final.log`); no-dynamic-evaluation grep -> exit 0; `wc -l <p24 paths>` -> exit 0, 4,389 lines, all files under 1,000 (`wc-lines-continuation-post-plan.log`). Logs are under `tmp/telescreen-v1-20261008-s319/p24-workflow-engine/`.
+**Notes**: All files remain below 1,000 lines; `engine.py` is 712 lines, `test_engine_extended.py` is 793 lines, and this plan is 292 lines. One test exposed that `cancel_run` left the human task's SLA check ready; the fix cancels that task. Earlier failed fixture iterations and the pre-fix cancellation failure are preserved in the evidence directory; final-source scoped pytest passed. Codex agent `/root/p24_port_audit` performed a read-only API/model audit and made no edits. Workflow mode is `issue-resolution`; issue URL, number and repository were not supplied. Review gates remain owned by later workflow steps.

@@ -1,0 +1,131 @@
+"""Issue recording, reading, and scan ports."""
+
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Protocol
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from telescreen.core.vocabulary import (
+    DetectorKind,
+    IssueEventKind,
+    IssueHistoryKind,
+    IssueStatus,
+    RuleClass,
+    Severity,
+)
+from telescreen.ports.collectors import ResourceContent
+from telescreen.ports.findings import ExternalScan, RecordOutcome, ResourceScan
+
+
+@dataclass(frozen=True)
+class IssueHistoryEntry:
+    """A masked issue history change."""
+
+    issue_id: str
+    kind: IssueHistoryKind
+    actor_ref: str
+    at: datetime
+    note: str | None = None
+    from_value: str | None = None
+    to_value: str | None = None
+
+
+class IssueRecorder(Protocol):
+    """Persist scan findings and issue history in a caller transaction."""
+
+    async def record_scan(self, session: AsyncSession, scan: ResourceScan) -> RecordOutcome:
+        """Record a resource scan result."""
+        ...
+
+    async def record_external(self, session: AsyncSession, scan: ExternalScan) -> RecordOutcome:
+        """Record an external masked scan result."""
+        ...
+
+    async def add_history(self, session: AsyncSession, entry: IssueHistoryEntry) -> None:
+        """Append one issue history entry."""
+        ...
+
+    async def resolve_unchecked(
+        self, session: AsyncSession, collector_config_id: str, checked_before: datetime
+    ) -> int:
+        """Resolve resources not checked since the supplied watermark."""
+        ...
+
+
+class ResourceScanner(Protocol):
+    """Scan transient content, mask results, and record them atomically."""
+
+    async def scan_resource(
+        self,
+        content: ResourceContent,
+        scan_job_id: str,
+        detectors: tuple[DetectorKind, ...] | None = None,
+    ) -> RecordOutcome:
+        """Scan one resource using the configured pipeline or explicit detectors."""
+        ...
+
+
+@dataclass(frozen=True)
+class IssueSnapshot:
+    """Masked issue fields needed by other feature packages."""
+
+    id: str
+    number: int
+    short_id: str
+    display_title: str
+    status: IssueStatus
+    source: str
+    rule_class: RuleClass
+    severity: Severity
+    display_locator: str
+    times_seen: int
+    first_seen: datetime
+    last_seen: datetime
+    collector_config_id: str | None
+    ref_json: str | None
+
+
+@dataclass(frozen=True)
+class OpenResourceRef:
+    """Opaque resource reference for an open issue."""
+
+    issue_id: str
+    resource_key: str
+    ref_json: str | None
+    sweep_covered: bool
+
+
+class IssueReader(Protocol):
+    """Read masked issue snapshots and open resource references."""
+
+    async def get(self, session: AsyncSession, issue_id: str) -> IssueSnapshot | None:
+        """Return an issue snapshot or None when it does not exist."""
+        ...
+
+    async def open_resource_refs(
+        self, session: AsyncSession, collector_config_id: str
+    ) -> tuple[OpenResourceRef, ...]:
+        """Return open resource references for a collector configuration."""
+        ...
+
+
+@dataclass(frozen=True)
+class IssueEvent:
+    """An issue lifecycle event delivered to subscribed systems."""
+
+    kind: IssueEventKind
+    event_id: str
+    issue_id: str
+    source: str
+    rule_class: RuleClass
+    severity: Severity
+    at: datetime
+
+
+class IssueEventSink(Protocol):
+    """Receive issue lifecycle events in the caller transaction."""
+
+    async def on_issue_event(self, session: AsyncSession, event: IssueEvent) -> None:
+        """Handle one issue event."""
+        ...

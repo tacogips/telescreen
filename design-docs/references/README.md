@@ -25,6 +25,12 @@ This directory contains reference materials for system design and implementation
 | Kestra workers | https://kestra.io/docs/architecture | Inspiration for pull-mode police |
 | riela | https://github.com/tacogips/riela | Workflow concepts (nodes, manager/worker, branching, loops) |
 | JSON Schema 2020-12 | https://json-schema.org/draft/2020-12 | Police contract schemas |
+| ai4privacy pii-masking-400k | https://huggingface.co/datasets/ai4privacy/pii-masking-400k | Synthetic multilingual PII dataset with span labels (detector evaluation; no Japanese) |
+| ai4privacy pii-masking-300k | https://huggingface.co/datasets/ai4privacy/pii-masking-300k | Earlier synthetic PII masking dataset (detector evaluation) |
+| Nemotron-Personas-Japan | https://huggingface.co/datasets/nvidia/Nemotron-Personas-Japan | NVIDIA synthetic Japanese personas, CC BY 4.0 (names/profiles for test templates) |
+| presidio-evaluator | https://pypi.org/project/presidio-evaluator/ | Template-based synthetic PII sentence generation with labels |
+| Faker | https://faker.readthedocs.io/ | Fake value providers (`ja_JP`, `en_US`) for filler data |
+| RFC 2606 / RFC 6761 | https://www.rfc-editor.org/rfc/rfc6761 | Reserved example and `.invalid` domains for fictitious email addresses |
 
 ## Reference Documents
 

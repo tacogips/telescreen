@@ -1,0 +1,9 @@
+{
+  "locator": "repo://example.invalid/repo/file",
+  "rule_id": "generic-token",
+  "rule_class": "token",
+  "masked_snippet": "ghp_****************[40]",
+  "location": "line 10",
+  "confidence": 0.9,
+  "external_fingerprint": "0000000000000000000000000000000000000000000000000000000000000000"
+}

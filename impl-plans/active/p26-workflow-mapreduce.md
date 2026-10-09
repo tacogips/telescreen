@@ -1,6 +1,6 @@
 # P26 Map-Reduce Sweeps (Map Step, Partition, Dispatch, Shards, Reduce) Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-map-reduce-sweeps.md (all sections), design-docs/specs/notes.md (Map step scope in v1; Sweep removal reconciliation by watermark)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-08
@@ -213,10 +213,10 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p26-workflow-mapreduc
 
 ## Completion Criteria
 
-- [ ] Job service, launcher, partition, dispatch, shard, sink, reduce, map executor and router delivered with the exact names
-- [ ] The 10,000-shard cap test and the DR-1 reconciliation tests pass
-- [ ] Scoped verification passes; logs recorded
-- [ ] Progress Log updated
+- [x] Job service, launcher, partition, dispatch, shard, sink, reduce, map executor and router delivered with the exact names
+- [x] The 10,000-shard cap test and the DR-1 reconciliation tests pass
+- [x] Scoped verification passes; logs recorded
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -225,3 +225,18 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p26-workflow-mapreduc
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-09 07:37
+**Tasks Completed**: Implemented the durable map job service, launcher, partition/page handling, capped dispatch, shard execution, Police result sink, count-only reduce, map workflow executor, and authenticated map-job router. The 10,000-item dispatch test runs each dispatched item through `MapShardHandler` with a count-only fake sweeper and asserts 32 items on the first tick, zero new items on a sequential same-tick dispatch, one idempotent queue entry, a 32-item upper bound across later batches, completion of all items, successful reduction, and runtime under 60 seconds. Added DR-1 tests for partial scans skipping reconciliation and clean success reconciling once. Normalized SQLite-naive timestamps before timeout comparisons and used savepoint inserts for dialect-independent unique-key handling.
+**Tasks In Progress**: None
+**Blockers**: None
+**Reconciliation requests**: None
+**Hashes**: Before snapshot: p26 source files were absent; plan before=d868ebb2c849b13920d94dca42d144f1ee9c7b3fb9faf2a3f7c5c6fcdb977c64. Source inventory for the final MapShardHandler test: `tmp/telescreen-v1-20261008-s319/p26-workflow-mapreduce/final-source-hashes-actual-shards.sha256`.
+**Verification**:
+- `uv run --frozen ruff format --check --no-cache src/telescreen/workflow/mapreduce src/telescreen/workflow/executors/map.py src/telescreen/api/routers/map_jobs.py tests/workflow/mapreduce` -> exit 0 (log: `/tmp/telescreen-p26-workflow-mapreduce-format-final.log`).
+- `uv run --frozen ruff check --no-cache src/telescreen/workflow/mapreduce src/telescreen/workflow/executors/map.py src/telescreen/api/routers/map_jobs.py tests/workflow/mapreduce` -> exit 0 (log: `/tmp/telescreen-p26-workflow-mapreduce-ruff-final.log`).
+- `uv run --frozen ty check src/telescreen/workflow/mapreduce src/telescreen/workflow/executors/map.py src/telescreen/api/routers/map_jobs.py tests/workflow/mapreduce` -> exit 0 (log: `/tmp/telescreen-p26-workflow-mapreduce-ty-final.log`).
+- `uv run --frozen python tools/typelint.py src/telescreen/workflow/mapreduce src/telescreen/workflow/executors/map.py src/telescreen/api/routers/map_jobs.py tests/workflow/mapreduce` -> exit 0, 14 files clean (log: `/tmp/telescreen-p26-workflow-mapreduce-typelint-scoped-final.log`).
+- `uv run --frozen pytest -p no:cacheprovider tests/workflow/mapreduce` -> exit 0, 3 passed; includes actual `MapShardHandler` execution for all 10,000 items (log: `/tmp/telescreen-p26-workflow-mapreduce-pytest-final.log`).
+- `uv run --frozen python tools/typelint.py` -> final combined tree exit 0, 248 files clean (log: `/tmp/telescreen-p26-workflow-mapreduce-typelint-full-final.log`). An earlier combined-tree attempt exited 1 with 92 diagnostics in other plan-owned files; its log was overwritten by the final rerun, so only the final source-matched log remains.
+**Notes**: The SQLite 10,000-item scenario completes through dispatch, shard execution, and reduction while exercising the exact concurrency/idempotency assertions. The PostgreSQL concurrent-session integration variant remains conditional on `TELESCREEN_TEST_DATABASE_URL` and was not run. Formal test-integrity, adversarial, branch-evidence, and final serial integration reviews remain downstream workflow steps.

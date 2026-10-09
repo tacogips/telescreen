@@ -1,0 +1,36 @@
+[
+  {
+    "name": "secops-standard",
+    "tiers": [
+      {
+        "after": "PT4H",
+        "assign_to": "team:secops-tier2",
+        "notify": ["team:secops-tier2", "email:secops-leads@example.invalid"],
+        "channels": ["slack", "email"]
+      },
+      {
+        "after": "PT8H",
+        "assign_to": "member:ciso",
+        "notify": ["member:ciso"],
+        "channels": ["email"]
+      }
+    ]
+  },
+  {
+    "name": "dev-remediation",
+    "tiers": [
+      {
+        "after": "PT24H",
+        "assign_to": "team:dev-remediation-leads",
+        "notify": ["team:dev-remediation-leads", "email:engineering-leads@example.invalid"],
+        "channels": ["slack", "email"]
+      },
+      {
+        "after": "PT48H",
+        "assign_to": "member:engineering-director",
+        "notify": ["member:engineering-director"],
+        "channels": ["email"]
+      }
+    ]
+  }
+]

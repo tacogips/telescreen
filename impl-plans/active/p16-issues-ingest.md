@@ -1,9 +1,9 @@
 # P16 Issues (Grouping, Lifecycle, Scan Pipeline) and Push Ingestion Implementation Plan
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-collectors-and-ingestion.md (Scan pipeline, Issue grouping and lifecycle, Resource identity, Push ingestion API), design-docs/specs/design-data-model.md (Findings and issues, Keys, Issue status machine), design-docs/specs/design-map-reduce-sweeps.md (Reduce: resolve_unchecked)
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-08
+**Last Updated**: 2026-10-09
 
 ## Plan Metadata
 
@@ -182,20 +182,19 @@ Use the SQLite harness, a recording fake `IssueEventSink`, a fake `AuditLog`, a 
 ```bash
 set -o pipefail
 export PYTHONDONTWRITEBYTECODE=1
-P="src/telescreen/issues src/telescreen/api/routers/issues.py src/telescreen/api/routers/ingest.py tests/issues"
-uv run --frozen ruff format --check --no-cache $P
-uv run --frozen ruff check --no-cache $P
-uv run --frozen ty check $P
+uv run --frozen ruff format --check --no-cache src/telescreen/issues src/telescreen/api/routers/issues.py src/telescreen/api/routers/ingest.py tests/issues
+uv run --frozen ruff check --no-cache src/telescreen/issues src/telescreen/api/routers/issues.py src/telescreen/api/routers/ingest.py tests/issues
+uv run --frozen ty check src/telescreen/issues src/telescreen/api/routers/issues.py src/telescreen/api/routers/ingest.py tests/issues
 uv run --frozen pytest -p no:cacheprovider tests/issues 2>&1 | tee /tmp/telescreen-p16-issues-ingest-pytest.log
-uv run --frozen python tools/typelint.py > /tmp/telescreen-p16-issues-ingest-typelint.log 2>&1; grep -E '^(src/telescreen/issues|src/telescreen/api/routers/(issues|ingest)\.py|tests/issues)' /tmp/telescreen-p16-issues-ingest-typelint.log   # prints nothing
+uv run --frozen python tools/typelint.py src/telescreen/issues src/telescreen/api/routers/issues.py src/telescreen/api/routers/ingest.py tests/issues
 ```
 
 ## Completion Criteria
 
-- [ ] IssueService (recorder, reader, transitions), ResourceScannerImpl, IngestService and both routers delivered with the exact names
-- [ ] Lifecycle, regression, auto-resolve, skip, resolve_unchecked and leak tests pass
-- [ ] Scoped verification passes; logs recorded
-- [ ] Progress Log updated
+- [x] IssueService (recorder, reader, transitions), ResourceScannerImpl, IngestService and both routers delivered with the exact names
+- [x] Lifecycle, regression, auto-resolve, skip, resolve_unchecked and leak tests pass
+- [x] Scoped verification passes; logs recorded
+- [x] Progress Log updated
 
 ## Progress Log
 
@@ -204,3 +203,9 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-p16-issues-ingest-typ
 **Tasks In Progress**: None
 **Blockers**: None
 **Notes**: Initial plan
+
+### Session: 2026-10-09 p16 implementation
+**Tasks Completed**: Implemented issue grouping, idempotent finding persistence, lifecycle transitions and history, regression and auto-resolution, resource scanning with size skip and post-commit indexing, custom push ingestion, and both REST routers. Added 9 SQLite/API tests covering lifecycle, ignored status, removal reconciliation bounds, scanner skip, direct/external raw-value rejection, persistence/response leak checks, API filters/stats/comments/history pagination, and ingest source/config/findings/content behavior.
+**Tasks In Progress**: Formal test-integrity, adversarial, and combined-tree review are owned by later workflow steps.
+**Blockers**: None.
+**Notes**: Scoped verification passed on the current p16 source. Logs: `/tmp/telescreen-p16-issues-ingest-format-final.log`, `/tmp/telescreen-p16-issues-ingest-ruff-final.log`, `/tmp/telescreen-p16-issues-ingest-ty-final.log`, `/tmp/telescreen-p16-issues-ingest-typelint-final.log`, and `/tmp/telescreen-p16-issues-ingest-pytest-final.log` (9 passed). Earlier implementation attempts exposed timezone-aware SQLite comparisons, a literal stats route shadowed by `{issue_id}`, and test assumptions about UUID ordering/JSON spacing; each was corrected and the final test suite passed. All p16 Python files remain below 1000 lines; the test file is 884 lines.
