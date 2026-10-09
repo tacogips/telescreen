@@ -1,6 +1,6 @@
 # P20 Collectors Core (Configs, Webhooks, Scheduling, Scans, Rescans, Sweeper) Implementation Plan
 
-**Status**: Implementation Complete (run A, session 338; review pending)
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-collectors-and-ingestion.md (Collector adapters, Resource identity, Per-kind behavior, Full sweeps), design-docs/specs/design-map-reduce-sweeps.md (Map: collector shards, Ports)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09

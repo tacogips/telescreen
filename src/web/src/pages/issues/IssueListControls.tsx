@@ -8,6 +8,7 @@ import {
 } from "../../components/ui";
 import { ISSUE_QUERY_KEYS, ISSUE_SOURCES } from "./query";
 import type { IssueView } from "./savedViews";
+import { sourceLabel } from "../../components/labels";
 
 const SORTS = [
   {
@@ -22,13 +23,6 @@ const SORTS = [
   },
   { value: "times_seen", label: "Findings", detail: "Number of findings" },
 ] as const;
-
-function sourceLabel(source: string): string {
-  if (source === "gdrive") return "Google Drive";
-  if (source === "gdocs") return "Google Docs";
-  if (source === "gsheets") return "Google Sheets";
-  return source;
-}
 
 export function IssueListControls(
   props: Readonly<{

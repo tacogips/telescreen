@@ -1,6 +1,6 @@
 # P19 Police Bureau Side (Gateway, Pull and Push Transports, Result Acceptance) Implementation Plan
 
-**Status**: Completed (run A2 wave A2-2, session 340)
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-police-contract.md (Endpoints, Push signing, Bureau side incl. the Attempts bullet revised in session 340), design-docs/specs/design-map-reduce-sweeps.md (Police contract additions), design-docs/specs/design-masking.md (Re-scan of inbound masked data)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09

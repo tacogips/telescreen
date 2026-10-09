@@ -1,11 +1,12 @@
 import { readStorage } from "./storage";
 import type { AreaKey } from "../../routes";
+import { RULE_KEYS, SOURCE_KEYS, ruleLabel, sourceLabel } from "../labels";
 export type NavEntry = Readonly<{ label: string; href: string }>;
 export const entriesFor = (area: AreaKey): readonly NavEntry[] => {
   if (area === "issues") return [
     { label: "Feed", href: "/issues" },
-    ...["slack", "gdrive", "gdocs", "gsheets", "github", "custom", "police"].map((source) => ({ label: source, href: `/issues?query=source:${source}` })),
-    ...["credential", "token", "private_key", "password", "payment_card", "national_id", "email", "phone", "address"].map((rule) => ({ label: rule.replaceAll("_", " "), href: `/issues?query=rule:${rule}` })),
+    ...SOURCE_KEYS.map((source) => ({ label: sourceLabel(source), href: `/issues?query=source:${source}` })),
+    ...RULE_KEYS.map((rule) => ({ label: ruleLabel(rule), href: `/issues?query=rule:${rule}` })),
     ...savedViews(),
   ];
   if (area === "workflows") return [{ label: "Workflows", href: "/workflows" }, { label: "Runs", href: "/runs" }];

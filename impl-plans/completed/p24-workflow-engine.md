@@ -1,6 +1,6 @@
 # P24 Durable Workflow Engine, Queue, Scheduler, Human Tasks, Escalation and Workflow APIs Implementation Plan
 
-**Status**: Completed (implementation, run A session 338; formal review downstream)
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-workflow-engine.md (Engine semantics, Queue and worker, Human tasks SLA and escalation, Triggers), design-docs/specs/notes.md (polling queue rationale), design-docs/specs/design-api-and-ui.md (Endpoints: Workflows, Runs, Human tasks, Escalation)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09

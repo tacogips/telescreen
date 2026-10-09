@@ -1,6 +1,6 @@
 # P25 Workflow Node Executors (detect, ai_agent, notify, police_verify) Implementation Plan
 
-**Status**: Completed (run A implementation verification; downstream integration review pending)
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-workflow-engine.md (Node executors with external effects, Ports used by executors), design-docs/specs/design-police-contract.md (Inputs by task type: verify_remediation)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09

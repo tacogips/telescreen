@@ -1,6 +1,6 @@
 # P27 Assistant (MCP Server and Agent Chat) Implementation Plan
 
-**Status**: Completed (implementation; formal review and combined-tree integration pending)
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-api-and-ui.md (Assistant), design-docs/specs/architecture.md section 7 item 7
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09

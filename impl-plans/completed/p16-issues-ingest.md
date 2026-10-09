@@ -1,6 +1,6 @@
 # P16 Issues (Grouping, Lifecycle, Scan Pipeline) and Push Ingestion Implementation Plan
 
-**Status**: Completed (run A resume, session 338)
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-collectors-and-ingestion.md (Scan pipeline, Issue grouping and lifecycle, Resource identity, Push ingestion API), design-docs/specs/design-data-model.md (Findings and issues, Keys, Issue status machine), design-docs/specs/design-map-reduce-sweeps.md (Reduce: resolve_unchecked)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09

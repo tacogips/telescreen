@@ -38,44 +38,41 @@ Large features are split into multiple related plans with cross-references.
 ## Active Plans
 
 All plans share `impl-plans/conventions.md` (ownership, typing, verification and
-progress-log rules). Wave = 1 + max(wave of dependencies).
+progress-log rules).
 
-"Integration-accepted" plans were accepted by an earlier run's integration review
-(runs A through B4) and are committed. Each still lives in `active/` until a later serial
-cleanup archives it. No active plan has remaining implementation work.
-
-| Plan | Wave | Status | Design Reference | Last Updated |
-|------|------|--------|------------------|--------------|
-| `active/p01-foundation.md` | 1 | Integration-accepted (archival pending) | architecture.md s4-s8, command.md | 2026-10-09 |
-| `active/p02-db-schema.md` | 2 | Integration-accepted (archival pending) | design-data-model.md | 2026-10-09 |
-| `active/p03-detection-rules.md` | 2 | Integration-accepted (archival pending) | design-detectors.md | 2026-10-09 |
-| `active/p04-ports.md` | 2 | Integration-accepted (archival pending) | architecture.md s4 | 2026-10-09 |
-| `active/p05-police-contract.md` | 2 | Integration-accepted (archival pending) | design-police-contract.md | 2026-10-09 |
-| `active/p07-web-shell.md` | 2 | Integration-accepted (archival pending) | design-api-and-ui.md | 2026-10-09 |
-| `active/p06-workflow-dsl.md` | 3 | Integration-accepted (archival pending) | design-workflow-engine.md | 2026-10-09 |
-| `active/p08-masking.md` | 3 | Integration-accepted (archival pending) | design-masking.md | 2026-10-09 |
-| `active/p09-detection-llm-ml.md` | 3 | Integration-accepted (archival pending) | design-detectors.md | 2026-10-09 |
-| `active/p10-api-common.md` | 3 | Integration-accepted (archival pending) | design-api-and-ui.md | 2026-10-09 |
-| `active/p30-ui-design-system.md` | B1 | Integration-accepted (archival pending) | design-ui-sentry.md | 2026-10-09 |
-| `active/p31-ui-mock-api.md` | B1 | Integration-accepted (archival pending) | design-ui-sentry.md, design-synthetic-test-dataset.md | 2026-10-09 |
-| `active/p12-ui-issues.md` | 3 | Integration-accepted (archival pending) | design-ui-sentry.md | 2026-10-09 |
-| `active/p13-ui-workflows.md` | 3 | Integration-accepted (archival pending) | design-ui-sentry.md | 2026-10-09 |
-| `active/p14-ui-ops.md` | 3 | Integration-accepted (archival pending) | design-ui-sentry.md | 2026-10-09 |
-| `active/p22-collectors-google.md` | 3 | Integration-accepted (archival pending) | design-collectors-and-ingestion.md, design-map-reduce-sweeps.md | 2026-10-09 |
-| `active/p23-collectors-github.md` | 3 | Integration-accepted (archival pending) | design-collectors-and-ingestion.md | 2026-10-09 |
-| `active/p15-audit-search.md` | 4 | Integration-accepted (archival pending) | design-data-model.md, design-api-and-ui.md | 2026-10-09 |
-| `active/p16-issues-ingest.md` | 4 | Integration-accepted (archival pending) | design-collectors-and-ingestion.md | 2026-10-09 |
-| `active/p18-evidence.md` | 4 | Integration-accepted (archival pending) | design-api-and-ui.md | 2026-10-09 |
-| `active/p20-collectors-core.md` | 4 | Integration-accepted (archival pending) | design-collectors-and-ingestion.md | 2026-10-09 |
-| `active/p24-workflow-engine.md` | 4 | Integration-accepted (archival pending) | design-workflow-engine.md | 2026-10-09 |
-| `active/p25-workflow-nodes.md` | 4 | Integration-accepted (archival pending) | design-workflow-engine.md | 2026-10-09 |
-| `active/p27-assistant.md` | 4 | Integration-accepted (archival pending) | design-api-and-ui.md | 2026-10-09 |
-| `active/p28-assembly.md` | 5 | Integration-accepted (archival pending; run B3) | command.md, design-masking.md | 2026-10-10 |
+No active plans. Telescreen v1 is complete (all 32 plans integration-accepted,
+final commit 7a8c600). The v1.1 backlog is `design-docs/specs/design-v1-1-dspm-adoption.md`.
+Run dispatch manifests are archived under `completed/dispatch/`.
 
 ## Completed Plans
 
 | Plan | Wave | Completed | Design Reference |
 |------|------|-----------|------------------|
+| `completed/p01-foundation.md` | 1 | Integration-accepted (2026-10-09); archived 2026-10-10 | architecture.md s4-s8, command.md |
+| `completed/p02-db-schema.md` | 2 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-data-model.md |
+| `completed/p03-detection-rules.md` | 2 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-detectors.md |
+| `completed/p04-ports.md` | 2 | Integration-accepted (2026-10-09); archived 2026-10-10 | architecture.md s4 |
+| `completed/p05-police-contract.md` | 2 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-police-contract.md |
+| `completed/p07-web-shell.md` | 2 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-api-and-ui.md |
+| `completed/p06-workflow-dsl.md` | 3 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-workflow-engine.md |
+| `completed/p08-masking.md` | 3 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-masking.md |
+| `completed/p09-detection-llm-ml.md` | 3 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-detectors.md |
+| `completed/p10-api-common.md` | 3 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-api-and-ui.md |
+| `completed/p30-ui-design-system.md` | B1 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-ui-sentry.md |
+| `completed/p31-ui-mock-api.md` | B1 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-ui-sentry.md, design-synthetic-test-dataset.md |
+| `completed/p12-ui-issues.md` | 3 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-ui-sentry.md |
+| `completed/p13-ui-workflows.md` | 3 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-ui-sentry.md |
+| `completed/p14-ui-ops.md` | 3 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-ui-sentry.md |
+| `completed/p22-collectors-google.md` | 3 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-collectors-and-ingestion.md, design-map-reduce-sweeps.md |
+| `completed/p23-collectors-github.md` | 3 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-collectors-and-ingestion.md |
+| `completed/p15-audit-search.md` | 4 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-data-model.md, design-api-and-ui.md |
+| `completed/p16-issues-ingest.md` | 4 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-collectors-and-ingestion.md |
+| `completed/p18-evidence.md` | 4 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-api-and-ui.md |
+| `completed/p20-collectors-core.md` | 4 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-collectors-and-ingestion.md |
+| `completed/p24-workflow-engine.md` | 4 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-workflow-engine.md |
+| `completed/p25-workflow-nodes.md` | 4 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-workflow-engine.md |
+| `completed/p27-assistant.md` | 4 | Integration-accepted (2026-10-09); archived 2026-10-10 | design-api-and-ui.md |
+| `completed/p28-assembly.md` | 5 | Integration-accepted (2026-10-10); archived 2026-10-10 | command.md, design-masking.md |
 | `completed/p11-police-sdk.md` | 3 | 2026-10-09 (run A2, session 340) | design-police-contract.md |
 | `completed/p21-collectors-slack.md` | 3 | 2026-10-09 (run A2, session 340) | design-collectors-and-ingestion.md |
 | `completed/p17-notifications.md` | 4 | 2026-10-09 (run A2, session 340) | design-masking.md |

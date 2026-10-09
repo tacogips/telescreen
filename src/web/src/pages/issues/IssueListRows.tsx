@@ -11,13 +11,7 @@ import {
   Redacted,
   SeverityBar,
 } from "../../components/ui";
-
-function sourceLabel(source: string): string {
-  if (source === "gdrive") return "Google Drive";
-  if (source === "gdocs") return "Google Docs";
-  if (source === "gsheets") return "Google Sheets";
-  return source;
-}
+import { sourceLabel } from "../../components/labels";
 
 function severity(value: string): "high" | "medium" | "low" {
   if (value === "high" || value === "medium") return value;
@@ -49,7 +43,7 @@ export function IssueListRows(
     >
       <div class="issue-list-container">
         <div class="issue-table-head">
-          <label>
+          <label class="issue-select">
             <input
               type="checkbox"
               aria-label="Select all loaded issues"
@@ -67,9 +61,9 @@ export function IssueListRows(
               onChange={(event) =>
                 props.onToggleAll(event.currentTarget.checked)
               }
-            />{" "}
-            Issue
+            />
           </label>
+          <span>Issue</span>
           <span>Last seen</span>
           <span>Age</span>
           <span>Findings</span>

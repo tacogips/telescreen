@@ -1,6 +1,6 @@
 # P28 Assembly (Container, Collector Bindings, CLI, Serve) Implementation Plan
 
-**Status**: Completed (run B2: p28a role)
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-collectors-and-ingestion.md (Assembly bindings, run B2), design-docs/specs/command.md, design-docs/specs/architecture.md sections 3, 4, 8 (Run B2), design-docs/specs/design-ui-sentry.md 8.6
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09 (run B2, session 342)
