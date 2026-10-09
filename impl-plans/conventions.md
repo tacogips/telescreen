@@ -176,6 +176,9 @@ The progress gate treats every high or medium entry in your step result `finding
 - `findings` and `risks` list only issues that are genuinely still open after your work.
   A residual note that does not need action (for example "integration review is
   downstream") is not a risk and must not be listed.
+- Integration tests marked `integration` that are skipped because
+  `TELESCREEN_TEST_DATABASE_URL` / `TELESCREEN_TEST_MEILI_URL` are unset are skipped by
+  design (offline suite). This is expected, not a risk, and must not be listed.
 - If a repair brief forbids editing a file that a mutation check would need, document the
   equivalent in-memory mutation evidence in the plan Progress Log and in
   `addressedFeedback`; this is not a blocker or a risk.
