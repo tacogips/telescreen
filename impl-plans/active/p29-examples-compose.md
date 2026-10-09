@@ -9,7 +9,7 @@
 
 - planId: `p29-examples-compose`
 - planPath: `impl-plans/active/p29-examples-compose.md`
-- wave: B2-3 (last; runs alone)
+- wave: B3-3 in the s345 manifest (B2-3 in s342; last; runs alone)
 - dependsOn: `p13-ui-workflows`, `p28-assembly`, `p28b-e2e-flows`, `p28c-leak-matrix` (run B2), plus accepted `p12-ui-issues`, `p14-ui-ops`, `p30-ui-design-system`, `p31-ui-mock-api`, `p06-workflow-dsl`, `p08-masking`
 - writePaths:
   - `impl-plans/active/p29-examples-compose.md`
@@ -129,7 +129,7 @@ uv build --out-dir /tmp/telescreen-p29-final-dist 2>&1 | tee /tmp/telescreen-p29
 (cd src/web && bun run screenshots) 2>&1 | tee /tmp/telescreen-p29-screenshots.log; echo "exit=$?"
 ls tmp/ui-screenshots/*.png | wc -l    # 28 (13 pages x 2 themes + mobile issues x 2)
 uv run --frozen telescreen workflow validate examples/workflows/github-credential-leak.yaml examples/workflows/slack-pii.yaml examples/workflows/gdrive-mynumber-sheet.yaml examples/workflows/drive-weekly-sweep.yaml 2>&1 | tee /tmp/telescreen-p29-workflow-validate.log; echo "exit=$?"
-git status --porcelain -- design-docs/user-qa design-docs/specs/design-v1-1-dspm-adoption.md > /tmp/telescreen-p29-preexisting.log; echo "exit=$?"   # still lists README.md (M) and the four untracked files
+test -z "$(git status --porcelain -- design-docs)"; echo "exit=$?"   # design-docs untouched (all committed at cdf195d; empty output expected)
 command -v docker && docker compose -f examples/compose/docker-compose.yml --env-file examples/compose/.env.example config > /tmp/telescreen-p29-compose-config.log 2>&1; echo "exit=$?"
 ```
 

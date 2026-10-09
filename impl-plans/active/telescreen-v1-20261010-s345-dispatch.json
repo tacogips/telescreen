@@ -1,0 +1,236 @@
+{
+  "taskId": "telescreen-v1-20261010-s345",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "cdf195d3a926c4bed62a09b4e3198654dc753dbd",
+  "evidenceRoot": "tmp/telescreen-v1-20261010-s345",
+  "evidenceRootNotes": "Untracked; never staged or committed. Use per-plan and per-attempt subdirectories: tmp/telescreen-v1-20261010-s345/<planId>/attempt-<n>/. Logs go to /tmp/telescreen-<planId>-*.log (conventions section 7).",
+  "supersedes": "impl-plans/active/telescreen-v1-20261009-s342-dispatch.json (kept unchanged as the run B2 historical record)",
+  "runScope": "Final run B3: p28-assembly re-verification and 7a-compliant report only; p28b-e2e-flows (GitHub remediation, sweep, ingestion, chat); p28c-leak-matrix (raw-value leak matrix over every sink); p29 compose/README reconciliation and final whole-repository gates. Same plan files and split as s342.",
+  "designDocPaths": [
+    "design-docs/specs/architecture.md",
+    "design-docs/specs/design-collectors-and-ingestion.md",
+    "design-docs/specs/design-masking.md",
+    "design-docs/specs/command.md",
+    "design-docs/specs/design-ui-sentry.md",
+    "design-docs/specs/design-workflow-engine.md",
+    "design-docs/specs/design-map-reduce-sweeps.md",
+    "design-docs/specs/design-police-contract.md",
+    "design-docs/specs/design-synthetic-test-dataset.md",
+    "design-docs/specs/design-api-and-ui.md",
+    "design-docs/specs/design-data-model.md",
+    "design-docs/specs/design-detectors.md",
+    "design-docs/specs/notes.md"
+  ],
+  "reviewContext": {
+    "issueReference": "workflowInput (no GitHub issue) - Telescreen v1 final run B3, workflowExecutionId opus-luna-design-and-implement-review-loop-session-345; dispatch comm-005811; intake comm-005812; design (unchanged baseline) accepted by step3-design-review comm-005814; plans comm-005815 accepted by step5-impl-plan-review comm-005816",
+    "userProblem": "Telescreen v1 needs its last deliverables: assembly re-verified with a gate-clean report, end-to-end flow tests, the raw-value leak matrix, and runnable compose/workflow examples with README and final gates.",
+    "requiredOutcomes": [
+      "p28-assembly: re-run its Verification block on the current tree; report only final passing commands (conventions 7a).",
+      "p28b: GitHub remediation (human task, SLA escalation, evidence gate, police send-back then pass), sweep, ingestion and chat E2E flows through the real container, offline.",
+      "p28c: raw-value leak matrix over DB, logs, search docs, outbound bodies, evidence files, API responses, tracebacks and exception output, with non-empty sink guards.",
+      "p29: examples/compose and examples/workflows reconciled, README updated, full Python and web gates plus screenshot smoke (or recorded gap)."
+    ],
+    "nonGoals": [
+      "Re-implementing any of the 29 integration-accepted plans listed in acceptedDependencies.",
+      "design-docs/specs/design-v1-1-dspm-adoption.md (v1.1 backlog).",
+      "Dependency changes to pyproject.toml, uv.lock, src/web/package.json or bun.lock.",
+      "Any design-docs edit."
+    ],
+    "constraints": [
+      "AGENTS.md: English only, no emojis, python-coding-standards, plans under 400 lines, Python files under 1000 lines.",
+      "Strict typing via tools/typelint.py, ruff ANN/PGH and ty; no weakening, no type-ignore comments, no new per-file-ignores.",
+      "Raw detected values never persisted, logged, indexed, notified or returned; only masked values and HMAC fingerprints.",
+      "Default uv run pytest passes offline; integration tests marked and skipped without TELESCREEN_TEST_DATABASE_URL / TELESCREEN_TEST_MEILI_URL.",
+      "Example configs use placeholders and secret references only; no committed secrets; test secrets built at runtime.",
+      "Conventions 7a: fixed findings only in addressedFeedback; verification lists only final passing commands; mutation and superseded runs only in the Progress Log; build outputs to /tmp.",
+      "The working tree was clean at cdf195d; design-docs/** must stay unmodified.",
+      "A defect found outside a plan's writePaths becomes a Reconciliation request in that plan's Progress Log, not an in-place fix."
+    ],
+    "designDecisionsAndRationale": [
+      "Design reused unchanged (step2 D1, accepted by step3 comm-005814).",
+      "p28-assembly re-verify only (D2): mutation evidence already lives only in its Progress Log; the earlier block came from the step-result contents.",
+      "Traces sink = rendered tracebacks, exception messages, 500 body and MockTransport bodies (design-masking.md, D3).",
+      "Waves B3-1 {p28-assembly}, B3-2 {p28b, p28c}, B3-3 {p29}: acyclic, file-disjoint; p29 last because it runs whole-repository gates."
+    ],
+    "intentionalTradeoffs": [
+      "Screenshot smoke or docker compose config may be unavailable locally; recorded as verification gaps per design-ui-sentry.md 8.5.",
+      "p28c expresses scanner-unavailable and free-text image cases through the HTTP seam (stricter than design-masking.md allows)."
+    ],
+    "supportedEdgeCases": [
+      "SLA breach escalates a human task to the next tier via masked Slack/email (p28b).",
+      "Evidence containing a credential is rejected, then clean evidence is accepted (p28b, p28c).",
+      "Police verify_remediation fails once (send-back) and then passes (p28b).",
+      "Sweep removal reconciliation auto-resolves issues; partial sweeps skip reconciliation; concurrent start returns 409 (p28b).",
+      "Separator-stripped variants of sample secrets are also searched in every sink; empty sinks fail the guard (p28c).",
+      "Scanner unavailable yields 503 fail-closed; image metadata is stripped; pushed raw findings are rejected (p28c).",
+      "Screenshot smoke exit 2 (no browser) or missing docker is recorded only as a verificationGap (p29)."
+    ],
+    "outOfScopeEdgeCases": [
+      "Live PostgreSQL/Meilisearch behavior beyond the marked integration tests skipped offline.",
+      "Real external services (Slack, Google, GitHub, Anthropic, SMTP) and real docker compose up.",
+      "v1.1 DSPM features in design-docs/specs/design-v1-1-dspm-adoption.md."
+    ],
+    "sourcePaths": [
+      "impl-plans/conventions.md",
+      "impl-plans/active/p28-assembly.md",
+      "impl-plans/active/p28b-e2e-flows.md",
+      "impl-plans/active/p28c-leak-matrix.md",
+      "impl-plans/active/p29-examples-compose.md"
+    ]
+  },
+  "acceptedDependencies": [
+    {"planId": "p01-foundation", "planPath": "impl-plans/active/p01-foundation.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p02-db-schema", "planPath": "impl-plans/active/p02-db-schema.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p03-detection-rules", "planPath": "impl-plans/active/p03-detection-rules.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p04-ports", "planPath": "impl-plans/active/p04-ports.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p05-police-contract", "planPath": "impl-plans/active/p05-police-contract.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p06-workflow-dsl", "planPath": "impl-plans/active/p06-workflow-dsl.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p07-web-shell", "planPath": "impl-plans/active/p07-web-shell.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p08-masking", "planPath": "impl-plans/active/p08-masking.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p09-detection-llm-ml", "planPath": "impl-plans/active/p09-detection-llm-ml.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p10-api-common", "planPath": "impl-plans/active/p10-api-common.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p11-police-sdk", "planPath": "impl-plans/completed/p11-police-sdk.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p12-ui-issues", "planPath": "impl-plans/active/p12-ui-issues.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p13-ui-workflows", "planPath": "impl-plans/active/p13-ui-workflows.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p14-ui-ops", "planPath": "impl-plans/active/p14-ui-ops.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p15-audit-search", "planPath": "impl-plans/active/p15-audit-search.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p16-issues-ingest", "planPath": "impl-plans/active/p16-issues-ingest.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p17-notifications", "planPath": "impl-plans/completed/p17-notifications.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p18-evidence", "planPath": "impl-plans/active/p18-evidence.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p19-police-bureau", "planPath": "impl-plans/completed/p19-police-bureau.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p20-collectors-core", "planPath": "impl-plans/active/p20-collectors-core.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p21-collectors-slack", "planPath": "impl-plans/completed/p21-collectors-slack.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p22-collectors-google", "planPath": "impl-plans/active/p22-collectors-google.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p23-collectors-github", "planPath": "impl-plans/active/p23-collectors-github.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p24-workflow-engine", "planPath": "impl-plans/active/p24-workflow-engine.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p25-workflow-nodes", "planPath": "impl-plans/active/p25-workflow-nodes.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p26-workflow-mapreduce", "planPath": "impl-plans/completed/p26-workflow-mapreduce.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p27-assistant", "planPath": "impl-plans/active/p27-assistant.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p30-ui-design-system", "planPath": "impl-plans/active/p30-ui-design-system.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"},
+    {"planId": "p31-ui-mock-api", "planPath": "impl-plans/active/p31-ui-mock-api.md", "commit": "cdf195d3a926c4bed62a09b4e3198654dc753dbd"}
+  ],
+  "designChangeThisRun": "None. Existing design reused unchanged (step2 comm-005813; accepted by step3-design-review comm-005814, needs_revision=false).",
+  "waves": {
+    "B3-1": ["p28-assembly"],
+    "B3-2": ["p28b-e2e-flows", "p28c-leak-matrix"],
+    "B3-3": ["p29-examples-compose"]
+  },
+  "waveRationale": "p28-assembly is re-verified first so p28b and p28c build on a gate-clean container. p28b and p28c own disjoint test files (tests/e2e/harness.py plus tests/e2e/test_flow_*.py vs tests/leak) and do not import each other. p29 runs alone last because it runs the final whole-repository and web gates over everything.",
+  "plans": [
+    {
+      "planId": "p28-assembly",
+      "planPath": "impl-plans/active/p28-assembly.md",
+      "wave": "B3-1",
+      "dependsOn": [],
+      "mode": "re-verify only; append Progress Log; 7a-compliant report",
+      "writePaths": ["impl-plans/active/p28-assembly.md", "src/telescreen/wiring.py", "src/telescreen/wiring_builders.py", "src/telescreen/wiring_collectors.py", "src/telescreen/api/app.py", "src/telescreen/cli.py", "src/telescreen/__main__.py", "tests/test_package.py", "tests/e2e/test_serve_static.py", "tests/e2e/test_api_routes.py", "tests/e2e/test_wiring_collectors.py", "tests/e2e/test_wiring_cli.py"],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "No source or test change unless a gate fails; every Verification-block command exits 0 on the current tree.",
+        "A new Progress Log session lists each final command, exit code and log path.",
+        "Step result verification lists only final passing commands; priorVerification empty; no mutation/superseded run outside the Progress Log."
+      ],
+      "verification": [
+        "set -o pipefail; uv run --frozen pytest -p no:cacheprovider tests/e2e/test_wiring_collectors.py tests/e2e/test_wiring_cli.py tests/e2e/test_api_routes.py tests/e2e/test_serve_static.py tests/test_package.py 2>&1 | tee /tmp/telescreen-p28-assembly-b3-focused.log",
+        "uv run --frozen ruff format --check --no-cache .",
+        "uv run --frozen ruff check --no-cache .",
+        "uv run --frozen python tools/typelint.py",
+        "uv run --frozen ty check",
+        "set -o pipefail; uv run --frozen pytest -p no:cacheprovider 2>&1 | tee /tmp/telescreen-p28-assembly-b3-pytest.log",
+        "uv build --out-dir /tmp/telescreen-p28-assembly-b3-dist",
+        "git diff --quiet -- pyproject.toml uv.lock",
+        "! grep -n 'CollectorSecrets(None, None)' src/telescreen/wiring.py",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p28-assembly.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p28b-e2e-flows",
+      "planPath": "impl-plans/active/p28b-e2e-flows.md",
+      "wave": "B3-2",
+      "dependsOn": ["p28-assembly"],
+      "mode": "implement from plan (tests only)",
+      "writePaths": ["impl-plans/active/p28b-e2e-flows.md", "tests/e2e/harness.py", "tests/e2e/test_flow_github_remediation.py", "tests/e2e/test_flow_sweep.py", "tests/e2e/test_flow_ingest.py", "tests/e2e/test_flow_chat.py"],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "GitHub credential-leak remediation runs end to end with SLA escalation, masked Slack, evidence reject/accept, police send-back then pass, run succeeded, audit chain valid.",
+        "Sweep succeeded with auto-resolve; partial without reconciliation; 409 conflict.",
+        "Push ingestion and chat flows pass; no raw value in any outbound body or API response; all offline."
+      ],
+      "verification": [
+        "set -o pipefail; uv run --frozen pytest -p no:cacheprovider tests/e2e 2>&1 | tee /tmp/telescreen-p28b-e2e-flows-pytest.log",
+        "uv run --frozen ruff format --check --no-cache tests/e2e",
+        "uv run --frozen ruff check --no-cache tests/e2e",
+        "uv run --frozen ty check tests/e2e",
+        "uv run --frozen python tools/typelint.py",
+        "set -o pipefail; uv run --frozen pytest -p no:cacheprovider 2>&1 | tee /tmp/telescreen-p28b-e2e-flows-pytest-all.log",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p28b-e2e-flows.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p28c-leak-matrix",
+      "planPath": "impl-plans/active/p28c-leak-matrix.md",
+      "wave": "B3-2",
+      "dependsOn": ["p28-assembly"],
+      "mode": "implement from plan (tests only)",
+      "writePaths": ["impl-plans/active/p28c-leak-matrix.md", "tests/leak"],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "All flows run through the real container with only the SQLite, in-memory search, MockTransport and FakeClock seams.",
+        "No sample (or separator-stripped variant) appears in DB text columns, logs, search documents, outbound bodies, evidence files, API responses, tracebacks or exception output; every sink is non-empty.",
+        "Image metadata stripping, scanner-unavailable 503, raw findings rejection and the UI fixture check pass."
+      ],
+      "verification": [
+        "set -o pipefail; uv run --frozen pytest -p no:cacheprovider tests/leak 2>&1 | tee /tmp/telescreen-p28c-leak-matrix-pytest.log",
+        "uv run --frozen ruff format --check --no-cache tests/leak",
+        "uv run --frozen ruff check --no-cache tests/leak",
+        "uv run --frozen ty check tests/leak",
+        "uv run --frozen python tools/typelint.py",
+        "set -o pipefail; uv run --frozen pytest -p no:cacheprovider 2>&1 | tee /tmp/telescreen-p28c-leak-matrix-pytest-all.log",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p28c-leak-matrix.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p29-examples-compose",
+      "planPath": "impl-plans/active/p29-examples-compose.md",
+      "wave": "B3-3",
+      "dependsOn": ["p28-assembly", "p28b-e2e-flows", "p28c-leak-matrix"],
+      "mode": "reconcile, document, final gates",
+      "writePaths": ["impl-plans/active/p29-examples-compose.md", "examples/compose", "examples/workflows", "tests/examples", "README.md"],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Compose reconciled with the CLI and UI serving; the four workflow examples pass `telescreen workflow validate`; tests/examples assertions pass; placeholder secrets only.",
+        "README documents setup, architecture, UI (dev, mock, screenshots), serve, webhooks, compose and the e2e/leak suites.",
+        "Full Python and web gates pass; screenshot smoke saved under tmp/ui-screenshots or the browser/docker gap recorded; design-docs untouched."
+      ],
+      "verification": [
+        "uv run --frozen ruff format --check --no-cache .",
+        "uv run --frozen ruff check --no-cache .",
+        "uv run --frozen python tools/typelint.py",
+        "uv run --frozen ty check",
+        "set -o pipefail; uv run --frozen pytest -p no:cacheprovider 2>&1 | tee /tmp/telescreen-p29-final-pytest.log",
+        "uv build --out-dir /tmp/telescreen-p29-final-dist",
+        "set -o pipefail; (cd src/web && (test -d node_modules || bun install --frozen-lockfile) && bun run typecheck && bun run test && bun run build --outDir /tmp/telescreen-p29-final-web --emptyOutDir) 2>&1 | tee /tmp/telescreen-p29-final-web.log",
+        "set -o pipefail; (cd src/web && bun run screenshots) 2>&1 | tee /tmp/telescreen-p29-screenshots.log",
+        "uv run --frozen telescreen workflow validate examples/workflows/github-credential-leak.yaml examples/workflows/slack-pii.yaml examples/workflows/gdrive-mynumber-sheet.yaml examples/workflows/drive-weekly-sweep.yaml",
+        "test -z \"$(git status --porcelain -- design-docs)\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p29-examples-compose.md)\" -eq 0"
+      ]
+    }
+  ],
+  "serialFinalization": {
+    "owner": "serial reconciliation after wave B3-3 joins (not a fanout plan)",
+    "steps": [
+      "Apply every Reconciliation request logged in the four plan Progress Logs one at a time, with fresh reads and sha256 before/after.",
+      "Re-run the full gates with logs under /tmp/telescreen-s345-final-*.log: uv run --frozen ruff format --check --no-cache . ; uv run --frozen ruff check --no-cache . ; uv run --frozen python tools/typelint.py ; uv run --frozen ty check ; uv run --frozen pytest -p no:cacheprovider ; uv build --out-dir /tmp/telescreen-s345-final-dist ; cd src/web && bun install --frozen-lockfile && bun run typecheck && bun run test && bun run build --outDir /tmp/telescreen-s345-final-web --emptyOutDir.",
+      "Confirm design-docs/** is unmodified (git status --porcelain -- design-docs is empty).",
+      "Archive accepted plans to impl-plans/completed only after integration review."
+    ]
+  }
+}

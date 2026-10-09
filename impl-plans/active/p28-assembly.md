@@ -9,8 +9,8 @@
 
 - planId: `p28-assembly` (the "p28a" row of architecture.md section 8, Run B2)
 - planPath: `impl-plans/active/p28-assembly.md`
-- wave: B2-1 (parallel with `p13-ui-workflows`, which edits only `src/web/src/pages`)
-- dependsOn: the 28 accepted plans at d6cffb3 (see the s342 dispatch manifest)
+- wave: B3-1 in the s345 manifest (runs alone; B2-1 in s342)
+- dependsOn: the 29 accepted plans at cdf195d (see the s345 dispatch manifest)
 - writePaths:
   - `impl-plans/active/p28-assembly.md`
   - `src/telescreen/wiring.py`
@@ -40,6 +40,19 @@ Run B2 splits the old p28 into three plans with disjoint write paths:
 Both p28b and p28c start after this plan. Do NOT create or edit `tests/leak/**`,
 `tests/e2e/harness.py` or `tests/e2e/test_flow_*.py`. The E2E and leak-matrix criteria
 moved to those plans.
+
+## Run B3 (s345): re-verify only
+
+The deliverables below are in the tree at cdf195d and pass all gates. In run B3:
+
+- Do not edit source or tests. Fresh-read and record sha256 of every writePath first.
+- Run the Verification block below once on the current tree, unchanged.
+- Append one Progress Log session listing each command, its exit code and log path.
+- Step result: `verification` lists ONLY those final passing commands; `priorVerification`
+  is empty; no mutation run or superseded attempt appears outside the Progress Log;
+  `addressedFeedback` lists only fixed findings; `findings`/`risks` only open items
+  (conventions 7a).
+- If a gate fails, fix only within this plan's writePaths, then re-run the whole block.
 
 ## Intent and Context
 

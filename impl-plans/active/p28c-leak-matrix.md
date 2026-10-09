@@ -9,9 +9,9 @@
 
 - planId: `p28c-leak-matrix`
 - planPath: `impl-plans/active/p28c-leak-matrix.md`
-- wave: B2-2 (parallel with `p28b-e2e-flows`; no shared files)
-- dependsOn: `p28-assembly` (collector registry and webhook secrets bound), plus the 28
-  accepted plans at d6cffb3
+- wave: B3-2 in the s345 manifest (B2-2 in s342; parallel with `p28b-e2e-flows`; no shared files)
+- dependsOn: `p28-assembly` (collector registry and webhook secrets bound), plus the 29
+  accepted plans at cdf195d
 - writePaths:
   - `impl-plans/active/p28c-leak-matrix.md`
   - `tests/leak` (directory; includes the existing `tests/leak/test_ui_fixtures.py`)
