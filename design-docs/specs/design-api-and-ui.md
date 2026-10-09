@@ -127,6 +127,10 @@ members) must never appear on the wire, so pydantic dataclass bodies never have 
 
 ### UI (`src/web`)
 
+Visual design, layout, components and page patterns follow
+`design-docs/specs/design-ui-sentry.md` (Sentry-based UI, owner decision 2026-10-09). That
+document takes precedence over the page descriptions below where they differ.
+
 Stack: SolidJS, TypeScript (strict), Vite, `@solidjs/router`, vitest, jsdom,
 `@solidjs/testing-library`. Package scripts (owned by foundation in `package.json`):
 `dev`, `build` (`vite build`), `typecheck` (`tsc --noEmit`), `test` (`vitest run`).

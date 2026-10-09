@@ -30,6 +30,11 @@ This directory contains reference materials for system design and implementation
 | Nemotron-Personas-Japan | https://huggingface.co/datasets/nvidia/Nemotron-Personas-Japan | NVIDIA synthetic Japanese personas, CC BY 4.0 (names/profiles for test templates) |
 | presidio-evaluator | https://pypi.org/project/presidio-evaluator/ | Template-based synthetic PII sentence generation with labels |
 | Faker | https://faker.readthedocs.io/ | Fake value providers (`ja_JP`, `en_US`) for filler data |
+| Sentry UI refresh (S.C.R.A.P.S.) | https://blog.sentry.io/sentry-has-a-bold-new-look | UI design base: chonky components, elevation model |
+| Sentry issues docs | https://docs.sentry.io/product/issues/ | Issue stream, views, states and issue details patterns |
+| Sentry source (FSL-1.1-Apache-2.0) | https://github.com/getsentry/sentry | Pattern reference only; do not copy code, assets or brand colors |
+| Lucide icons (ISC) | https://lucide.dev/license | UI icon set (`lucide-solid`) |
+| Rubik / Roboto Mono (OFL) | https://fonts.google.com/specimen/Rubik | UI fonts, self-hosted |
 | RFC 2606 / RFC 6761 | https://www.rfc-editor.org/rfc/rfc6761 | Reserved example and `.invalid` domains for fictitious email addresses |
 
 ## Reference Documents
