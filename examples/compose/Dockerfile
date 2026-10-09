@@ -19,7 +19,9 @@ WORKDIR /app
 COPY --from=python-build /dist/ /dist/
 RUN pip install --no-cache-dir /dist/*.whl \
     && rm -rf /dist \
-    && useradd --create-home --uid 10001 telescreen
+    && useradd --create-home --uid 10001 telescreen \
+    && mkdir -p /app/var/evidence \
+    && chown -R telescreen:telescreen /app/var
 COPY --from=web-build /app/src/web/dist/ /app/web/
 COPY examples/police/ /app/examples/police/
 USER telescreen

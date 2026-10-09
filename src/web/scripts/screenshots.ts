@@ -14,7 +14,7 @@ else {
   const buildCode = await new Promise<number>((resolveCode) => build.once("exit", (code) => resolveCode(code ?? 1)));
   if (buildCode !== 0) process.exitCode = buildCode;
   else {
-    const preview: ChildProcess = spawn("bun", ["x", "vite", "preview", "--outDir", output, "--port", "4319", "--strictPort"], { cwd: resolve(root, "src/web"), stdio: "ignore" });
+    const preview: ChildProcess = spawn("bun", ["x", "vite", "preview", "--outDir", output, "--host", "127.0.0.1", "--port", "4319", "--strictPort"], { cwd: resolve(root, "src/web"), stdio: "ignore" });
     try {
       let ready = false;
       for (let attempt = 0; attempt < 40 && !ready; attempt += 1) {
@@ -25,8 +25,8 @@ else {
       const browser = await chromium.launch({ executablePath, headless: true });
       try {
         const page = await browser.newPage(); let errors = 0;
-        page.on("pageerror", () => { errors += 1; });
-        page.on("console", (message) => { if (message.type() === "error") errors += 1; });
+        page.on("pageerror", (error) => { errors += 1; console.error(`[pageerror ${page.url()}] ${error.message}`); });
+        page.on("response", (response) => { if (response.status() >= 400) console.error(`[http ${response.status()}] ${response.url()}`); }); page.on("console", (message) => { if (message.type() === "error") { errors += 1; console.error(`[console ${page.url()}] ${message.text()}`); } });
         const pages = ["/issues", "/search?q=TELE", "/workflows", "/runs", "/police", "/collectors", "/escalation", "/audit", "/assistant", "/settings"];
         const discoverFirst = async (list: string, prefix: string): Promise<string | null> => { await page.goto(`http://127.0.0.1:4319${list}`, { waitUntil: "networkidle" }); return page.locator(`a[href^="${prefix}/"]`).first().getAttribute("href"); };
         const firstIssue = await discoverFirst("/issues", "/issues"); if (firstIssue !== null) pages.splice(1, 0, firstIssue);

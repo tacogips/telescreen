@@ -95,13 +95,17 @@ async def test_leak_matrix(
         assert sinks
         for label, text in sinks:
             assert find_leaks(text) == (), label
+        assert any(label.startswith("db:") and text for label, text in sinks), "db"
+        assert any(label.startswith("logs:") and text for label, text in sinks), "logs"
+        assert any(label.startswith("search:") and text for label, text in sinks), "search"
+        assert any(
+            label.startswith("outbound:https://slack.com") and text for label, text in sinks
+        ), "outbound:slack"
+        assert any("api.anthropic.com" in label and text for label, text in sinks), (
+            "outbound:anthropic"
+        )
+        assert any(label.startswith("evidence:") and text for label, text in sinks), "evidence"
         labels: tuple[str, ...] = tuple(label for label, _ in sinks)
-        assert any(label.startswith("db:") for label in labels)
-        assert any(label.startswith("logs:") for label in labels)
-        assert any(label.startswith("search:") for label in labels)
-        assert any(label.startswith("outbound:https://slack.com") for label in labels)
-        assert any("api.anthropic.com" in label for label in labels)
-        assert any(label.startswith("evidence:") for label in labels)
         assert len(tuple(label for label in labels if label.startswith("api-response:"))) >= 20
         assert "Uncaught exception" in exception_log
     finally:

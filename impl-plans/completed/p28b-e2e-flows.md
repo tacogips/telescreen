@@ -1,6 +1,6 @@
 # P28b End-to-End Flows (GitHub Remediation, Sweep, Push Ingestion, Chat) Implementation Plan
 
-**Status**: In Progress
+**Status**: Completed
 **Design Reference**: design-docs/specs/architecture.md section 8 (Run B2) and 9, design-docs/specs/design-collectors-and-ingestion.md (Per-kind behavior, Push ingestion API, Full sweeps, Assembly bindings), design-docs/specs/design-workflow-engine.md, design-docs/specs/design-map-reduce-sweeps.md, design-docs/specs/design-police-contract.md
 **Created**: 2026-10-09 (run B2, session 342; split out of p28-assembly)
 **Last Updated**: 2026-10-10 (run B4)
@@ -327,14 +327,14 @@ Evidence required:
 ## Completion Criteria
 
 - [x] `tests/e2e/harness.py` delivered (PairEnv, OutboundRecorder, E2EWorld, make_world, drain)
-- [ ] GitHub remediation flow passes end to end (escalation, masked Slack, evidence reject/accept, send-back, police pass, run succeeded, audit valid)
+- [x] GitHub remediation flow passes end to end (escalation, masked Slack, evidence reject/accept, send-back, police pass, run succeeded, audit valid)
 - [x] Sweep flow passes (succeeded with auto-resolve; partial without reconciliation; 409 conflict)
 - [x] Push ingestion flow passes (scan -> issue; raw findings -> 422; unknown source -> 404)
 - [x] Chat flow passes (tool executed against the DB; no raw value forwarded)
-- [ ] Verification passes on the final source (logs recorded); Reconciliation requests (if any) listed
-- [ ] Run B4 conformance check done (every item in "Run B4 Work" step 2 asserted; gaps filled only in owned files)
+- [x] Verification passes on the final source (logs recorded); Reconciliation requests (if any) listed
+- [x] Run B4 conformance check done (every item in "Run B4 Work" step 2 asserted; gaps filled only in owned files)
 - [x] Progress Log updated
-- [ ] Run B4 Progress Log session with the Owner resolution line, hashes and final passing commands only
+- [x] Run B4 Progress Log session with the Owner resolution line, hashes and final passing commands only
 
 ## Progress Log
 
@@ -353,3 +353,13 @@ Evidence required:
 **Hashes**: The `before:step6-implement` immutable snapshot records the five test/support source paths as missing; it records the plan SHA-256 as `ff5a0f83d2a3ca416f11af74e40a6f9dc8ceb9be70c948623b3ac33606637bf8`. Final source SHA-256: `tests/e2e/harness.py` `63b1c0fb64f9d69961301e02707c96d051c85f3ccfd4201b39cd6285f023b0b7`; `tests/e2e/test_flow_github_remediation.py` `5ffaf3dc1c4b0232e657cae24dde22b6eda639e5bb81042a39c35eee65da3dbb`; `tests/e2e/test_flow_sweep.py` `5a651597b142f54b08881083f49f970821aa17bdc4af9539e4726d6e57474217`; `tests/e2e/test_flow_ingest.py` `7a37df5985ae264c93bbf4f106c9813bf209ed1afad48e008591f1b6724caa73`; `tests/e2e/test_flow_chat.py` `6518067165b01a280de24b0b9cf3cfa4ba252099f5fcb7fdb96e663527321832`. Plan's final hash is captured in the Step 6 result.
 **Notes**: Dependency readiness used the runtime-owned acceptedPlanIds list, which includes `p28-assembly`. Changed test files are only the declared p28b write paths. The four newly added flow files contribute 7 tests; 6 pass and the remediation test remains unresolved. No source changes were made outside the assigned test paths. Workflow mode `issue-resolution`; issue reference: `workflowInput` (no GitHub issue), Telescreen v1 final run B3, `opus-luna-design-and-implement-review-loop-session-345`; dispatch `comm-005811`, intake `comm-005812`, design accepted `comm-005814`, plans accepted `comm-005816`. Read-only codex-agent reference: `/root/p28b_api_survey`.
 **Prior Attempts**: The sweep mock path matcher and response assertions were corrected; an intermediate run with the serialized SQLite worker reached success but exposed the plan's mistaken expectation of three root partitions instead of one root plus three shard items. The final E2E run passes all three sweep tests. The first format/Ruff check found one overlong sweep diagnostic line; it was reflowed and both final gates pass. Intermediate logs: `/tmp/telescreen-p28b-sweep-diag.log`, `/tmp/telescreen-p28b-sweep-concurrency-01.log`, `/tmp/telescreen-p28b-sweep-concurrency-02.log`. These are superseded by the final-source verification above; the remediation failure remains current.
+
+### Session: 2026-10-10 Run B4
+**Tasks Completed**: Fresh conformance audit confirmed every Run B4 Work step 2 assertion is present in the four flow tests; no test rewrite or source edit was needed. GitHub remediation, sweep, push ingestion, and chat flows pass on the current tree. All assigned scoped gates pass.
+**Tasks In Progress**: None.
+**Blockers**: None.
+**Reconciliation requests**: None. Owner resolution: the earlier p24 Reconciliation request was resolved by owner commit `e24a433`; the earlier exit-1 aggregates are superseded history.
+**Verification**: `uv run --frozen pytest -p no:cacheprovider tests/e2e` -> exit 0, 17 passed, 0 failed, 0 skipped (log: `/tmp/telescreen-p28b-e2e-flows-pytest.log`); `uv run --frozen ruff format --check --no-cache tests/e2e` -> exit 0 (log: `/tmp/telescreen-p28b-e2e-flows-format.log`); `uv run --frozen ruff check --no-cache tests/e2e` -> exit 0 (log: `/tmp/telescreen-p28b-e2e-flows-ruff.log`); `uv run --frozen ty check tests/e2e` -> exit 0 (log: `/tmp/telescreen-p28b-e2e-flows-ty.log`); `uv run --frozen python tools/typelint.py` with p28b path filter -> exit 0, no p28b diagnostics (log: `/tmp/telescreen-p28b-e2e-flows-typelint.log`); Python line-limit guard -> exit 0 (log: `/tmp/telescreen-p28b-e2e-flows-line-limit.log`); raw-token-pattern guard -> exit 0 (log: `/tmp/telescreen-p28b-e2e-flows-secret-pattern.log`); `test "$(grep -c '^- \[ \]' impl-plans/active/p28b-e2e-flows.md)" -eq 0` -> exit 0, zero unchecked criteria (log: `/tmp/telescreen-p28b-e2e-flows-checkboxes.log`). No whole-repository pytest was run.
+**Hashes**: `tests/e2e/harness.py` before=`63b1c0fb64f9d69961301e02707c96d051c85f3ccfd4201b39cd6285f023b0b7` after=`63b1c0fb64f9d69961301e02707c96d051c85f3ccfd4201b39cd6285f023b0b7`; `tests/e2e/test_flow_github_remediation.py` before=`5ffaf3dc1c4b0232e657cae24dde22b6eda639e5bb81042a39c35eee65da3dbb` after=`5ffaf3dc1c4b0232e657cae24dde22b6eda639e5bb81042a39c35eee65da3dbb`; `tests/e2e/test_flow_sweep.py` before=`5a651597b142f54b08881083f49f970821aa17bdc4af9539e4726d6e57474217` after=`5a651597b142f54b08881083f49f970821aa17bdc4af9539e4726d6e57474217`; `tests/e2e/test_flow_ingest.py` before=`7a37df5985ae264c93bbf4f106c9813bf209ed1afad48e008591f1b6724caa73` after=`7a37df5985ae264c93bbf4f106c9813bf209ed1afad48e008591f1b6724caa73`; `tests/e2e/test_flow_chat.py` before=`6518067165b01a280de24b0b9cf3cfa4ba252099f5fcb7fdb96e663527321832` after=`6518067165b01a280de24b0b9cf3cfa4ba252099f5fcb7fdb96e663527321832`.
+**Notes**: Workflow mode `issue-resolution`; issue reference `workflowInput` (no GitHub issue URL/number), p28b plan `impl-plans/active/p28b-e2e-flows.md`, workflow execution `nested-v1-e078e494773650aae3d369331dd47bfa85f818481b02e14d8714e158a3aa6ca0`, source workflow execution `opus-luna-design-and-implement-review-loop-session-1`; accepted plans include p28-assembly. Read-only codex-agent references: `/root/p28b_audit` (Run B4 conformance) and `/root/p28b_api_survey` (prior session survey).
+**Prior Attempts**: Earlier exit-1 aggregate attempts in the preceding session predated owner fix `e24a433` and are superseded. The first Run B4 shell wrapper used a zsh-reserved variable while capturing pytest's exit, so the passing suite was rerun under bash with a complete log and explicit exit 0; only that final run is listed above.

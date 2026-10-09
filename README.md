@@ -77,6 +77,20 @@ mise run web-ci
 ```
 
 For development, run `mise run web-install` and then `cd src/web && bun run dev`.
+Vite proxies API requests to `http://localhost:8000`; start the Bureau there when working
+against live data. To render every page with masked local fixtures and no backend, run
+`cd src/web && VITE_TELESCREEN_MOCK=1 bun run dev`. The mock data contains masked values.
+Run `cd src/web && bun run screenshots` for the screenshot smoke against the mock API
+(every page in light and dark themes plus the mobile Issues page, 27 images); it needs Chrome/Chromium or `TELESCREEN_SCREENSHOT_BROWSER` and writes images under
+`tmp/ui-screenshots/`. The visual reference is
+[`design-docs/specs/design-ui-sentry.md`](design-docs/specs/design-ui-sentry.md). The
+self-hosted Rubik and Roboto Mono fonts use the OFL licenses in `src/web/public/fonts/`;
+Lucide icons use ISC licensing.
+
+To serve a production build locally, run `cd src/web && bun run build`, then set
+`TELESCREEN_WEB_DIST=src/web/dist` when running `telescreen serve`. The directory must
+contain `index.html`; otherwise startup exits with code 3. The Python wheel does not
+include the separately built UI assets.
 
 ## Police workers
 
@@ -108,14 +122,18 @@ protocol with two transports: `PullQueueTransport` and `WebhookTransport`.
   containing a raw value is rejected with HTTP 422, and the task stays open, so the
   Police can resubmit a clean result before the deadline.
 
-Registering the push-delivery engine task and mounting the Police router into the
-assembled application belong to the assembly plan (`p28-assembly`).
-
 ## Local compose environment
 
-The quick-start deployment is under `examples/compose/`. Start it with
-`docker compose -f examples/compose/compose.yaml up --build`; configure credentials using
-secret references and environment variables described in the command design. Example
+The quick-start deployment is under `examples/compose/`. Follow
+[`examples/compose/README.md`](examples/compose/README.md), or start it from the repository
+root with `docker compose -f examples/compose/docker-compose.yml --env-file examples/compose/.env up --build`.
+The bureau serves the built UI from `/app/web`. The bureau and engine share accepted
+evidence through the `evidence-data` named volume, mounted at `/app/var/evidence` and
+owned by the non-root image user. The example Police uses its own fingerprint key,
+supplied through `POLICE_FINGERPRINT_KEY`. Slack and GitHub webhooks return HTTP 401 until `TELESCREEN_SLACK_SIGNING_SECRET` and
+`TELESCREEN_GITHUB_WEBHOOK_SECRET` are configured as secret references and the matching
+secret files are declared and mounted in Compose. Drive channel tokens are derived from
+the fingerprint key; there is no separate Drive channel variable. Example
 incident-response workflows are in `examples/workflows/`.
 
 ## Testing and checks
@@ -126,7 +144,8 @@ Run the Python format, lint, typing, test, and build gates with:
 mise run ci
 ```
 
-The default test suite is offline and uses fakes or in-memory SQLite. Tests requiring
+The end-to-end flows live in `tests/e2e`; the raw-value leak matrix over every sink lives
+in `tests/leak`. The default test suite is offline and uses fakes or in-memory SQLite. Tests requiring
 PostgreSQL or Meilisearch are marked `integration` and run only when
 `TELESCREEN_TEST_DATABASE_URL` or `TELESCREEN_TEST_MEILI_URL` is set. Frontend checks are
 available through `mise run web-ci`.

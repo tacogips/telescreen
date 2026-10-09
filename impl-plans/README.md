@@ -40,11 +40,9 @@ Large features are split into multiple related plans with cross-references.
 All plans share `impl-plans/conventions.md` (ownership, typing, verification and
 progress-log rules). Wave = 1 + max(wave of dependencies).
 
-| Plan | Wave | Status | Design Reference | Last Updated |
-|------|------|--------|------------------|--------------|
 "Integration-accepted" plans were accepted by an earlier run's integration review
-(sessions up to 339) and are committed. Each still lives in `active/` until a later serial
-cleanup archives it.
+(runs A through B4) and are committed. Each still lives in `active/` until a later serial
+cleanup archives it. No active plan has remaining implementation work.
 
 | Plan | Wave | Status | Design Reference | Last Updated |
 |------|------|--------|------------------|--------------|
@@ -58,9 +56,11 @@ cleanup archives it.
 | `active/p08-masking.md` | 3 | Integration-accepted (archival pending) | design-masking.md | 2026-10-09 |
 | `active/p09-detection-llm-ml.md` | 3 | Integration-accepted (archival pending) | design-detectors.md | 2026-10-09 |
 | `active/p10-api-common.md` | 3 | Integration-accepted (archival pending) | design-api-and-ui.md | 2026-10-09 |
-| `active/p12-ui-issues.md` | 3 | Ready (UI rework to design-ui-sentry.md, later run) | design-api-and-ui.md | 2026-10-08 |
-| `active/p13-ui-workflows.md` | 3 | Ready (UI rework to design-ui-sentry.md, later run) | design-api-and-ui.md | 2026-10-08 |
-| `active/p14-ui-ops.md` | 3 | Ready (UI rework to design-ui-sentry.md, later run) | design-api-and-ui.md | 2026-10-08 |
+| `active/p30-ui-design-system.md` | B1 | Integration-accepted (archival pending) | design-ui-sentry.md | 2026-10-09 |
+| `active/p31-ui-mock-api.md` | B1 | Integration-accepted (archival pending) | design-ui-sentry.md, design-synthetic-test-dataset.md | 2026-10-09 |
+| `active/p12-ui-issues.md` | 3 | Integration-accepted (archival pending) | design-ui-sentry.md | 2026-10-09 |
+| `active/p13-ui-workflows.md` | 3 | Integration-accepted (archival pending) | design-ui-sentry.md | 2026-10-09 |
+| `active/p14-ui-ops.md` | 3 | Integration-accepted (archival pending) | design-ui-sentry.md | 2026-10-09 |
 | `active/p22-collectors-google.md` | 3 | Integration-accepted (archival pending) | design-collectors-and-ingestion.md, design-map-reduce-sweeps.md | 2026-10-09 |
 | `active/p23-collectors-github.md` | 3 | Integration-accepted (archival pending) | design-collectors-and-ingestion.md | 2026-10-09 |
 | `active/p15-audit-search.md` | 4 | Integration-accepted (archival pending) | design-data-model.md, design-api-and-ui.md | 2026-10-09 |
@@ -70,8 +70,7 @@ cleanup archives it.
 | `active/p24-workflow-engine.md` | 4 | Integration-accepted (archival pending) | design-workflow-engine.md | 2026-10-09 |
 | `active/p25-workflow-nodes.md` | 4 | Integration-accepted (archival pending) | design-workflow-engine.md | 2026-10-09 |
 | `active/p27-assistant.md` | 4 | Integration-accepted (archival pending) | design-api-and-ui.md | 2026-10-09 |
-| `active/p29-examples-compose.md` | 4 | Ready (later run) | architecture.md s3 | 2026-10-08 |
-| `active/p28-assembly.md` | 5 | Ready (depends on every wave-3/4 feature plan, including the UI plans p07, p12, p13, p14). It also owns police router mounting and POLICE_PUSH_DELIVERY engine registration. | command.md, design-masking.md | 2026-10-09 |
+| `active/p28-assembly.md` | 5 | Integration-accepted (archival pending; run B3) | command.md, design-masking.md | 2026-10-10 |
 
 ## Completed Plans
 
@@ -82,6 +81,9 @@ cleanup archives it.
 | `completed/p17-notifications.md` | 4 | 2026-10-09 (run A2, session 340) | design-masking.md |
 | `completed/p19-police-bureau.md` | 4 | 2026-10-09 (run A2, session 340) | design-police-contract.md |
 | `completed/p26-workflow-mapreduce.md` | 4 | 2026-10-09 (run A2, session 340) | design-map-reduce-sweeps.md |
+| `completed/p28b-e2e-flows.md` | B4-1 | 2026-10-10 (run B4) | architecture.md s8-s9, design-workflow-engine.md, design-map-reduce-sweeps.md |
+| `completed/p28c-leak-matrix.md` | B4-1 | 2026-10-10 (run B4) | design-masking.md, architecture.md s7-s9, design-ui-sentry.md 8.3 |
+| `completed/p29-examples-compose.md` | B4-2 | 2026-10-10 (run B4) | architecture.md s3, s8, command.md |
 
 ## Phase Dependencies (for impl-exec-auto)
 
@@ -94,9 +96,15 @@ Only plans from eligible phases should be read to minimize context loading.
 |-------|--------|------------|
 | 1 | COMPLETED | - |
 | 2 | COMPLETED | Phase 1 |
-| 3 | IN_PROGRESS (remaining: p12, p13, p14) | Phase 2 (per-plan dependencies) |
-| 4 | IN_PROGRESS (remaining: p29) | Phase 3 (per-plan dependencies) |
-| 5 | BLOCKED (p28 waits for p12, p13, p14, p29) | Phase 4 |
+| 3 | COMPLETED | Phase 2 (per-plan dependencies) |
+| 4 | COMPLETED | Phase 3 (per-plan dependencies) |
+| 5 | COMPLETED | Phase 4 |
+| 6 | COMPLETED | Phase 5 |
+| 7 | COMPLETED | Phase 6 |
+
+Run B added `p30-ui-design-system.md` and `p31-ui-mock-api.md` (wave B1, before the
+reworked p12, p13 and p14), split the end-to-end and leak tests into p28b and p28c after
+p28, and moved p29 after them.
 
 ### Phase to Plans Mapping
 
@@ -109,8 +117,10 @@ PHASE_TO_PLANS = {
       "p22-collectors-google.md", "p23-collectors-github.md"],
   4: ["p15-audit-search.md", "p16-issues-ingest.md", "p17-notifications.md", "p18-evidence.md",
       "p19-police-bureau.md", "p20-collectors-core.md", "p24-workflow-engine.md", "p25-workflow-nodes.md",
-      "p26-workflow-mapreduce.md", "p27-assistant.md", "p29-examples-compose.md"],
-  5: ["p28-assembly.md"]
+      "p26-workflow-mapreduce.md", "p27-assistant.md"],
+  5: ["p28-assembly.md"],
+  6: ["p28b-e2e-flows.md", "p28c-leak-matrix.md"],
+  7: ["p29-examples-compose.md"]
 }
 ```
 
