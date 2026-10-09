@@ -30,6 +30,14 @@ def _matches(document: SearchDocument, constraint: SearchFilter) -> bool:
     return number >= bound if constraint.op.value == ">=" else number <= bound
 
 
+def _sort_value(document: SearchDocument, field_name: str) -> tuple[int, float | str]:
+    """Keep numeric fields numeric while giving other values stable string ordering."""
+    value: FieldValue | tuple[str, ...] | None = document.get(field_name)
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return (0, float(value))
+    return (1, str(value or "").casefold())
+
+
 @dataclass
 class InMemorySearchBackend(SearchBackend):
     """Simple case-insensitive substring search over indexed fields."""
@@ -81,6 +89,6 @@ class InMemorySearchBackend(SearchBackend):
         for sort_key in reversed(query.sort):
             field_name: str = sort_key.removesuffix(":desc").removesuffix(":asc")
             descending: bool = sort_key.endswith(":desc")
-            matches.sort(key=lambda doc: str(doc.get(field_name) or ""), reverse=descending)
+            matches.sort(key=lambda doc: _sort_value(doc, field_name), reverse=descending)
         total: int = len(matches)
         return SearchPage(tuple(matches[query.offset : query.offset + query.limit]), total)

@@ -1,16 +1,21 @@
 """Guarded search indexing and backend behavior tests."""
 
+import asyncio
+import os
 from datetime import UTC, datetime
 
 import httpx
 import pytest
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from telescreen.api.routers.search import SearchHit, _hit
 from telescreen.audit.service import AuditLogService
 from telescreen.core.clock import FakeClock
+from telescreen.core.errors import TelescreenError
 from telescreen.core.json import JsonValue, parse_json
 from telescreen.core.secrets import SecretValue
+from telescreen.core.vocabulary import ErrorCode
 from telescreen.db.models import AuditRecordRow, IssueRow
 from telescreen.detection import RuleDetector
 from telescreen.masking.index_guard import IndexGuard
@@ -218,3 +223,78 @@ async def test_meili_upsert_failure_is_absorbed_and_not_logged_with_response_bod
     assert "issue-clean" in caplog.text
     await http.aclose()
     await harness.close()
+
+
+@pytest.mark.asyncio
+async def test_indexer_absorbs_session_factory_failure_without_logging_error(
+    caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failed database load is absorbed and only index/document identifiers are logged."""
+    harness: SqliteHarness = await make_sqlite_harness()
+    clock: FakeClock = FakeClock(datetime(2026, 10, 9, tzinfo=UTC))
+    audit: AuditLogService = AuditLogService(clock, Redactor(RuleDetector()))
+
+    def fail_session(factory: async_sessionmaker[AsyncSession]) -> AsyncSession:
+        """Raise a sentinel when the indexer opens its session."""
+        del factory
+        raise RuntimeError("provider detail sentinel")
+
+    monkeypatch.setattr(async_sessionmaker, "__call__", fail_session)
+    indexer: DocumentIndexer = DocumentIndexer(
+        harness.sessions, InMemorySearchBackend(), IndexGuard(RuleDetector()), audit, clock
+    )
+    await indexer.index_issue("issue-load-failure")
+    assert "issue-load-failure" in caplog.text
+    assert "provider detail sentinel" not in caplog.text
+    await harness.close()
+
+
+@pytest.mark.asyncio
+async def test_meili_settings_failure_raises_static_provider_error() -> None:
+    """A failed settings PUT raises a static provider error without response text."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        """Return a settings failure with a sensitive-looking response body."""
+        if request.url.path == "/indexes":
+            return httpx.Response(409, json={"message": "already exists"})
+        return httpx.Response(500, text="provider detail sentinel")
+
+    http: httpx.AsyncClient = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    backend: MeiliSearchBackend = MeiliSearchBackend(http, "http://meili")
+    with pytest.raises(TelescreenError) as error:
+        await backend.ensure_indexes()
+    assert error.value.code is ErrorCode.PROVIDER_ERROR
+    assert error.value.detail == "Meilisearch settings update failed"
+    assert "provider detail sentinel" not in str(error.value)
+    await http.aclose()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_meili_integration_ensure_upsert_search_round_trip() -> None:
+    """The configured Meilisearch service accepts and returns an indexed document."""
+    base_url: str | None = os.environ.get("TELESCREEN_TEST_MEILI_URL")
+    if base_url is None:
+        pytest.skip("requires TELESCREEN_TEST_MEILI_URL")
+    http: httpx.AsyncClient = httpx.AsyncClient(timeout=10.0)
+    backend: MeiliSearchBackend = MeiliSearchBackend(http, base_url)
+    document: SearchDocument = SearchDocument(
+        "p15-integration-round-trip", (("display_title", "p15 integration marker"),)
+    )
+    indexed: bool = False
+    try:
+        await backend.ensure_indexes()
+        await backend.upsert(IndexName.ISSUES, (document,))
+        indexed = True
+        page: SearchPage = SearchPage((), 0)
+        for _ in range(25):
+            page = await backend.search(IndexName.ISSUES, SearchQuery("p15 integration marker"))
+            if page.total:
+                break
+            await asyncio.sleep(0.2)
+        assert page.total == 1
+        assert page.hits[0].id == document.id
+    finally:
+        if indexed:
+            await backend.delete(IndexName.ISSUES, (document.id,))
+        await http.aclose()

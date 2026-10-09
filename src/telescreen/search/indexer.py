@@ -100,48 +100,76 @@ class DocumentIndexer(SearchIndexer):
 
     async def index_issue(self, issue_id: str) -> None:
         """Index one issue after its transaction commits."""
-        async with self.sessions() as session:
-            row: IssueRow | None = await session.get(IssueRow, issue_id)
-            if row is None:
-                return
-            assignee: str | None = None
-            if row.assignee_member_id is not None:
-                member: MemberRow | None = await session.get(MemberRow, row.assignee_member_id)
-                assignee = member.id if member is not None else None
-            elif row.assignee_team_id is not None:
-                team: TeamRow | None = await session.get(TeamRow, row.assignee_team_id)
-                assignee = team.id if team is not None else None
-            document: SearchDocument = issue_document(row, assignee)
-        await self._submit(IndexName.ISSUES, document)
+        try:
+            async with self.sessions() as session:
+                row: IssueRow | None = await session.get(IssueRow, issue_id)
+                if row is None:
+                    return
+                assignee: str | None = None
+                if row.assignee_member_id is not None:
+                    member: MemberRow | None = await session.get(MemberRow, row.assignee_member_id)
+                    assignee = member.id if member is not None else None
+                elif row.assignee_team_id is not None:
+                    team: TeamRow | None = await session.get(TeamRow, row.assignee_team_id)
+                    assignee = team.id if team is not None else None
+                document: SearchDocument = issue_document(row, assignee)
+            await self._submit(IndexName.ISSUES, document)
+        except Exception:
+            logger.warning(
+                "index failed for document %s",
+                issue_id,
+                extra={"index": IndexName.ISSUES.value, "document_id": issue_id},
+            )
 
     async def index_finding(self, finding_id: str) -> None:
         """Index one finding after its transaction commits."""
-        async with self.sessions() as session:
-            row: FindingRow | None = await session.get(FindingRow, finding_id)
-            if row is None:
-                return
-            document: SearchDocument = finding_document(row)
-        await self._submit(IndexName.FINDINGS, document)
+        try:
+            async with self.sessions() as session:
+                row: FindingRow | None = await session.get(FindingRow, finding_id)
+                if row is None:
+                    return
+                document: SearchDocument = finding_document(row)
+            await self._submit(IndexName.FINDINGS, document)
+        except Exception:
+            logger.warning(
+                "index failed for document %s",
+                finding_id,
+                extra={"index": IndexName.FINDINGS.value, "document_id": finding_id},
+            )
 
     async def index_run(self, run_id: str) -> None:
         """Index one workflow run after its transaction commits."""
-        async with self.sessions() as session:
-            row: WorkflowRunRow | None = await session.get(WorkflowRunRow, run_id)
-            if row is None:
-                return
-            definition: WorkflowDefinitionRow | None = await session.get(
-                WorkflowDefinitionRow, row.definition_id
+        try:
+            async with self.sessions() as session:
+                row: WorkflowRunRow | None = await session.get(WorkflowRunRow, run_id)
+                if row is None:
+                    return
+                definition: WorkflowDefinitionRow | None = await session.get(
+                    WorkflowDefinitionRow, row.definition_id
+                )
+                document: SearchDocument = run_document(row, definition)
+            await self._submit(IndexName.RUNS, document)
+        except Exception:
+            logger.warning(
+                "index failed for document %s",
+                run_id,
+                extra={"index": IndexName.RUNS.value, "document_id": run_id},
             )
-            document: SearchDocument = run_document(row, definition)
-        await self._submit(IndexName.RUNS, document)
 
     async def index_audit_record(self, record_id: str) -> None:
         """Load and index one persisted audit record through the guard."""
-        async with self.sessions() as session:
-            row: AuditRecordRow | None = await session.scalar(
-                select(AuditRecordRow).where(AuditRecordRow.id == record_id)
+        try:
+            async with self.sessions() as session:
+                row: AuditRecordRow | None = await session.scalar(
+                    select(AuditRecordRow).where(AuditRecordRow.id == record_id)
+                )
+                if row is None:
+                    return
+                document: SearchDocument = audit_document(row)
+            await self._submit(IndexName.AUDIT, document)
+        except Exception:
+            logger.warning(
+                "index failed for document %s",
+                record_id,
+                extra={"index": IndexName.AUDIT.value, "document_id": record_id},
             )
-            if row is None:
-                return
-            document: SearchDocument = audit_document(row)
-        await self._submit(IndexName.AUDIT, document)

@@ -9,10 +9,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.core.clock import Clock
+from telescreen.core.errors import TelescreenError
 from telescreen.core.ids import new_id
-from telescreen.core.json import dump_json
-from telescreen.core.vocabulary import ActorKind, SourceFormat
+from telescreen.core.json import dump_json, json_object, json_str
+from telescreen.core.vocabulary import ActorKind, ErrorCode, SourceFormat
 from telescreen.db.models import EscalationPolicyRow
+from telescreen.masking.redact import Redactor
 from telescreen.ports.audit import AuditEntry, AuditLog
 from telescreen.workflow.dsl.escalation import (
     EscalationPolicySpec,
@@ -27,6 +29,7 @@ class EscalationPolicyService:
 
     audit: AuditLog
     clock: Clock
+    redactor: Redactor
 
     async def create(
         self,
@@ -36,6 +39,7 @@ class EscalationPolicyService:
         actor_ref: str,
     ) -> EscalationPolicyRow:
         """Create a policy after validating its source document."""
+        self._reject_sensitive_text(text)
         spec: EscalationPolicySpec = load_escalation_policy(text, source_format)
         row: EscalationPolicyRow = EscalationPolicyRow(
             id=new_id(),
@@ -58,6 +62,7 @@ class EscalationPolicyService:
         actor_ref: str,
     ) -> EscalationPolicyRow:
         """Replace the tiers of an existing policy."""
+        self._reject_sensitive_text(text)
         spec: EscalationPolicySpec = load_escalation_policy(text, source_format)
         row: EscalationPolicyRow | None = await session.scalar(
             select(EscalationPolicyRow).where(EscalationPolicyRow.name == name)
@@ -77,6 +82,13 @@ class EscalationPolicyService:
         return await session.scalar(
             select(EscalationPolicyRow).where(EscalationPolicyRow.name == name)
         )
+
+    def _reject_sensitive_text(self, text: str) -> None:
+        """Reject sensitive source before it can be stored or audited."""
+        if self.redactor.has_hits(text):
+            raise TelescreenError(
+                ErrorCode.RAW_VALUE_DETECTED, "Escalation policy contains sensitive data"
+            )
 
     async def list(self, session: AsyncSession) -> Sequence[EscalationPolicyRow]:
         """Return all policies in name order."""
@@ -106,6 +118,6 @@ class EscalationPolicyService:
                 "escalation_policy",
                 row.id,
                 "Escalation policy updated",
-                escalation_to_json(spec),
+                json_object((("name", json_str(row.name)),)),
             ),
         )

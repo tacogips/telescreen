@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import httpx
 
+from telescreen.core.errors import TelescreenError
 from telescreen.core.json import (
     JsonKind,
     JsonValue,
@@ -15,6 +16,7 @@ from telescreen.core.json import (
     parse_json,
 )
 from telescreen.core.secrets import SecretValue
+from telescreen.core.vocabulary import ErrorCode
 from telescreen.search.backend import (
     FieldValue,
     IndexName,
@@ -121,11 +123,15 @@ class MeiliSearchBackend(SearchBackend):
                     ),
                 )
             )
-            await self.http.put(
+            settings_response: httpx.Response = await self.http.put(
                 f"{self.base_url.rstrip('/')}/indexes/{index.value}/settings",
                 headers=self._headers(),
                 content=dump_json(settings_json),
             )
+            if not settings_response.is_success:
+                raise TelescreenError(
+                    ErrorCode.PROVIDER_ERROR, "Meilisearch settings update failed"
+                )
 
     async def upsert(self, index: IndexName, documents: tuple[SearchDocument, ...]) -> None:
         """Submit documents using their stable id primary key."""

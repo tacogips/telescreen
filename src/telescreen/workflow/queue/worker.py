@@ -12,12 +12,11 @@ from typing import Protocol
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from telescreen.core.clock import Clock
-from telescreen.core.vocabulary import EngineTaskKind, ErrorCode
+from telescreen.core.vocabulary import EngineTaskKind, EngineTaskStatus, ErrorCode
 from telescreen.ports.workflow import (
     ClaimedTask,
     TaskHandler,
     TaskResult,
-    TaskResultKind,
 )
 from telescreen.workflow.queue.sql_queue import SqlTaskQueue
 from telescreen.workflow.scheduler.service import Scheduler
@@ -69,7 +68,7 @@ class EngineWorker:
         """Poll until stopped, reclaiming leases and ticking schedules each pass."""
         while not stop.is_set():
             async with self.sessions.begin() as session:
-                await self.queue.reclaim_expired(session)
+                await self.queue.reclaim_expired(session, self.clock.now())
             await self.scheduler.tick()
             claimed: list[ClaimedTask] = await self._claim()
             if claimed:
@@ -82,7 +81,7 @@ class EngineWorker:
         processed: int = 0
         for _ in range(max_rounds):
             async with self.sessions.begin() as session:
-                await self.queue.reclaim_expired(session)
+                await self.queue.reclaim_expired(session, self.clock.now())
             await self.scheduler.tick()
             claimed: list[ClaimedTask] = await self._claim()
             if not claimed:
@@ -117,7 +116,8 @@ class EngineWorker:
                     self.clock.now() + delay,
                     ErrorCode.INTERNAL_ERROR,
                 )
+        final_status: EngineTaskStatus | None = None
         async with self.sessions.begin() as session:
-            await self.queue.apply_result(session, task.id, result)
-        if result.kind is TaskResultKind.DEAD and self.dead_hook is not None:
+            final_status = await self.queue.apply_result(session, task.id, result)
+        if final_status is EngineTaskStatus.DEAD and self.dead_hook is not None:
             await self.dead_hook.on_dead(task)

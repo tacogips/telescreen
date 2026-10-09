@@ -154,19 +154,23 @@ def _jpeg(metadata: bytes) -> bytes:
     return b"\xff\xd8" + app0 + app1 + comment + scan_header + b"pixels\xff\xd9"
 
 
-def _webp() -> bytes:
+def _webp(metadata: bytes = b"gps!") -> bytes:
     """Build a WebP VP8X container with EXIF and XMP chunks."""
     vp8x: bytes = bytes((0x0C,)) + bytes(9)
+    exif_padding: bytes = b"\x00" if len(metadata) % 2 else b""
+    xmp_padding: bytes = b"\x00" if len(metadata) % 2 else b""
     chunks: bytes = (
         b"VP8X"
         + len(vp8x).to_bytes(4, "little")
         + vp8x
         + b"EXIF"
-        + (4).to_bytes(4, "little")
-        + b"gps!"
+        + len(metadata).to_bytes(4, "little")
+        + metadata
+        + exif_padding
         + b"XMP "
-        + (3).to_bytes(4, "little")
-        + b"abc\x00"
+        + len(metadata).to_bytes(4, "little")
+        + metadata
+        + xmp_padding
     )
     payload: bytes = b"WEBP" + chunks
     return b"RIFF" + len(payload).to_bytes(4, "little") + payload
@@ -267,6 +271,31 @@ async def test_image_metadata_is_stripped_and_sensitive_verdict_is_rejected(tmp_
     await harness.close()
 
 
+@pytest.mark.asyncio
+async def test_truncated_png_upload_records_only_safe_rejection_metadata(tmp_path: Path) -> None:
+    """Reject malformed PNG uploads without storing their bytes."""
+    harness: SqliteHarness = await make_sqlite_harness()
+    service: EvidenceService = await _service(
+        harness,
+        tmp_path / "evidence",
+        FixedImageScanner(ImageVerdict(False, ())),
+        RecordingAudit([]),
+        RecordingIssues([]),
+    )
+    with pytest.raises(TelescreenError) as rejected:
+        await service.upload("issue", "step", "broken.png", _png(b"metadata")[:-5], "member:1")
+    assert rejected.value.code is ErrorCode.EVIDENCE_REJECTED
+    assert rejected.value.detail == "malformed_image"
+    async with harness.sessions() as session:
+        rows: list[EvidenceRow] = list((await session.scalars(select(EvidenceRow))).all())
+    assert len(rows) == 1
+    assert rows[0].verdict == "rejected"
+    assert rows[0].rejection_rule_classes == "malformed_image"
+    assert rows[0].sha256 is None and rows[0].storage_key is None
+    assert not (tmp_path / "evidence").exists()
+    await harness.close()
+
+
 def test_classification_rejects_mismatched_unknown_and_invalid_utf8() -> None:
     """Reject unsupported extensions, mismatched signatures and invalid UTF-8."""
     cases: tuple[tuple[str, bytes], ...] = (
@@ -289,7 +318,24 @@ def test_strippers_handle_webp_flags_and_reject_truncated_images() -> None:
     assert b"EXIF" not in stripped_webp and b"XMP " not in stripped_webp
     stripped_png: bytes = strip_metadata("image/png", _png(b"metadata"))
     assert b"tEXt" not in stripped_png
-    assert stripped_png.endswith(_png_chunk(b"IEND", b""))
+    metadata_types: frozenset[bytes] = frozenset({b"tEXt", b"iTXt", b"zTXt", b"eXIf", b"tIME"})
+    offset: int = 8
+    saw_iend: bool = False
+    while offset < len(stripped_png):
+        length: int = int.from_bytes(stripped_png[offset : offset + 4], "big")
+        chunk_type: bytes = stripped_png[offset + 4 : offset + 8]
+        chunk_end: int = offset + 12 + length
+        assert chunk_end <= len(stripped_png)
+        chunk_data: bytes = stripped_png[offset + 8 : offset + 8 + length]
+        stored_crc: int = int.from_bytes(stripped_png[offset + 8 + length : chunk_end], "big")
+        assert stored_crc == zlib.crc32(chunk_type + chunk_data) & 0xFFFFFFFF
+        assert chunk_type not in metadata_types
+        offset = chunk_end
+        if chunk_type == b"IEND":
+            saw_iend = True
+            assert length == 0 and offset == len(stripped_png)
+            break
+    assert saw_iend
     stripped_jpeg: bytes = strip_metadata("image/jpeg", _jpeg(b"exif"))
     assert b"\xff\xe1" not in stripped_jpeg and b"\xff\xfe" not in stripped_jpeg
     assert b"\xff\xe0" in stripped_jpeg and stripped_jpeg.endswith(b"\xff\xd9")
@@ -381,6 +427,21 @@ async def test_api_rejection_and_over_size_are_safe(tmp_path: Path) -> None:
             content=b"0" * 300,
         )
         assert too_large.status_code == 413
+        mismatched: HttpxResponse = await client.put(
+            "/api/evidence?issue_id=issue&filename=private.png",
+            headers=headers,
+            content=b"\xff\xd8\xffjpeg-fixture",
+        )
+        assert mismatched.status_code == 415
+        assert "private.png" not in mismatched.text and "jpeg-fixture" not in mismatched.text
+        unsupported: HttpxResponse = await client.put(
+            "/api/evidence?issue_id=issue&filename=private.exe",
+            headers=headers,
+            content=b"unsupported-fixture",
+        )
+        assert unsupported.status_code == 415
+        assert "private.exe" not in unsupported.text
+        assert "unsupported-fixture" not in unsupported.text
         sample: Sample = github_token()
         # The service limit is deliberately larger than the router limit in this test.
         rejected: HttpxResponse = await client.put(
@@ -410,6 +471,31 @@ async def test_api_rejection_and_over_size_are_safe(tmp_path: Path) -> None:
         )
         assert content.status_code == 200
         assert content.content == b"Clean remediation notes"
+    await harness.close()
+
+
+@pytest.mark.asyncio
+async def test_webp_upload_strips_secret_metadata_and_repairs_container(tmp_path: Path) -> None:
+    """Strip WebP EXIF/XMP secrets and retain a valid metadata-free container."""
+    harness: SqliteHarness = await make_sqlite_harness()
+    sample: Sample = github_token()
+    store_root: Path = tmp_path / "evidence"
+    service: EvidenceService = await _service(
+        harness,
+        store_root,
+        FixedImageScanner(ImageVerdict(False, ())),
+        RecordingAudit([]),
+        RecordingIssues([]),
+    )
+    row: EvidenceRow = await service.upload(
+        "issue", "step", "photo.webp", _webp(sample.value.encode()), "member:1"
+    )
+    stored: bytes = await service.content(row.id)
+    assert_no_leaks(stored.decode("latin-1"), "stored WebP bytes")
+    assert int.from_bytes(stored[4:8], "little") == len(stored) - 8
+    assert stored[12:16] == b"VP8X"
+    assert stored[20] & 0x0C == 0
+    assert b"EXIF" not in stored and b"XMP " not in stored
     await harness.close()
 
 

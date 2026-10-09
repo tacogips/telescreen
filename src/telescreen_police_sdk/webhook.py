@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+import httpx
+
 from telescreen_police_sdk import _json
-from telescreen_police_sdk.client import BureauClient
+from telescreen_police_sdk.client import BureauClient, BureauError
 from telescreen_police_sdk.models import (
     Callback,
     ResultEnvelope,
@@ -19,6 +22,8 @@ from telescreen_police_sdk.models import (
 )
 from telescreen_police_sdk.signing import NonceCache, VerifyResult, verify
 from telescreen_police_sdk.worker import TaskHandler
+
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 class WebhookMode(StrEnum):
@@ -104,7 +109,12 @@ class WebhookHandler:
             complete_locators=result.complete_locators,
             contract_version=result.contract_version,
         )
-        await self.client.callback(callback.url, callback_result, self.secret)
+        try:
+            await self.client.callback(callback.url, callback_result, self.secret)
+        except BureauError as error:
+            logger.warning("Police callback failed with HTTP status %d", error.status)
+        except httpx.HTTPError as error:
+            logger.warning("Police callback failed with %s", type(error).__name__)
 
     @staticmethod
     async def _run_handler(handler: TaskHandler, envelope: TaskEnvelope) -> ResultEnvelope:

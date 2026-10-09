@@ -1,15 +1,17 @@
 """Collector and Police partition handling with idempotent page writes."""
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from telescreen.core.clock import Clock
+from telescreen.core.errors import TelescreenError
 from telescreen.core.ids import new_id
 from telescreen.core.json import JsonValue, dump_json, json_object, json_str
-from telescreen.core.vocabulary import EngineTaskKind, MapJobStatus, MapPartitionStatus
+from telescreen.core.vocabulary import EngineTaskKind, ErrorCode, MapJobStatus, MapPartitionStatus
 from telescreen.db.models import MapItemRow, MapJobRow, MapPartitionRow
 from telescreen.masking.redact import Redactor
 from telescreen.ports.collectors import (
@@ -17,15 +19,16 @@ from telescreen.ports.collectors import (
     CollectorConfigReader,
     CollectorSelector,
     PoliceSelector,
+    RateLimited,
 )
 from telescreen.ports.police import PoliceGateway, PoliceTaskRequest
 from telescreen.ports.sweeps import CollectorSweeper, PartitionPage, PartitionRequest
-from telescreen.ports.workflow import TaskQueue, TaskSpec
+from telescreen.ports.workflow import ClaimedTask, TaskQueue, TaskResult, TaskSpec
 from telescreen.workflow.mapreduce.spec import MapJobSpec
 from telescreen.workflow.mapreduce.utils import spec_from_json
 
 
-@dataclass(frozen=True)
+@dataclass
 class MapPartitionHandler:
     """Handle a single durable partition page or Police partition request."""
 
@@ -36,8 +39,14 @@ class MapPartitionHandler:
     redactor: Redactor
     clock: Clock
     queue: TaskQueue
+    kind: EngineTaskKind = EngineTaskKind.MAP_PARTITION
 
-    async def handle(self, partition_id: str) -> None:
+    async def handle(self, task: ClaimedTask) -> TaskResult:
+        """Handle a claimed partition task through the durable queue contract."""
+        await self._handle_id(task.ref_id)
+        return TaskResult.done()
+
+    async def _handle_id(self, partition_id: str) -> None:
         """Partition through the selected adapter or enqueue a Police request."""
         async with self.sessions.begin() as session:
             partition: MapPartitionRow | None = await session.get(MapPartitionRow, partition_id)
@@ -88,7 +97,57 @@ class MapPartitionHandler:
             request: PartitionRequest = PartitionRequest(
                 partition.corpus_key, partition.cursor, selector
             )
-        page: PartitionPage = await self.sweeper.partition(job.collector_config_id, request)
+        try:
+            page: PartitionPage = await self.sweeper.partition(job.collector_config_id, request)
+        except RateLimited as error:
+            async with self.sessions.begin() as session:
+                row: MapPartitionRow | None = await session.get(MapPartitionRow, partition_id)
+                current_job: MapJobRow | None = await session.get(MapJobRow, job.id)
+                if row is not None and current_job is not None:
+                    paused_until: datetime = self.clock.now() + timedelta(
+                        seconds=error.retry_after_seconds or 5
+                    )
+                    row.status = MapPartitionStatus.READY.value
+                    current_job.paused_until = paused_until
+                    await self.queue.enqueue(
+                        session,
+                        TaskSpec(
+                            EngineTaskKind.MAP_PARTITION,
+                            row.id,
+                            json_str(row.id),
+                            paused_until,
+                            f"mappart:{row.id}:{row.attempt}:rate-limit:{int(paused_until.timestamp())}",
+                        ),
+                    )
+            return
+        except Exception as error:
+            code: str = error.code.value if isinstance(error, TelescreenError) else "fetch_failed"
+            async with self.sessions.begin() as session:
+                row = await session.get(MapPartitionRow, partition_id)
+                current_job = await session.get(MapJobRow, job.id)
+                if row is not None and current_job is not None:
+                    row.status = (
+                        MapPartitionStatus.FAILED.value
+                        if row.attempt >= 3
+                        else MapPartitionStatus.READY.value
+                    )
+                    if row.status == MapPartitionStatus.FAILED.value:
+                        row.police_task_id = None
+                        row.cursor = code
+                    else:
+                        row.attempt += 1
+                        await self.queue.enqueue(
+                            session,
+                            TaskSpec(
+                                EngineTaskKind.MAP_PARTITION,
+                                row.id,
+                                json_str(row.id),
+                                self.clock.now(),
+                                f"mappart:{row.id}:{row.attempt}:retry",
+                            ),
+                        )
+                    await self._complete_partitioning(session, current_job)
+            return
         async with self.sessions.begin() as session:
             row: MapPartitionRow | None = await session.get(MapPartitionRow, partition_id)
             current_job: MapJobRow | None = await session.get(MapJobRow, job.id)
@@ -109,6 +168,7 @@ class MapPartitionHandler:
             return
         if any(self.redactor.has_hits(dump_json(shard.descriptor)) for shard in page.shards):
             partition.status = MapPartitionStatus.FAILED.value
+            partition.cursor = ErrorCode.RAW_VALUE_DETECTED.value
             partition.police_task_id = None
             return
         for shard in page.shards:

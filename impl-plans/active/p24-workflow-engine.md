@@ -1,6 +1,6 @@
 # P24 Durable Workflow Engine, Queue, Scheduler, Human Tasks, Escalation and Workflow APIs Implementation Plan
 
-**Status**: In Progress (run A resume, session 338)
+**Status**: Completed (implementation, run A session 338; formal review downstream)
 **Design Reference**: design-docs/specs/design-workflow-engine.md (Engine semantics, Queue and worker, Human tasks SLA and escalation, Triggers), design-docs/specs/notes.md (polling queue rationale), design-docs/specs/design-api-and-ui.md (Endpoints: Workflows, Runs, Human tasks, Escalation)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -257,7 +257,7 @@ uv run --frozen ruff format --check --no-cache $P
 uv run --frozen ruff check --no-cache $P
 uv run --frozen ty check $P
 uv run --frozen pytest -p no:cacheprovider tests/workflow/engine 2>&1 | tee /tmp/telescreen-p24-workflow-engine-pytest.log
-uv run --frozen python tools/typelint.py > /tmp/telescreen-p24-workflow-engine-typelint.log 2>&1; grep -E '^(src/telescreen/workflow/(engine|queue|scheduler|escalation|triggers)|src/telescreen/workflow/executors/(__init__|flow|human)\.py|src/telescreen/api/routers/(workflows|runs|human_tasks|escalation)\.py|tests/workflow/engine)' /tmp/telescreen-p24-workflow-engine-typelint.log   # prints nothing
+uv run --frozen python tools/typelint.py > /tmp/telescreen-p24-workflow-engine-typelint.log 2>&1; ! grep -E '(^|/)(src/telescreen/workflow/(engine|queue|scheduler|escalation|triggers)|src/telescreen/workflow/executors/(__init__|flow|human)\.py|src/telescreen/api/routers/(workflows|runs|human_tasks|escalation)\.py|tests/workflow/engine)' /tmp/telescreen-p24-workflow-engine-typelint.log   # no p24 diagnostics
 ```
 
 ## Run A Resume (2026-10-09, session 338)
@@ -269,52 +269,26 @@ near 1000, move send-back/join helpers into a new `workflow/engine/flow_ops.py`.
 go into new files (for example `tests/workflow/engine/test_engine_runA.py`,
 `test_routers.py`). Static gap review (s338 planning) found:
 
-- [ ] R0 Baseline: run the Verification block on the untouched tree; log exit codes to
-  `/tmp/telescreen-p24-workflow-engine-baseline-*.log` before any edit.
-- [ ] R1 Send-back (Task 3) must cancel open `human_tasks` (and their `sla_check` tasks via
-  `cancel_by_ref`) of steps visited after the target. Test: triage -> review (human open)
-  -> send_back to triage -> the review human task is `cancelled`, no SLA check stays ready.
-- [ ] R2 Optimistic lock (Task 3 step 5): run updates must be conditional on the loaded
-  `lock_version` (`UPDATE ... WHERE id = :id AND lock_version = :expected`); zero rows ->
-  roll back and return `TaskResult.retry(now + 1 s, conflict)`. Test: bump
-  `lock_version` with raw SQL between load and apply (a test hook or a fake repository
-  method) -> handler returns retry and no transition is written.
-- [ ] R3 Retry policy: `_failed` must use the step's `retry` (`RetrySpec.max_attempts`,
-  `backoff`) or the workflow default from `src/telescreen/workflow/dsl/model.py`; fall back
-  to 5 attempts / 10 s only when neither is set. Test: `retry: {max_attempts: 2,
-  backoff: 30s}` -> one retry at +30 s, then `on_error`.
-- [ ] R4 Child runs: every terminal path of a child run (including `loop_limit_exceeded`
-  and a missing route target) calls `_notify_parent_finished`. Test: a child that hits the
-  loop guard -> the parent routes `failed`.
-- [ ] R5 Dead hook: `queue/worker.py` must call `dead_hook.on_dead` whenever the applied
-  final status is `dead`, including a RETRY or exception converted to dead by
-  `apply_result` (have `apply_result` return the final status). Test through
-  `EngineWorker.run_until_idle`, not by calling `fail_dead_step` directly.
-- [ ] R6 Triggers (Task 5): dedupe by workflow NAME across versions (join definitions), not
-  by `definition_id`. Test: an active run of v1 for the issue blocks a v2 start. (The
-  severity order `(MEDIUM, HIGH)` already covers every `Severity` member; no change.)
-- [ ] R7 Smaller fixes: `human.py` stores the rendered assignee ref; `ConditionExecutor`
-  records `type_mismatch` in the transition reason; `definitions.upload` checks the map
-  collector kind is sweep-capable (`sweep_unsupported`); `sql_queue.reclaim_expired` takes
-  `now` per Task 1.
-- [ ] R8 Missing tests: send-back reason containing a sample is stored masked; workflow
-  upload with a sample through `upload` and through the router -> 422 with no echo; join
-  `any` asserts exactly one continuation and the other branch cancelled; router tests for
-  workflows (create/validate/activate/start), runs (list/get/cancel) and escalation
-  policies (create/put with admin; read with read scope); `EscalationPolicyService`
-  rejects a `tiers_json` containing a sample (`redactor.has_hits`) and the
-  `workflow.uploaded` audit details hold ids and version only (not the compiled workflow).
-- [ ] R9 Re-run the full Verification block and `wc -l` on every p24 file; every command
-  exits 0; log paths recorded.
+- [x] R0 Baseline: untouched-tree scoped format, Ruff, ty and pytest passed; logs are
+  `/tmp/telescreen-p24-workflow-engine-baseline-{format,ruff,ty,pytest,typelint}.log`.
+- [x] R1 Send-back cancels open later-step human tasks and their SLA tasks; masked reason regression passes.
+- [x] R2 Run advances use `UPDATE ... WHERE id AND lock_version`; conflict retries do not consume task attempts, including six consecutive stale rounds, and later advance normally.
+- [x] R3 Step retry limit/backoff is honored; max-attempt exhaustion routes to `on_error`.
+- [x] R4 Child failures from the loop guard and child cancellation notify the parent; missing-route terminal paths notify too.
+- [x] R5 Worker invokes the dead hook when applying a retry produces final `dead` status.
+- [x] R6 Trigger dedupe joins active runs by workflow name across definition versions.
+- [x] R7 Redacted assignee storage, condition mismatch transition reason, sweep-capability validation, and explicit queue reclaim time are covered.
+- [x] R8 Upload and router masking, join-any single continuation, workflow/run/escalation routes and scopes, sensitive escalation rejection, and metadata-only upload audit are covered.
+- [x] R9 Final scoped gates and line counts are recorded below; all files remain under 1,000 lines.
 
 ## Completion Criteria
 
 - [x] Queue, worker, scheduler, engine, definitions, flow and human executors, escalation, triggers and the four routers delivered with the exact names
-- [ ] Every test case above passes, plus R1-R8
-- [ ] No file over 1000 lines (`wc -l` recorded on the final tree)
-- [ ] Run A Resume items R0-R9 checked with evidence
-- [ ] Scoped verification passes on the final tree; logs recorded
-- [ ] Progress Log updated (run A session)
+- [x] Every test case above passes, plus R1-R8
+- [x] No file over 1000 lines (`wc -l` recorded on the final tree)
+- [x] Run A Resume items R0-R9 checked with evidence
+- [x] Scoped verification passes on the final tree; logs recorded
+- [x] Progress Log updated (run A session)
 
 ## Progress Log
 
@@ -338,3 +312,21 @@ go into new files (for example `tests/workflow/engine/test_engine_runA.py`,
 **Hashes**: Before: plan `0d06ac1353d3fad03f2aae0611a4ab838ec841c6b35177b69a41b37d124fa2de`; engine `8d62bede2c91e4590b5719230353a1479ddb1966810994abc6ff2af12e9abd66`; human executor `b77492d5e196ae1ffc00e94760086c54efc98f483c7dd92c336ed7aba35115da`; extended tests `68290b8f2e60391424fd035b358c6fc425d3299fbb7d3d48bff75ca6465463d8`. After hashes are recorded in `tmp/telescreen-v1-20261008-s319/p24-workflow-engine/source-hashes-continuation-final.sha256`.
 **Verification**: Using the exact p24 `P` scope from the Verification section: `uv run --frozen ruff format --check --no-cache $P` -> exit 0 (`ruff-format-continuation-final.log`); `uv run --frozen ruff check --no-cache $P` -> exit 0 (`ruff-check-continuation-final.log`); `uv run --frozen ty check $P` -> exit 0 (`ty-continuation-final.log`); `uv run --frozen python tools/typelint.py <p24 scope>` -> exit 0, 20 files clean (`typelint-scoped-continuation-final.log`); `uv run --frozen python tools/typelint.py` -> exit 0, 249 files clean (`typelint-full-continuation-final.log`); `uv run --frozen pytest -p no:cacheprovider tests/workflow/engine` -> exit 0, 19 passed (`pytest-continuation-final.log`); no-dynamic-evaluation grep -> exit 0; `wc -l <p24 paths>` -> exit 0, 4,389 lines, all files under 1,000 (`wc-lines-continuation-post-plan.log`). Logs are under `tmp/telescreen-v1-20261008-s319/p24-workflow-engine/`.
 **Notes**: All files remain below 1,000 lines; `engine.py` is 712 lines, `test_engine_extended.py` is 793 lines, and this plan is 292 lines. One test exposed that `cancel_run` left the human task's SLA check ready; the fix cancels that task. Earlier failed fixture iterations and the pre-fix cancellation failure are preserved in the evidence directory; final-source scoped pytest passed. Codex agent `/root/p24_port_audit` performed a read-only API/model audit and made no edits. Workflow mode is `issue-resolution`; issue URL, number and repository were not supplied. Review gates remain owned by later workflow steps.
+
+### Session: 2026-10-09 Run A implementation resume (session 338)
+**Tasks Completed**: Closed resume gaps R0-R9: optimistic run version checks; send-back cancellation and redaction; configured retry/backoff; child terminal propagation; final dead-hook dispatch; cross-version trigger dedupe; safe assignee, condition note, map sweep validation and metadata-only workflow audit; expanded API and behavior regressions.
+**Tasks In Progress**: None for p24 implementation. Formal integrity/adversarial review and serial integration/finalization are downstream.
+**Blockers**: None within p24 writePaths.
+**Reconciliation requests**: None.
+**Hashes**: Pre-edit snapshot hashes are in the runtime fanout evidence and `pre-edit-hashes.sha256`; final source hashes: `tmp/telescreen-v1-20261009-s338/p24-workflow-engine/source-hashes-final.sha256`. Per-edit intents and snapshots are under the same evidence directory.
+**Verification**: Scoped format/check, Ruff, ty and `pytest -p no:cacheprovider tests/workflow/engine` passed (31 tests); complete logs: `/tmp/telescreen-p24-workflow-engine-{format-check-final,ruff-final,ty-final,pytest-final}.log`. Filtered p24 typelint has no diagnostics; complete log `/tmp/telescreen-p24-workflow-engine-typelint-final.log`. Final line-count evidence `/tmp/telescreen-p24-workflow-engine-wc-lines-final-plan-update.log` (largest p24 Python file 793 lines; plan 323 lines; no file >=1000).
+**Notes**: The full-tree typelint process returned exit 1 for three unrelated TL003 findings owned by p26 in `src/telescreen/workflow/mapreduce/{partition,shard,sink}.py`; p24 filtered typelint is clean. Workflow mode `issue-resolution`; issue reference is `workflowInput` (no issue URL/number); execution `opus-luna-design-and-implement-review-loop-session-338`; Codex read-only audit reference `/root/p24_port_audit`. Formal review, shared documentation/index changes, exact-file staging, commit and push remain downstream.
+
+### Session: 2026-10-09 Adversarial repair P24-ADV-01
+**Tasks Completed**: `SqlTaskQueue.apply_result` reschedules `ErrorCode.CONFLICT` retries as READY, records the conflict code and refunds the claim attempt; non-CONFLICT retries retain their bounded retry behavior. Added queue-level limit-boundary coverage and a worker/engine regression covering six stale CAS rounds followed by successful run completion. Corrected the scoped typelint filter to match absolute tool paths.
+**Tasks In Progress**: None for p24 implementation; independent review and serial finalization remain downstream.
+**Blockers**: None.
+**Hashes**: Queue `src/telescreen/workflow/queue/sql_queue.py` before `f3dd823169e38da29db924192c25cdb76bbf24dd74c30414b058e37918e3e69f`, after `3bed133af38dbb9f1823abe408ef183eb8f4ac0e7ff0f089406795b2ed2d12b8`; tests `tests/workflow/engine/test_resume_gaps.py` before `7f3f2f7e8f57566ad68a24394c39e86214efff7266abfff7c4e142e643475b3a`, after `b3548d1cc40472d3b4ef2ea94bf87501228cb344ed190c94283507e5de6a0c9b`. Plan pre-edit hash `6cba00caf011aaf729d645b056ccc20c2d92855f46e81509a66610ee796369e8`; final plan hash is recorded in `tmp/telescreen-v1-20261009-s338/p24-workflow-engine/source-hashes-adv-conflict-final.sha256`.
+**Verification**: Focused new regressions -> exit 0, 2 passed (`/tmp/telescreen-p24-adv-conflict-focused.log`). Final bash-scoped format -> exit 0 (`/tmp/telescreen-p24-adv-conflict-format-final2.log`); Ruff -> exit 0 (`/tmp/telescreen-p24-adv-conflict-ruff-final2.log`); ty -> exit 0 (`/tmp/telescreen-p24-adv-conflict-ty-final2.log`); `pytest -p no:cacheprovider tests/workflow/engine` -> exit 0, 33 passed (`/tmp/telescreen-p24-adv-conflict-pytest-final2.log`); full typelint -> exit 0, 253 files clean, and absolute-path scoped filter -> exit 0 (`/tmp/telescreen-p24-adv-conflict-typelint-full.log`); `wc -l` and `<1000` gate -> exit 0, largest p24 file `test_resume_gaps.py` at 895 lines (`/tmp/telescreen-p24-adv-conflict-wc-lines.log`); no unchecked plan boxes -> exit 0.
+**Prior Attempts**: The first static-check invocation under zsh treated the space-separated scope as one path and exited 2/1/2 (format/Ruff/ty); rerun under bash resolved it. The first bash format check found one line requiring reflow (exit 1); the final format check passes. Logs: `/tmp/telescreen-p24-adv-conflict-{format,ruff,ty,pytest}.log` and `/tmp/telescreen-p24-adv-conflict-{format,ruff,ty,pytest}-final.log`.
+**Notes**: Changes remain within p24 `writePaths`; no ports, vocabulary or p26 files changed. Workflow mode `issue-resolution`; issue reference `workflowInput` (no URL/number); execution `nested-v1-769462c539ba1177c5a573360acb57cef539bc041899e652497bf3042632a3d7`; Codex read-only audit reference `/root/p24_port_audit`. Review approval is pending downstream.

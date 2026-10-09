@@ -1,6 +1,6 @@
 """Behavioral tests for durable map job dispatch and reduction."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from time import monotonic
 
@@ -9,9 +9,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.core.clock import FakeClock
-from telescreen.core.json import dump_json, json_object
+from telescreen.core.ids import new_id
+from telescreen.core.json import dump_json, json_null, json_object, json_str
 from telescreen.core.vocabulary import (
     CollectorKind,
+    EngineTaskKind,
+    EngineTaskStatus,
     ErrorCode,
     MapItemStatus,
     MapJobStatus,
@@ -20,7 +23,8 @@ from telescreen.core.vocabulary import (
     ScanTrigger,
     TriggerMode,
 )
-from telescreen.db.models import MapItemRow, MapJobRow
+from telescreen.db.models import EngineTaskRow, MapItemRow, MapJobRow, MapPartitionRow
+from telescreen.masking.redact import Redactor
 from telescreen.ports.audit import AuditEntry
 from telescreen.ports.collectors import CollectorConfig, CustomSelector
 from telescreen.ports.findings import ExternalScan, RecordOutcome, ResourceScan
@@ -32,9 +36,17 @@ from telescreen.ports.sweeps import (
     ShardSpec,
     ShardSummary,
 )
-from telescreen.ports.workflow import StepSignal, TaskSpec
+from telescreen.ports.workflow import (
+    ClaimedTask,
+    StepSignal,
+    TaskHandler,
+    TaskResult,
+    TaskResultKind,
+    TaskSpec,
+)
 from telescreen.workflow.dsl.model import MapVia
 from telescreen.workflow.mapreduce.dispatch import MapDispatchHandler
+from telescreen.workflow.mapreduce.partition import MapPartitionHandler
 from telescreen.workflow.mapreduce.reduce import MapReduceHandler
 from telescreen.workflow.mapreduce.service import spec_to_json
 from telescreen.workflow.mapreduce.shard import MapShardHandler
@@ -48,12 +60,37 @@ class QueueFake:
 
     keys: set[str]
     attempts: list[str]
+    specs: list[TaskSpec] = field(default_factory=list)
 
     async def enqueue(self, session: AsyncSession, spec: TaskSpec) -> bool:
-        del session
+        self.specs.append(spec)
         self.attempts.append(spec.idempotency_key)
         before: int = len(self.keys)
         self.keys.add(spec.idempotency_key)
+        if spec.kind is EngineTaskKind.MAP_DISPATCH:
+            existing: str | None = await session.scalar(
+                select(EngineTaskRow.id).where(
+                    EngineTaskRow.idempotency_key == spec.idempotency_key
+                )
+            )
+            if existing is None:
+                session.add(
+                    EngineTaskRow(
+                        id=new_id(),
+                        kind=spec.kind.value,
+                        ref_id=spec.ref_id,
+                        payload_json=dump_json(spec.payload),
+                        status=EngineTaskStatus.READY.value,
+                        available_at=spec.available_at,
+                        lease_owner=None,
+                        lease_expires_at=None,
+                        attempts=0,
+                        max_attempts=spec.max_attempts,
+                        idempotency_key=spec.idempotency_key,
+                        last_error_code=None,
+                        created_at=spec.available_at,
+                    )
+                )
         return len(self.keys) != before
 
     async def cancel_by_ref(self, session: AsyncSession, ref_id: str) -> int:
@@ -134,6 +171,21 @@ class SweeperFake:
     ) -> ShardSummary:
         del collector_config_id, shard, scan_job_id
         return ShardSummary.empty()
+
+
+@dataclass
+class TenPageSweeper(SweeperFake):
+    """Produce ten pages of one thousand opaque shards each."""
+
+    async def partition(self, collector_config_id: str, request: PartitionRequest) -> PartitionPage:
+        del collector_config_id
+        page: int = int(request.cursor or "0")
+        shards: tuple[ShardSpec, ...] = tuple(
+            ShardSpec(f"shard-{page * 1000 + index}", json_str("opaque"), 1)
+            for index in range(1000)
+        )
+        next_cursor: str | None = str(page + 1) if page < 9 else None
+        return PartitionPage(shards, next_cursor, ())
 
 
 @dataclass
@@ -231,7 +283,7 @@ async def test_dispatch_caps_ten_thousand_shards_at_thirty_two() -> None:
                     collector_config_id="collector-1",
                     spec_json=dump_json(spec_to_json(spec)),
                     status=MapJobStatus.RUNNING.value,
-                    partition_done=True,
+                    partition_done=False,
                     max_concurrency=32,
                     paused_until=None,
                     deadline=now + timedelta(days=1),
@@ -240,24 +292,40 @@ async def test_dispatch_caps_ten_thousand_shards_at_thirty_two() -> None:
                     finished_at=None,
                 )
             )
-            session.add_all(
-                MapItemRow(
-                    id=f"item-{index}",
+            session.add(
+                MapPartitionRow(
+                    id="partition",
                     map_job_id="job",
-                    shard_key=f"shard-{index}",
-                    descriptor_json='{"id":"opaque"}',
-                    weight=1.0,
-                    status=MapItemStatus.READY.value,
-                    attempt=0,
-                    dispatched_at=None,
-                    finished_at=None,
-                    summary_json=None,
-                    error_code=None,
+                    corpus_key="",
+                    cursor=None,
+                    status="ready",
+                    attempt=1,
                     police_task_id=None,
-                    scan_job_id=None,
                 )
-                for index in range(10000)
             )
+        partitioner: MapPartitionHandler = MapPartitionHandler(
+            harness.sessions,
+            TenPageSweeper(),
+            GatewayFake(),
+            ConfigFake(_config()),
+            Redactor.default(),
+            clock,
+            queue,
+        )
+        await partitioner._handle_id("partition")
+        async with harness.sessions() as session:
+            ready_count: int = int(
+                await session.scalar(
+                    select(func.count())
+                    .select_from(MapItemRow)
+                    .where(
+                        MapItemRow.map_job_id == "job",
+                        MapItemRow.status == MapItemStatus.READY.value,
+                    )
+                )
+                or 0
+            )
+            assert ready_count == 1000
         handler: MapDispatchHandler = MapDispatchHandler(
             harness.sessions,
             queue,
@@ -267,8 +335,28 @@ async def test_dispatch_caps_ten_thousand_shards_at_thirty_two() -> None:
             clock,
             2,
         )
-        assert await handler.handle("job") == 32
+        assert await handler._handle_id("job") == 32
+        first_shard_specs: list[TaskSpec] = [
+            task for task in queue.specs if task.kind is EngineTaskKind.MAP_SHARD
+        ]
+        assert len(first_shard_specs) == 32
         async with harness.sessions() as session:
+            dispatched_items: list[MapItemRow] = list(
+                await session.scalars(
+                    select(MapItemRow).where(
+                        MapItemRow.map_job_id == "job",
+                        MapItemRow.status == MapItemStatus.DISPATCHED.value,
+                    )
+                )
+            )
+            assert {task.ref_id for task in first_shard_specs} == {
+                item.id for item in dispatched_items
+            }
+            for task in first_shard_specs:
+                item: MapItemRow = next(
+                    candidate for candidate in dispatched_items if candidate.id == task.ref_id
+                )
+                assert task.idempotency_key == f"map:job:{item.shard_key}:{item.attempt}"
             peak: int = int(
                 await session.scalar(
                     select(func.count())
@@ -281,7 +369,7 @@ async def test_dispatch_caps_ten_thousand_shards_at_thirty_two() -> None:
                 or 0
             )
             assert peak == 32
-        assert await handler.handle("job") == 0
+        assert await handler._handle_id("job") == 0
         async with harness.sessions() as session:
             peak = int(
                 await session.scalar(
@@ -298,6 +386,28 @@ async def test_dispatch_caps_ten_thousand_shards_at_thirty_two() -> None:
         same_tick_key: str = f"mapdisp:job:{int(now.timestamp()) // 2 + 1}"
         assert same_tick_key in queue.keys
         assert queue.attempts.count(same_tick_key) == 2
+        async with harness.sessions() as session:
+            dispatch_task_count: int = int(
+                await session.scalar(
+                    select(func.count())
+                    .select_from(EngineTaskRow)
+                    .where(EngineTaskRow.idempotency_key == same_tick_key)
+                )
+                or 0
+            )
+            assert dispatch_task_count == 1
+        for _ in range(9):
+            await partitioner._handle_id("partition")
+        async with harness.sessions() as session:
+            total_count: int = int(
+                await session.scalar(
+                    select(func.count())
+                    .select_from(MapItemRow)
+                    .where(MapItemRow.map_job_id == "job")
+                )
+                or 0
+            )
+            assert total_count == 10000
         shard_handler: MapShardHandler = MapShardHandler(
             harness.sessions,
             SweeperFake(),
@@ -305,18 +415,30 @@ async def test_dispatch_caps_ten_thousand_shards_at_thirty_two() -> None:
             clock,
         )
         succeeded: int = 0
-        while succeeded < 10000:
-            async with harness.sessions() as session:
-                dispatched_ids: list[str] = list(
-                    await session.scalars(
-                        select(MapItemRow.id).where(
-                            MapItemRow.map_job_id == "job",
-                            MapItemRow.status == MapItemStatus.DISPATCHED.value,
-                        )
+        consumed_specs: set[str] = set()
+        iterations: int = 0
+        while succeeded < 10000 and iterations < 1000:
+            iterations += 1
+            queued_shards: list[TaskSpec] = [
+                task
+                for task in queue.specs
+                if task.kind is EngineTaskKind.MAP_SHARD
+                and task.idempotency_key not in consumed_specs
+            ]
+            for task in queued_shards:
+                result: TaskResult = await shard_handler.handle(
+                    ClaimedTask(
+                        new_id(),
+                        EngineTaskKind.MAP_SHARD,
+                        task.ref_id,
+                        task.payload,
+                        1,
+                        task.max_attempts,
+                        task.idempotency_key,
                     )
                 )
-            for item_id in dispatched_ids:
-                await shard_handler.handle(item_id)
+                assert result.kind is TaskResultKind.DONE
+                consumed_specs.add(task.idempotency_key)
             async with harness.sessions() as session:
                 succeeded = int(
                     await session.scalar(
@@ -331,7 +453,7 @@ async def test_dispatch_caps_ten_thousand_shards_at_thirty_two() -> None:
                 )
             if succeeded < 10000:
                 clock.advance(timedelta(seconds=2))
-                await handler.handle("job")
+                await handler._handle_id("job")
                 async with harness.sessions() as session:
                     in_flight: int = int(
                         await session.scalar(
@@ -345,7 +467,9 @@ async def test_dispatch_caps_ten_thousand_shards_at_thirty_two() -> None:
                         or 0
                     )
                     assert in_flight <= 32
-        await handler.handle("job")
+        assert iterations < 1000
+        assert len(consumed_specs) == 10000
+        await handler._handle_id("job")
         reducer: MapReduceHandler = MapReduceHandler(
             harness.sessions,
             queue,
@@ -355,7 +479,7 @@ async def test_dispatch_caps_ten_thousand_shards_at_thirty_two() -> None:
             AuditFake(),
             clock,
         )
-        await reducer.handle("job")
+        await reducer._handle_id("job")
         async with harness.sessions() as session:
             job: MapJobRow | None = await session.get(MapJobRow, "job")
             assert job is not None and job.status == MapJobStatus.SUCCEEDED.value
@@ -399,7 +523,7 @@ async def test_reduce_reconciles_after_clean_success() -> None:
             AuditFake(),
             FakeClock(now),
         )
-        await reducer.handle("job")
+        await reducer._handle_id("job")
         async with harness.sessions() as session:
             job: MapJobRow | None = await session.get(MapJobRow, "job")
             assert job is not None and job.status == MapJobStatus.SUCCEEDED.value
@@ -461,10 +585,73 @@ async def test_reduce_skips_reconciliation_when_resource_scan_failed() -> None:
             AuditFake(),
             FakeClock(now),
         )
-        await reducer.handle("job")
+        await reducer._handle_id("job")
         async with harness.sessions() as session:
             job: MapJobRow | None = await session.get(MapJobRow, "job")
             assert job is not None and job.status == MapJobStatus.PARTIAL.value
         assert issues.calls == []
+    finally:
+        await harness.close()
+
+
+@pytest.mark.asyncio
+async def test_map_handlers_register_and_accept_claimed_tasks() -> None:
+    """Each map handler implements the engine registry contract by task kind."""
+    harness: SqliteHarness = await make_sqlite_harness()
+    try:
+        now: datetime = datetime(2026, 10, 9, tzinfo=UTC)
+        clock: FakeClock = FakeClock(now)
+        queue: QueueFake = QueueFake(set(), [])
+        gateway: GatewayFake = GatewayFake()
+        config: ConfigFake = ConfigFake(_config())
+        handlers: tuple[TaskHandler, ...] = (
+            MapPartitionHandler(
+                harness.sessions,
+                SweeperFake(),
+                gateway,
+                config,
+                Redactor.default(),
+                clock,
+                queue,
+            ),
+            MapDispatchHandler(
+                harness.sessions,
+                queue,
+                gateway,
+                ScanJobsFake(),
+                config,
+                clock,
+                2,
+            ),
+            MapShardHandler(harness.sessions, SweeperFake(), queue, clock),
+            MapReduceHandler(
+                harness.sessions,
+                queue,
+                gateway,
+                IssueFake([]),
+                SignalFake(),
+                AuditFake(),
+                clock,
+            ),
+        )
+        expected: tuple[EngineTaskKind, ...] = (
+            EngineTaskKind.MAP_PARTITION,
+            EngineTaskKind.MAP_DISPATCH,
+            EngineTaskKind.MAP_SHARD,
+            EngineTaskKind.MAP_REDUCE,
+        )
+        assert tuple(handler.kind for handler in handlers) == expected
+        for handler in handlers:
+            claimed: ClaimedTask = ClaimedTask(
+                "task",
+                handler.kind,
+                "missing-row",
+                json_null(),
+                1,
+                3,
+                f"task:{handler.kind.value}",
+            )
+            result: TaskResult = await handler.handle(claimed)
+            assert result.kind is TaskResultKind.DONE
     finally:
         await harness.close()

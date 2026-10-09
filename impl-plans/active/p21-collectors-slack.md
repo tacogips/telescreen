@@ -1,9 +1,9 @@
 # P21 Slack Collector Adapter Implementation Plan
 
-**Status**: In Progress (run A verify-only, session 338)
+**Status**: Completed (run A implementation and verification complete; formal review downstream)
 **Design Reference**: design-docs/specs/design-collectors-and-ingestion.md (Collector adapters, Resource identity, Per-kind behavior: slack), design-docs/specs/design-map-reduce-sweeps.md (Built-in sweep implementations: slack)
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-08
+**Last Updated**: 2026-10-09
 
 ## Plan Metadata
 
@@ -146,11 +146,11 @@ pending. Dispatch: `impl-plans/active/telescreen-v1-20261009-s338-dispatch.json`
 Verify only: the static gap review found every Tests bullet covered and no in-scope
 defect. Do not edit source unless a gate fails.
 
-- [ ] R0 Run the full Verification block on the untouched tree; log exit codes to
+- [x] R0 Run the full Verification block on the untouched tree; log exit codes to
   `/tmp/telescreen-p21-collectors-slack-runA-*.log`.
-- [ ] R1 If any command fails, fix only the failing cause inside this plan's writePaths,
+- [x] R1 If any command fails, fix only the failing cause inside this plan's writePaths,
   then re-run the whole block. Otherwise record "no change".
-- [ ] R2 Record these accepted deviations in the Progress Log (no code change):
+- [x] R2 Record these accepted deviations in the Progress Log (no code change):
   `SlackApi.download` takes `max_bytes`; `conversations_replies` was added; HTTP 404 maps to
   `ResourceGoneError`; `list_changed` returns all history pages of one call in a single
   `ChangePage` with `has_more=False` (Slack history pages newest-first, so a
@@ -264,3 +264,32 @@ defect. Do not edit source unless a gate fails.
 - `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/collectors/slack` -> exit 0, 19 passed, 0 failed (complete log: `/tmp/telescreen-p21-adv-repair/pytest.log`).
 - `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py` -> exit 0, 249 files clean; p21 filter empty (complete log: `/tmp/telescreen-p21-adv-repair/typelint-full.log`; filter output: `/tmp/telescreen-p21-adv-repair/typelint-p21-filter.log`).
 **Notes**: The test suite verifies integer `created`/`timestamp` for `files.list` and `files.info`, including the schedule cursor and sweep fetch paths. No existing assertion was removed. Formal review decisions are pending downstream.
+
+### Session: 2026-10-09 Run A resume verification
+**Tasks Completed**: Ran the complete scoped verification block against the current shared tree. No source or test changes were needed. Recorded the Run A Slack API deviations: `SlackApi.download` accepts `max_bytes`; `conversations_replies` supports event-identified threads; HTTP 404 maps to `ResourceGoneError`; one `list_changed` call consumes all history pages and returns `has_more=False` because Slack history is newest-first; `file_deleted` is not channel-filtered; and schedule/sweep history does not independently enumerate thread replies.
+**Tasks In Progress**: Independent test-integrity, adversarial and combined-tree integration review decisions remain downstream workflow work.
+**Blockers**: None for p21 implementation or required verification.
+**Reconciliation requests**: None.
+**Hashes**: `impl-plans/active/p21-collectors-slack.md` before=efa63e12328f10303558a3003b471e9b03391ff740fa1576d4be5b04ed43e6e5 after=3afa4792f1d05d501b39681f28077d7930f4400803cb248d4320e4eaa3bee6e3.
+**Verification**:
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/collectors/slack tests/collectors/slack` -> exit 0, 6 files already formatted (complete log: `/tmp/telescreen-p21-collectors-slack-runA-format.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/collectors/slack tests/collectors/slack` -> exit 0 (complete log: `/tmp/telescreen-p21-collectors-slack-runA-ruff.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/collectors/slack tests/collectors/slack` -> exit 0 (complete log: `/tmp/telescreen-p21-collectors-slack-runA-ty.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/collectors/slack` -> exit 0, 19 passed, 0 failed (complete log: `/tmp/telescreen-p21-collectors-slack-runA-pytest.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py` -> exit 0, 249 files clean (complete log: `/tmp/telescreen-p21-collectors-slack-runA-typelint.log`); scoped `grep -E '^(src/telescreen/collectors/slack|tests/collectors/slack)'` produced no diagnostics (empty output: `/tmp/telescreen-p21-collectors-slack-runA-typelint-scope.log`).
+**Notes**: All three Run A resume items are complete. Formal review is not claimed accepted here.
+
+### Session: 2026-10-09 adversarial repair P21-ADV-THREAD-REPLY-PARENT-FIRST
+**Tasks Completed**: Increased the `conversations.replies` limit to 2 while retaining exact `ts` matching. Updated the thread-reply fake to return the parent before the requested reply and assert reply text plus repr hiding. Added a parent-only regression that still reports the requested reply gone; preserved the empty-replies regression.
+**Tasks In Progress**: Independent adversarial re-review and combined-tree integration review remain downstream.
+**Blockers**: None for p21 implementation or scoped verification.
+**Reconciliation requests**: None.
+**Hashes**: `src/telescreen/collectors/slack/adapter.py` before=62b8e9d28b03117e96de6885b1f945671912f47cd841706fa56fc45b1df6a662 after=074dafb59b3767e82f80e76a09dc715f9b806ddc584a6615dc3de741c5c2d1fc; `tests/collectors/slack/test_adapter.py` before=0dcabbda9677e4d493962c90ff74f9b8c20042ea916a8fbc155450bc30f306e6 after=81d3509fe11bd3dc3622efd4c6eb683f7021adf4382f83cb22d3c16dc260abdf; plan before=b695ef919b2fb605c15c4d8c8aea788f5d22c6fcfc19a4a58a3499d8ecc3518a; final after hash: `/tmp/telescreen-p21-parent-first/plan-final.sha256`.
+**Verification**:
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/collectors/slack tests/collectors/slack` -> exit 0 (complete log: `/tmp/telescreen-p21-parent-first/ruff-format.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/collectors/slack tests/collectors/slack` -> exit 0 (complete log: `/tmp/telescreen-p21-parent-first/ruff-check.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/collectors/slack tests/collectors/slack` -> exit 0 (complete log: `/tmp/telescreen-p21-parent-first/ty-check.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/collectors/slack` -> exit 0, 20 passed, 0 failed (complete log: `/tmp/telescreen-p21-parent-first/pytest.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py` -> exit 0, 250 files clean; scoped filter has no p21 diagnostics (complete log: `/tmp/telescreen-p21-parent-first/typelint.log`; filter output: `/tmp/telescreen-p21-parent-first/typelint-scope.log`).
+- `test "$(grep -c '^- \[ \]' impl-plans/active/p21-collectors-slack.md)" -eq 0` -> exit 0; no incomplete checklist items.
+**Notes**: `P21-ADV-THREAD-REPLY-PARENT-FIRST` is implemented and locally verified; independent re-review is pending and not claimed accepted.

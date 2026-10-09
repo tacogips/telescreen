@@ -62,6 +62,7 @@ class HumanTaskExecutor:
 
             raise TelescreenError(ErrorCode.WORKFLOW_INVALID, "workflow step type mismatch")
         safe_title: str = self.redactor.redact(title).text[:512]
+        safe_assignee: str = self.redactor.redact(assignee).text[:256]
         policy_id: str | None = None
         if policy_name is not None:
             policy: EscalationPolicyRow | None = await ctx.session.scalar(
@@ -75,7 +76,7 @@ class HumanTaskExecutor:
             step_run_id=ctx.step_run_id,
             kind=kind.value,
             title=safe_title,
-            assignee_ref=assignee,
+            assignee_ref=safe_assignee,
             escalation_policy_id=policy_id,
             tier_index=0,
             due_at=ctx.now + sla if sla is not None else None,

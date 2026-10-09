@@ -8,7 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.core.clock import Clock
 from telescreen.core.json import dump_json, json_str
-from telescreen.core.vocabulary import EngineTaskKind, MapItemStatus, MapPartitionStatus
+from telescreen.core.vocabulary import (
+    EngineTaskKind,
+    ErrorCode,
+    MapItemStatus,
+    MapJobStatus,
+    MapPartitionStatus,
+)
 from telescreen.db.models import MapItemRow, MapJobRow, MapPartitionRow
 from telescreen.masking.redact import Redactor
 from telescreen.ports.sweeps import MapResultSink, PartitionPage, ShardFailure, ShardSummary
@@ -56,6 +62,7 @@ class MapResultSinkImpl(MapResultSink):
         )
         if pending is None:
             job.partition_done = True
+            job.status = MapJobStatus.RUNNING.value
         await self._wake(session, job.id)
 
     async def shard_finished(
@@ -96,13 +103,66 @@ class MapResultSinkImpl(MapResultSink):
                 )
             )
             if partition is not None:
+                job: MapJobRow | None = await session.get(MapJobRow, partition.map_job_id)
                 partition.police_task_id = None
-                partition.status = MapPartitionStatus.READY.value
+                if failure.error_code is ErrorCode.RATE_LIMITED:
+                    partition.status = MapPartitionStatus.READY.value
+                    if job is not None:
+                        paused_until: datetime = self.clock.now() + timedelta(
+                            seconds=failure.retry_after_seconds or 5
+                        )
+                        job.paused_until = paused_until
+                        await self.queue.enqueue(
+                            session,
+                            TaskSpec(
+                                EngineTaskKind.MAP_PARTITION,
+                                partition.id,
+                                json_str(partition.id),
+                                paused_until,
+                                f"mappart:{partition.id}:{partition.attempt}:rate-limit:{int(paused_until.timestamp())}",
+                            ),
+                        )
+                else:
+                    partition.status = (
+                        MapPartitionStatus.FAILED.value
+                        if partition.attempt >= 3
+                        else MapPartitionStatus.READY.value
+                    )
+                    if partition.status == MapPartitionStatus.FAILED.value:
+                        partition.cursor = failure.error_code.value
+                    else:
+                        partition.attempt += 1
+                        await self.queue.enqueue(
+                            session,
+                            TaskSpec(
+                                EngineTaskKind.MAP_PARTITION,
+                                partition.id,
+                                json_str(partition.id),
+                                self.clock.now(),
+                                f"mappart:{partition.id}:{partition.attempt}:retry",
+                            ),
+                        )
+                if job is not None:
+                    pending: str | None = await session.scalar(
+                        select(MapPartitionRow.id)
+                        .where(
+                            MapPartitionRow.map_job_id == job.id,
+                            MapPartitionRow.status.in_(
+                                (MapPartitionStatus.READY.value, MapPartitionStatus.LEASED.value)
+                            ),
+                        )
+                        .limit(1)
+                    )
+                    if pending is None:
+                        job.partition_done = True
+                        job.status = MapJobStatus.RUNNING.value
+                    await self._wake(session, job.id)
             return
         job: MapJobRow | None = await session.get(MapJobRow, item.map_job_id)
         item.police_task_id = None
-        if failure.error_code.value == "rate_limited":
+        if failure.error_code is ErrorCode.RATE_LIMITED:
             item.status = MapItemStatus.READY.value
+            item.attempt = max(0, item.attempt - 1)
             if job is not None:
                 job.paused_until = self.clock.now() + timedelta(
                     seconds=failure.retry_after_seconds or 5

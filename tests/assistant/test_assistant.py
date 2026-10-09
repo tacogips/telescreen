@@ -40,7 +40,7 @@ from telescreen.detection.harness import LlmJsonRequest
 from telescreen.masking.redact import Redactor
 from telescreen.ports.audit import AuditEntry
 from tests.support.db import SqliteHarness, make_sqlite_harness
-from tests.support.samples import Sample, github_token
+from tests.support.samples import Sample, assert_no_leaks, github_token
 
 
 @dataclass
@@ -192,6 +192,28 @@ async def test_assistant_tools_redact_results_and_filter_by_status() -> None:
 
 
 @pytest.mark.asyncio
+async def test_search_issues_clamps_limit_to_one_through_fifty() -> None:
+    """Issue search enforces its documented lower and upper result bounds."""
+    harness: SqliteHarness = await make_sqlite_harness()
+    instant: datetime = datetime(2026, 9, 15, tzinfo=UTC)
+    async with harness.sessions.begin() as session:
+        session.add_all(
+            [
+                _issue(f"issue-{index}", "Known issue", IssueStatus.UNRESOLVED, instant, index)
+                for index in range(1, 56)
+            ]
+        )
+    tools: AssistantTools = _tools(harness)
+    try:
+        lower: IssueList = await tools.search_issues("", None, 0)
+        upper: IssueList = await tools.search_issues("", None, 100)
+        assert len(lower.items) == 1
+        assert len(upper.items) == 50
+    finally:
+        await harness.close()
+
+
+@pytest.mark.asyncio
 async def test_incident_report_contains_counts_and_redacts_seeded_values() -> None:
     """Markdown reports include severity, rule, resource and open/resolved totals."""
     sample: Sample = github_token()
@@ -205,7 +227,10 @@ async def test_incident_report_contains_counts_and_redacts_seeded_values() -> No
         assert "Total incidents: 2" in report
         assert "Resolved or ignored: 1; open: 1" in report
         assert "By severity" in report
+        assert "| high | 2 |" in report
         assert "By rule class" in report
+        assert "## Top resources by observed events" in report
+        assert "| repo/issue-1 | 3 |" in report
         assert sample.value not in report
     finally:
         await harness.close()
@@ -246,6 +271,42 @@ async def test_chat_tool_loop_redacts_transcript_results_and_final_answer() -> N
         assert r"\"total\": 2" in client.requests[1].user
         assert sample.value not in answer
         assert "****************[42]" in answer
+    finally:
+        await harness.close()
+
+
+@pytest.mark.asyncio
+async def test_chat_audit_search_dispatches_its_typed_arguments() -> None:
+    """Audit search arguments reach the audit tool rather than an invalid-step path."""
+    sample: Sample = github_token()
+    harness: SqliteHarness = await make_sqlite_harness()
+    await _seed(harness, sample)
+    client: FakeLlmClient = FakeLlmClient(
+        [
+            json.dumps(
+                {
+                    "action": "tool",
+                    "tool": "audit_search",
+                    "arguments": {"query": "issue.created", "limit": 10},
+                }
+            ),
+            json.dumps({"action": "answer", "answer": "Audit results found."}),
+        ],
+        [],
+    )
+    service: ChatService = ChatService(
+        client,
+        "test-model",
+        _tools(harness),
+        Redactor.default(),
+        FakeClock(datetime(2026, 10, 8, tzinfo=UTC)),
+    )
+    try:
+        answer: str = await service.answer((ChatMessage(ChatRole.USER, "find audit"),))
+        assert answer == "Audit results found."
+        assert r"\"action\": \"issue.created\"" in client.requests[1].user
+        assert "previous tool request was invalid" not in client.requests[1].user
+        assert_no_leaks(client.requests[1].user, "chat audit-search tool result")
     finally:
         await harness.close()
 
@@ -311,6 +372,23 @@ async def test_mcp_registers_exactly_six_tools() -> None:
 
 
 @pytest.mark.asyncio
+async def test_mcp_search_masks_seeded_raw_issue_title() -> None:
+    """Calling a registered MCP tool returns no seeded raw sensitive value."""
+    sample: Sample = github_token()
+    harness: SqliteHarness = await make_sqlite_harness()
+    await _seed(harness, sample)
+    server: FastMCP[None] = build_mcp(_tools(harness))
+    try:
+        response: str = str(
+            await server.call_tool("search_issues", {"query": "", "status": None, "limit": 20})
+        )
+        assert_no_leaks(response, "MCP search_issues response")
+        assert "****************[42]" in response
+    finally:
+        await harness.close()
+
+
+@pytest.mark.asyncio
 async def test_chat_router_returns_503_when_client_is_unavailable() -> None:
     """The authenticated HTTP route maps a missing managed LLM to 503."""
     harness: SqliteHarness = await make_sqlite_harness()
@@ -339,7 +417,22 @@ async def test_chat_router_returns_503_when_client_is_unavailable() -> None:
                 headers={"Authorization": "Bearer test-api-token"},
                 json={"messages": [{"role": "user", "content": "hello"}]},
             )
+            too_many: HttpxResponse = await client.post(
+                "/api/chat",
+                headers={"Authorization": "Bearer test-api-token"},
+                json={"messages": [{"role": "user", "content": "bounded"} for _ in range(51)]},
+            )
+            oversized_content: str = "x" * 20001
+            too_long: HttpxResponse = await client.post(
+                "/api/chat",
+                headers={"Authorization": "Bearer test-api-token"},
+                json={"messages": [{"role": "user", "content": oversized_content}]},
+            )
         assert response.status_code == 503
         assert response.json()["error"]["code"] == ErrorCode.LLM_UNAVAILABLE.value
+        assert too_many.status_code == 422
+        assert too_long.status_code == 422
+        assert "bounded" not in too_many.text
+        assert oversized_content not in too_long.text
     finally:
         await harness.close()

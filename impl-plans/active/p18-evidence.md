@@ -1,6 +1,6 @@
 # P18 Evidence Upload, Scan-and-Reject, Image Scanner and Metadata Stripper Implementation Plan
 
-**Status**: In Progress (run A resume, session 338)
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-api-and-ui.md (Evidence), design-docs/specs/command.md (Dependencies decisions: stdlib stripper), design-docs/user-qa/qa-evidence-file-types.md, design-docs/specs/design-masking.md (leak test matrix, image cases)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-08
@@ -147,22 +147,22 @@ pending. Dispatch: `impl-plans/active/telescreen-v1-20261009-s338-dispatch.json`
 Resume from the in-tree code; do not rewrite working modules. The static gap review found
 no source defect in scope, only test coverage gaps against the Tests section:
 
-- [ ] R0 Baseline: run the Verification block on the untouched tree; log exit codes to
-  `/tmp/telescreen-p18-evidence-baseline-*.log` before any edit.
-- [ ] R1 Stripped PNG: walk the chunks of the stored bytes (length, type, CRC32 of
+- [x] R0 Baseline: run the Verification block on the untouched tree; corrected baseline
+  logs are `/tmp/telescreen-p18-evidence-baseline-{format,ruff,ty,pytest,typelint}-correct.log`.
+- [x] R1 Stripped PNG: walk the chunks of the stored bytes (length, type, CRC32 of
   type+data) through `IEND`; every CRC matches and no `tEXt`/`iTXt`/`zTXt`/`eXIf` chunk
   remains.
-- [ ] R2 Truncated PNG uploaded through `EvidenceService.upload` -> `evidence_rejected`;
+- [x] R2 Truncated PNG uploaded through `EvidenceService.upload` -> `evidence_rejected`;
   the rejected row's rule classes include `malformed_image`; nothing under the store root.
-- [ ] R3 HTTP-level 415: through the router (in-process ASGI app), a `.png` filename with
+- [x] R3 HTTP-level 415: through the router (in-process ASGI app), a `.png` filename with
   JPEG magic -> 415 and an `.exe` -> 415; neither response echoes the filename or body.
-- [ ] R4 WebP through `upload` with a clean fake scanner: put a sample secret in the
+- [x] R4 WebP through `upload` with a clean fake scanner: put a sample secret in the
   EXIF/XMP fixture; the stored bytes have no leak (`find_leaks` on latin-1 decode), VP8X
   flags cleared, RIFF size correct.
-- [ ] R5 Accepted plan deviation (no code change): `EvidenceQueryImpl.accepted_count`
+- [x] R5 Accepted plan deviation (no code change): `EvidenceQueryImpl.accepted_count`
   takes `session` first, matching the `EvidenceQuery` port in `src/telescreen/ports`.
-  Confirm against the port and record it in the Progress Log.
-- [ ] R6 Re-run the full Verification block; every command exits 0; log paths recorded.
+  Confirmed against `src/telescreen/ports/evidence.py`; see the Progress Log.
+- [x] R6 Re-run the full Verification block; every command exits 0; log paths recorded.
 
 Out of scope here (not accepted requirements): async file I/O in the store and orphan-file
 cleanup after a failed commit (the stored bytes are scanned and stripped, so no leak).
@@ -170,10 +170,10 @@ cleanup after a failed commit (the stored bytes are scanned and stripped, so no 
 ## Completion Criteria
 
 - [x] Classifier, stripper (JPEG, PNG, WebP), image scanner, store, service, query and router delivered with the exact names
-- [ ] Every evidence case in the design-masking leak matrix is covered by a test here (after R1-R4)
-- [ ] Run A Resume items R0-R6 checked with evidence
-- [ ] Scoped verification passes on the final tree; logs recorded
-- [ ] Progress Log updated (run A session)
+- [x] Every evidence case in the design-masking leak matrix is covered by a test here (after R1-R4)
+- [x] Run A Resume items R0-R6 checked with evidence
+- [x] Scoped verification passes on the final tree; logs recorded
+- [x] Progress Log updated (run A session)
 
 ## Progress Log
 
@@ -189,3 +189,12 @@ cleanup after a failed commit (the stored bytes are scanned and stripped, so no 
 **Blockers**: None within p18. Full-tree typelint reports violations outside p18 paths; p18 paths are clean.
 **Verification**: `uv run --frozen ruff format --check --no-cache src/telescreen/evidence src/telescreen/api/routers/evidence.py tests/evidence` exit 0 (`/tmp/telescreen-p18-evidence-format-final.log`); `uv run --frozen ruff check --no-cache src/telescreen/evidence src/telescreen/api/routers/evidence.py tests/evidence` exit 0 (`/tmp/telescreen-p18-evidence-ruff-final.log`); `uv run --frozen ty check src/telescreen/evidence src/telescreen/api/routers/evidence.py tests/evidence` exit 0 (`/tmp/telescreen-p18-evidence-ty-final.log`); `uv run --frozen python tools/typelint.py src/telescreen/evidence src/telescreen/api/routers/evidence.py tests/evidence` exit 0, 9 files clean (`/tmp/telescreen-p18-evidence-typelint-scoped-final.log`); scoped pytest exit 0, 7 passed (`/tmp/telescreen-p18-evidence-pytest-final.log`). Full-tree typelint exit 1 with no p18 diagnostics (`/tmp/telescreen-p18-evidence-typelint-full-final.log`); this is not claimed as a global pass.
 **Source Hashes**: `src/telescreen/evidence/__init__.py` 1b2cf1b99ed6594229976244220c89dad7ea65e5495c93466f0cd622092a5e0d; `image.py` 4cecab5e2bedcf15607a34abb8cd460067fb55358b87320c0c45d0a78e479f28; `query.py` 29f2119cae7aa02e268c1a179d33e04cd242f6e2dedaa7d1e12c54025a5c80f0; `service.py` 0330d2749bac5f87947292e7bbae7a328d560a7fe312185eb5909ba3556e8a28; `store.py` 4fb981d3e75e2f307a55c5d9f4f837ce45e6d62fbecbcb1a84def486900a8ad4; `strip.py` 25877e24a2a978a28a814bd408ad7d16482fea4281bbb25ce925d9d29b32b1cd; `types.py` d5bb07993248475fa0319c07a01f1e5791322534e6fab78aa49a58d58e709b4d; `src/telescreen/api/routers/evidence.py` 22fdcc9df30b05b93fce57aa5fcb0853bc5756b4d1035890ab96132d0adfd40e; `tests/evidence/test_evidence.py` 1bfa29e6bc9e557c9dfef46241ceb3aa3fd87d3a51c3b360e64e4c4510f52062.
+
+### Session: 2026-10-09 p18 resume, session 338
+**Tasks Completed**: Added stored-PNG chunk length/CRC/IEND and metadata assertions; service-level truncated-PNG rejection-row/no-storage coverage; router-level non-echoing 415 cases for mismatched and unsupported media; and accepted WebP upload coverage with runtime sample metadata secrets, stripped EXIF/XMP, cleared VP8X flags and corrected RIFF size. Confirmed `EvidenceQueryImpl.accepted_count(session, ...)` matches the `EvidenceQuery` port. All R0-R6 and completion criteria are checked.
+**Tasks In Progress**: None.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `tests/evidence/test_evidence.py` before=1bfa29e6bc9e557c9dfef46241ceb3aa3fd87d3a51c3b360e64e4c4510f52062 after=5d3011e81f59e57feaa379df3b71987a96271901019825ec23755db2bba863f; `impl-plans/active/p18-evidence.md` before=a0e75c73ac3e907d1b82026fa50e88dac41547ff37c09ea5ad102c51c69f8119 (recorded immediately before this session's plan update; previous implementation log remains unchanged).
+**Verification**: Corrected untouched-tree baseline: format, Ruff, ty, pytest and p18 typelint filter all exit 0; logs `/tmp/telescreen-p18-evidence-baseline-{format,ruff,ty,pytest,typelint}-correct.log` (baseline pytest 7 passed). Final `uv run --frozen ruff format --check --no-cache src/telescreen/evidence src/telescreen/api/routers/evidence.py tests/evidence` -> exit 0 (`/tmp/telescreen-p18-evidence-format-final.log`); `uv run --frozen ruff check --no-cache src/telescreen/evidence src/telescreen/api/routers/evidence.py tests/evidence` -> exit 0 (`/tmp/telescreen-p18-evidence-ruff-final.log`); `uv run --frozen ty check src/telescreen/evidence src/telescreen/api/routers/evidence.py tests/evidence` -> exit 0 (`/tmp/telescreen-p18-evidence-ty-final.log`); `uv run --frozen pytest -p no:cacheprovider tests/evidence` -> exit 0, 9 passed (`/tmp/telescreen-p18-evidence-pytest-final.log`); `uv run --frozen python tools/typelint.py` -> exit 0 and no p18 diagnostics (`/tmp/telescreen-p18-evidence-typelint-final.log`).
+**Notes**: The first baseline attempt incorrectly quoted the multi-path variable as one path and produced tool usage errors; corrected untouched-tree baseline passed before edits. Other workers have concurrent changes outside p18 writePaths; no such files were edited.

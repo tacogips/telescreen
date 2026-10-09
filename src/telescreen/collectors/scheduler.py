@@ -62,7 +62,9 @@ class CollectorScheduleProvider(ScheduleProvider):
                                 TaskSpec(
                                     EngineTaskKind.COLLECTOR_SCAN,
                                     config.id,
-                                    _task_payload(config.id, "changes"),
+                                    _task_payload(
+                                        config.id, "changes", trigger=ScanTrigger.SCHEDULE
+                                    ),
                                     now,
                                     f"collector:{config.id}:{fire.isoformat()}",
                                 ),

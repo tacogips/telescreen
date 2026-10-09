@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.core.clock import Clock
 from telescreen.core.ids import new_id
-from telescreen.core.json import dump_json
-from telescreen.core.vocabulary import ActorKind, SourceFormat
+from telescreen.core.json import dump_json, json_int, json_object, json_str
+from telescreen.core.vocabulary import ActorKind, CollectorKind, SourceFormat
 from telescreen.db.models import WorkflowDefinitionRow
 from telescreen.masking.redact import Redactor
 from telescreen.ports.audit import AuditEntry, AuditLog
@@ -75,6 +75,16 @@ class WorkflowService:
                     raise WorkflowValidationError(
                         (ValidationIssue(f"/steps/{step.id}/collector", "unknown_collector"),)
                     )
+                if config.kind not in (
+                    CollectorKind.SLACK,
+                    CollectorKind.GDRIVE,
+                    CollectorKind.GDOCS,
+                    CollectorKind.GSHEETS,
+                    CollectorKind.GITHUB,
+                ):
+                    raise WorkflowValidationError(
+                        (ValidationIssue(f"/steps/{step.id}/collector", "sweep_unsupported"),)
+                    )
         version_value: int | None = await session.scalar(
             select(func.max(WorkflowDefinitionRow.version)).where(
                 WorkflowDefinitionRow.name == workflow.name
@@ -103,7 +113,13 @@ class WorkflowService:
                 "workflow_definition",
                 row.id,
                 "Workflow version uploaded",
-                compiled_to_json(workflow),
+                json_object(
+                    (
+                        ("definition_id", json_str(row.id)),
+                        ("name", json_str(row.name)),
+                        ("version", json_int(row.version)),
+                    )
+                ),
             ),
         )
         return row

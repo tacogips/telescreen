@@ -4,8 +4,17 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 import pytest
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient, Headers
+from httpx import Response as HttpxResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from telescreen.api.common import ApiContext, install_error_handlers
+from telescreen.api.routers.collectors import (
+    CollectorsRouterDeps,
+    WebhookSecrets,
+    build_collectors_router,
+)
 from telescreen.collectors.codec import (
     CursorState,
     cursor_from_json,
@@ -13,19 +22,23 @@ from telescreen.collectors.codec import (
     selector_from_json,
     selector_to_json,
 )
+from telescreen.collectors.police import PoliceCollector
 from telescreen.collectors.registry import CollectorRegistry
 from telescreen.collectors.repository import CollectorRepository, ScanJobStoreImpl
+from telescreen.collectors.scheduler import CollectorScheduleProvider
 from telescreen.collectors.service import CollectorService, WebhookOutcome
 from telescreen.core.clock import FakeClock
 from telescreen.core.errors import TelescreenError
 from telescreen.core.json import JsonValue, dump_json, json_object, parse_json
 from telescreen.core.vocabulary import (
+    ApiScope,
     CollectorKind,
     ErrorCode,
     ScanJobStatus,
     ScanTrigger,
     TriggerMode,
 )
+from telescreen.directory import CreatedToken, TokenService
 from telescreen.masking.fingerprint import Fingerprinter
 from telescreen.masking.redact import Redactor
 from telescreen.ports.audit import AuditEntry
@@ -44,6 +57,7 @@ from telescreen.ports.collectors import (
     SlackSelector,
     WatchState,
 )
+from telescreen.ports.police import PoliceTaskRequest
 from telescreen.ports.workflow import TaskSpec
 from tests.support.db import SqliteHarness, make_sqlite_harness
 from tests.support.samples import assert_no_leaks, email_address
@@ -57,16 +71,20 @@ class FakePorts:
 
     tasks: list[TaskSpec] = field(default_factory=list)
     audits: list[AuditEntry] = field(default_factory=list)
+    serialized_task_payloads: list[str] = field(default_factory=list)
+    serialized_audit_details: list[str] = field(default_factory=list)
     kind: CollectorKind = CollectorKind.SLACK
     event_check: EventCheck = EventCheck(EventCheckKind.VALID)
     event_resources: EventResources = EventResources((), ())
     resource: ResourceRef = ResourceRef(
         CollectorKind.SLACK, '{"id":"r1"}', "slack:t/c/" + email_address().value
     )
+    sweep_conflict: bool = False
 
     async def append(self, session: AsyncSession, entry: AuditEntry) -> int:
         """Capture safe audit entries."""
         self.audits.append(entry)
+        self.serialized_audit_details.append(dump_json(entry.details))
         return len(self.audits)
 
     async def enqueue(self, session: AsyncSession, spec: TaskSpec) -> bool:
@@ -74,11 +92,20 @@ class FakePorts:
         if any(item.idempotency_key == spec.idempotency_key for item in self.tasks):
             return False
         self.tasks.append(spec)
+        self.serialized_task_payloads.append(dump_json(spec.payload))
         return True
 
     async def cancel_by_ref(self, session: AsyncSession, ref_id: str) -> int:
         """No-op unused queue method."""
         return 0
+
+    async def dispatch(self, session: AsyncSession, request: PoliceTaskRequest) -> str:
+        """Return a stable fake Police task id."""
+        return "police-task-test"
+
+    async def cancel(self, session: AsyncSession, task_id: str) -> None:
+        """No-op Police cancellation for unrelated scheduler tests."""
+        return None
 
     async def verify_event(self, event: InboundWebhook, secrets: CollectorSecrets) -> EventCheck:
         """Accept test webhook events."""
@@ -115,6 +142,12 @@ class FakePorts:
     def ref_from_json(self, ref_json: str) -> ResourceRef:
         """Decode a test reference."""
         return self.resource
+
+    async def start_collector_sweep(self, collector_config_id: str, trigger: ScanTrigger) -> str:
+        """Return a stable map job id or emulate an active-sweep conflict."""
+        if self.sweep_conflict:
+            raise TelescreenError(ErrorCode.CONFLICT, "sweep already running")
+        return "map-job-test"
 
 
 @pytest.mark.asyncio
@@ -287,6 +320,16 @@ async def test_webhook_enqueues_hmac_keys_without_raw_locator_and_deduplicates()
                 "env:SLACK_TOKEN",
                 "member:1",
             )
+        fake.event_resources = EventResources(
+            (fake.resource,),
+            (
+                ResourceRef(
+                    CollectorKind.SLACK,
+                    '{"id":"removed"}',
+                    "slack:file/" + email_address().value,
+                ),
+            ),
+        )
         event: InboundWebhook = InboundWebhook(CollectorKind.SLACK, "POST", NOW, (), b"safe event")
         async with harness.sessions.begin() as session:
             outcome: WebhookOutcome = await service.handle_webhook(
@@ -297,10 +340,194 @@ async def test_webhook_enqueues_hmac_keys_without_raw_locator_and_deduplicates()
                 session, CollectorKind.SLACK, event, CollectorSecrets(None, None)
             )
         assert outcome.status == 200
-        assert len(fake.tasks) == 1
+        assert len(fake.tasks) == 2
+        async with harness.sessions.begin() as session:
+            assert await service.enqueue_run(session, config.id, ScanTrigger.MANUAL)
+        async with harness.sessions.begin() as session:
+            scheduled: CollectorConfig = await service.create(
+                session,
+                "slack-scheduled",
+                CollectorKind.SLACK,
+                TriggerMode.SCHEDULE,
+                "0 12 * * *",
+                None,
+                SlackSelector(("C456",), False),
+                None,
+                "member:1",
+            )
+        provider: CollectorScheduleProvider = CollectorScheduleProvider(
+            fake, fake, PoliceCollector(fake, FakeClock(NOW)), repository, FakeClock(NOW)
+        )
+        async with harness.sessions.begin() as session:
+            assert await provider.tick(session, NOW) == 1
+        assert len(fake.tasks) == 4
         assert_no_leaks(dump_json(fake.tasks[0].payload), "collector task payload")
-        assert_no_leaks(repr(fake.audits), "collector audit entries")
+        assert_no_leaks(" ".join(fake.serialized_audit_details), "serialized audit details")
+        assert_no_leaks(" ".join(fake.serialized_task_payloads), "serialized task payloads")
+        assert '"trigger":"event"' in dump_json(fake.tasks[0].payload)
+        assert '"trigger":"manual"' in dump_json(fake.tasks[2].payload)
+        assert '"trigger":"schedule"' in dump_json(fake.tasks[-1].payload)
+        assert fake.tasks[-1].ref_id == scheduled.id
         assert fake.tasks[0].idempotency_key.startswith(f"collector:{config.id}:")
+    finally:
+        await harness.close()
+
+
+@pytest.mark.asyncio
+async def test_webhook_config_hint_selects_matching_watch() -> None:
+    """Route a channel hint to only the collector config with that watch."""
+    harness: SqliteHarness = await make_sqlite_harness()
+    fake: FakePorts = FakePorts()
+    repository: CollectorRepository = CollectorRepository()
+    registry: CollectorRegistry = CollectorRegistry()
+    registry.register(fake)
+    service: CollectorService = _service(fake, repository, registry)
+    try:
+        async with harness.sessions.begin() as session:
+            first: CollectorConfig = await service.create(
+                session,
+                "slack-first",
+                CollectorKind.SLACK,
+                TriggerMode.EVENT,
+                None,
+                None,
+                SlackSelector(("C1",), False),
+                None,
+                "member:1",
+            )
+            second: CollectorConfig = await service.create(
+                session,
+                "slack-second",
+                CollectorKind.SLACK,
+                TriggerMode.EVENT,
+                None,
+                None,
+                SlackSelector(("C2",), False),
+                None,
+                "member:1",
+            )
+            await repository.set_cursor(
+                session, first.id, CursorState(None, WatchState("channel-a", "r1", NOW), None), NOW
+            )
+            await repository.set_cursor(
+                session, second.id, CursorState(None, WatchState("channel-b", "r2", NOW), None), NOW
+            )
+        fake.event_check = EventCheck(EventCheckKind.VALID, config_hint="channel-b")
+        event: InboundWebhook = InboundWebhook(CollectorKind.SLACK, "POST", NOW, (), b"event")
+        async with harness.sessions.begin() as session:
+            await service.handle_webhook(
+                session, CollectorKind.SLACK, event, CollectorSecrets(None, None)
+            )
+        assert len(fake.tasks) == 1
+        assert fake.tasks[0].ref_id == second.id
+        assert fake.tasks[0].ref_id != first.id
+    finally:
+        await harness.close()
+
+
+@pytest.mark.asyncio
+async def test_collectors_router_responses_conflicts_and_no_echo() -> None:
+    """Return map_job_id, map conflicts to 409, and hide invalid config values."""
+    harness: SqliteHarness = await make_sqlite_harness()
+    fake: FakePorts = FakePorts()
+    repository: CollectorRepository = CollectorRepository()
+    registry: CollectorRegistry = CollectorRegistry()
+    registry.register(fake)
+    service: CollectorService = _service(fake, repository, registry)
+    clock: FakeClock = FakeClock(NOW)
+    context: ApiContext = ApiContext(harness.sessions, clock, fake)
+    tokens: TokenService = TokenService(fake, clock)
+    try:
+        async with harness.sessions.begin() as session:
+            config: CollectorConfig = await service.create(
+                session,
+                "slack-prod",
+                CollectorKind.SLACK,
+                TriggerMode.EVENT,
+                None,
+                None,
+                SlackSelector(("C123",), False),
+                None,
+                "member:1",
+            )
+            token: CreatedToken = await tokens.create(
+                session, "test-admin", frozenset((ApiScope.ADMIN,)), None
+            )
+        app: FastAPI = FastAPI()
+        install_error_handlers(app)
+        app.include_router(
+            build_collectors_router(
+                CollectorsRouterDeps(
+                    context,
+                    service,
+                    fake,
+                    WebhookSecrets(
+                        CollectorSecrets(None, None),
+                        CollectorSecrets(None, None),
+                        CollectorSecrets(None, None),
+                    ),
+                )
+            )
+        )
+        headers: Headers = Headers({"Authorization": f"Bearer {token.token}"})
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            swept: HttpxResponse = await client.post(
+                f"/api/collectors/{config.id}/sweep", headers=headers
+            )
+            assert swept.status_code == 200
+            assert swept.json() == {"map_job_id": "map-job-test"}
+            fake.sweep_conflict = True
+            conflict: HttpxResponse = await client.post(
+                f"/api/collectors/{config.id}/sweep", headers=headers
+            )
+            assert conflict.status_code == 409
+            assert conflict.json()["error"]["code"] == ErrorCode.CONFLICT.value
+            bad_cron: HttpxResponse = await client.post(
+                "/api/collectors",
+                headers=headers,
+                json={
+                    "name": "bad-cron",
+                    "kind": "slack",
+                    "trigger_mode": "schedule",
+                    "cron": "bad",
+                    "sweep_cron": None,
+                    "selector_json": '{"channel_ids":["C1"],"include_files":false}',
+                    "credential_ref": None,
+                },
+            )
+            assert bad_cron.status_code == 422 and "bad" not in bad_cron.text
+            bad_credential: HttpxResponse = await client.post(
+                "/api/collectors",
+                headers=headers,
+                json={
+                    "name": "bad-credential",
+                    "kind": "slack",
+                    "trigger_mode": "event",
+                    "cron": None,
+                    "sweep_cron": None,
+                    "selector_json": '{"channel_ids":["C1"],"include_files":false}',
+                    "credential_ref": "raw-secret",
+                },
+            )
+            assert bad_credential.status_code == 422
+            assert "raw-secret" not in bad_credential.text
+            raw_selector: HttpxResponse = await client.post(
+                "/api/collectors",
+                headers=headers,
+                json={
+                    "name": "bad-selector",
+                    "kind": "slack",
+                    "trigger_mode": "event",
+                    "cron": None,
+                    "sweep_cron": None,
+                    "selector_json": (
+                        '{"channel_ids":["person@example.invalid"],"include_files":false}'
+                    ),
+                    "credential_ref": None,
+                },
+            )
+            assert raw_selector.status_code == 422
+            assert "person@example.invalid" not in raw_selector.text
     finally:
         await harness.close()
 

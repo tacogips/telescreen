@@ -92,6 +92,13 @@ class ConfigIdBody:
     id: str
 
 
+@pydantic.dataclasses.dataclass(frozen=True)
+class MapJobIdBody:
+    """Map-reduce job identifier returned after a collector sweep starts."""
+
+    map_job_id: str
+
+
 def build_collectors_router(deps: CollectorsRouterDeps) -> APIRouter:
     """Build routes for collector configuration and webhook intake."""
     router: APIRouter = APIRouter(prefix="/api/collectors", tags=["collectors"])
@@ -172,11 +179,11 @@ def build_collectors_router(deps: CollectorsRouterDeps) -> APIRouter:
             await deps.service.enqueue_run(session, config_id, ScanTrigger.MANUAL)
         return ConfigIdBody(config_id)
 
-    @router.post("/{config_id}/sweep", response_model=ConfigIdBody)
+    @router.post("/{config_id}/sweep", response_model=MapJobIdBody)
     async def sweep_config(
         config_id: str,
         principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.ADMIN))],
-    ) -> ConfigIdBody:
+    ) -> MapJobIdBody:
         """Launch a map-reduce collector sweep."""
         async with deps.ctx.sessions() as session:
             config: CollectorConfig | None = await deps.service.get(session, config_id)
@@ -186,7 +193,7 @@ def build_collectors_router(deps: CollectorsRouterDeps) -> APIRouter:
 
             raise TelescreenError(ErrorCode.NOT_FOUND, "collector not found")
         job_id: str = await deps.launcher.start_collector_sweep(config_id, ScanTrigger.MANUAL)
-        return ConfigIdBody(job_id)
+        return MapJobIdBody(job_id)
 
     @router.post("/{kind}/webhook")
     async def webhook(kind: CollectorKind, request: Request) -> Response:

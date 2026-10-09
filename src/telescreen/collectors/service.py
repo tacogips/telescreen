@@ -187,7 +187,7 @@ class CollectorService:
             TaskSpec(
                 EngineTaskKind.COLLECTOR_SCAN,
                 config.id,
-                _task_payload(config.id, "changes"),
+                _task_payload(config.id, "changes", trigger=trigger),
                 self.clock.now(),
                 f"collector:{config.id}:{trigger.value}:{now}",
             ),
@@ -232,16 +232,20 @@ class CollectorService:
                 config.kind
             ).resources_from_event(event, config)
             for ref in resources.changed:
-                await self._enqueue_ref(session, config, ref, event_id, "resource")
+                await self._enqueue_ref(
+                    session, config, ref, event_id, "resource", ScanTrigger.EVENT
+                )
             for ref in resources.removed:
-                await self._enqueue_ref(session, config, ref, event_id, "removed")
+                await self._enqueue_ref(
+                    session, config, ref, event_id, "removed", ScanTrigger.EVENT
+                )
             if resources.poll_changes:
                 await self.queue.enqueue(
                     session,
                     TaskSpec(
                         EngineTaskKind.COLLECTOR_SCAN,
                         config.id,
-                        _task_payload(config.id, "changes"),
+                        _task_payload(config.id, "changes", trigger=ScanTrigger.EVENT),
                         self.clock.now(),
                         f"collector:{config.id}:changes:{event_id}",
                     ),
@@ -271,12 +275,13 @@ class CollectorService:
         ref: ResourceRef,
         event_id: str,
         mode: str,
+        trigger: ScanTrigger,
     ) -> None:
         """Enqueue a reference only after checking its opaque JSON for leaks."""
         if self.redactor.has_hits(ref.ref_json):
             logger.warning("collector ref rejected: %s", ErrorCode.RAW_VALUE_DETECTED.value)
             return
-        payload: JsonValue = _task_payload(config.id, mode, ref.ref_json)
+        payload: JsonValue = _task_payload(config.id, mode, ref.ref_json, trigger)
         resource_key: str = self.fingerprinter.resource_key(config.kind.value, ref.raw_locator)
         await self.queue.enqueue(
             session,
@@ -315,7 +320,12 @@ def _valid_cron(value: str | None) -> bool:
     return value is not None and len(value.split()) == 5 and croniter.is_valid(value)
 
 
-def _task_payload(config_id: str, mode: str, ref_json: str | None = None) -> JsonValue:
+def _task_payload(
+    config_id: str,
+    mode: str,
+    ref_json: str | None = None,
+    trigger: ScanTrigger | None = None,
+) -> JsonValue:
     """Build a content-free collector task payload."""
     from telescreen.core.json import json_object
 
@@ -325,6 +335,8 @@ def _task_payload(config_id: str, mode: str, ref_json: str | None = None) -> Jso
     ]
     if ref_json is not None:
         members.append(("ref_json", json_str(ref_json)))
+    if trigger is not None:
+        members.append(("trigger", json_str(trigger.value)))
     return json_object(tuple(members))
 
 

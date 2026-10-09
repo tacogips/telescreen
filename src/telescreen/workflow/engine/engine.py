@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from telescreen.core.clock import Clock
@@ -52,10 +52,12 @@ from telescreen.workflow.dsl.context import RunContext
 from telescreen.workflow.dsl.loader import compiled_from_json
 from telescreen.workflow.dsl.model import (
     CompiledWorkflow,
+    ConditionStep,
     EndStep,
     JoinMode,
     JoinStep,
     ParallelStep,
+    RetrySpec,
     SendBackStep,
     StepSpec,
     SubWorkflowStep,
@@ -208,6 +210,7 @@ class RunEngine(RunSignaler):
         run.status = RunStatus.CANCELLED.value
         run.finished_at = self.clock.now()
         run.lock_version += 1
+        await self._notify_parent_finished(session, run)
         await self.audit.append(
             session,
             AuditEntry(
@@ -251,6 +254,8 @@ class RunEngine(RunSignaler):
                 RunStatus.FAILED.value,
             ):
                 return TaskResult.done()
+            if not await self._reserve_run_version(session, run):
+                return TaskResult.retry(self.clock.now() + timedelta(seconds=1), ErrorCode.CONFLICT)
             definition: WorkflowDefinitionRow | None = await self.repository.definition(
                 session, run.definition_id
             )
@@ -281,7 +286,7 @@ class RunEngine(RunSignaler):
             workflow: CompiledWorkflow = compiled_from_json(parse_json(definition.compiled_json))
             step: StepSpec = workflow.step(step_run.step_id)
             step_run.status = StepRunStatus.RUNNING.value
-            await self._failed(session, run, step_run, step, ErrorCode.TASK_DEAD, False)
+            await self._failed(session, run, step_run, step, workflow, ErrorCode.TASK_DEAD, False)
 
     async def _advance(
         self,
@@ -349,7 +354,15 @@ class RunEngine(RunSignaler):
                 await self._complete_join_arrivals(session, run, step_run, step)
             return
         if outcome.kind is StepOutcomeKind.FAILED:
-            await self._failed(session, run, step_run, step, outcome.error_code, outcome.retryable)
+            await self._failed(
+                session,
+                run,
+                step_run,
+                step,
+                workflow,
+                outcome.error_code,
+                outcome.retryable,
+            )
             return
         safe_output: JsonValue = redact_json(outcome.output, self.redactor)
         step_run.status = StepRunStatus.SUCCEEDED.value
@@ -358,7 +371,6 @@ class RunEngine(RunSignaler):
         step_run.finished_at = self.clock.now()
         context = latest_context(context, step.id, "completed", safe_output)
         run.context_json = dump_json(context.to_json())
-        run.lock_version += 1
         if isinstance(step, EndStep):
             run.status = step.result.value
             run.finished_at = self.clock.now()
@@ -370,6 +382,10 @@ class RunEngine(RunSignaler):
         target: str | None = outcome.route or step.next
         transition_kind: TransitionKind = TransitionKind.NEXT
         reason: str | None = None
+        if isinstance(step, ConditionStep):
+            note_value: JsonValue | None = safe_output.get("note")
+            if note_value is not None and note_value.as_str() == "type_mismatch":
+                reason = "type_mismatch"
         if isinstance(step, SendBackStep):
             count: int = int(
                 await session.scalar(
@@ -387,9 +403,11 @@ class RunEngine(RunSignaler):
                 transition_kind = TransitionKind.SEND_BACK
                 reason_value: JsonValue | None = safe_output.get("reason")
                 reason = reason_value.as_str() if reason_value is not None else None
+                await self._cancel_later_human_tasks(session, run.id, step.to)
         if target is None:
             run.status = RunStatus.FAILED.value
             run.finished_at = self.clock.now()
+            await self._notify_parent_finished(session, run)
             return
         previous_count: int = int(
             await session.scalar(
@@ -404,6 +422,7 @@ class RunEngine(RunSignaler):
             run.status = RunStatus.FAILED.value
             run.finished_at = self.clock.now()
             step_run.error_code = ErrorCode.LOOP_LIMIT_EXCEEDED.value
+            await self._notify_parent_finished(session, run)
             return
         next_step_run_id: str = await self._create_step(
             session, run, target, step_run.branch_token, previous_count + 1
@@ -430,6 +449,7 @@ class RunEngine(RunSignaler):
             run.status = RunStatus.FAILED.value
             run.finished_at = self.clock.now()
             source.error_code = ErrorCode.WORKFLOW_INVALID.value
+            await self._notify_parent_finished(session, run)
             return
         source.output_json = dump_json(json_object((("join", json_str(step.join)),)))
         for index, target in enumerate(step.branches):
@@ -472,6 +492,7 @@ class RunEngine(RunSignaler):
             run.status = RunStatus.FAILED.value
             run.finished_at = self.clock.now()
             current.error_code = ErrorCode.WORKFLOW_INVALID.value
+            await self._notify_parent_finished(session, run)
             return
         workflow_definition: WorkflowDefinitionRow | None = await self.repository.definition(
             session, run.definition_id
@@ -479,6 +500,7 @@ class RunEngine(RunSignaler):
         if workflow_definition is None:
             run.status = RunStatus.FAILED.value
             run.finished_at = self.clock.now()
+            await self._notify_parent_finished(session, run)
             return
         workflow: CompiledWorkflow = compiled_from_json(
             parse_json(workflow_definition.compiled_json)
@@ -487,6 +509,7 @@ class RunEngine(RunSignaler):
         if not isinstance(fork_spec, ParallelStep):
             run.status = RunStatus.FAILED.value
             run.finished_at = self.clock.now()
+            await self._notify_parent_finished(session, run)
             return
         arrivals: list[StepRunRow] = list(
             (
@@ -538,21 +561,62 @@ class RunEngine(RunSignaler):
             ),
         )
 
+    async def _reserve_run_version(self, session: AsyncSession, run: WorkflowRunRow) -> bool:
+        """Advance a run version only when the loaded version is still current."""
+        expected: int = run.lock_version
+        updated_id: str | None = await session.scalar(
+            update(WorkflowRunRow)
+            .where(
+                WorkflowRunRow.id == run.id,
+                WorkflowRunRow.lock_version == expected,
+            )
+            .values(lock_version=expected + 1)
+            .returning(WorkflowRunRow.id)
+            .execution_options(synchronize_session=False)
+        )
+        if updated_id is None:
+            return False
+        run.lock_version = expected + 1
+        return True
+
+    async def _cancel_later_human_tasks(
+        self,
+        session: AsyncSession,
+        run_id: str,
+        target_step_id: str,
+    ) -> None:
+        """Cancel open human tasks and SLA checks after a send-back target visit."""
+        steps_by_id: list[tuple[str, StepRunRow]] = [
+            (item.id, item) for item in await self.repository.steps(session, run_id)
+        ]
+        for task in await self.repository.human_tasks(session, run_id):
+            step: StepRunRow | None = next(
+                (item for step_run_id, item in steps_by_id if step_run_id == task.step_run_id),
+                None,
+            )
+            if task.status == "open" and step is not None and step.step_id != target_step_id:
+                await self.queue.cancel_by_ref(session, task.id)
+                task.status = "cancelled"
+
     async def _failed(
         self,
         session: AsyncSession,
         run: WorkflowRunRow,
         step_run: StepRunRow,
         step: StepSpec,
+        workflow: CompiledWorkflow,
         error_code: ErrorCode | None,
         retryable: bool,
     ) -> None:
         """Persist a retry or route a failed step through on_error."""
         step_run.error_code = (error_code or ErrorCode.INTERNAL_ERROR).value
-        if retryable and step_run.attempt < 5:
+        retry_spec: RetrySpec = (
+            step.retry or workflow.defaults.retry or RetrySpec(5, timedelta(seconds=10))
+        )
+        if retryable and step_run.attempt < retry_spec.max_attempts:
             step_run.status = StepRunStatus.READY.value
             step_run.attempt += 1
-            delay: timedelta = timedelta(seconds=10 * (2 ** (step_run.attempt - 2)))
+            delay: timedelta = retry_spec.backoff * (2 ** (step_run.attempt - 2))
             await self._enqueue_advance(
                 session,
                 step_run.id,
@@ -567,7 +631,6 @@ class RunEngine(RunSignaler):
         if target is None:
             run.status = RunStatus.FAILED.value
             run.finished_at = self.clock.now()
-            run.lock_version += 1
             await self._notify_parent_finished(session, run)
             return
         next_visit: int = (
@@ -598,7 +661,6 @@ class RunEngine(RunSignaler):
             )
         )
         run.status = RunStatus.RUNNING.value
-        run.lock_version += 1
         await self._enqueue_advance(session, next_step_run_id, None, self.clock.now())
 
     async def _create_step(

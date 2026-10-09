@@ -324,7 +324,15 @@ class IssueService:
             to_value=target.value,
         )
         await self._audit(
-            session, "issue.status_changed", "issue", issue.id, "Issue status changed", 1, 0
+            session,
+            "issue.status_changed",
+            "issue",
+            issue.id,
+            "Issue status changed",
+            1,
+            0,
+            actor_ref,
+            self._actor_kind(actor_ref),
         )
         return issue
 
@@ -345,7 +353,17 @@ class IssueService:
             issue.updated_at,
             to_value=assignee_ref,
         )
-        await self._audit(session, "issue.assigned", "issue", issue.id, "Issue assigned", 0, 0)
+        await self._audit(
+            session,
+            "issue.assigned",
+            "issue",
+            issue.id,
+            "Issue assigned",
+            0,
+            0,
+            actor_ref,
+            self._actor_kind(actor_ref),
+        )
         return issue
 
     async def comment(
@@ -357,7 +375,15 @@ class IssueService:
         now: datetime = self.clock.now()
         await self._history(session, issue.id, IssueHistoryKind.COMMENTED, actor_ref, now, note)
         await self._audit(
-            session, "issue.commented", "issue", issue.id, "Issue comment added", 0, 0
+            session,
+            "issue.commented",
+            "issue",
+            issue.id,
+            "Issue comment added",
+            0,
+            0,
+            actor_ref,
+            self._actor_kind(actor_ref),
         )
 
     async def resolve_unchecked(
@@ -486,6 +512,11 @@ class IssueService:
         """Redact optional display text before persistence."""
         return self.redactor.redact(value).text if value is not None else None
 
+    @staticmethod
+    def _actor_kind(actor_ref: str) -> ActorKind:
+        """Classify an authenticated user reference for audit records."""
+        return ActorKind.MEMBER if actor_ref.startswith("member:") else ActorKind.TOKEN
+
     async def _audit(
         self,
         session: AsyncSession,
@@ -495,6 +526,8 @@ class IssueService:
         summary: str,
         opened: int,
         inserted: int,
+        actor_ref: str = "system:issues",
+        actor_kind: ActorKind = ActorKind.SYSTEM,
     ) -> None:
         """Append an audit entry containing only identifiers and counts."""
         details: JsonValue = json_object(
@@ -503,8 +536,8 @@ class IssueService:
         await self.audit.append(
             session,
             AuditEntry(
-                ActorKind.SYSTEM,
-                "system:issues",
+                actor_kind,
+                actor_ref,
                 action,
                 target_kind,
                 target_id,

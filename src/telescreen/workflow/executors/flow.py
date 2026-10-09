@@ -41,19 +41,25 @@ class ConditionExecutor:
     async def execute(self, ctx: StepContext) -> StepOutcome:
         """Evaluate condition cases in order."""
         step: ConditionStep = _expect(ctx.step, ConditionStep)
+        note: str | None = None
         for case in step.cases:
             result: EvalResult = evaluate(case.when, ctx.context)
+            if result.note == "type_mismatch":
+                note = result.note
             if result.value.as_bool():
                 return StepOutcome.completed(
                     json_object(
                         (
                             ("matched", json_bool(True)),
-                            ("note", json_str(result.note or "")),
+                            ("note", json_str(result.note or note or "")),
                         )
                     ),
                     case.next,
                 )
-        return StepOutcome.completed(json_object((("matched", json_bool(False)),)), step.default)
+        return StepOutcome.completed(
+            json_object((("matched", json_bool(False)), ("note", json_str(note or "")))),
+            step.default,
+        )
 
     async def resume(self, ctx: StepContext, signal: StepSignal) -> StepOutcome:
         """Condition steps cannot be resumed."""

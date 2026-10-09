@@ -1,9 +1,9 @@
 # P26 Map-Reduce Sweeps (Map Step, Partition, Dispatch, Shards, Reduce) Implementation Plan
 
-**Status**: In Progress (run A resume, session 338)
+**Status**: Completed (run A implementation; downstream review pending)
 **Design Reference**: design-docs/specs/design-map-reduce-sweeps.md (all sections), design-docs/specs/notes.md (Map step scope in v1; Sweep removal reconciliation by watermark)
 **Created**: 2026-10-08
-**Last Updated**: 2026-10-08
+**Last Updated**: 2026-10-09
 
 ## Plan Metadata
 
@@ -220,64 +220,65 @@ existing 10,000-shard and DR-1 tests, and the public class names. Put new tests 
 files (for example `tests/workflow/mapreduce/test_failures.py`, `test_police_path.py`) so
 no file reaches 1000 lines. Static gap review (s338 planning) found:
 
-- [ ] R0 Baseline: run the Verification block on the untouched tree; log exit codes to
-  `/tmp/telescreen-p26-workflow-mapreduce-baseline-*.log` before any edit.
-- [ ] R1 Queue contract. `MapPartitionHandler`, `MapDispatchHandler`, `MapShardHandler` and
+- [x] R0 Baseline: ran every scoped gate before edits; logs and exit codes are recorded in
+  `tmp/telescreen-v1-20261009-s338/p26-workflow-mapreduce/r0-baseline.md`.
+- [x] R1 Queue contract. `MapPartitionHandler`, `MapDispatchHandler`, `MapShardHandler` and
   `MapReduceHandler` must satisfy `telescreen.ports.workflow:TaskHandler`: a
   `kind: EngineTaskKind` field (`MAP_PARTITION`, `MAP_DISPATCH`, `MAP_SHARD`, `MAP_REDUCE`)
   and `async def handle(self, task: ClaimedTask) -> TaskResult`, reading the row id from
   `task.ref_id`. Keep the current id-based logic as a private helper the tests can still
   call. Add one test per handler that registers it in a `TaskHandlerRegistry`-like list by
   `kind` and drives it with a `ClaimedTask`. Do not import p24 modules.
-- [ ] R2 `executors/map.py:MapExecutor` needs the field `step_type: StepType = StepType.MAP`
+- [x] R2 `executors/map.py:MapExecutor` has the field `step_type: StepType = StepType.MAP`
   exactly as `src/telescreen/workflow/executors/detect.py:DetectExecutor` declares
   `step_type: StepType = StepType.DETECT` (the `StepExecutor` protocol in
   `src/telescreen/workflow/step_api.py` requires it), so `ExecutorRegistry.register`
   accepts it. Test: `execute` creates a job and returns waiting; `resume(map_finished)`
   routes by outcome with the result as output.
-- [ ] R3 `partition.py`: `RateLimited` -> partition back to `ready`, attempt unchanged, job
+- [x] R3 `partition.py`: `RateLimited` -> partition back to `ready`, attempt unchanged, job
   `paused_until` set; other errors -> attempt + 1, `failed` after 3, with the error code;
   a raw-value descriptor -> `failed` with `raw_value_detected` recorded.
-- [ ] R4 `dispatch.py` step 5: past the job deadline, cancel the remaining ready and
+- [x] R4 `dispatch.py` step 5: past the job deadline, cancel the remaining ready and
   dispatched items (police tasks through `PoliceGateway.cancel`) and reduce with
   `sweep_timeout`.
-- [ ] R5 `shard.py`: non-`RateLimited` errors -> attempt + 1 or `failed` with the error
+- [x] R5 `shard.py`: non-`RateLimited` errors -> retry or `failed` with the error
   code (`TelescreenError.code`, else `fetch_failed`). `RateLimited` must not consume an
   attempt (dispatch already incremented it, so restore it), and with no `retry_after` the
   pause is exponential from 5 s capped at 300 s.
-- [ ] R6 `sink.py`: `task_failed` for a partition counts attempts and re-enqueues a
+- [x] R6 `sink.py`: `task_failed` for a partition counts attempts and re-enqueues a
   `map_partition` task (or fails after 3); `partition_page` moves the job to `running`
   when all partitions are done (same `apply_page` rules).
-- [ ] R7 `reduce.py`: fill `failed_error_codes` (distinct codes of failed items and
+- [x] R7 `reduce.py`: fill `failed_error_codes` (distinct codes of failed items and
   partitions, sorted) and `findings_by_rule_class` from the summed shard summaries.
   `cancel` must cancel `map_shard` tasks by item id (`cancel_by_ref` per dispatched item)
   and must not overwrite a terminal job. `retry_failed` must also reset failed partitions.
-- [ ] R8 Missing tests from the Tests section, each `situation -> outcome`:
+- [x] R8 Missing tests from the Tests section, each `situation -> outcome`:
   crash/resume (same page twice; stale `map_shard` re-run) -> item count unchanged, stale
   result ignored; 1/200 failed at ratio 0.01 -> partial, 3/200 -> failed; 429 ->
   `RateLimited(10)` keeps the attempt, `paused_until = now + 10`, no dispatch until the
   clock passes it; police path through the sink with `resources_failed = 1` -> partial,
   late result for a timed-out item ignored; shard timeout -> retried then `sweep_timeout`;
   cancel; retry-failed; launcher conflict; descriptor sample -> `raw_value_detected`;
-  the `@pytest.mark.integration` two-dispatcher PostgreSQL test (skips offline).
-- [ ] R9 Strengthen the 10,000-shard test to the plan wording: the fake partitioner yields
+  the `@pytest.mark.integration` two-dispatcher PostgreSQL test (skipped offline without a DB URL).
+- [x] R9 Strengthen the 10,000-shard test to the plan wording: the fake partitioner yields
   10 pages of 1000 through `MapPartitionHandler`, and the same-tick check counts real
   `engine_tasks` rows of kind `map_dispatch` for key `mapdisp:<job>:<tick>` (== 1). Keep
   the lower bound 32, upper bound 32 and under-60 s checks.
-- [ ] R10 Accepted deviations to record (no code change needed): `status_counts` returns a
+- [x] R10 Accepted deviations to record (no code change needed): `status_counts` returns a
   tuple-based shape; `MapJobService(queue, clock)` omits `configs`/`scan_jobs` if they are
   unused; `findings_so_far` read from `result_json` (0 while running).
-- [ ] R11 Re-run the full Verification block; every command exits 0; log paths recorded.
+- [x] R11 Re-ran the full scoped Verification block on final source; commands exited 0 and
+  log paths are recorded below.
 
 Not in scope: populating `findings_by_rule_class` in `collectors/sweep.py` (p20 owns it).
 
 ## Completion Criteria
 
-- [ ] Job service, launcher, partition, dispatch, shard, sink, reduce, map executor and router delivered with the exact names and the TaskHandler/StepExecutor contracts (R1, R2)
-- [ ] The 10,000-shard cap test (plan wording, R9) and the DR-1 reconciliation tests pass
-- [ ] Run A Resume items R0-R11 checked with evidence
-- [ ] Scoped verification passes on the final tree; logs recorded
-- [ ] Progress Log updated (run A session)
+- [x] Job service, launcher, partition, dispatch, shard, sink, reduce, map executor and router delivered with the exact names and the TaskHandler/StepExecutor contracts (R1, R2)
+- [x] The 10,000-shard cap test (plan wording, R9) and the DR-1 reconciliation tests pass
+- [x] Run A Resume items R0-R11 checked with evidence
+- [x] Scoped verification passes on the final tree; logs recorded
+- [x] Progress Log updated (run A session)
 
 ## Progress Log
 
@@ -301,3 +302,33 @@ Not in scope: populating `findings_by_rule_class` in `collectors/sweep.py` (p20 
 - `uv run --frozen pytest -p no:cacheprovider tests/workflow/mapreduce` -> exit 0, 3 passed; includes actual `MapShardHandler` execution for all 10,000 items (log: `/tmp/telescreen-p26-workflow-mapreduce-pytest-final.log`).
 - `uv run --frozen python tools/typelint.py` -> final combined tree exit 0, 248 files clean (log: `/tmp/telescreen-p26-workflow-mapreduce-typelint-full-final.log`). An earlier combined-tree attempt exited 1 with 92 diagnostics in other plan-owned files; its log was overwritten by the final rerun, so only the final source-matched log remains.
 **Notes**: The SQLite 10,000-item scenario completes through dispatch, shard execution, and reduction while exercising the exact concurrency/idempotency assertions. The PostgreSQL concurrent-session integration variant remains conditional on `TELESCREEN_TEST_DATABASE_URL` and was not run. Formal test-integrity, adversarial, branch-evidence, and final serial integration reviews remain downstream workflow steps.
+
+### Session: 2026-10-09 13:03
+**Tasks Completed**: Resumed and completed R0-R11. Added `TaskHandler` contracts and `StepExecutor.step_type` alignment; completed partition/shard retries and backpressure, whole-job and shard timeouts, Police sink retries, count-only error/rule summaries, terminal-safe cancellation, failed-partition retries, and MapExecutor result routing. Added recovery and integration tests. The 10,000-shard test now loads ten 1,000-shard pages through `MapPartitionHandler`; the first page is dispatched immediately and asserts 32 in flight, sequential same-tick dispatch creates one SQLite `engine_tasks` row, subsequent ticks stay capped, all 10,000 shards complete, and runtime stays below 60 seconds. DR-1 tests pass.
+**Tasks In Progress**: Formal test-integrity, adversarial, integration review, branch evidence, serial finalization, commit, and push are downstream workflow steps.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: Source/test before and after SHA-256 values are recorded in the session evidence and fanout node snapshot. New files: `tests/workflow/mapreduce/test_recovery.py` and `tests/workflow/mapreduce/test_postgres.py`.
+**Verification**:
+- Pre-edit baseline: all scoped gates exited 0; see `tmp/telescreen-v1-20261009-s338/p26-workflow-mapreduce/r0-baseline.md`.
+- `uv run --frozen ruff format --check --no-cache src/telescreen/workflow/mapreduce src/telescreen/workflow/executors/map.py src/telescreen/api/routers/map_jobs.py tests/workflow/mapreduce` -> exit 0 (log: `/tmp/telescreen-p26-workflow-mapreduce-format-final.log`).
+- `uv run --frozen ruff check --no-cache src/telescreen/workflow/mapreduce src/telescreen/workflow/executors/map.py src/telescreen/api/routers/map_jobs.py tests/workflow/mapreduce` -> exit 0 (log: `/tmp/telescreen-p26-workflow-mapreduce-ruff-final.log`).
+- `uv run --frozen ty check src/telescreen/workflow/mapreduce src/telescreen/workflow/executors/map.py src/telescreen/api/routers/map_jobs.py tests/workflow/mapreduce` -> exit 0 (log: `/tmp/telescreen-p26-workflow-mapreduce-ty-final.log`).
+- `uv run --frozen python tools/typelint.py` -> exit 0, 253 files clean (log: `/tmp/telescreen-p26-workflow-mapreduce-typelint-final.log`).
+- `uv run --frozen pytest -p no:cacheprovider tests/workflow/mapreduce` -> exit 0; 17 passed, 1 integration test skipped without `TELESCREEN_TEST_DATABASE_URL` (log: `/tmp/telescreen-p26-workflow-mapreduce-pytest-final.log`).
+**Notes**: R10 accepted deviations retained: tuple-based `status_counts`; `MapJobService(queue, clock)`; `findings_so_far` from `result_json` and zero while running. No review approval is claimed; downstream review remains pending.
+
+### Session: 2026-10-09 14:00
+**Tasks Completed**: Addressed test-integrity findings TI-P26-1 and TI-P26-2 from `comm-005607`. `QueueFake` now records all task specs; the 10,000-shard test verifies the first 32 MAP_SHARD refs and idempotency keys against dispatched rows, then processes queued specs through `MapShardHandler.handle(ClaimedTask)` with a 1,000-iteration cap. Added `test_police_path.py` for Police partition-page application/replay, dispatch and partial reduction without issue reconciliation, partition retry/final failure, and rate-limit pause/attempt preservation. No production source change was required.
+**Tasks In Progress**: Independent test-integrity and adversarial re-review; serial integration/finalization remain downstream workflow steps.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `tests/workflow/mapreduce/test_mapreduce.py` before `5cafecacbbe082ca3a58ebe82e9943a3dea7491db81cd453ce8b70740387d7d0`, after `3e0acdfb8f40bf53970dc0a18699749e215005bb27972aef3ec9f4674a537ba6`; `tests/workflow/mapreduce/test_police_path.py` before absent, after `27f5f7b4e400c58f8f5a85fa1291427d32123927c5dc602ee2e18d3481dd7549`; `src/telescreen/workflow/mapreduce/sink.py` unchanged at `ba70299f9a46941a951f228945e6220d10bf44995c0edd53b33c36bb4cb37699`; plan before `b893b8ce0bb72c0bb5824d89c168e1e5b85d2ffedcb9970292ab4d0ab8ffe1e9`.
+**Verification**:
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/workflow/mapreduce -q -rs` -> exit 0, 20 passed, 1 PostgreSQL integration test skipped (database URL unset), 22.23 s (log: `/tmp/telescreen-p26-workflow-mapreduce-pytest-integrity-final-source.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/workflow/mapreduce src/telescreen/workflow/executors/map.py src/telescreen/api/routers/map_jobs.py tests/workflow/mapreduce` -> exit 0 (log: `/tmp/telescreen-p26-workflow-mapreduce-format-integrity-final-source.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/workflow/mapreduce src/telescreen/workflow/executors/map.py src/telescreen/api/routers/map_jobs.py tests/workflow/mapreduce` -> exit 0 (log: `/tmp/telescreen-p26-workflow-mapreduce-ruff-integrity-final-source.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/workflow/mapreduce src/telescreen/workflow/executors/map.py src/telescreen/api/routers/map_jobs.py tests/workflow/mapreduce` -> exit 0 (log: `/tmp/telescreen-p26-workflow-mapreduce-ty-integrity-final-source.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-p26-workflow-mapreduce-typelint-integrity-final-source.log 2>&1; ! grep -E '^(src/telescreen/workflow/mapreduce|src/telescreen/workflow/executors/map.py|src/telescreen/api/routers/map_jobs.py|tests/workflow/mapreduce)' /tmp/telescreen-p26-workflow-mapreduce-typelint-integrity-final-source.log` -> exit 0.
+- Isolated mutation check in `/tmp/telescreen-p26-ti-mutation`: omitting only the MAP_SHARD enqueue makes `test_dispatch_caps_ten_thousand_shards_at_thirty_two` fail at the expected `len(first_shard_specs) == 32` assertion (exit 1; log: `/tmp/telescreen-p26-ti-p26-1-mutation.log`). The repository production file was not mutated.
+**Notes**: Focused repair tests plus the 10,000-shard test passed 4/4 in 21.64 s (log: `/tmp/telescreen-p26-workflow-mapreduce-repair-focused.log`). Earlier intermediate lint/type/format attempts exposed and then corrected test-only formatting/typing issues; final source gates above all pass. No independent review acceptance is claimed.

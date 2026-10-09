@@ -37,8 +37,12 @@ class WorkflowTriggerService(IssueEventSink):
                 continue
             active_run: WorkflowRunRow | None = await session.scalar(
                 select(WorkflowRunRow)
+                .join(
+                    WorkflowDefinitionRow,
+                    WorkflowDefinitionRow.id == WorkflowRunRow.definition_id,
+                )
                 .where(
-                    WorkflowRunRow.definition_id == definition.id,
+                    WorkflowDefinitionRow.name == definition.name,
                     WorkflowRunRow.issue_id == event.issue_id,
                     WorkflowRunRow.status.in_((RunStatus.RUNNING.value, RunStatus.WAITING.value)),
                 )

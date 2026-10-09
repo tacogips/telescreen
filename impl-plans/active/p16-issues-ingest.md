@@ -1,6 +1,6 @@
 # P16 Issues (Grouping, Lifecycle, Scan Pipeline) and Push Ingestion Implementation Plan
 
-**Status**: In Progress (run A resume, session 338)
+**Status**: Completed (run A resume, session 338)
 **Design Reference**: design-docs/specs/design-collectors-and-ingestion.md (Scan pipeline, Issue grouping and lifecycle, Resource identity, Push ingestion API), design-docs/specs/design-data-model.md (Findings and issues, Keys, Issue status machine), design-docs/specs/design-map-reduce-sweeps.md (Reduce: resolve_unchecked)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -194,35 +194,39 @@ uv run --frozen python tools/typelint.py src/telescreen/issues src/telescreen/ap
 State: s319 recorded p16 as BLOCKED, but no cause is written in-tree. Dispatch:
 `impl-plans/active/telescreen-v1-20261009-s338-dispatch.json`, wave A1. Resume from the
 in-tree code; keep every public name. Treat any failing gate in R0 as the probable block
-cause and fix it first. `tests/issues/test_issues.py` is 884 lines, so put new tests in
+cause and fix it first. At resume start, `tests/issues/test_issues.py` was 884 lines, so put new tests in
 `tests/issues/test_issues_api.py` (and further files if needed). Static gap review (s338
 planning) found:
 
-- [ ] R0 Baseline: run the Verification block on the untouched tree; log exit codes to
-  `/tmp/telescreen-p16-issues-ingest-baseline-*.log` before any edit.
-- [ ] R1 Audit actor: `issues/service.py:_audit` records every entry as
+- [x] R0 Baseline: run the Verification block on the untouched tree; all scoped gates passed. Logs:
+  `/tmp/telescreen-p16-issues-ingest-baseline-format.log`, `-ruff.log`, `-ty.log`,
+  `-pytest.log` (9 passed), `-typelint.log`; target typelint filter was empty.
+- [x] R1 Audit actor: `issues/service.py:_audit` records every entry as
   `ActorKind.SYSTEM`/`system:issues`. For `change_status`, assignment and comments, pass the
   caller's `actor_ref` and actor kind so the audit trail shows who acted (requirement 11).
-  Scan-driven events stay `system`. Test: PATCH by a user token -> the audit row actor is
-  that user ref.
-- [ ] R2 `routers/ingest.py` findings endpoint: read the raw body with
+  Scan-driven events stay `system`. PATCH token audit actor is verified in
+  `tests/issues/test_issues_api.py`.
+- [x] R2 `routers/ingest.py` findings endpoint: read the raw body with
   `read_limited_body` and parse with `TypeAdapter(...).validate_json`, the same as the scan
-  endpoint (bounded body, static `validation_error`, no echo). Test: an oversized body ->
-  413; a malformed body -> 422 whose response holds no request text.
-- [ ] R3 `issues/ingest.py:IngestService.scan_push`: if the scanner raises mid-loop, finish
-  the scan job `failed` with a static error code before re-raising. Test with a fake
-  scanner that raises on the second resource.
-- [ ] R4 Missing tests from the Tests section: `TELE-2` is assigned and email
+  endpoint. Oversized input returns 413; malformed input returns static 422 with no request
+  text, verified in `tests/issues/test_issues.py`.
+- [x] R3 `issues/ingest.py:IngestService.scan_push`: scanner failures finish the job as
+  `failed` with `internal_error` and accumulated counts before the original exception is
+  re-raised. The second-resource failure is covered in `tests/issues/test_issues_api.py`.
+- [x] R4 Missing tests from the Tests section: `TELE-2` is assigned and email
   `times_seen == 2` after the first scan; PATCH `/api/issues/{id}` with an allowed
   transition -> history and audit, a disallowed one -> 409 `invalid_transition`; list
   filters `source`, `rule_class`, `severity`, `assignee`, `q`, `sort=times_seen`, keyset
   cursor paging over 3+ issues, and `/events` paging; stats zero-fill returns exactly
-  `days` buckets with zeros for empty days.
-- [ ] R5 Accepted deviations to record (no code change): ingest responses are built with
+  `days` buckets with zeros for empty days. These assertions pass in the p16 SQLite/API tests.
+- [x] R5 Accepted deviations recorded (no code change): ingest responses are built with
   `json.dumps` over a literal dict passed inline (allowed by conventions section 3);
   `findings_push` records with `scan_job_id=None` and `DetectorKind.POLICE`.
-- [ ] R6 Re-run the full Verification block and `wc -l` on every p16 Python file (each
-  under 1000); every command exits 0; log paths recorded.
+- [x] R6 Final scoped verification passed; Python line inventory found no file at 1000 lines.
+  Logs: `/tmp/telescreen-p16-issues-ingest-format-final2.log`, `-ruff-final2.log`,
+  `-ty-final2.log`, `-pytest-final2.log` (11 passed), `-typelint-final2.log`,
+  `-typelint-filter-final2.log`, and `-line-limit-final2.log`. The inventory command was
+  `find src/telescreen/issues tests/issues src/telescreen/api/routers/issues.py src/telescreen/api/routers/ingest.py -name '*.py' -exec wc -l {} + | awk '$1 >= 1000 && $2 != "total"'`; it returned no paths. The unchecked-item command `test "$(grep -c '^- \[ \]' impl-plans/active/p16-issues-ingest.md)" -eq 0` exited 0.
 
 Not in scope: escaping `%`/`_` in the `q` filter (masked columns only, no accepted
 requirement).
@@ -230,10 +234,10 @@ requirement).
 ## Completion Criteria
 
 - [x] IssueService (recorder, reader, transitions), ResourceScannerImpl, IngestService and both routers delivered with the exact names
-- [ ] Lifecycle, regression, auto-resolve, skip, resolve_unchecked and leak tests pass (after R1-R4)
-- [ ] Run A Resume items R0-R6 checked with evidence
-- [ ] Scoped verification passes on the final tree; logs recorded
-- [ ] Progress Log updated (run A session)
+- [x] Lifecycle, regression, auto-resolve, skip, resolve_unchecked and leak tests pass (after R1-R4)
+- [x] Run A Resume items R0-R6 checked with evidence
+- [x] Scoped verification passes on the final tree; logs recorded
+- [x] Progress Log updated (run A session)
 
 ## Progress Log
 
@@ -248,3 +252,12 @@ requirement).
 **Tasks In Progress**: Formal test-integrity, adversarial, and combined-tree review are owned by later workflow steps.
 **Blockers**: None.
 **Notes**: Scoped verification passed on the current p16 source. Logs: `/tmp/telescreen-p16-issues-ingest-format-final.log`, `/tmp/telescreen-p16-issues-ingest-ruff-final.log`, `/tmp/telescreen-p16-issues-ingest-ty-final.log`, `/tmp/telescreen-p16-issues-ingest-typelint-final.log`, and `/tmp/telescreen-p16-issues-ingest-pytest-final.log` (9 passed). Earlier implementation attempts exposed timezone-aware SQLite comparisons, a literal stats route shadowed by `{issue_id}`, and test assumptions about UUID ordering/JSON spacing; each was corrected and the final test suite passed. All p16 Python files remain below 1000 lines; the test file is 884 lines.
+
+### Session: 2026-10-09 p16 resume, session 338
+**Tasks Completed**: R0-R6. User status/assignment/comment audit entries now preserve token/member actors; findings push uses bounded raw-body parsing with static validation errors; interrupted push scans finish failed with `internal_error` before re-raising. Added the missing lifecycle numbering, failure, API filtering, sorting, cursor paging, status transition, actor, zero-fill, and payload-bound regression assertions.
+**Tasks In Progress**: Formal test-integrity, adversarial, integration review and serial finalization are owned by later workflow steps.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `src/telescreen/issues/service.py` before=ea89dd983082fb19dc0afeaed5a832b9a17d2186822f72a660262d6c6662ac98 after=2c7687039af4098fea26ff16b190038cc53e1420b6e7c3bc8980f5666de6ac51; `src/telescreen/issues/ingest.py` before=c797ae6faefd3de04105db360afc6fda08c2785a8734446371db27ae5f82626c after=a521544428ecb1fca8733c5c3b3ad353f19d3ed073ee8ef2f1817a7fb5bbfbbc; `src/telescreen/api/routers/ingest.py` before=b79f6b18f707e30a65f50eea4b79fd276eaa31efe55d7718286b8b1e48dfaf0a after=6ed319255c4f11a00342114b0cb83f4f0e4985294e099f85ae2d36f499b1d044; `tests/issues/test_issues.py` before=b39f4b2051f3867fd88c7f267cd1b98a98cb51470286fa1f7f4df59e4e6c2fd4 after=bc9bc6d12cb3daceadfdbb664cd11eee093c407b72fc77065216e6e052ba8303; `tests/issues/test_issues_api.py` before=absent after=b9019c02389e179c63bc39467b243655b1d26c8f13d239481ffc3a68941c0ef1.
+**Verification**: `uv run --frozen ruff format --check --no-cache src/telescreen/issues src/telescreen/api/routers/issues.py src/telescreen/api/routers/ingest.py tests/issues` -> exit 0 (`/tmp/telescreen-p16-issues-ingest-format-final2.log`); `uv run --frozen ruff check --no-cache src/telescreen/issues src/telescreen/api/routers/issues.py src/telescreen/api/routers/ingest.py tests/issues` -> exit 0 (`/tmp/telescreen-p16-issues-ingest-ruff-final2.log`); `uv run --frozen ty check src/telescreen/issues src/telescreen/api/routers/issues.py src/telescreen/api/routers/ingest.py tests/issues` -> exit 0 (`/tmp/telescreen-p16-issues-ingest-ty-final2.log`); `uv run --frozen pytest -p no:cacheprovider tests/issues` -> exit 0, 11 passed (`/tmp/telescreen-p16-issues-ingest-pytest-final2.log`); `uv run --frozen python tools/typelint.py` -> exit 0, no diagnostics in p16 paths (`/tmp/telescreen-p16-issues-ingest-typelint-final2.log`); `! grep -E '^(src/telescreen/issues|src/telescreen/api/routers/(issues|ingest)[.]py|tests/issues)' /tmp/telescreen-p16-issues-ingest-typelint-final2.log` -> exit 0, empty filtered log (`/tmp/telescreen-p16-issues-ingest-typelint-filter-final2.log`); Python line inventory command above -> exit 0, no files at 1000 lines (`/tmp/telescreen-p16-issues-ingest-line-limit-final2.log`); `test "$(grep -c '^- \[ \]' impl-plans/active/p16-issues-ingest.md)" -eq 0` -> exit 0.
+**Notes**: Pre-edit baseline passed format, ruff, ty, typelint and 9 tests; baseline logs are recorded under `/tmp/telescreen-p16-issues-ingest-baseline-*`. Intermediate test attempt 1 had two failures (oversize fixture bound and token identifier assertion); attempt 2 passed 11 tests. Initial style check reported only formatting/F401/E501 issues in the new test file; final scoped checks pass. A first line-limit wrapper had invalid awk quoting and was rerun successfully with an empty output log. All p16 Python files remain below 1000 lines; `tests/issues/test_issues.py` is 906 lines and the added API test is 330 lines. The final2 run added negative source/q filter assertions and verified descending `times_seen` order. Review and serial finalization remain downstream work.

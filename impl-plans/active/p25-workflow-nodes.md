@@ -1,6 +1,6 @@
 # P25 Workflow Node Executors (detect, ai_agent, notify, police_verify) Implementation Plan
 
-**Status**: In Progress (run A verify-only, session 338)
+**Status**: Completed (run A implementation verification; downstream integration review pending)
 **Design Reference**: design-docs/specs/design-workflow-engine.md (Node executors with external effects, Ports used by executors), design-docs/specs/design-police-contract.md (Inputs by task type: verify_remediation)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -133,12 +133,12 @@ pending. Dispatch: `impl-plans/active/telescreen-v1-20261009-s338-dispatch.json`
 Verify only: the static gap review found every Tests bullet covered and no in-scope
 defect. Do not edit source unless a gate fails.
 
-- [ ] R0 Run the full Verification block on the untouched tree; log exit codes to
+- [x] R0 Run the full Verification block on the untouched tree; log exit codes to
   `/tmp/telescreen-p25-workflow-nodes-runA-*.log`.
-- [ ] R1 If any command fails (for example because a wave-A2 sibling changed a port it
+- [x] R1 If any command fails (for example because a wave-A2 sibling changed a port it
   uses), fix only the failing cause inside this plan's writePaths and re-run the whole
-  block; a needed change outside writePaths becomes a Reconciliation request.
-- [ ] R2 Record these accepted deviations in the Progress Log (no code change):
+  block; a needed change outside writePaths becomes a Reconciliation request. Not triggered: all gates passed on the current tree.
+- [x] R2 Record these accepted deviations in the Progress Log (no code change):
   `NotifyExecutor` and `PoliceVerifyExecutor` take an extra `redactor`; `detect` and
   `ai_agent` map unexpected exceptions to `fetch_failed` / `provider_error` with static
   details.
@@ -159,3 +159,12 @@ defect. Do not edit source unless a gate fails.
 **Hashes**: detect.py before=absent after=2f752fec02777f10908e3d5f4a36571819a30652d83041384736b64c66014c9d; ai_agent.py before=absent after=377b0068efe454b44c7622769a9b269029042cdd101a3830a85784d49bdde3a8; notify.py before=absent after=934415a13385e530864e9b7d923254527a10a017397624887c016d5d7fcc65c4; police_verify.py before=absent after=7608f4dbfb29d9fb67435fc0d83c2b122ff5ca5cbf0b18a0cb541c833bc8919e; test_executors.py before=absent after=02a63e7b78f052b3ac8f40629b4a133b1cc723a858f20580eada02ec9466c5a9; plan before=66b8af2135db2862e3340a59db5edaeef2e28710a69c803e52c5ee81d7ccf192; final plan hash is reported in the Step 6 result.
 **Verification**: `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/workflow/executors/detect.py src/telescreen/workflow/executors/ai_agent.py src/telescreen/workflow/executors/notify.py src/telescreen/workflow/executors/police_verify.py tests/workflow/executors` -> exit 0 (log: `/tmp/telescreen-p25-workflow-nodes-format-final4.log`); `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/workflow/executors/detect.py src/telescreen/workflow/executors/ai_agent.py src/telescreen/workflow/executors/notify.py src/telescreen/workflow/executors/police_verify.py tests/workflow/executors` -> exit 0 (log: `/tmp/telescreen-p25-workflow-nodes-ruff-final4.log`); `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/workflow/executors/detect.py src/telescreen/workflow/executors/ai_agent.py src/telescreen/workflow/executors/notify.py src/telescreen/workflow/executors/police_verify.py tests/workflow/executors` -> exit 0 (log: `/tmp/telescreen-p25-workflow-nodes-ty-final4.log`); `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/workflow/executors -q` -> exit 0, 10 passed, 0 failed (log: `/tmp/telescreen-p25-workflow-nodes-pytest-final4.log`); `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py src/telescreen/workflow/executors/detect.py src/telescreen/workflow/executors/ai_agent.py src/telescreen/workflow/executors/notify.py src/telescreen/workflow/executors/police_verify.py tests/workflow/executors` -> exit 0, 5 files clean (log: `/tmp/telescreen-p25-workflow-nodes-typelint-final4.log`). Earlier Ruff/ty/typelint failures were corrected and rerun; an initial test import failure was fixed and all 10 tests pass on final source.
 **Notes**: No files outside p25 writePaths were changed. The executor package `__init__.py` remains owned by p24. This implementation does not register executors; p28 owns registry wiring.
+
+### Session: 2026-10-09 Run A resume verification
+**Tasks Completed**: Ran the complete p25 scoped verification on the current shared tree; confirmed all four exact executor types and 10 behavior tests remain in place; recorded the accepted deviations: NotifyExecutor and PoliceVerifyExecutor take an extra redactor, while detect and ai_agent map unexpected exceptions to static fetch_failed/provider_error outcomes.
+**Tasks In Progress**: Formal integration review and review-dependent finalization are downstream workflow steps.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: plan before=d560769acd6178ac38c2b4014b592cd7bb3b8c18b9dd76d7a697efcbfaac8424 after=recorded in Step 6 result; source and tests unchanged.
+**Verification**: `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/workflow/executors/detect.py src/telescreen/workflow/executors/ai_agent.py src/telescreen/workflow/executors/notify.py src/telescreen/workflow/executors/police_verify.py tests/workflow/executors` -> exit 0 (log: `/tmp/telescreen-p25-workflow-nodes-runA-format.log`, 5 files already formatted); `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/workflow/executors/detect.py src/telescreen/workflow/executors/ai_agent.py src/telescreen/workflow/executors/notify.py src/telescreen/workflow/executors/police_verify.py tests/workflow/executors` -> exit 0 (log: `/tmp/telescreen-p25-workflow-nodes-runA-ruff.log`); `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/workflow/executors/detect.py src/telescreen/workflow/executors/ai_agent.py src/telescreen/workflow/executors/notify.py src/telescreen/workflow/executors/police_verify.py tests/workflow/executors` -> exit 0 (log: `/tmp/telescreen-p25-workflow-nodes-runA-ty.log`); `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/workflow/executors -q` -> exit 0, 10 passed, 0 failed (log: `/tmp/telescreen-p25-workflow-nodes-runA-pytest.log`); `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py` plus assigned-path diagnostic filter -> exit 0, 250 files clean and no p25 diagnostics (log: `/tmp/telescreen-p25-workflow-nodes-runA-typelint.log`).
+**Notes**: R1 was not triggered because all gates passed; no source changes were needed. Verification checklist and implementation completion criteria are fully ticked. The full implementation review remains pending in downstream workflow steps.

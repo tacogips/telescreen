@@ -249,6 +249,13 @@ async def test_grouping_counts_duplicate_scans_auto_resolve_and_regress() -> Non
         assert first.findings_inserted == 3
         assert len(harness.events.events) == 2
         assert all(event.kind is IssueEventKind.ISSUE_CREATED for event in harness.events.events)
+        async with harness.db.sessions() as session:
+            first_issues: list[IssueRow] = list((await session.scalars(select(IssueRow))).all())
+        email_first: IssueRow = next(
+            issue for issue in first_issues if issue.rule_class == RuleClass.EMAIL.value
+        )
+        assert email_first.number == 2
+        assert email_first.times_seen == 2
 
         async with harness.db.sessions.begin() as session:
             duplicate: RecordOutcome = await harness.service.record_scan(
@@ -766,7 +773,7 @@ async def test_ingest_routes_reject_unknown_and_raw_payloads_without_echo() -> N
         ctx: ApiContext = ApiContext(harness.db.sessions, harness.clock, harness.audit)
         app: FastAPI = FastAPI()
         install_error_handlers(app)
-        app.include_router(build_ingest_router(IngestRouterDeps(ctx, ingest, configs)))
+        app.include_router(build_ingest_router(IngestRouterDeps(ctx, ingest, configs, 1024)))
         transport: ASGITransport = ASGITransport(app=app)
         headers: Headers = Headers({"Authorization": f"Bearer {api_token.token}"})
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -777,6 +784,21 @@ async def test_ingest_routes_reject_unknown_and_raw_payloads_without_echo() -> N
             )
             assert unknown.status_code == 404
             assert "missing" not in unknown.text
+
+            oversized: HttpxResponse = await client.post(
+                "/api/ingest/v1/findings",
+                headers=headers,
+                content=b"x" * 1025,
+            )
+            assert oversized.status_code == 413
+
+            malformed: HttpxResponse = await client.post(
+                "/api/ingest/v1/findings",
+                headers=headers,
+                content=b'{"source":"malformed-sentinel"',
+            )
+            assert malformed.status_code == 422
+            assert "malformed-sentinel" not in malformed.text
 
             rejected: HttpxResponse = await client.post(
                 "/api/ingest/v1/findings",

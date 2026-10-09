@@ -8,8 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from telescreen.core.clock import Clock, ensure_utc
 from telescreen.core.json import JsonValue, json_object, json_str, parse_json
-from telescreen.core.vocabulary import EngineTaskKind, MapItemStatus, MapJobStatus, ScanTrigger
-from telescreen.db.models import MapItemRow, MapJobRow
+from telescreen.core.vocabulary import (
+    EngineTaskKind,
+    MapItemStatus,
+    MapJobStatus,
+    MapPartitionStatus,
+    ScanTrigger,
+)
+from telescreen.db.models import MapItemRow, MapJobRow, MapPartitionRow
 from telescreen.ports.collectors import (
     CollectorConfig,
     CollectorConfigReader,
@@ -17,13 +23,13 @@ from telescreen.ports.collectors import (
     ScanJobStore,
 )
 from telescreen.ports.police import PoliceGateway, PoliceTaskRequest
-from telescreen.ports.workflow import TaskQueue, TaskSpec
+from telescreen.ports.workflow import ClaimedTask, TaskQueue, TaskResult, TaskSpec
 from telescreen.workflow.mapreduce.repository import in_flight_count
 from telescreen.workflow.mapreduce.spec import MapJobSpec
 from telescreen.workflow.mapreduce.utils import spec_from_json
 
 
-@dataclass(frozen=True)
+@dataclass
 class MapDispatchHandler:
     """Dispatch ready work while preserving the per-job database cap."""
 
@@ -34,8 +40,14 @@ class MapDispatchHandler:
     configs: CollectorConfigReader
     clock: Clock
     tick_seconds: int
+    kind: EngineTaskKind = EngineTaskKind.MAP_DISPATCH
 
-    async def handle(self, job_id: str) -> int:
+    async def handle(self, task: ClaimedTask) -> TaskResult:
+        """Handle a claimed dispatcher task through the durable queue contract."""
+        await self._handle_id(task.ref_id)
+        return TaskResult.done()
+
+    async def _handle_id(self, job_id: str) -> int:
         """Dispatch one tick and return the number of new shard tasks."""
         async with self.sessions.begin() as session:
             job: MapJobRow | None = await session.scalar(
@@ -53,6 +65,57 @@ class MapDispatchHandler:
             config: CollectorConfig | None = await self.configs.get(
                 session, job.collector_config_id
             )
+            if config is None and ensure_utc(job.deadline) > now:
+                return 0
+            if ensure_utc(job.deadline) <= now:
+                for item in await session.scalars(
+                    select(MapItemRow).where(
+                        MapItemRow.map_job_id == job_id,
+                        MapItemRow.status.in_(
+                            (MapItemStatus.READY.value, MapItemStatus.DISPATCHED.value)
+                        ),
+                    )
+                ):
+                    if item.police_task_id is not None:
+                        await self.gateway.cancel(session, item.police_task_id)
+                    await self.queue.cancel_by_ref(session, item.id)
+                    item.status = MapItemStatus.FAILED.value
+                    item.error_code = "sweep_timeout"
+                    item.police_task_id = None
+                    item.finished_at = now
+                if not job.partition_done:
+                    partitions: list[MapPartitionRow] = list(
+                        await session.scalars(
+                            select(MapPartitionRow).where(
+                                MapPartitionRow.map_job_id == job_id,
+                                MapPartitionRow.status.in_(
+                                    (
+                                        MapPartitionStatus.READY.value,
+                                        MapPartitionStatus.LEASED.value,
+                                    )
+                                ),
+                            )
+                        )
+                    )
+                    for partition in partitions:
+                        if partition.police_task_id is not None:
+                            await self.gateway.cancel(session, partition.police_task_id)
+                        await self.queue.cancel_by_ref(session, partition.id)
+                        partition.status = MapPartitionStatus.FAILED.value
+                        partition.cursor = "sweep_timeout"
+                        partition.police_task_id = None
+                    job.partition_done = True
+                await self.queue.enqueue(
+                    session,
+                    TaskSpec(
+                        EngineTaskKind.MAP_REDUCE,
+                        job.id,
+                        json_str(job.id),
+                        now,
+                        f"mapreduce:{job.id}",
+                    ),
+                )
+                return 0
             if config is None:
                 return 0
             for item in await session.scalars(
@@ -67,15 +130,14 @@ class MapDispatchHandler:
                 ):
                     if item.police_task_id is not None:
                         await self.gateway.cancel(session, item.police_task_id)
-                    item.attempt += 1
-                    item.status = (
-                        MapItemStatus.FAILED.value
-                        if item.attempt >= spec.shard_max_attempts
-                        else MapItemStatus.READY.value
-                    )
-                    item.error_code = (
-                        "sweep_timeout" if item.status == MapItemStatus.FAILED.value else None
-                    )
+                    if item.attempt >= spec.shard_max_attempts:
+                        item.status = MapItemStatus.FAILED.value
+                        item.error_code = "sweep_timeout"
+                        item.finished_at = now
+                    else:
+                        item.status = MapItemStatus.READY.value
+                        item.error_code = None
+                    await self.queue.cancel_by_ref(session, item.id)
                     item.police_task_id = None
             dispatched: int = await in_flight_count(session, job_id)
             slots: int = max(0, job.max_concurrency - dispatched)
@@ -90,7 +152,7 @@ class MapDispatchHandler:
                     .limit(slots)
                 )
             )
-            if job.paused_until is None or job.paused_until <= now:
+            if job.paused_until is None or ensure_utc(job.paused_until) <= now:
                 for item in ready:
                     if spec.map_via.value == "police":
                         selector: JsonValue = (
@@ -135,7 +197,9 @@ class MapDispatchHandler:
                     item.status = MapItemStatus.DISPATCHED.value
                     item.dispatched_at = now
                     item.attempt += 1
-            count: int = len(ready) if job.paused_until is None or job.paused_until <= now else 0
+            count: int = (
+                len(ready) if job.paused_until is None or ensure_utc(job.paused_until) <= now else 0
+            )
             pending: str | None = await session.scalar(
                 select(MapItemRow.id)
                 .where(

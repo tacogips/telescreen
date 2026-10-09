@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 from telescreen.core.errors import TelescreenError
-from telescreen.core.vocabulary import ErrorCode, MapOrigin
+from telescreen.core.vocabulary import ErrorCode, MapOrigin, StepType
 from telescreen.ports.collectors import CollectorConfig, CollectorConfigReader
 from telescreen.ports.workflow import StepSignal, StepSignalKind
 from telescreen.workflow.dsl.model import MapStep
@@ -18,6 +18,7 @@ class MapExecutor:
 
     service: MapJobService
     configs: CollectorConfigReader
+    step_type: StepType = StepType.MAP
 
     async def execute(self, ctx: StepContext) -> StepOutcome:
         """Create the durable job for a validated map step."""

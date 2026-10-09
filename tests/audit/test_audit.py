@@ -1,19 +1,26 @@
 """Audit chain, redaction and incremental search tests."""
 
+import asyncio
+import os
+import time
 from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient, Headers, Response
-from sqlalchemy import select, text
+from sqlalchemy import insert, select, text, update
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from telescreen.api.common import ApiContext, install_error_handlers
 from telescreen.api.routers.audit import AuditRouterDeps, build_audit_router
+from telescreen.audit.query import AuditQuery, search_audit
 from telescreen.audit.service import AuditLogService
 from telescreen.audit.verify import ChainVerification, verify_chain
 from telescreen.core.clock import FakeClock, ensure_utc
 from telescreen.core.json import JsonValue, json_array, json_object, json_str, parse_json
 from telescreen.core.vocabulary import ActorKind, ApiScope
+from telescreen.db.migrate import upgrade
 from telescreen.db.models import AuditRecordRow
 from telescreen.detection import RuleDetector
 from telescreen.directory import CreatedToken, TokenService
@@ -21,7 +28,7 @@ from telescreen.masking.index_guard import IndexGuard
 from telescreen.masking.redact import Redactor
 from telescreen.ports.audit import AuditEntry
 from telescreen.search.audit_tick import AuditIndexSchedule
-from telescreen.search.backend import IndexName, SearchPage, SearchQuery
+from telescreen.search.backend import IndexName, SearchDocument, SearchPage, SearchQuery
 from telescreen.search.memory import InMemorySearchBackend
 from tests.support.db import SqliteHarness, make_sqlite_harness
 from tests.support.samples import Sample, assert_no_leaks, github_token
@@ -59,18 +66,30 @@ async def test_append_redacts_nested_details_and_chain_verifies() -> None:
                 json_object(()),
             ),
         )
-    assert (first, second) == (1, 2)
+        third: int = await audit.append(
+            session,
+            AuditEntry(
+                ActorKind.SYSTEM,
+                "system:test",
+                "test.append",
+                "issue",
+                "issue-3",
+                "third clean summary",
+                json_object(()),
+            ),
+        )
+    assert (first, second, third) == (1, 2, 3)
     async with harness.sessions() as session:
         result: ChainVerification = await verify_chain(session)
         rows: list[AuditRecordRow] = list(
             (await session.scalars(select(AuditRecordRow).order_by(AuditRecordRow.seq))).all()
         )
-    assert result == ChainVerification(True, None, 2)
+    assert result == ChainVerification(True, None, 3)
     async with harness.sessions() as session:
         stored: AuditRecordRow | None = await session.get(AuditRecordRow, 1)
         assert stored is not None
         assert_no_leaks(stored.summary + stored.details_json, "audit record")
-    assert len(rows) == 2
+    assert len(rows) == 3
     await harness.close()
 
 
@@ -133,6 +152,108 @@ async def test_audit_schedule_indexes_new_records() -> None:
     assert page.total == 1
     assert page.hits[0].get("action") == "test.action"
     await harness.close()
+
+
+@pytest.mark.asyncio
+async def test_audit_schedule_restores_numeric_watermark() -> None:
+    """A fresh schedule reads the highest sequence numerically and avoids duplicates."""
+    harness: SqliteHarness = await make_sqlite_harness()
+    clock: FakeClock = FakeClock(datetime(2026, 10, 9, tzinfo=UTC))
+    audit: AuditLogService = AuditLogService(clock, Redactor(RuleDetector()))
+    async with harness.sessions.begin() as session:
+        for number in range(1, 13):
+            await audit.append(
+                session,
+                AuditEntry(
+                    ActorKind.SYSTEM,
+                    "system:test",
+                    "test.append",
+                    "issue",
+                    f"issue-{number}",
+                    f"entry {number}",
+                    json_object(()),
+                ),
+            )
+    backend: InMemorySearchBackend = InMemorySearchBackend()
+    first_schedule: AuditIndexSchedule = AuditIndexSchedule(
+        harness.sessions, backend, IndexGuard(RuleDetector()), audit
+    )
+    async with harness.sessions() as session:
+        assert await first_schedule.tick(session, clock.now()) == 12
+    page: SearchPage = await backend.search(
+        IndexName.AUDIT, SearchQuery("", sort=("seq:desc",), limit=1)
+    )
+    assert page.hits[0].get("seq") == 12
+
+    resumed_schedule: AuditIndexSchedule = AuditIndexSchedule(
+        harness.sessions, backend, IndexGuard(RuleDetector()), audit
+    )
+    async with harness.sessions() as session:
+        assert await resumed_schedule.tick(session, clock.now()) == 0
+    await harness.close()
+
+
+@pytest.mark.asyncio
+async def test_audit_query_normalizes_naive_bounds_as_utc() -> None:
+    """Naive audit bounds produce the same epoch filters as UTC-aware bounds."""
+    naive: datetime = datetime(2026, 10, 9, 12)
+    aware: datetime = naive.replace(tzinfo=UTC)
+    backend: InMemorySearchBackend = InMemorySearchBackend(
+        [
+            (
+                IndexName.AUDIT,
+                SearchDocument("audit-bound", (("at_ts", int(aware.timestamp())),)),
+            )
+        ]
+    )
+    naive_page: SearchPage = await search_audit(
+        backend, AuditQuery("", None, None, None, naive, naive, 10, 0)
+    )
+    aware_page: SearchPage = await search_audit(
+        backend, AuditQuery("", None, None, None, aware, aware, 10, 0)
+    )
+    assert naive_page == aware_page
+    assert naive_page.total == 1
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_postgres_audit_records_reject_update() -> None:
+    """The PostgreSQL trigger prevents updates to persisted audit records."""
+    database_url: str | None = os.environ.get("TELESCREEN_TEST_DATABASE_URL")
+    if database_url is None:
+        pytest.skip("requires TELESCREEN_TEST_DATABASE_URL")
+    await asyncio.to_thread(upgrade, database_url)
+    engine: AsyncEngine = create_async_engine(database_url)
+    sequence: int = 2_000_000_000 + time.time_ns() % 1_000_000_000
+    async with engine.connect() as connection:
+        await connection.begin()
+        try:
+            await connection.execute(
+                insert(AuditRecordRow).values(
+                    seq=sequence,
+                    id=f"p15-integration-{sequence}",
+                    at=datetime.now(UTC),
+                    actor_kind="system",
+                    actor_ref="integration",
+                    action="test",
+                    target_kind="test",
+                    target_id="test",
+                    summary="masked integration entry",
+                    details_json="{}",
+                    prev_hash="0" * 64,
+                    hash="1" * 64,
+                )
+            )
+            with pytest.raises(SQLAlchemyError, match="append-only"):
+                await connection.execute(
+                    update(AuditRecordRow)
+                    .where(AuditRecordRow.seq == sequence)
+                    .values(summary="updated")
+                )
+        finally:
+            await connection.rollback()
+    await engine.dispose()
 
 
 @pytest.mark.asyncio

@@ -62,23 +62,39 @@ class IngestService:
             )
         outcome: RecordOutcome = RecordOutcome.empty()
         skipped: int = 0
-        for content in resources:
-            normalized: ResourceContent = ResourceContent(
-                source,
-                config.id,
-                content.segments,
-                content.complete,
-                False,
-                content.raw_locator,
-                content.display_title,
-                content.ref,
-            )
-            resource_outcome: RecordOutcome = await self.scanner.scan_resource(
-                normalized, scan_job_id
-            )
-            outcome = outcome.plus(resource_outcome)
-            if resource_outcome.skipped:
-                skipped += 1
+        scanned: int = 0
+        try:
+            for content in resources:
+                normalized: ResourceContent = ResourceContent(
+                    source,
+                    config.id,
+                    content.segments,
+                    content.complete,
+                    False,
+                    content.raw_locator,
+                    content.display_title,
+                    content.ref,
+                )
+                resource_outcome: RecordOutcome = await self.scanner.scan_resource(
+                    normalized, scan_job_id
+                )
+                outcome = outcome.plus(resource_outcome)
+                scanned += 1
+                if resource_outcome.skipped:
+                    skipped += 1
+        except Exception:
+            async with self.sessions.begin() as session:
+                await self.scan_jobs.finish(
+                    session,
+                    scan_job_id,
+                    ScanJobStatus.FAILED,
+                    scanned,
+                    skipped,
+                    outcome.findings_inserted,
+                    ErrorCode.INTERNAL_ERROR,
+                    self.clock.now(),
+                )
+            raise
         async with self.sessions.begin() as session:
             await self.scan_jobs.finish(
                 session,

@@ -24,17 +24,6 @@ class ChatRole(StrEnum):
     ASSISTANT = "assistant"
 
 
-class ToolName(StrEnum):
-    """Closed set of assistant tool names understood by this service."""
-
-    SEARCH_ISSUES = "search_issues"
-    GET_ISSUE = "get_issue"
-    COUNT_INCIDENTS = "count_incidents"
-    INCIDENT_REPORT = "incident_report"
-    LIST_WORKFLOW_RUNS = "list_workflow_runs"
-    AUDIT_SEARCH = "audit_search"
-
-
 @dataclass(frozen=True)
 class ChatMessage:
     """One client-supplied transcript message, with content hidden from repr."""
@@ -92,23 +81,69 @@ class AuditSearchArgs:
     limit: int = 20
 
 
-type ChatToolArguments = (
-    SearchIssuesArgs
-    | GetIssueArgs
-    | CountIncidentsArgs
-    | IncidentReportArgs
-    | ListRunsArgs
-    | AuditSearchArgs
-)
+@dataclass(frozen=True)
+class ChatSearchIssuesStep:
+    """A model request to search issues."""
+
+    action: Literal["tool"]
+    tool: Literal["search_issues"]
+    arguments: SearchIssuesArgs
 
 
 @dataclass(frozen=True)
-class ChatToolStep:
-    """A model request to invoke one assistant tool."""
+class ChatGetIssueStep:
+    """A model request to retrieve one issue."""
 
     action: Literal["tool"]
-    tool: ToolName
-    arguments: ChatToolArguments
+    tool: Literal["get_issue"]
+    arguments: GetIssueArgs
+
+
+@dataclass(frozen=True)
+class ChatCountIncidentsStep:
+    """A model request to count incidents."""
+
+    action: Literal["tool"]
+    tool: Literal["count_incidents"]
+    arguments: CountIncidentsArgs
+
+
+@dataclass(frozen=True)
+class ChatIncidentReportStep:
+    """A model request to build an incident report."""
+
+    action: Literal["tool"]
+    tool: Literal["incident_report"]
+    arguments: IncidentReportArgs
+
+
+@dataclass(frozen=True)
+class ChatListRunsStep:
+    """A model request to list workflow runs."""
+
+    action: Literal["tool"]
+    tool: Literal["list_workflow_runs"]
+    arguments: ListRunsArgs
+
+
+@dataclass(frozen=True)
+class ChatAuditSearchStep:
+    """A model request to search audit history."""
+
+    action: Literal["tool"]
+    tool: Literal["audit_search"]
+    arguments: AuditSearchArgs
+
+
+type ChatToolStep = Annotated[
+    ChatSearchIssuesStep
+    | ChatGetIssueStep
+    | ChatCountIncidentsStep
+    | ChatIncidentReportStep
+    | ChatListRunsStep
+    | ChatAuditSearchStep,
+    Field(discriminator="tool"),
+]
 
 
 @dataclass(frozen=True)
@@ -198,25 +233,29 @@ class ChatService:
 
     async def _run_tool(self, step: ChatToolStep) -> str:
         """Dispatch typed arguments to one of the six read-only tools."""
-        name: ToolName = step.tool
-        args: ChatToolArguments = step.arguments
-        if name is ToolName.SEARCH_ISSUES and isinstance(args, SearchIssuesArgs):
+        if isinstance(step, ChatSearchIssuesStep):
+            args: SearchIssuesArgs = step.arguments
             return self.tools.render_json(
                 await self.tools.search_issues(args.query, args.status, args.limit)
             )
-        if name is ToolName.GET_ISSUE and isinstance(args, GetIssueArgs):
+        if isinstance(step, ChatGetIssueStep):
+            args: GetIssueArgs = step.arguments
             result: IssueDetail | None = await self.tools.get_issue(args.issue_id)
             return self.tools.render_json(result) if result is not None else "null"
-        if name is ToolName.COUNT_INCIDENTS and isinstance(args, CountIncidentsArgs):
+        if isinstance(step, ChatCountIncidentsStep):
+            args: CountIncidentsArgs = step.arguments
             return self.tools.render_json(
                 await self.tools.count_incidents(args.start, args.end, args.group_by)
             )
-        if name is ToolName.INCIDENT_REPORT and isinstance(args, IncidentReportArgs):
+        if isinstance(step, ChatIncidentReportStep):
+            args: IncidentReportArgs = step.arguments
             return await self.tools.incident_report(args.start, args.end)
-        if name is ToolName.LIST_WORKFLOW_RUNS and isinstance(args, ListRunsArgs):
+        if isinstance(step, ChatListRunsStep):
+            args: ListRunsArgs = step.arguments
             return self.tools.render_json(
                 await self.tools.list_workflow_runs(args.status, args.limit)
             )
-        if name is ToolName.AUDIT_SEARCH and isinstance(args, AuditSearchArgs):
+        if isinstance(step, ChatAuditSearchStep):
+            args: AuditSearchArgs = step.arguments
             return self.tools.render_json(await self.tools.audit_search(args.query, args.limit))
         return _INVALID_STEP_NOTE

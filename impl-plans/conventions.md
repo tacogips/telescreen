@@ -164,6 +164,22 @@ needs no `artifactRoots` entry, and is never a reason to report a blocker. Never
 Record in the Progress Log for every command: the command, exit status and log path. An
 incomplete log is not a pass.
 
+## 7a. Reporting fixed review findings (owner ruling 2026-10-09)
+
+The progress gate treats every high or medium entry in your step result `findings` or
+`risks` as UNRESOLVED and blocks the plan. Therefore:
+
+- A review finding you have fixed and verified goes ONLY in `addressedFeedback`, with the
+  changed paths, the verification commands and their passing results. Do not repeat it in
+  `findings` or `risks`, and do not mark it "re-review pending": the independent re-review
+  happens automatically after your step.
+- `findings` and `risks` list only issues that are genuinely still open after your work.
+  A residual note that does not need action (for example "integration review is
+  downstream") is not a risk and must not be listed.
+- If a repair brief forbids editing a file that a mutation check would need, document the
+  equivalent in-memory mutation evidence in the plan Progress Log and in
+  `addressedFeedback`; this is not a blocker or a risk.
+
 ## 8. Progress Log format
 
 Append one entry per session to your own plan's `## Progress Log`:

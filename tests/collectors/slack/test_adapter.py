@@ -315,10 +315,16 @@ async def test_fetch_thread_reply_uses_conversations_replies() -> None:
             assert request.url.params.get("oldest") == reply_ts
             assert request.url.params.get("latest") == reply_ts
             assert request.url.params.get("inclusive") == "true"
-            assert request.url.params.get("limit") == "1"
+            assert request.url.params.get("limit") == "2"
             return httpx.Response(
                 200,
-                json={"ok": True, "messages": [{"ts": reply_ts, "text": sample.value}]},
+                json={
+                    "ok": True,
+                    "messages": [
+                        {"ts": thread_ts, "text": "thread parent"},
+                        {"ts": reply_ts, "text": sample.value},
+                    ],
+                },
             )
         return httpx.Response(500)
 
@@ -328,6 +334,30 @@ async def test_fetch_thread_reply_uses_conversations_replies() -> None:
         content: ResourceContent = await adapter.fetch(config(), ref)
     assert content.segments[0].text == sample.value
     assert sample.value not in repr(content)
+
+
+async def test_fetch_thread_reply_parent_only_reports_gone() -> None:
+    """Do not mistake a returned thread parent for the requested reply."""
+    reply_ts: str = "1700000000.000200"
+    thread_ts: str = "1700000000.000100"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("conversations.replies"):
+            assert request.url.params.get("limit") == "2"
+            return httpx.Response(
+                200,
+                json={
+                    "ok": True,
+                    "messages": [{"ts": thread_ts, "text": "thread parent"}],
+                },
+            )
+        return httpx.Response(500)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+        adapter: SlackAdapter = adapter_for(http)
+        ref: ResourceRef = adapter._message_ref("T1", "C1", reply_ts, thread_ts)
+        with pytest.raises(ResourceGoneError):
+            await adapter.fetch(config(), ref)
 
 
 async def test_fetch_empty_thread_replies_reports_gone() -> None:

@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.collectors.codec import CursorState, cursor_from_json
@@ -16,6 +17,7 @@ from telescreen.collectors.scheduler import CollectorScheduleProvider
 from telescreen.collectors.sweep import CollectorSweeperImpl
 from telescreen.collectors.tasks import CollectorScanHandler
 from telescreen.core.clock import FakeClock
+from telescreen.core.errors import TelescreenError
 from telescreen.core.json import JsonValue, dump_json, json_object, json_str
 from telescreen.core.vocabulary import (
     CollectorKind,
@@ -28,7 +30,7 @@ from telescreen.core.vocabulary import (
     Severity,
     TriggerMode,
 )
-from telescreen.db.models import CollectorConfigRow
+from telescreen.db.models import CollectorConfigRow, ScanJobRow
 from telescreen.masking.fingerprint import Fingerprinter
 from telescreen.masking.redact import Redactor
 from telescreen.ports.collectors import (
@@ -77,6 +79,7 @@ class RuntimeAdapter:
     event_resources: EventResources = EventResources((), ())
     gone: bool = False
     rate_limited: bool = False
+    fetch_error: bool = False
     list_calls: int = 0
     fetched: list[ResourceRef] = field(default_factory=list)
     entries: tuple[ShardEntry, ...] = ()
@@ -99,6 +102,8 @@ class RuntimeAdapter:
         return page
 
     async def fetch(self, config: CollectorConfig, ref: ResourceRef) -> ResourceContent:
+        if self.fetch_error:
+            raise RuntimeError("source unavailable")
         if self.gone:
             raise ResourceGoneError()
         self.fetched.append(ref)
@@ -136,6 +141,7 @@ class RuntimePorts:
     scan_outcome: RecordOutcome = RecordOutcome.empty()
     police_requests: list[PoliceTaskRequest] = field(default_factory=list)
     sweep_launches: list[tuple[str, ScanTrigger]] = field(default_factory=list)
+    sweep_conflict: bool = False
 
     async def enqueue(self, session: AsyncSession, spec: TaskSpec) -> bool:
         if any(task.idempotency_key == spec.idempotency_key for task in self.tasks):
@@ -178,6 +184,8 @@ class RuntimePorts:
 
     async def start_collector_sweep(self, collector_config_id: str, trigger: ScanTrigger) -> str:
         self.sweep_launches.append((collector_config_id, trigger))
+        if self.sweep_conflict:
+            raise TelescreenError(ErrorCode.CONFLICT, "sweep already running")
         return "map-job-1"
 
 
@@ -240,6 +248,7 @@ async def test_scan_handler_advances_pages_and_retries_rate_limit() -> None:
         assert retry.kind is TaskResultKind.RETRY
         assert retry.available_at == NOW + timedelta(seconds=5)
         assert retry.error_code is ErrorCode.RATE_LIMITED
+        assert _payload_trigger_from_json(task.payload) is None
         assert_no_leaks(dump_json(task.payload), "collector task payload")
         assert_no_leaks(repr(ports.scans), "recorded scans")
     finally:
@@ -311,6 +320,7 @@ async def test_scheduler_is_idempotent_and_renews_expiring_watch() -> None:
     harness: SqliteHarness = await make_sqlite_harness()
     repo: CollectorRepository = CollectorRepository()
     ports: RuntimePorts = RuntimePorts()
+    ports.sweep_conflict = True
     police: PoliceCollector = PoliceCollector(ports, FakeClock(NOW))
     provider: CollectorScheduleProvider = CollectorScheduleProvider(
         ports, ports, police, repo, FakeClock(NOW)
@@ -334,13 +344,132 @@ async def test_scheduler_is_idempotent_and_renews_expiring_watch() -> None:
             assert await provider.tick(session, NOW) == 3
         async with harness.sessions.begin() as session:
             assert await provider.tick(session, NOW) == 0
+            stored: CollectorConfigRow | None = await session.get(CollectorConfigRow, config.id)
+            assert stored is not None
+            assert cursor_from_json(stored.cursor_json).last_sweep_fire == NOW - timedelta(days=1)
         assert len(ports.tasks) == 2
         assert len(ports.sweep_launches) == 1
+        scan_task: TaskSpec = next(
+            task for task in ports.tasks if task.kind is EngineTaskKind.COLLECTOR_SCAN
+        )
+        assert _payload_trigger_from_json(scan_task.payload) == ScanTrigger.SCHEDULE.value
         assert {task.kind for task in ports.tasks} == {
             EngineTaskKind.COLLECTOR_SCAN,
             EngineTaskKind.COLLECTOR_WATCH_RENEW,
         }
         assert_no_leaks(repr(ports.tasks), "scheduled task payloads")
+    finally:
+        await harness.close()
+
+
+@pytest.mark.asyncio
+async def test_scheduler_dispatches_due_police_cron_without_collector_scan() -> None:
+    """Schedule a Police detect task directly for a due Police config."""
+    harness: SqliteHarness = await make_sqlite_harness()
+    repo: CollectorRepository = CollectorRepository()
+    ports: RuntimePorts = RuntimePorts()
+    provider: CollectorScheduleProvider = CollectorScheduleProvider(
+        ports, ports, PoliceCollector(ports, FakeClock(NOW)), repo, FakeClock(NOW)
+    )
+    try:
+        async with harness.sessions.begin() as session:
+            await repo.create(
+                session,
+                "police-config",
+                "private-db",
+                CollectorKind.POLICE,
+                TriggerMode.SCHEDULE,
+                "0 12 * * *",
+                None,
+                16,
+                PoliceSelector(("private-db",), json_object(())),
+                None,
+                NOW,
+            )
+            assert await provider.tick(session, NOW) == 0
+        assert len(ports.police_requests) == 1
+        assert ports.police_requests[0].task_type == "detect"
+        assert ports.police_requests[0].collector_config_id == "police-config"
+        assert all(task.kind is not EngineTaskKind.COLLECTOR_SCAN for task in ports.tasks)
+    finally:
+        await harness.close()
+
+
+@pytest.mark.asyncio
+async def test_scan_continuation_trigger_and_transient_retry_backoff() -> None:
+    """Continue capped change pages and persist trigger plus failed scan state."""
+    harness: SqliteHarness = await make_sqlite_harness()
+    repo: CollectorRepository = CollectorRepository()
+    jobs: ScanJobStoreImpl = ScanJobStoreImpl(repo)
+    ports: RuntimePorts = RuntimePorts()
+    adapter: RuntimeAdapter = RuntimeAdapter(
+        pages=(
+            ChangePage((), (), CollectorCursor("cursor-1"), False, True),
+            ChangePage((), (), CollectorCursor("cursor-2"), False, True),
+            ChangePage((), (), CollectorCursor("cursor-3"), False, False),
+        )
+    )
+    registry: CollectorRegistry = CollectorRegistry()
+    registry.register(adapter)
+    try:
+        config: CollectorConfig = await _create_config(harness, repo, NOW)
+        handler: CollectorScanHandler = _scan_handler(
+            harness, registry, RuntimeScanner(ports), ports, jobs, repo, max_pages=2
+        )
+        result: TaskResult = await handler.handle(
+            _scan_task(config.id, "changes", None, ScanTrigger.SCHEDULE)
+        )
+        assert result.kind is TaskResultKind.DONE
+        assert adapter.list_calls == 2
+        assert len(ports.tasks) == 1
+        continuation: TaskSpec = ports.tasks[0]
+        assert continuation.idempotency_key.endswith("changes-cont:0c82b3c55fc4ad47")
+        assert _payload_trigger_from_json(continuation.payload) == ScanTrigger.SCHEDULE.value
+        assert_no_leaks(dump_json(continuation.payload), "continuation task")
+        async with harness.sessions() as session:
+            state: CollectorConfigRow | None = await session.get(CollectorConfigRow, config.id)
+            assert state is not None
+            assert cursor_from_json(state.cursor_json).cursor == "cursor-2"
+            job: ScanJobRow | None = await session.scalar(
+                select(ScanJobRow).where(ScanJobRow.collector_config_id == config.id)
+            )
+            assert job is not None and job.trigger == ScanTrigger.SCHEDULE.value
+
+        adapter.pages = (ChangePage((), (), None, False, False),)
+        adapter.list_calls = 0
+        manual: TaskResult = await handler.handle(
+            _scan_task(config.id, "changes", None, ScanTrigger.MANUAL)
+        )
+        assert manual.kind is TaskResultKind.DONE
+        async with harness.sessions() as session:
+            jobs_for_config: list[ScanJobRow] = list(
+                (
+                    await session.scalars(
+                        select(ScanJobRow).where(ScanJobRow.collector_config_id == config.id)
+                    )
+                ).all()
+            )
+            assert any(job.trigger == ScanTrigger.MANUAL.value for job in jobs_for_config)
+
+        adapter.fetch_error = True
+        adapter.pages = (
+            ChangePage(
+                (ResourceRef(CollectorKind.SLACK, '{"id":"safe"}', "safe"),), (), None, False, False
+            ),
+        )
+        adapter.list_calls = 0
+        failed: TaskResult = await handler.handle(_scan_task(config.id, "changes", None, attempt=2))
+        assert failed.kind is TaskResultKind.RETRY
+        assert failed.available_at == NOW + timedelta(seconds=20)
+        async with harness.sessions() as session:
+            rows: list[ScanJobRow] = list(
+                (
+                    await session.scalars(
+                        select(ScanJobRow).where(ScanJobRow.collector_config_id == config.id)
+                    )
+                ).all()
+            )
+            assert any(row.status == "failed" for row in rows)
     finally:
         await harness.close()
 
@@ -550,6 +679,7 @@ def _scan_handler(
     ports: RuntimePorts,
     jobs: ScanJobStoreImpl,
     repo: CollectorRepository,
+    max_pages: int = 20,
 ) -> CollectorScanHandler:
     return CollectorScanHandler(
         harness.sessions,
@@ -559,20 +689,36 @@ def _scan_handler(
         ports,
         jobs,
         repo,
+        ports,
         Fingerprinter(b"k" * 32, "test"),
         Redactor.default(),
         FakeClock(NOW),
+        max_pages,
     )
 
 
-def _scan_task(config_id: str, mode: str, ref_json: str | None) -> ClaimedTask:
+def _scan_task(
+    config_id: str,
+    mode: str,
+    ref_json: str | None,
+    trigger: ScanTrigger | None = None,
+    attempt: int = 1,
+) -> ClaimedTask:
     payload_fields: list[tuple[str, JsonValue]] = [
         ("config_id", json_str(config_id)),
         ("mode", json_str(mode)),
     ]
     if ref_json is not None:
         payload_fields.append(("ref_json", json_str(ref_json)))
+    if trigger is not None:
+        payload_fields.append(("trigger", json_str(trigger.value)))
     payload: JsonValue = json_object(tuple(payload_fields))
     return ClaimedTask(
-        "task-1", EngineTaskKind.COLLECTOR_SCAN, config_id, payload, 1, 3, "idempotency-1"
+        "task-1", EngineTaskKind.COLLECTOR_SCAN, config_id, payload, attempt, 3, "idempotency-1"
     )
+
+
+def _payload_trigger_from_json(payload: JsonValue) -> str | None:
+    """Read an optional trigger field from task JSON for assertions."""
+    value: JsonValue | None = payload.get("trigger")
+    return value.as_str() if value is not None else None

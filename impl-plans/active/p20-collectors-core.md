@@ -1,6 +1,6 @@
 # P20 Collectors Core (Configs, Webhooks, Scheduling, Scans, Rescans, Sweeper) Implementation Plan
 
-**Status**: In Progress (run A resume, session 338)
+**Status**: Implementation Complete (run A, session 338; review pending)
 **Design Reference**: design-docs/specs/design-collectors-and-ingestion.md (Collector adapters, Resource identity, Per-kind behavior, Full sweeps), design-docs/specs/design-map-reduce-sweeps.md (Map: collector shards, Ports)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -209,12 +209,12 @@ and fakes for `ResourceScanner`, `IssueRecorder`, `IssueReader`, `TaskQueue`,
 ```bash
 set -o pipefail
 export PYTHONDONTWRITEBYTECODE=1
-P="src/telescreen/collectors/__init__.py src/telescreen/collectors/service.py src/telescreen/collectors/repository.py src/telescreen/collectors/codec.py src/telescreen/collectors/registry.py src/telescreen/collectors/scheduler.py src/telescreen/collectors/rescanner.py src/telescreen/collectors/police.py src/telescreen/collectors/tasks.py src/telescreen/collectors/sweep.py src/telescreen/api/routers/collectors.py tests/collectors/core"
-uv run --frozen ruff format --check --no-cache $P
-uv run --frozen ruff check --no-cache $P
-uv run --frozen ty check $P
-uv run --frozen pytest -p no:cacheprovider tests/collectors/core 2>&1 | tee /tmp/telescreen-p20-collectors-core-pytest.log
-uv run --frozen python tools/typelint.py > /tmp/telescreen-p20-collectors-core-typelint.log 2>&1; grep -E '^(src/telescreen/collectors/(__init__|service|repository|codec|registry|scheduler|rescanner|police|tasks|sweep)\.py|src/telescreen/api/routers/collectors.py|tests/collectors/core)' /tmp/telescreen-p20-collectors-core-typelint.log   # prints nothing
+FILES=(src/telescreen/collectors/__init__.py src/telescreen/collectors/service.py src/telescreen/collectors/repository.py src/telescreen/collectors/codec.py src/telescreen/collectors/registry.py src/telescreen/collectors/scheduler.py src/telescreen/collectors/rescanner.py src/telescreen/collectors/police.py src/telescreen/collectors/tasks.py src/telescreen/collectors/sweep.py src/telescreen/api/routers/collectors.py tests/collectors/core)
+uv run --frozen ruff format --check --no-cache "${FILES[@]}"
+uv run --frozen ruff check --no-cache "${FILES[@]}"
+uv run --frozen ty check "${FILES[@]}"
+uv run --frozen pytest -p no:cacheprovider tests/collectors/core 2>&1 | tee tmp/telescreen-v1-20261009-s338/p20-collectors-core/verification/pytest-final.log
+uv run --frozen python tools/typelint.py > tmp/telescreen-v1-20261009-s338/p20-collectors-core/verification/typelint-final.log 2>&1; ! grep -E '^(src/telescreen/collectors/(__init__|service|repository|codec|registry|scheduler|rescanner|police|tasks|sweep)\.py|src/telescreen/api/routers/collectors.py|tests/collectors/core)' tmp/telescreen-v1-20261009-s338/p20-collectors-core/verification/typelint-final.log
 ```
 
 ## Run A Resume (2026-10-09, session 338)
@@ -223,39 +223,39 @@ State: interrupted at s319; all modules exist. Dispatch:
 `impl-plans/active/telescreen-v1-20261009-s338-dispatch.json`, wave A2. Resume from the
 in-tree code; do not rewrite working modules. Static gap review (s338 planning) found:
 
-- [ ] R0 Baseline: run the Verification block on the untouched tree; log exit codes to
-  `/tmp/telescreen-p20-collectors-core-baseline-*.log` before any edit.
-- [ ] R1 `tasks.py:CollectorScanHandler._changes`: `has_more` after `max_pages` must enqueue
+- [x] R0 Baseline: untouched-tree verification passed; logs are in
+  `tmp/telescreen-v1-20261009-s338/p20-collectors-core/verification/*-baseline-rerun.log`.
+- [x] R1 `tasks.py:CollectorScanHandler._changes`: `has_more` after `max_pages` enqueues
   a continuation `collector_scan` (mode `changes`, key
   `collector:<config>:changes-cont:<sha256(cursor)[:16]>`). Add a `queue: TaskQueue` field
   to the handler (record the constructor change for assembly in run B). Test: 3 pages with
   `max_pages=2` -> cursor saved after page 2 and exactly one continuation task.
-- [ ] R2 Scan-job trigger comes from the payload: add an optional `trigger` member to the
+- [x] R2 Scan-job trigger comes from the payload: optional `trigger` metadata is carried for
   task payload (`event` from webhooks, `manual` from `enqueue_run`, `schedule` from the
   scheduler; default `event` when absent). Test: a scheduler-enqueued scan creates a scan
   job with trigger `schedule`; `enqueue_run` -> `manual`.
-- [ ] R3 Non-rate-limit errors retry with backoff `10 s * 2^(attempt-1)` (the engine
+- [x] R3 Non-rate-limit errors retry with backoff `10 s * 2^(attempt-1)` (the engine
   worker's formula), not a flat 5 s; the scan job is finished `failed` (or `partial` when
   some refs were scanned). Test with a fake adapter raising on fetch.
-- [ ] R4 `routers/collectors.py` sweep endpoint returns `{map_job_id}` (not `{id}`); a
+- [x] R4 `routers/collectors.py` sweep endpoint returns `{map_job_id}`; a
   launcher `TelescreenError(conflict)` -> 409 through the common handler. Test both.
-- [ ] R5 Missing tests from the Tests section: `config_hint` routing picks only the config
-  whose watch `channel_id` matches; scheduler tolerates a launcher conflict and still
-  stores `last_sweep_fire`; a `police`-kind config with a due cron -> one
+- [x] R5 Added tests for `config_hint` routing to the config whose watch `channel_id`
+  matches; scheduler tolerates a launcher conflict and still stores `last_sweep_fire`; a
+  `police`-kind config with a due cron -> one
   `PoliceCollector.dispatch_detect` call (fake gateway) and no `collector_scan`; router
   `POST /api/collectors` with an invalid cron, a non-ref credential and a sample selector
   -> 422 with no echo.
-- [ ] R6 No-raw-locator test on persisted rows: use a recording fake `TaskQueue` that
-  inserts `EngineTaskRow` rows and the SQLite audit rows (or a fake that stores the
-  serialized details). Run `find_leaks` over every stored payload and audit details text
-  after a webhook, a scheduled scan and a removal (raw locator holds a sample email).
-- [ ] R7 Accepted deviations to record (no code change): `scheduler.py` calls the
+- [x] R6 No-raw-locator test: the recording fake queue/audit sink stores serialized JSON
+  details. `find_leaks` checks all queued payloads after changed/removed webhooks, a manual
+  run and a scheduled scan; the sample email is in the transient raw locator.
+- [x] R7 Accepted deviations recorded: `scheduler.py` calls the
   `SweepLauncher` port, which opens its own transaction (the port has no session
   parameter), so the launch and `last_sweep_fire` are not atomic; a repeat launch is
   refused by the launcher's `conflict` check. Removal empty scans use
   `sweep_covered=True` because `ResourceContent.sweep_covered` is only known after a fetch.
   Extra constructor fields (`repository`, `fingerprinter`, `redactor`) are kept.
-- [ ] R8 Re-run the full Verification block; every command exits 0; log paths recorded.
+- [x] R8 Final scoped verification passed; logs are in
+  `tmp/telescreen-v1-20261009-s338/p20-collectors-core/verification/`.
 
 Not in scope: per-rule-class counts in `sweep.py` (needs a `ResourceScanner` port change
 owned by accepted plan p04; file a Reconciliation request only if a test requires it).
@@ -263,11 +263,11 @@ owned by accepted plan p04; file a Reconciliation request only if a test require
 ## Completion Criteria
 
 - [x] All modules above delivered with the exact names; the ports are implemented
-- [ ] Webhook, scan modes, scheduling, rescans, police dispatch and sweeper tested (after R1-R5)
-- [ ] The no-raw-locator test passes on persisted rows (R6)
-- [ ] Run A Resume items R0-R8 checked with evidence
-- [ ] Scoped verification passes on the final tree; logs recorded
-- [ ] Progress Log updated (run A session)
+- [x] Webhook, scan modes, scheduling, rescans, Police dispatch and sweeper tested
+- [x] No-raw-locator test passes against serialized task/audit records
+- [x] Run A Resume items R0-R8 checked with evidence
+- [x] Scoped verification passes on the final tree; logs recorded
+- [x] Progress Log updated (run A session)
 
 ## Progress Log
 
@@ -282,3 +282,10 @@ owned by accepted plan p04; file a Reconciliation request only if a test require
 **Tasks In Progress**: Independent test-integrity, adversarial, and branch-evidence reviews are downstream workflow steps.
 **Blockers**: None.
 **Notes**: `tests/collectors/core` passed 10 tests. Scoped format, Ruff, ty, and typelint checks passed. Full-tree typelint passed for 248 files. A router import smoke check passed. Final logs are under `tmp/telescreen-v1-20261008-s319/p20-collectors-core/verification/` (`format-final.log`, `ruff-final.log`, `ty-final.log`, `pytest-final.log`, `typelint-scoped-final.log`, `typelint-full-final.log`, `router-import-final.log`). An earlier test assertion failure and an initial router import schema failure were corrected before these final gates.
+
+### Session: 2026-10-09 Run A Resume (session 338)
+**Tasks Completed**: Closed R0-R8. Added max-page change-feed continuation using a cursor hash, task trigger propagation into scan jobs, engine-aligned exponential retry timing and failed/partial scan counts, `{map_job_id}` sweep response, conflict/no-echo/config-hint/Police schedule coverage, and serialized no-raw-locator assertions across webhook changed/removed and schedule/manual tasks. Added the new `TaskQueue` constructor dependency to `CollectorScanHandler`; assembly must pass it in run B.
+**Tasks In Progress**: Independent test-integrity and adversarial reviews remain downstream gates.
+**Blockers**: None for p20 implementation.
+**Notes**: Untouched baseline logs are in `tmp/telescreen-v1-20261009-s338/p20-collectors-core/verification/*-baseline-rerun.log`. Final source-matched format, Ruff, ty, pytest (14 passed), and p20-filtered typelint logs use the `*-final-rerun2.log` names in that directory. Full-repository typelint currently exits 1 only for concurrent findings in `src/telescreen/workflow/mapreduce/shard.py` and `tests/workflow/engine/test_resume_gaps.py`; the p20 file filter is clean. R7 records the existing launcher transaction boundary and removal `sweep_covered=True` choice.
+**Hash Ledger**: `src/telescreen/collectors/tasks.py` before=`39743725cf031cc30b71c69e4e82a8d5fce041bc2a04228b21ae29e3ec35b7d7` after=`b18facebd38e2aad308b70c8865b3eaa71ebebb4299eb58b82e41f82798da9d6`; `src/telescreen/collectors/service.py` before=`933bfa484c6b942a1322ebb6719b08c960d3699eea5a34fe43b3eee20daa54d9` after=`edad1023fa2e194f1517f61a3c44d5c7671be8fdc82f84c818cee655cbe58cab`; `src/telescreen/collectors/scheduler.py` before=`de0ea8ce5a5b05b665b405bba6463a5a7a497058c6ba85d6a14253d6d2fa09a3` after=`881657b227cc0f315bd253e814133c6b36cb65b10228af15054009ca6291bb7d`; `src/telescreen/api/routers/collectors.py` before=`d02439f50e2087224bb0e62079f97da8792aa5527d6b9395fb177bda4757d658` after=`44863a0553239a3455c82cd6c3965b19b44b3f1f95d3117ff1b3b167f2156161`; `tests/collectors/core/test_core.py` before=`aa14549d3b4982cde061e4550ecaea441b89ba587ada67c0be5335dc51f0741e` after=`53cb4da53648fd1331244214f965d045bc9acb5dac6d81d724247d9fa287295e`; `tests/collectors/core/test_runtime.py` before=`32718e0f926369afacb076d77dd26b2d732dcb849cdd17fcbf264d1fcec2d416` after=`e3837274fdb7aa8a1bf54e35844a2cb503ae85248a6af5926ab416ae6aee2413`.

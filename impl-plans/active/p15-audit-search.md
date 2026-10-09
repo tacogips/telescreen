@@ -1,6 +1,6 @@
 # P15 Audit Log and Search Implementation Plan
 
-**Status**: In Progress (run A resume, session 338)
+**Status**: Implementation complete (run A resume, session 338; integration review pending)
 **Design Reference**: design-docs/specs/design-data-model.md (Audit), design-docs/specs/design-api-and-ui.md (Search, Endpoints: Audit, Search), design-docs/specs/design-masking.md (IndexGuard), design-docs/specs/architecture.md section 5 item 8
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -181,38 +181,38 @@ pending. Dispatch: `impl-plans/active/telescreen-v1-20261009-s338-dispatch.json`
 Resume from the in-tree code. Do not rewrite or reformat working modules. Change only what
 an item below or a failing gate requires. Static gap review (s338 planning) found:
 
-- [ ] R0 Baseline: run the Verification block on the untouched tree; log exit codes to
+- [x] R0 Baseline: run the Verification block on the untouched tree; log exit codes to
   `/tmp/telescreen-p15-audit-search-baseline-*.log` before any edit.
-- [ ] R1 `search/memory.py:InMemorySearchBackend.search` sorts by `str(value)`, so
+- [x] R1 `search/memory.py:InMemorySearchBackend.search` sorts by `str(value)`, so
   `seq:desc` puts 9 before 10 and breaks the `audit_tick.py` watermark. Sort numbers
   numerically (keep string sort for strings). Test: 12 audit records -> `seq:desc` limit 1
   returns seq 12; a tick after 12 indexed records indexes nothing new.
-- [ ] R2 `search/indexer.py:DocumentIndexer.index_*` load the row outside the `try`; the
+- [x] R2 `search/indexer.py:DocumentIndexer.index_*` load the row outside the `try`; the
   plan says the indexer never raises. Move loading inside the guarded block. Test: a
   session factory that raises on load -> no exception, warning logged with ids only.
-- [ ] R3 `search/meili.py:MeiliSearchBackend.ensure_indexes` ignores the settings `PUT`
+- [x] R3 `search/meili.py:MeiliSearchBackend.ensure_indexes` ignores the settings `PUT`
   status. Treat a non-2xx as a `TelescreenError` with a static detail. Test with
   MockTransport returning 500 on the settings call.
-- [ ] R4 `audit/query.py` converts `from`/`to` with `int(start.timestamp())` on possibly
+- [x] R4 `audit/query.py` converts `from`/`to` with `int(start.timestamp())` on possibly
   naive datetimes. Normalize with `telescreen.core.clock.ensure_utc` first. Test: a naive
   bound equals the same UTC-aware bound.
-- [ ] R5 Add the two missing `@pytest.mark.integration` tests from Tests (PostgreSQL UPDATE
+- [x] R5 Add the two missing `@pytest.mark.integration` tests from Tests (PostgreSQL UPDATE
   of `audit_records` raises; Meili round trip). They must skip when
   `TELESCREEN_TEST_DATABASE_URL` / `TELESCREEN_TEST_MEILI_URL` are unset.
-- [ ] R6 Extend the chain test to 3 appends and assert seq values 1, 2, 3.
-- [ ] R7 Accepted plan deviation (no code change): `audit/query.py:search_audit` returns the
+- [x] R6 Extend the chain test to 3 appends and assert seq values 1, 2, 3.
+- [x] R7 Accepted plan deviation (no code change): `audit/query.py:search_audit` returns the
   shared `telescreen.search.backend.SearchPage`; no `AuditSearchPage` type exists or is
   needed. Record it in the Progress Log.
-- [ ] R8 Re-run the full Verification block; every command exits 0; log paths recorded.
+- [x] R8 Re-run the full Verification block; every command exits 0; log paths recorded.
 
 ## Completion Criteria
 
 - [x] AuditLogService, verify_chain, the search backends, DocumentIndexer, AuditIndexSchedule, reindex_all and both routers delivered with the exact names
 - [x] Guard rejection, tamper detection and leak tests pass
 - [x] Audit API search and verify are exercised through an authenticated in-process ASGI app, including action, actor, from/to, response mapping, and missing-token assertions
-- [ ] Run A Resume items R0-R8 checked with evidence
-- [ ] Scoped verification passes on the final tree; logs recorded
-- [ ] Progress Log updated (run A session)
+- [x] Run A Resume items R0-R8 checked with evidence
+- [x] Scoped verification passes on the final tree; logs recorded
+- [x] Progress Log updated (run A session)
 
 ## Progress Log
 
@@ -233,3 +233,11 @@ an item below or a failing gate requires. Static gap review (s338 planning) foun
 **Tasks In Progress**: Independent test-integrity and adversarial re-review are owned by downstream workflow steps.
 **Blockers**: None for the p15 implementation repair.
 **Verification**: The focused API test passed (1 passed). Final scoped gates passed: ruff format, ruff check, ty check, typelint (18 files clean), and `pytest tests/audit tests/search` (9 passed, 0 failed). Final-source logs: `/tmp/telescreen-p15-audit-search-format-final-comm005509-v4.log`, `/tmp/telescreen-p15-audit-search-ruff-final-comm005509-v4.log`, `/tmp/telescreen-p15-audit-search-ty-final-comm005509-v4.log`, `/tmp/telescreen-p15-audit-search-typelint-scoped-final-comm005509-v4.log`, `/tmp/telescreen-p15-audit-search-pytest-final-comm005509-v4.log`. Earlier format/type diagnostics and a SQLite-naive-timestamp test assertion were corrected before these final gates; the record mapping assertion compares UTC-normalized timestamps to the persisted audit row.
+
+### Session: 2026-10-09 run A resume (session 338)
+**Tasks Completed**: Completed R0-R8. Fixed numeric ordering in `InMemorySearchBackend` so audit sequence watermarks restore correctly; moved all indexer database loads inside exception containment with identifiers-only warnings; made failed Meilisearch settings responses raise a static `TelescreenError`; normalized naive audit query bounds to UTC; added the 12-record watermark, failing session-factory, settings-500 and naive-bound regressions; extended the append-chain test to 3 records; added PostgreSQL append-only UPDATE and Meilisearch round-trip integration tests. Both integration tests are marked `integration` and explicitly skip without their corresponding service URL. Accepted deviation: `search_audit` returns the common `SearchPage`; no separate `AuditSearchPage` is needed.
+**Tasks In Progress**: Formal test-integrity, adversarial and combined-tree integration reviews, review-dependent updates, staging, commit and push are owned by later workflow steps.
+**Blockers**: None for p15 scoped implementation. PostgreSQL and Meilisearch live behavior was not exercised because `TELESCREEN_TEST_DATABASE_URL` and `TELESCREEN_TEST_MEILI_URL` are unset.
+**Baseline Verification**: Untouched tree before edits: format (exit 0), Ruff (exit 0), ty (exit 0), `pytest tests/audit tests/search` (9 passed, 0 failed), full typelint (249 files clean, exit 0). Logs: `/tmp/telescreen-p15-audit-search-baseline-valid-format.log`, `/tmp/telescreen-p15-audit-search-baseline-valid-ruff.log`, `/tmp/telescreen-p15-audit-search-baseline-valid-ty.log`, `/tmp/telescreen-p15-audit-search-baseline-pytest.log`, `/tmp/telescreen-p15-audit-search-baseline-typelint.log`.
+**Final Verification**: Scoped format, Ruff, ty, full typelint (250 files clean; no scoped diagnostics), and `pytest tests/audit tests/search` all exited 0. Pytest reported 13 passed, 2 integration tests skipped, 0 failed. Logs: `/tmp/telescreen-p15-audit-search-final-format.log`, `/tmp/telescreen-p15-audit-search-final-ruff.log`, `/tmp/telescreen-p15-audit-search-final-ty.log`, `/tmp/telescreen-p15-audit-search-final-pytest.log`, `/tmp/telescreen-p15-audit-search-final-typelint.log`, `/tmp/telescreen-p15-audit-search-final-typelint-scoped.log`.
+**Per-edit SHA-256**: `src/telescreen/search/memory.py` before `514bac0e911e8d9e16c7d12ad5494a13cb0e1934ef7a6983f9981d5c3ae04f6e`, after `b9c1c224e2ff79c067fd99d9e91bff082dfba8533357f15ea8c3c7fcf5635a75`; `src/telescreen/search/indexer.py` before `1aca84c45c646f5486f3b048caa5f44f1badc38f16a3794a8b36d7da2e5eadbd`, after `dd65c26cf489d88a63669582a145513e8b5532c537712b0d6ed41796cca2b15a`; `src/telescreen/search/meili.py` before `2a262099ec093f9cd3e1bf0c01d57690e16a96e2791a081dbe9502870841a2cb`, after `1cec92533876c10f87b6c6dd57639678001c228d74933ac1a36f363f3f36526f`; `src/telescreen/audit/query.py` before `7be677a3010d178a04a64ff5114ed9fc673e09f6dfd60445db46208532a3709d`, after `646f492780d6885fd52191d6e6410e5cc58782109004f947c73c9c03822551`; `tests/audit/test_audit.py` before `466ad18dbcac87f290fcd5fb5f8db4be542a750aee081cacd5e3fb2f6bdb7463`, after `15024c21de9cb144f404de3ff8827ff6439fbd02be410034a3fa6bbc44b9d86f`; `tests/search/test_search.py` before `fe4a4a9ae78696ea10d4e89032620ed542bc820ecd2f931c479cfd1b1a833cfc`, after `587575c216759e6335532146fc2d1621b707a1f6890fe50a3ce1bdff9effe647`.

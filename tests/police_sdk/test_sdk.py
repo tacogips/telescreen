@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import sqlite3
 import time
 from collections.abc import AsyncIterator
@@ -396,10 +397,17 @@ async def test_asgi_app_post_and_get() -> None:
         (("verify_remediation", handler),), secret, clock=lambda: 100
     )
     app: AsgiApp = create_webhook_app(webhook)
+    # ty's httpx stub is narrower than the ASGI protocol accepted by this adapter.
     asgi_transport: httpx.AsyncBaseTransport = httpx.__dict__["ASGITransport"](app=app)
     async with httpx.AsyncClient(transport=asgi_transport, base_url="http://test") as http:
         response: httpx.Response = await http.post("/", content=body, headers=dict(signed))
         assert response.status_code == 200
+        bad_headers: tuple[tuple[str, str], ...] = tuple(
+            (name, "bad") if name == "X-Telescreen-Signature" else (name, value)
+            for name, value in signed
+        )
+        bad_response: httpx.Response = await http.post("/", content=body, headers=dict(bad_headers))
+        assert bad_response.status_code == 401
         get_response: httpx.Response = await http.get("/")
         assert get_response.status_code == 405
 
@@ -412,21 +420,83 @@ async def test_sweep_accounts_for_resources_and_limits_partition() -> None:
         count: int = 1200 if task.task_id == "too-many" else 1
         return PartitionResult(tuple(Shard(str(index), _json.obj(()), 1) for index in range(count)))
 
-    async def scan(_: _json.Json) -> AsyncIterator[ResourceOutcome]:
-        yield ResourceOutcome("complete-a", (), True)
-        yield ResourceOutcome("failed-b", (), False)
-        raise RuntimeError("private error")
+    async def enumerate_resources(_: _json.Json) -> AsyncIterator[str]:
+        yield "complete-a"
+        yield "raises-b"
+        yield "complete-c"
 
-    sweep: SweepHandler = SweepHandler(partition, scan)
+    async def scan_resource(locator: str) -> ResourceOutcome:
+        if locator == "raises-b":
+            raise RuntimeError("private error")
+        return ResourceOutcome(locator, (), True)
+
+    sweep: SweepHandler = SweepHandler(partition, enumerate_resources, scan_resource)
     page: ResultEnvelope = await sweep.partition(_task("ok"))
     assert page.status is ResultStatus.COMPLETED
     assert page.payload is not None
     assert PartitionResult.from_json(page.payload).shards
     too_many: ResultEnvelope = await sweep.partition(_task("too-many"))
     assert too_many.status is ResultStatus.FAILED
+    assert too_many.error is not None
+    assert too_many.error.code == "partition_too_large"
     shard: ResultEnvelope = await sweep.scan_shard(_task())
-    assert shard.complete_locators == ("complete-a",)
-    assert shard.stats == ShardStats(1, 2, 0)
+    assert shard.complete_locators == ("complete-a", "complete-c")
+    assert shard.stats == ShardStats(2, 1, 0)
+
+    async def enumerate_partial_then_fail(_: _json.Json) -> AsyncIterator[str]:
+        yield "complete-a"
+        yield "incomplete-b"
+        raise RuntimeError("private error")
+
+    async def scan_with_incomplete(locator: str) -> ResourceOutcome:
+        return ResourceOutcome(locator, (), locator != "incomplete-b")
+
+    incomplete_sweep: SweepHandler = SweepHandler(
+        partition, enumerate_partial_then_fail, scan_with_incomplete
+    )
+    partial: ResultEnvelope = await incomplete_sweep.scan_shard(_task())
+    assert partial.status is ResultStatus.COMPLETED
+    assert partial.complete_locators == ("complete-a",)
+    assert partial.stats == ShardStats(1, 2, 0)
+    assert "private error" not in _json.dump(partial.to_json())
+
+
+@pytest.mark.asyncio
+async def test_async_webhook_logs_callback_failure_without_task_data(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Callback errors are logged once with status only and never escape the task."""
+    sensitive_sample: str = email_address().value
+
+    def callback_route(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, json={"detail": sensitive_sample})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(callback_route)) as http:
+        client: BureauClient = BureauClient("https://bureau.example.invalid", http)
+
+        async def handler(task: TaskEnvelope) -> ResultEnvelope:
+            return _result(task.task_id)
+
+        secret: bytes = b"callback secret"
+        task: TaskEnvelope = _task(
+            callback=Callback("https://bureau.example.invalid/callback", "result-token")
+        )
+        body: bytes = _json.dump(task.to_json()).encode()
+        now: int = 100
+        webhook: WebhookHandler = WebhookHandler(
+            (("verify_remediation", handler),), secret, WebhookMode.ASYNC, client, lambda: now
+        )
+        headers: tuple[tuple[str, str], ...] = signature_headers(
+            secret, body, now, "callback-failure-nonce"
+        )
+        with caplog.at_level(logging.WARNING):
+            reply: WebhookReply = await webhook.handle(WebhookRequest(headers, body))
+            assert reply.status == 202
+            await asyncio.gather(*webhook._background)
+
+    assert len(caplog.records) == 1
+    assert "500" in caplog.records[0].getMessage()
+    assert sensitive_sample not in caplog.records[0].getMessage()
 
 
 @pytest.mark.asyncio
@@ -464,6 +534,65 @@ async def test_private_db_example_masks_values_and_rejects_identifiers(tmp_path:
             for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")
         )
     assert names == ("records",)
+
+
+@pytest.mark.asyncio
+async def test_private_db_example_result_submitted_by_pull_worker(tmp_path: Path) -> None:
+    """The example worker submits only a masked result for a private DB finding."""
+    sample: str = email_address().value
+    database: Path = tmp_path / "worker-private.sqlite"
+    with sqlite3.connect(database) as connection:
+        connection.execute('CREATE TABLE "records" ("contact" TEXT)')
+        connection.execute('INSERT INTO "records" VALUES (?)', (sample,))
+    input_value: _json.Json = _json.parse(
+        '{"issue":{"display_locator":"sqlite://records/contact"}}'
+    )
+    task: TaskEnvelope = TaskEnvelope(
+        "private-db-task", "verify_remediation", 1, "now", "later", (), input_value
+    )
+    result_bodies: list[bytes] = []
+    stop: asyncio.Event = asyncio.Event()
+    claims: int = 0
+
+    def route(request: httpx.Request) -> httpx.Response:
+        nonlocal claims
+        if request.url.path.endswith("/claim"):
+            claims += 1
+            if claims > 1:
+                return httpx.Response(200, json={"tasks": []})
+            encoded_task: bytes = _json.dump(task.to_json()).encode()
+            return httpx.Response(200, content=b'{"tasks":[' + encoded_task + b"]}")
+        if request.url.path.endswith("/result"):
+            result_bodies.append(request.content)
+            stop.set()
+            return httpx.Response(204)
+        return httpx.Response(404)
+
+    async def handler(envelope: TaskEnvelope) -> ResultEnvelope:
+        return await verify_task(envelope, str(database), b"fingerprint-key")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(route)) as http:
+        worker: PullWorker = PullWorker(
+            BureauClient("https://bureau.example.invalid", http),
+            "private-worker",
+            "worker-token",
+            (("verify_remediation", handler),),
+            1,
+            0.01,
+            0,
+        )
+        await asyncio.wait_for(worker.run(stop), timeout=1)
+
+    assert len(result_bodies) == 1
+    result_body: bytes = result_bodies[0]
+    submitted: ResultEnvelope = ResultEnvelope.from_json(_json.parse(result_body))
+    serialized: str = result_body.decode()
+    assert submitted.status is ResultStatus.COMPLETED
+    assert submitted.outcome is Outcome.FAILED
+    assert submitted.findings
+    assert submitted.findings[0].masked_snippet != sample
+    assert sample not in serialized
+    assert not find_leaks(serialized)
 
 
 def test_n8n_workflow_is_importable_shaped_json_without_secrets() -> None:

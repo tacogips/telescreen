@@ -128,11 +128,16 @@ def build_ingest_router(deps: IngestRouterDeps) -> APIRouter:
 
     @router.post("/api/ingest/v1/findings")
     async def findings_push(
-        body: FindingsBody,
+        request: Request,
         principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.INGEST))],
     ) -> Response:
         """Re-scan external masked findings and store only re-keyed fingerprints."""
         del principal
+        body_bytes: bytes = await read_limited_body(request, deps.max_scan_bytes)
+        try:
+            body: FindingsBody = TypeAdapter(FindingsBody).validate_json(body_bytes)
+        except ValidationError:
+            raise TelescreenError(ErrorCode.VALIDATION_ERROR, "invalid ingestion payload") from None
         findings: tuple[ExternalFinding, ...] = tuple(
             ExternalFinding(
                 item.locator,

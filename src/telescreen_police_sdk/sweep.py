@@ -28,7 +28,8 @@ class ResourceOutcome:
 
 
 type PartitionFunction = Callable[[TaskEnvelope], Awaitable[PartitionResult]]
-type ScanFunction = Callable[[_json.Json], AsyncIterator[ResourceOutcome]]
+type EnumerateFunction = Callable[[_json.Json], AsyncIterator[str]]
+type ScanResourceFunction = Callable[[str], Awaitable[ResourceOutcome]]
 
 
 @dataclass(frozen=True)
@@ -36,7 +37,8 @@ class SweepHandler:
     """Build task handlers for partition pages and concurrent shard scans."""
 
     partition_fn: PartitionFunction
-    scan_fn: ScanFunction
+    enumerate_fn: EnumerateFunction
+    scan_resource_fn: ScanResourceFunction
 
     def handlers(self) -> tuple[tuple[str, TaskHandler], ...]:
         """Return handlers keyed by the contract task types."""
@@ -59,7 +61,12 @@ class SweepHandler:
         complete_locators: list[str] = []
         findings: list[MaskedFinding] = []
         try:
-            async for outcome in self.scan_fn(task.input):
+            async for locator in self.enumerate_fn(task.input):
+                try:
+                    outcome: ResourceOutcome = await self.scan_resource_fn(locator)
+                except Exception:
+                    resources_failed += 1
+                    continue
                 if outcome.completed:
                     resources_scanned += 1
                     complete_locators.append(outcome.locator)

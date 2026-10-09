@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 
+from telescreen.core.clock import ensure_utc
 from telescreen.search.backend import (
     FilterOp,
     IndexName,
@@ -37,9 +38,11 @@ async def search_audit(backend: SearchBackend, query: AuditQuery) -> SearchPage:
     if query.target_kind is not None:
         filters.append(SearchFilter("target_kind", FilterOp.EQ, query.target_kind))
     if query.start is not None:
-        filters.append(SearchFilter("at_ts", FilterOp.GTE, int(query.start.timestamp())))
+        filters.append(
+            SearchFilter("at_ts", FilterOp.GTE, int(ensure_utc(query.start).timestamp()))
+        )
     if query.end is not None:
-        filters.append(SearchFilter("at_ts", FilterOp.LTE, int(query.end.timestamp())))
+        filters.append(SearchFilter("at_ts", FilterOp.LTE, int(ensure_utc(query.end).timestamp())))
     return await backend.search(
         IndexName.AUDIT,
         SearchQuery(query.q, tuple(filters), ("seq:desc",), query.limit, query.offset),

@@ -177,7 +177,7 @@ async def test_queue_idempotency_due_claim_and_expired_lease() -> None:
             assert claimed[0].attempt == 1
         clock.advance(timedelta(seconds=11))
         async with harness.sessions.begin() as session:
-            assert await queue.reclaim_expired(session) == 1
+            assert await queue.reclaim_expired(session, clock.now()) == 1
             row: EngineTaskRow | None = await session.scalar(select(EngineTaskRow))
             assert row is not None and row.status == EngineTaskStatus.READY.value
     finally:
@@ -341,6 +341,7 @@ steps:
             if join_mode == "any":
                 all_steps: Sequence[StepRunRow] = await repository.steps(session, run_id)
                 assert any(step.status == "cancelled" for step in all_steps)
+                assert sum(step.step_id == "finish" for step in all_steps) == 1
     finally:
         await harness.close()
 

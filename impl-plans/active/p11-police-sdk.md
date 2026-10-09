@@ -1,6 +1,6 @@
 # P11 Police SDK, Examples (Python and n8n) Implementation Plan
 
-**Status**: In Progress (run A resume, session 338)
+**Status**: Completed (run A implementation, session 338)
 **Design Reference**: design-docs/specs/design-police-contract.md (Push signing, Python SDK, Examples), design-docs/specs/design-map-reduce-sweeps.md (Police contract additions)
 **Created**: 2026-10-08
 **Last Updated**: 2026-10-09
@@ -138,15 +138,17 @@ depends on this plan through `tests/contract/test_bureau_contract.py`). Resume f
 in-tree code; keep every public name. Treat any failing gate in R0 as the probable block
 cause and fix it first. Static gap review (s338 planning) found:
 
-- [ ] R0 Baseline: run the Verification block on the untouched tree; log exit codes to
+- [x] R0 Baseline: run the Verification block on the untouched tree; log exit codes to
   `/tmp/telescreen-p11-police-sdk-baseline-*.log` before any edit. Also confirm
-  `pyproject.toml` has no `asgi.py` per-file-ignore (design: NOT pre-approved).
-- [ ] R1 `webhook.py:WebhookHandler._run_and_callback`: catch `BureauError` and `httpx`
+  `pyproject.toml` has no `asgi.py` per-file-ignore (design: NOT pre-approved). Baseline
+  scoped format, ruff, ty and 15 tests passed; whole typelint passed and no p11 findings
+  appeared in its filter; ASGI ignore was absent.
+- [x] R1 `webhook.py:WebhookHandler._run_and_callback`: catch `BureauError` and `httpx`
   errors from the callback and log them with the status code (or error class name) only;
   never let a background task end with an unretrieved exception. Test: async mode with a
   MockTransport returning 500 on the callback -> 202 reply, one warning log with no task
-  input, no "exception was never retrieved".
-- [ ] R2 `sweep.py:SweepHandler`: the design (`design-police-contract.md`, scan_shard) says
+  input, no "exception was never retrieved". Covered in `test_async_webhook_logs_callback_failure_without_task_data`.
+- [x] R2 `sweep.py:SweepHandler`: the design (`design-police-contract.md`, scan_shard) says
   a resource counts as failed "whenever its handler raises", and the Tests section expects
   "3 resources, one raising -> 2 `complete_locators`, `resources_failed == 1`". Replace
   `scan_fn` with `enumerate_fn: Callable[[Json], AsyncIterator[str]]` (yields locators) plus
@@ -154,32 +156,39 @@ cause and fix it first. Static gap review (s338 planning) found:
   adds 1 to `resources_failed` and continues; an exception from `enumerate_fn` adds 1 and
   stops; the status stays `completed`. Use PEP 695 `type` statements for both aliases.
   Update the existing sweep test and add the 3-resource case; the 1200-shard case asserts
-  error code `partition_too_large`.
-- [ ] R3 `tests/contract/test_sdk_contract.py`: round-trip EVERY contract example file
+  error code `partition_too_large`. The three-resource test confirms both successful
+  locators remain complete when the middle resource raises. A second scenario covers a
+  `completed=False` resource followed by an enumeration exception and asserts two failures.
+  Contract example comparison
+  uses parsed JSON equality for equivalent integer/decimal number spellings.
+- [x] R3 `tests/contract/test_sdk_contract.py`: round-trip EVERY contract example file
   (read via `importlib.resources` from `telescreen.contracts`): `from_json` then `to_json`
   equals the original after canonical `_json.dump`. Validate with
   `telescreen.contracts.validator.validate` every SDK model the tests build: TaskEnvelope,
   Registration, a failed ResultEnvelope, a scan_shard result with stats and
   `complete_locators`, the async callback body with `result_token`, and the heartbeat body.
-- [ ] R4 ASGI: add a bad-signature request through `create_webhook_app` -> 401. Replace
+- [x] R4 ASGI: add a bad-signature request through `create_webhook_app` -> 401. Replace
   `httpx.__dict__["ASGITransport"]` in `tests/police_sdk/test_sdk.py` with a normal
   import; if ty rejects the normal import, keep the workaround and add a one-line comment
-  saying why.
-- [ ] R5 Private DB example test: drive the example's handler through `PullWorker` with a
+  saying why. The direct `ASGITransport` constructor is rejected by ty's httpx stub; the
+  documented dynamic lookup remains with an explanatory comment.
+- [x] R5 Private DB example test: drive the example's handler through `PullWorker` with a
   MockTransport fake Bureau (as in the Tests section) and assert the submitted result is
   `failed` with a masked finding and no leak.
-- [ ] R6 Accepted deviations to record (no code change): `signing.verify` takes
+- [x] R6 Accepted deviations to record (no code change): `signing.verify` takes
   `tuple | list` headers; `BureauClient.callback` reads `time.time()` directly.
-- [ ] R7 Re-run the full Verification block; every command exits 0; log paths recorded.
+- [x] R7 Re-run the scoped Verification block; all p11 gates passed and log paths are
+  recorded. The final full-tree typelint rerun passed with 250 files clean; an earlier
+  concurrent-tree attempt had transient diagnostics recorded in the Progress Log.
 
 ## Completion Criteria
 
 - [x] All SDK modules delivered; no `telescreen.*` imports in the SDK (`src/telescreen_police_sdk/`; import scan passed)
-- [ ] Pull and push modes tested, including cancellation, replay and the async callback (after R1-R5)
+- [x] Pull and push modes tested, including cancellation, replay and the async callback (after R1-R5)
 - [x] Python and n8n examples plus READMEs delivered, with no secrets (`examples/police/`)
-- [ ] Run A Resume items R0-R7 checked with evidence
-- [ ] Scoped verification passes on the final tree; logs recorded
-- [ ] Progress Log updated (run A session)
+- [x] Run A Resume items R0-R7 checked with evidence
+- [x] Scoped verification passes on the final tree; logs recorded
+- [x] Progress Log updated (run A session)
 
 ## Progress Log
 
@@ -209,3 +218,21 @@ cause and fix it first. Static gap review (s338 planning) found:
 **Blockers**: None for p11 implementation.
 **Verification**: Final source format, ruff, ty, scoped typelint (13 files clean), import scan, and SDK/contract pytest exited 0; pytest reported 15 passed. The pre-fix reproduction failed on the expected free-slot assertion and is resolved by the source change.
 **Evidence**: Reproduction `/tmp/telescreen-p11-police-sdk-worker-free-slot-reproduction.log`; focused post-fix test `/tmp/telescreen-p11-police-sdk-worker-coverage-post-fix.log`; final source logs `/tmp/telescreen-p11-police-sdk-format-ti-repair-source-final.log`, `/tmp/telescreen-p11-police-sdk-ruff-ti-repair-source-final.log`, `/tmp/telescreen-p11-police-sdk-ty-ti-repair-source-final.log`, `/tmp/telescreen-p11-police-sdk-typelint-ti-repair-source-final.log`, `/tmp/telescreen-p11-police-sdk-pytest-ti-repair-source-final.log`, `/tmp/telescreen-p11-police-sdk-imports-ti-repair-source-final.log`.
+
+### Session: 2026-10-09 — Run A resume R0-R7
+**Tasks Completed**: Added sanitized async callback error logging; changed sweep scanning to enumerate then scan each resource and continue after per-resource exceptions; expanded SDK contract example round trips and schema validation; added ASGI bad-signature and private-database PullWorker tests. Kept the direct ASGITransport workaround with a ty explanation. Confirmed R6 deviations: verify accepts tuple/list headers, callback uses `time.time()`.
+**Tasks In Progress**: Formal test-integrity, adversarial and combined-tree integration review are downstream workflow steps.
+**Blockers**: None for p11 implementation.
+**Reconciliation requests**: None.
+**Hashes**: `src/telescreen_police_sdk/webhook.py` before=64668961a59f38f3fc68b1aa869ac2a5030b05029f061e551a073b36dfa607ba after=756d70e884e3eba9a0a851618b87784aad5a588ad05569e1c2fc6cda75b9c7fc; `src/telescreen_police_sdk/sweep.py` before=af4b8d48f27ad6ff490bf92afe17fea9a7b4f92c484a60efb034793172e6dc97 after=a97ebfea932a26d4c3bbd9cc9e44923c872998b847addadb55492702ad6c03de; `tests/police_sdk/test_sdk.py` before=bf0fb37aae13bbdc5c53a3b69aa530f7a3618a9da009527c7390af4ad417e78b after=971f1f3d0f591f9c2ccb74ec3936c968febdb35bc01f8ffca1db3eaf3aa5eea4; `tests/contract/test_sdk_contract.py` before=71ac7accb284d4b43e9746bb322cbb6992301d6380628c35d4372ac48614d266 after=fb46750ac7fdc7f1320a02ce86ffe4f901e2d77e61427b5b7cde144f4719570c.
+**Verification**: Baseline scoped format, ruff, ty, pytest (15 passed), full typelint and p11 filter passed before edits (`/tmp/telescreen-p11-police-sdk-baseline-{format,ruff,ty,pytest,typelint}.log`). Final commands: `uv run --frozen ruff format --check --no-cache src/telescreen_police_sdk tests/police_sdk tests/contract/test_sdk_contract.py examples/police/python` -> 0; `uv run --frozen ruff check --no-cache ...` -> 0; `uv run --frozen ty check ...` -> 0; `uv run --frozen pytest -p no:cacheprovider tests/police_sdk tests/contract/test_sdk_contract.py` -> 0, 17 passed; standalone `uv run --frozen python tools/typelint.py` -> 0, 250 files clean; p11 typelint filter -> empty. Logs: `/tmp/telescreen-p11-police-sdk-{format,ruff,ty,pytest,typelint,typelint-scoped,imports,asgi-ignore}-final.log`. One concurrent-tree typelint attempt transiently found nine diagnostics in `tests/issues/test_issues_api.py`; a later current-tree standalone rerun passed.
+**Notes**: Per-edit intentions are preserved in `tmp/telescreen-v1-20261009-s338/p11-police-sdk/edits/20261009-r1-r5.md`. No SDK imports from `telescreen.*`; no ASGI per-file-ignore. Downstream formal review and serial finalization remain owned by later workflow steps.
+
+### Session: 2026-10-09 — TI-P11-01 repair (comm-005570)
+**Tasks Completed**: Restored explicit sweep accounting coverage for one `completed=False` resource followed by an enumeration exception after a successful resource. The result remains COMPLETED, contains only `complete-a`, counts two failures, and omits the private exception message. Existing 3-resource and `partition_too_large` assertions are unchanged.
+**Tasks In Progress**: Independent test-integrity re-review and downstream adversarial/integration review.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `tests/police_sdk/test_sdk.py` before=971f1f3d0f591f9c2ccb74ec3936c968febdb35bc01f8ffca1db3eaf3aa5eea4 after=d5326ba766405964fd98cc4b25e7e21880c72b70426944b4be13de8e1be5d443. Source `sweep.py` remained before=after=a97ebfea932a26d4c3bbd9cc9e44923c872998b847addadb55492702ad6c03de.
+**Verification**: Focused sweep test passed (1 passed; `/tmp/telescreen-p11-police-sdk-ti01-focused.log`). Mutation check injected an in-memory behavior equivalent to omitting the `completed=False` failure increment; test failed at the expected `ShardStats(1, 2, 0)` assertion (exit 1, `/tmp/telescreen-p11-police-sdk-ti01-mutation.log`). `src/telescreen_police_sdk/sweep.py` remained unchanged at sha256 `a97ebfea932a26d4c3bbd9cc9e44923c872998b847addadb55492702ad6c03de`; repair constraints restricted edits to this test and the plan, so no source-file mutation was performed. Final scoped format, Ruff, ty and typelint filter all exited 0 (`/tmp/telescreen-p11-police-sdk-{format,ruff,ty,typelint}-ti01.log`). Focused SDK/contract pytest exited 0 with 17 passed and zero failures (`/tmp/telescreen-p11-police-sdk-pytest-ti01.log`).
+**Notes**: The full workflow review finding TI-P11-01 is addressed; independent review must re-check the added coverage and mutation evidence before acceptance. Intentions: `tmp/telescreen-v1-20261009-s338/p11-police-sdk/edits/20261009-ti-p11-01.md`.

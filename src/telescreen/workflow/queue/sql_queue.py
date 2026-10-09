@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from telescreen.core.clock import Clock, ensure_utc
 from telescreen.core.ids import new_id
 from telescreen.core.json import dump_json, parse_json
-from telescreen.core.vocabulary import EngineTaskKind, EngineTaskStatus
+from telescreen.core.vocabulary import EngineTaskKind, EngineTaskStatus, ErrorCode
 from telescreen.db.models import EngineTaskRow
 from telescreen.ports.workflow import ClaimedTask, TaskResult, TaskResultKind, TaskSpec
 
@@ -116,15 +116,22 @@ class SqlTaskQueue:
         await session.flush()
         return claimed
 
-    async def apply_result(self, session: AsyncSession, task_id: str, result: TaskResult) -> None:
+    async def apply_result(
+        self, session: AsyncSession, task_id: str, result: TaskResult
+    ) -> EngineTaskStatus | None:
         """Complete, retry or dead-letter a leased task."""
         row: EngineTaskRow | None = await session.get(EngineTaskRow, task_id)
         if row is None or row.status != EngineTaskStatus.LEASED.value:
-            return
+            return None
         row.lease_owner = None
         row.lease_expires_at = None
         if result.kind is TaskResultKind.DONE:
             row.status = EngineTaskStatus.DONE.value
+        elif result.kind is TaskResultKind.RETRY and result.error_code is ErrorCode.CONFLICT:
+            row.status = EngineTaskStatus.READY.value
+            row.available_at = ensure_utc(result.available_at or self.clock.now())
+            row.last_error_code = ErrorCode.CONFLICT.value
+            row.attempts = max(row.attempts - 1, 0)
         elif result.kind is TaskResultKind.RETRY and row.attempts < row.max_attempts:
             row.status = EngineTaskStatus.READY.value
             row.available_at = ensure_utc(result.available_at or self.clock.now())
@@ -133,10 +140,11 @@ class SqlTaskQueue:
             row.status = EngineTaskStatus.DEAD.value
             row.last_error_code = result.error_code.value if result.error_code else None
         await session.flush()
+        return EngineTaskStatus(row.status)
 
-    async def reclaim_expired(self, session: AsyncSession) -> int:
+    async def reclaim_expired(self, session: AsyncSession, now: datetime) -> int:
         """Return expired leases to the ready queue."""
-        now: datetime = self.clock.now()
+        now = ensure_utc(now)
         result: Result[tuple[str]] = await session.execute(
             update(EngineTaskRow)
             .where(

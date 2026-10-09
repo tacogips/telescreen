@@ -1,7 +1,8 @@
 """Durable collector scan and watch-renewal task handlers."""
 
+import hashlib
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -11,7 +12,7 @@ from telescreen.collectors.repository import CollectorRepository
 from telescreen.collectors.service import CollectorService
 from telescreen.core.clock import Clock
 from telescreen.core.errors import TelescreenError
-from telescreen.core.json import JsonValue
+from telescreen.core.json import JsonValue, json_object, json_str
 from telescreen.core.vocabulary import EngineTaskKind, ErrorCode, ScanJobStatus, ScanTrigger
 from telescreen.masking.fingerprint import Fingerprinter
 from telescreen.masking.redact import Redactor
@@ -27,7 +28,16 @@ from telescreen.ports.collectors import (
 )
 from telescreen.ports.findings import RecordOutcome, ResourceScan
 from telescreen.ports.issues import IssueReader, IssueRecorder, OpenResourceRef, ResourceScanner
-from telescreen.ports.workflow import ClaimedTask, TaskHandler, TaskResult
+from telescreen.ports.workflow import ClaimedTask, TaskHandler, TaskQueue, TaskResult, TaskSpec
+
+
+@dataclass
+class _ScanProgress:
+    """Keep count-only progress for failed scan job status and totals."""
+
+    scanned: int = 0
+    skipped: int = 0
+    findings: int = 0
 
 
 @dataclass(frozen=True)
@@ -41,6 +51,7 @@ class CollectorScanHandler(TaskHandler):
     reader: IssueReader
     scan_jobs: ScanJobStore
     repository: CollectorRepository
+    queue: TaskQueue
     fingerprinter: Fingerprinter
     redactor: Redactor
     clock: Clock
@@ -60,10 +71,20 @@ class CollectorScanHandler(TaskHandler):
             row_json: str | None = await _cursor_json(session, config_id)
         if config is None:
             return TaskResult.dead(ErrorCode.NOT_FOUND)
+        trigger_value: JsonValue | None = task.payload.get("trigger")
+        try:
+            trigger: ScanTrigger = (
+                ScanTrigger(trigger_value.as_str())
+                if trigger_value is not None
+                else ScanTrigger.EVENT
+            )
+        except ValueError:
+            return TaskResult.dead(ErrorCode.VALIDATION_ERROR)
         async with self.sessions.begin() as session:
             job_id: str = await self.scan_jobs.create(
-                session, config.id, config.kind.value, ScanTrigger.EVENT, self.clock.now()
+                session, config.id, config.kind.value, trigger, self.clock.now()
             )
+        progress: _ScanProgress = _ScanProgress()
         try:
             if mode == "resource" or mode == "removed":
                 ref_value: JsonValue | None = task.payload.get("ref_json")
@@ -79,6 +100,9 @@ class CollectorScanHandler(TaskHandler):
                             config, ref
                         )
                         outcome = await self.scanner.scan_resource(content, job_id)
+                        progress.scanned += 1
+                        progress.skipped += int(outcome.skipped)
+                        progress.findings += outcome.findings_inserted
                     except ResourceGoneError:
                         outcome = await self._record_empty(config, ref, job_id, True)
                 await self._finish(
@@ -90,27 +114,76 @@ class CollectorScanHandler(TaskHandler):
                     None,
                 )
                 return TaskResult.done()
-            await self._changes(config, row_json, job_id)
+            await self._changes(config, row_json, job_id, trigger, progress)
             return TaskResult.done()
         except RateLimited as limited:
             delay: float = (
                 limited.retry_after_seconds if limited.retry_after_seconds is not None else 5.0
             )
-            await self._finish(job_id, ScanJobStatus.PARTIAL, 0, 0, 0, ErrorCode.RATE_LIMITED)
+            await self._finish(
+                job_id,
+                _failure_status(progress),
+                progress.scanned,
+                progress.skipped,
+                progress.findings,
+                ErrorCode.RATE_LIMITED,
+            )
             return TaskResult.retry(
                 self.clock.now() + timedelta(seconds=delay), ErrorCode.RATE_LIMITED
             )
         except ResourceGoneError:
-            await self._finish(job_id, ScanJobStatus.PARTIAL, 0, 0, 0, ErrorCode.FETCH_FAILED)
-            return TaskResult.retry(self.clock.now() + timedelta(seconds=5), ErrorCode.FETCH_FAILED)
+            await self._finish(
+                job_id,
+                _failure_status(progress),
+                progress.scanned,
+                progress.skipped,
+                progress.findings,
+                ErrorCode.FETCH_FAILED,
+            )
+            return TaskResult.retry(
+                _retry_at(self.clock.now(), task.attempt), ErrorCode.FETCH_FAILED
+            )
         except TelescreenError as error:
-            await self._finish(job_id, ScanJobStatus.FAILED, 0, 0, 0, error.code)
-            return TaskResult.dead(error.code)
+            if error.code is ErrorCode.VALIDATION_ERROR:
+                await self._finish(
+                    job_id,
+                    ScanJobStatus.FAILED,
+                    progress.scanned,
+                    progress.skipped,
+                    progress.findings,
+                    error.code,
+                )
+                return TaskResult.dead(error.code)
+            await self._finish(
+                job_id,
+                _failure_status(progress),
+                progress.scanned,
+                progress.skipped,
+                progress.findings,
+                error.code,
+            )
+            return TaskResult.retry(_retry_at(self.clock.now(), task.attempt), error.code)
         except Exception:
-            await self._finish(job_id, ScanJobStatus.PARTIAL, 0, 0, 0, ErrorCode.FETCH_FAILED)
-            return TaskResult.retry(self.clock.now() + timedelta(seconds=5), ErrorCode.FETCH_FAILED)
+            await self._finish(
+                job_id,
+                _failure_status(progress),
+                progress.scanned,
+                progress.skipped,
+                progress.findings,
+                ErrorCode.FETCH_FAILED,
+            )
+            return TaskResult.retry(
+                _retry_at(self.clock.now(), task.attempt), ErrorCode.FETCH_FAILED
+            )
 
-    async def _changes(self, config: CollectorConfig, stored_json: str | None, job_id: str) -> None:
+    async def _changes(
+        self,
+        config: CollectorConfig,
+        stored_json: str | None,
+        job_id: str,
+        trigger: ScanTrigger,
+        progress: _ScanProgress,
+    ) -> None:
         """Consume incremental pages, advancing cursors and reconciling complete listings."""
         state: CursorState = cursor_from_json(stored_json)
         cursor: CollectorCursor | None = (
@@ -118,17 +191,15 @@ class CollectorScanHandler(TaskHandler):
         )
         listed: set[str] = set()
         pages: int = 0
-        scanned: int = 0
-        skipped: int = 0
-        findings: int = 0
         full_listing: bool = False
+        has_more: bool = False
         while True:
             page: ChangePage = await self.registry.adapter(config.kind).list_changed(config, cursor)
             pages += 1
             full_listing = full_listing or page.full_listing
             for ref in page.changed:
                 if self.redactor.has_hits(ref.ref_json):
-                    skipped += 1
+                    progress.skipped += 1
                     continue
                 resource_key: str = self.fingerprinter.resource_key(
                     config.kind.value, ref.raw_locator
@@ -139,15 +210,15 @@ class CollectorScanHandler(TaskHandler):
                         config, ref
                     )
                     outcome: RecordOutcome = await self.scanner.scan_resource(content, job_id)
-                    findings += outcome.findings_inserted
-                    skipped += int(outcome.skipped)
-                    scanned += 1
+                    progress.findings += outcome.findings_inserted
+                    progress.skipped += int(outcome.skipped)
+                    progress.scanned += 1
                 except ResourceGoneError:
                     await self._record_empty(config, ref, job_id, True)
-                    scanned += 1
+                    progress.scanned += 1
             for ref in page.removed:
                 await self._record_empty(config, ref, job_id, True)
-                scanned += 1
+                progress.scanned += 1
             cursor = page.next_cursor
             state = CursorState(
                 cursor.value if cursor is not None else state.cursor,
@@ -156,7 +227,8 @@ class CollectorScanHandler(TaskHandler):
             )
             async with self.sessions.begin() as session:
                 await self.repository.set_cursor(session, config.id, state, self.clock.now())
-            if not page.has_more or (not full_listing and pages >= self.max_pages):
+            has_more = page.has_more
+            if not has_more or (not full_listing and pages >= self.max_pages):
                 break
         if full_listing:
             async with self.sessions() as session:
@@ -173,7 +245,35 @@ class CollectorScanHandler(TaskHandler):
                         open_ref.ref_json
                     )
                     await self._record_empty(config, empty_ref, job_id, True)
-        await self._finish(job_id, ScanJobStatus.SUCCEEDED, scanned, skipped, findings, None)
+        await self._finish(
+            job_id,
+            ScanJobStatus.SUCCEEDED,
+            progress.scanned,
+            progress.skipped,
+            progress.findings,
+            None,
+        )
+        if has_more and not full_listing:
+            cursor_value: str = cursor.value if cursor is not None else ""
+            cursor_hash: str = hashlib.sha256(cursor_value.encode("utf-8")).hexdigest()[:16]
+            payload: JsonValue = json_object(
+                (
+                    ("config_id", json_str(config.id)),
+                    ("mode", json_str("changes")),
+                    ("trigger", json_str(trigger.value)),
+                )
+            )
+            async with self.sessions.begin() as session:
+                await self.queue.enqueue(
+                    session,
+                    TaskSpec(
+                        EngineTaskKind.COLLECTOR_SCAN,
+                        config.id,
+                        payload,
+                        self.clock.now(),
+                        f"collector:{config.id}:changes-cont:{cursor_hash}",
+                    ),
+                )
 
     async def _record_empty(
         self, config: CollectorConfig, ref: ResourceRef, job_id: str, complete: bool
@@ -236,3 +336,13 @@ async def _cursor_json(session: AsyncSession, config_id: str) -> str | None:
 
     row: CollectorConfigRow | None = await session.get(CollectorConfigRow, config_id)
     return row.cursor_json if row is not None else None
+
+
+def _retry_at(now: datetime, attempt: int) -> datetime:
+    """Match the workflow worker's bounded exponential retry schedule."""
+    return now + timedelta(seconds=10 * (2 ** (attempt - 1)))
+
+
+def _failure_status(progress: _ScanProgress) -> ScanJobStatus:
+    """Report partial only after at least one resource completed scanning."""
+    return ScanJobStatus.PARTIAL if progress.scanned > 0 else ScanJobStatus.FAILED

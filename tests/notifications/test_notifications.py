@@ -77,10 +77,12 @@ class RecordingQueue:
 class FakeResolver:
     """Resolve a known test reference into email and Slack targets."""
 
+    unknown_at_delivery: bool = False
+
     async def resolve(self, session: AsyncSession, ref: str) -> ResolvedRecipients:
         """Return fixed targets or reject the configured unknown reference."""
         del session
-        if ref == "unknown:target":
+        if ref == "unknown:target" or self.unknown_at_delivery:
             raise TelescreenError(ErrorCode.RECIPIENT_UNKNOWN, "recipient reference is unknown")
         return ResolvedRecipients(("oncall@example.invalid",), ("C123",), ("U123",), ())
 
@@ -129,6 +131,28 @@ class RecordingSmtp:
     def send(self, message: EmailMessage) -> None:
         """Record the complete email message."""
         self.messages.append(message)
+
+
+@dataclass
+class TrackingNotificationRepository(NotificationRepository):
+    """Retain the last session so transport tests can inspect transaction state."""
+
+    last_session: AsyncSession | None = None
+
+    async def get(self, session: AsyncSession, notification_id: str) -> NotificationRow | None:
+        """Record the repository session and load the notification."""
+        self.last_session = session
+        return await super().get(session, notification_id)
+
+
+@dataclass(frozen=True)
+class ResidualRedactor(Redactor):
+    """Simulate a rule detector that still finds sensitive content after masking."""
+
+    def has_hits(self, text: str) -> bool:
+        """Always report a residual hit for the fail-closed behavior test."""
+        del text
+        return True
 
 
 def make_service(
@@ -242,12 +266,24 @@ async def test_block_policy_stores_placeholder_and_does_not_enqueue() -> None:
 
 
 async def test_mask_policy_blocks_if_rule_redactor_finds_residual_value() -> None:
-    """Fail closed when a configured detector leaves a rule-detectable body value."""
+    """Fail closed when a synthetic redactor finds a residual masked value."""
+    gate: DlpGate = DlpGate(
+        SubjectFindingDetector(), ResidualRedactor(RuleDetector()), DlpPolicy.MASK
+    )
+    message: CensoredMessage = await gate.inspect(OutboundMessage("notice", github_token().value))
+    assert message.verdict is DlpVerdict.BLOCKED
+    assert message.subject == message.body == "[BLOCKED BY DLP]"
+    assert message.hit_count == 1
+
+
+async def test_mask_policy_blocks_raw_body_value_missed_by_detector() -> None:
+    """Use the real redactor to block a body value the configured detector missed."""
     gate: DlpGate = DlpGate(SubjectFindingDetector(), Redactor.default(), DlpPolicy.MASK)
     message: CensoredMessage = await gate.inspect(OutboundMessage("notice", github_token().value))
     assert message.verdict is DlpVerdict.BLOCKED
     assert message.subject == message.body == "[BLOCKED BY DLP]"
     assert message.hit_count == 1
+    assert_no_leaks(message.subject + message.body, "censored message")
 
 
 def test_censored_message_cannot_be_constructed_without_package_seal() -> None:
@@ -286,8 +322,11 @@ async def test_delivery_sends_once_and_skips_duplicate_task() -> None:
     async with harness.sessions.begin() as session:
         session.add(_notification("notification-1", clock.now()))
     posted: list[bytes] = []
+    repository: TrackingNotificationRepository = TrackingNotificationRepository()
 
     def handler(request_value: httpx.Request) -> httpx.Response:
+        assert repository.last_session is not None
+        assert not repository.last_session.in_transaction()
         posted.append(request_value.content)
         return httpx.Response(200, json={"ok": True})
 
@@ -302,7 +341,7 @@ async def test_delivery_sends_once_and_skips_duplicate_task() -> None:
             EmailNotifier(smtp, "noreply@example.invalid"),
             audit,
             clock,
-            NotificationRepository(),
+            repository,
         )
         task: ClaimedTask = _claimed("notification-1", 1, 5)
         first: TaskResult = await delivery.handle(task)
@@ -359,10 +398,15 @@ async def test_delivery_backoff_and_terminal_failure() -> None:
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         delivery: NotificationDeliveryHandler = _delivery(harness, clock, client, audit)
-        retry: TaskResult = await delivery.handle(_claimed("notification-failure", 2, 5))
+        retries: list[TaskResult] = [
+            await delivery.handle(_claimed("notification-failure", attempt, 5))
+            for attempt in range(1, 5)
+        ]
         dead: TaskResult = await delivery.handle(_claimed("notification-failure", 5, 5))
-    assert retry.kind is TaskResultKind.RETRY
-    assert retry.available_at == clock.now() + timedelta(seconds=60)
+    assert all(retry.kind is TaskResultKind.RETRY for retry in retries)
+    assert [retry.available_at for retry in retries] == [
+        clock.now() + timedelta(seconds=30 * (2 ** (attempt - 1))) for attempt in range(1, 5)
+    ]
     assert dead.kind is TaskResultKind.DEAD
     assert dead.error_code is ErrorCode.DELIVERY_FAILED
     async with harness.sessions() as session:
@@ -405,7 +449,45 @@ async def test_email_notifier_receives_only_censored_content() -> None:
     await notifier.send("oncall@example.invalid", message)
     assert len(smtp.messages) == 1
     assert smtp.messages[0]["To"] == "oncall@example.invalid"
-    assert_no_leaks(smtp.messages[0].as_string(), "email payload")
+    payload: str = smtp.messages[0].as_string()
+    assert "Token ghp_" in smtp.messages[0].get_content()
+    assert "*" in smtp.messages[0].get_content()
+    assert_no_leaks(payload, "email payload")
+
+
+async def test_delivery_unknown_recipient_is_terminal_and_audited() -> None:
+    """Mark a queued row failed when its recipient stops resolving before delivery."""
+    harness: SqliteHarness = await _queued_harness("notification-unknown-recipient")
+    clock: FakeClock = FakeClock(datetime(2026, 10, 9, tzinfo=UTC))
+    audit: RecordingAudit = RecordingAudit()
+
+    def unused_handler(request_value: httpx.Request) -> httpx.Response:
+        """Provide a transport that must not be used for unresolved recipients."""
+        del request_value
+        return httpx.Response(200)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(unused_handler)) as client:
+        delivery: NotificationDeliveryHandler = NotificationDeliveryHandler(
+            harness.sessions,
+            FakeResolver(unknown_at_delivery=True),
+            SlackNotifier(client, SecretValue("test-slack-token")),
+            EmailNotifier(RecordingSmtp(), "noreply@example.invalid"),
+            audit,
+            clock,
+            NotificationRepository(),
+        )
+        result: TaskResult = await delivery.handle(_claimed("notification-unknown-recipient", 1, 5))
+    assert result.kind is TaskResultKind.DEAD
+    assert result.error_code is ErrorCode.RECIPIENT_UNKNOWN
+    async with harness.sessions() as session:
+        row: NotificationRow | None = await session.get(
+            NotificationRow, "notification-unknown-recipient"
+        )
+    assert row is not None
+    assert row.status == NotificationStatus.FAILED.value
+    assert row.delivery_attempts == 1
+    assert [entry.action for entry in audit.entries] == ["notification.failed"]
+    await harness.close()
 
 
 def _claimed(notification_id: str, attempt: int, max_attempts: int) -> ClaimedTask:

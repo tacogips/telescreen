@@ -245,7 +245,7 @@ class SlackAdapter:
                     payload.ts,
                     payload.ts,
                     None,
-                    1,
+                    2,
                     inclusive=True,
                 )
             else:
