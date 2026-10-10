@@ -46,11 +46,16 @@ class Recorder:
     responses: list[str] = field(default_factory=list)
     response_paths: list[str] = field(default_factory=list)
     llm_responses: list[str] = field(default_factory=list)
+    clean_content_paths: set[str] = field(default_factory=set)
+    missing_content_paths: set[str] = field(default_factory=set)
+    failing_hosts: set[str] = field(default_factory=set)
 
     async def handle(self, request: Request) -> Response:
         """Record a request and return a deterministic provider response."""
         body: bytes = await request.aread()
         self.requests.append((str(request.url), body))
+        if request.url.host in self.failing_hosts:
+            return Response(500, request=request)
         if "api.anthropic.com" in request.url.host:
             answer: str = self.llm_responses.pop(0) if self.llm_responses else "{}"
             return Response(
@@ -69,6 +74,8 @@ class Recorder:
             )
         if "api.github.com" in request.url.host:
             if "/contents/" in request.url.path:
+                if request.url.path in self.missing_content_paths:
+                    return Response(404, request=request)
                 if request.url.path.endswith("/binary.bin"):
                     return Response(
                         200,
@@ -83,6 +90,8 @@ class Recorder:
                 content: str = (
                     "secrets/ " + CANARY_EMAIL
                     if request.url.path.endswith("/CODEOWNERS")
+                    else "safe test content"
+                    if request.url.path in self.clean_content_paths
                     else _github_content()
                 )
                 return Response(
@@ -187,6 +196,7 @@ async def make_leak_world(tmp: Path, with_llm: bool) -> LeakWorld:
         event_hooks={"response": [_record_response(recorder)]},
     )
     container: Container = build_container(settings, env, transport, database.sessions, clock)
+    container.worker.concurrency = 1
     assert isinstance(buffer_handler.formatter, MaskingFormatter)
     root.handlers[:] = [buffer_handler, *prior_handlers]
     app: FastAPI = create_app(container)

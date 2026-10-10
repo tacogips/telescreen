@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from telescreen.core.clock import ensure_utc
 from telescreen.core.vocabulary import (
     PlacementKind,
     PolicyEffect,
@@ -111,6 +112,8 @@ def _conditions_hold(policy: PolicyDefinition, subject: PolicySubject, now: date
         limit_rank: int | None = visibility_rank(policy.max_exposure)
         if subject_rank is None or limit_rank is None or subject_rank > limit_rank:
             return False
-    return policy.max_age_days is None or now - subject.age_reference <= timedelta(
-        days=policy.max_age_days
-    )
+    if policy.max_age_days is None:
+        return True
+    # SQLite returns naive datetimes; normalize both sides at the comparison boundary.
+    age: timedelta = ensure_utc(now) - ensure_utc(subject.age_reference)
+    return age <= timedelta(days=policy.max_age_days)

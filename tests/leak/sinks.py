@@ -98,65 +98,23 @@ async def v11_record_text(world: LeakWorld) -> tuple[tuple[str, str], ...]:
                 ("asset_tier", row.asset_tier),
             ):
                 sinks.append((f"v11:issues:{name}", value or ""))
-        for row in await session.scalars(select(PlacementPolicyRow)):
-            sinks.extend(
-                (f"v11:placement_policies:{name}", str(value or ""))
-                for name, value in (
-                    ("id", row.id),
-                    ("name", row.name),
-                    ("version", row.version),
-                    ("source_format", row.source_format),
-                    ("compiled_json", row.compiled_json),
-                    ("effect", row.effect),
-                    ("enabled", row.enabled),
-                    ("active", row.active),
-                    ("owner_team", row.owner_team),
-                    ("created_by", row.created_by),
-                    ("created_at", row.created_at.isoformat()),
-                )
-            )
-        for model, fields in (
-            (
-                IssueExceptionRow,
-                (
-                    "id",
-                    "issue_id",
-                    "reason",
-                    "duration",
-                    "status",
-                    "requested_by",
-                    "approver_ref",
-                    "decided_by",
-                    "expires_at",
-                ),
-            ),
-            (MemberIdentityRow, ("id", "member_id", "kind", "identity_key", "origin")),
-            (
-                ResourceCoverageRow,
-                (
-                    "id",
-                    "collector_config_id",
-                    "resource_key",
-                    "source",
-                    "state",
-                    "reason",
-                    "exposure_visibility",
-                ),
-            ),
-            (ScanCoverageRow, ("scan_job_id", "state", "reason", "count")),
-            (
-                CollectorHealthRow,
-                ("collector_config_id", "consecutive_failures", "open_conditions"),
-            ),
+        for model in (
+            PlacementPolicyRow,
+            IssueExceptionRow,
+            MemberIdentityRow,
+            ResourceCoverageRow,
+            ScanCoverageRow,
+            CollectorHealthRow,
         ):
-            for row in await session.scalars(select(model)):
-                for name in fields:
-                    value: str | int | bool | None = getattr(row, name)
-                    sinks.append((f"v11:{model.__tablename__}:{name}", str(value or "")))
+            for row in await session.execute(select(model.__table__)):
+                for index, column in enumerate(tuple(model.__table__.columns)):
+                    if model is PlacementPolicyRow and column.name == "source_text":
+                        continue
+                    value: str = str(row[index] or "")
+                    sinks.append((f"v11:{model.__tablename__}:{column.name}", value))
         notifications: tuple[NotificationRow, ...] = tuple(
             await session.scalars(select(NotificationRow))
         )
         for row in notifications:
-            if row.subject.startswith("Telescreen") or row.issue_id is not None:
-                sinks.append((f"v11:notifications:{row.subject}", row.subject + "\n" + row.body))
+            sinks.append((f"v11:notifications:{row.subject}", row.subject + "\n" + row.body))
     return tuple(sinks)

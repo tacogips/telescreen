@@ -161,3 +161,31 @@ async def test_rule_class_filter_excludes_policy() -> None:
         assert decision.policy_name is None
     finally:
         await harness.close()
+
+
+@pytest.mark.asyncio
+async def test_max_age_accepts_naive_age_reference_from_sqlite() -> None:
+    """Naive datetimes read back from SQLite are treated as UTC, not a TypeError."""
+    harness: SqliteHarness = await make_sqlite_harness()
+    fingerprinter: Fingerprinter = Fingerprinter(b"k" * 32, "key")
+    key: str = fingerprinter.placement_key(PlacementKind.GDRIVE_FOLDER, "folder-1")
+    naive_fresh: datetime = (NOW - timedelta(days=10)).replace(tzinfo=None)
+    naive_stale: datetime = (NOW - timedelta(days=400)).replace(tzinfo=None)
+    try:
+        async with harness.sessions.begin() as session:
+            add_policy(
+                session,
+                '{"name":"allow","effect":"allow","match":{"locations":{"gdrive_folders":["folder-1"]}},"condition":{"max_age_days":365},"owner_team":"hr"}',
+            )
+        async with harness.sessions() as session:
+            decider: PlacementPolicyDecider = PlacementPolicyDecider(fingerprinter, False)
+            fresh: PolicyDecision = await decider.decide(
+                session, make_subject((key,), Visibility.INTERNAL, naive_fresh), NOW
+            )
+            stale: PolicyDecision = await decider.decide(
+                session, make_subject((key,), Visibility.INTERNAL, naive_stale), NOW
+            )
+        assert fresh.effect is PolicyEffect.ALLOW
+        assert stale.effect is PolicyEffect.VIOLATE
+    finally:
+        await harness.close()

@@ -1,14 +1,17 @@
 """v1.1 canary and raw-value leak matrix for records, APIs, and notifications."""
 
+import json
 import logging
 from pathlib import Path
 
+import httpx
 import pytest
 from sqlalchemy import func, select
 
 from telescreen.db.models import (
     CollectorHealthRow,
     IssueExceptionRow,
+    IssueRow,
     MemberIdentityRow,
     NotificationRow,
     PlacementPolicyRow,
@@ -16,7 +19,7 @@ from telescreen.db.models import (
     ScanCoverageRow,
 )
 from tests.leak.flows_v11 import run_v11_flows
-from tests.leak.harness import CANARY_EMAIL, CANARY_FILENAME, LeakWorld, make_leak_world
+from tests.leak.harness import CANARY_EMAIL, CANARY_FILENAME, LeakWorld, auth, make_leak_world
 from tests.leak.sinks import (
     api_responses,
     database_text,
@@ -37,6 +40,16 @@ async def test_v11_leak_matrix(tmp_path: Path, caplog: pytest.LogCaptureFixture)
     try:
         await run_v11_flows(world)
         await world.drain()
+        async with world.database.sessions() as session:
+            issue_ids: tuple[str, ...] = tuple(await session.scalars(select(IssueRow.id)))
+        for issue_id in issue_ids:
+            detail: httpx.Response = await world.client.get(
+                f"/api/issues/{issue_id}", headers=auth(world.admin_token)
+            )
+            assert detail.status_code == 200, detail.text
+            for field_name in ("exposure", "owner"):
+                assert CANARY_EMAIL not in json.dumps(detail.json().get(field_name))
+                assert CANARY_FILENAME not in json.dumps(detail.json().get(field_name))
         sinks: tuple[tuple[str, str], ...] = (
             await database_text(world)
             + logs(world, caplog.text)
@@ -52,6 +65,10 @@ async def test_v11_leak_matrix(tmp_path: Path, caplog: pytest.LogCaptureFixture)
         record_sinks: tuple[tuple[str, str], ...] = await v11_record_text(world)
         for canary in (CANARY_EMAIL, CANARY_FILENAME):
             assert all(canary not in text for _, text in record_sinks)
+            assert all(
+                canary not in body.decode("utf-8", errors="replace")
+                for _, body in world.recorder.requests
+            )
         protected_responses: tuple[str, ...] = tuple(
             text
             for path, text in zip(
