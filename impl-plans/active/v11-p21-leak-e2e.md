@@ -294,6 +294,11 @@ e2e files, unless the v1.1 matrix fails again.
   3. Through app 2, push a modification of A. Expect the newest finding of A to have
      `fingerprint_key_version == 2` and the `IssueRow` count to stay 2.
 
+### Session 6 scope (2026-10-10, HEAD f9a9100, manifest c4): re-verify only
+
+All scenarios pass at f9a9100. Change no test unless a review finding names a concrete defect. Re-run every Verification gate on the committed tree; the step result lists only those final passing commands and `priorVerification` is empty (7a).
+Progress Log: append one Session entry of at most 7 lines (heading included), keeping this file under 400 lines; record the plan sha256 before and after the edit.
+
 ## Pitfalls
 
 - Use `world.drain()` (or the e2e harness equivalent) to run engine tasks and scheduler
