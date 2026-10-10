@@ -1,6 +1,6 @@
 # V11-P15 UI Issues Pages: Exposure, Risk, New Statuses, Remediation, Exceptions, Occurrences
 
-**Status**: In Progress
+**Status**: Completed (integration-accepted at 809b02d; archived 2026-10-11)
 **Design Reference**: design-docs/specs/design-ui-sentry.md sections 9.1 and 9.3 (rows: Issue search tokens, Sort, Secondary panel, List columns, Bulk actions, Issue detail actions, Status banner, Sidebar, Fold sections, Timeline); section 8 (still binding)
 **Created**: 2026-10-10
 **Last Updated**: 2026-10-10

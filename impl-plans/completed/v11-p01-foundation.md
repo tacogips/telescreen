@@ -1,6 +1,6 @@
 # V11-P01 Foundation: Vocabulary, Settings, Ports, Versioned Fingerprinter
 
-**Status**: Implementation complete (independent review pending)
+**Status**: Completed (integration-accepted at 809b02d; archived 2026-10-11)
 **Design Reference**: design-docs/specs/design-v1-1-dspm-adoption.md sections 2, 3 (settings), 7 (settings), 8 (settings), 9 (key versioning), 10 (risk weights); design-docs/specs/command.md (Environment Variables); design-docs/specs/design-masking.md (Fingerprints)
 **Created**: 2026-10-10
 **Last Updated**: 2026-10-10

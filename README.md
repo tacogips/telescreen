@@ -179,7 +179,13 @@ mise run ci
 ```
 
 The end-to-end flows live in `tests/e2e`; the raw-value leak matrix over every sink lives
-in `tests/leak`. The default test suite is offline and uses fakes or in-memory SQLite. Tests requiring
+in `tests/leak`. The v1.1 flows (`tests/e2e/test_flow_v11_*.py`) cover placement policies,
+verified resolution, owner routing, health, exceptions and fingerprint key rotation, and
+`tests/leak/test_leak_matrix_v11.py` extends the leak matrix to the v1.1 records, so that
+raw samples, file names and owner emails never reach a sink. The default test suite is
+offline and uses fakes or in-memory SQLite. Tests requiring
 PostgreSQL or Meilisearch are marked `integration` and run only when
 `TELESCREEN_TEST_DATABASE_URL` or `TELESCREEN_TEST_MEILI_URL` is set. Frontend checks are
-available through `mise run web-ci`.
+available through `mise run web-ci`. The headless screenshot smoke (`cd src/web && bun run
+screenshots`, needs a local Chrome or Chromium) builds the UI, renders its pages against
+the mock API into `tmp/ui-screenshots`, and fails on any browser error.

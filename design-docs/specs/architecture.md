@@ -12,7 +12,8 @@ pipeline turns raw hits into masked values and keyed fingerprints, and the centr
 workflows through its workflow engine, dispatches verification work to extensible Police
 workers, and exposes everything through a REST API, an MCP server and a SolidJS UI. Raw sensitive values never leave the scan coroutine that observed them.
 
-Status: v1 design, baseline for all plans under `impl-plans/active/`.
+Status: v1 design, implemented. It is the baseline for the v1 and v1.1 plans, which are
+archived under `impl-plans/completed/`.
 
 ---
 

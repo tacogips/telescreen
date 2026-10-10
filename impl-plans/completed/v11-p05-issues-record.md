@@ -1,6 +1,6 @@
 # V11-P05 Issues Record Path: Exposure, Policy Decisions, Status Machine, Owner Routing, Risk
 
-**Status**: Ready
+**Status**: Completed (integration-accepted at 809b02d; archived 2026-10-11)
 **Design Reference**: design-docs/specs/design-v1-1-dspm-adoption.md sections 3, 4 (record-time evaluation and re-evaluation), 5 (record path, auto-resolution, user transitions), 7 (assignment), 9 (distinct fingerprints), 10 (when computed), 11 (`until_regressed` and closing requests), 12 (policy maintenance)
 **Created**: 2026-10-10
 **Last Updated**: 2026-10-10

@@ -40,38 +40,49 @@ Large features are split into multiple related plans with cross-references.
 All plans share `impl-plans/conventions.md` (ownership, typing, verification and
 progress-log rules).
 
-Telescreen v1 is complete (all 32 plans integration-accepted, final commit 7a8c600).
-Run dispatch manifests are archived under `completed/dispatch/`.
+There are no active plans.
 
-v1.1 run (F1-F10 of `design-docs/specs/design-v1-1-dspm-adoption.md`, created 2026-10-10,
-base 289699e). Waves run in order. Plans within a wave have disjoint write paths and run in
-parallel.
+Telescreen v1 is complete (all 32 plans integration-accepted, final commit 7a8c600).
+Telescreen v1.1 (F1-F10 of `design-docs/specs/design-v1-1-dspm-adoption.md`) is complete:
+all 21 v11 plans are integration-accepted and archived under `completed/` (2026-10-11).
+Run dispatch manifests, including the v1.1 manifests `telescreen-v11-20261010-c1` to `-c4`,
+are archived under `completed/dispatch/`.
+
+## Completed Plans
+
+### v1.1 (F1-F10)
+
+Created 2026-10-10 at base 289699e. Waves ran in order, and plans within a wave had
+disjoint write paths. v11-p01 to v11-p20 were integration-accepted at 809b02d (v11-p07 at
+af943da, after the owner's naive/aware datetime fix in the policy max-age check).
+v11-p21 was re-verified on the committed tree at 366c16f and integration-accepted in
+session 6.
 
 | Plan | Wave | Depends On | Design Reference |
 |------|------|------------|------------------|
-| `active/v11-p01-foundation.md` | V1 | - | v1.1 s2, s9, s10; command.md |
-| `active/v11-p02-db-migration.md` | V1 | - | design-data-model.md v1.1 additions |
-| `active/v11-p03-police-contract.md` | V1 | - | design-police-contract.md Contract 1.1 |
-| `active/v11-p04-ui-foundation.md` | V1 | - | design-ui-sentry.md s9 |
-| `active/v11-p05-issues-record.md` | V2 | p01, p02 | v1.1 s3-s5, s7, s9-s12 |
-| `active/v11-p06-issues-remediation.md` | V2 | p01, p02 | v1.1 s5, s7, s9, s11, s12 |
-| `active/v11-p07-policy-risk.md` | V2 | p01, p02 | v1.1 s4, s10 |
-| `active/v11-p08-collectors-core.md` | V2 | p01, p02 | v1.1 s5, s6, s8 |
-| `active/v11-p09-collectors-slack.md` | V2 | p01 | v1.1 s3, s4, s6, s7 |
-| `active/v11-p10-collectors-google.md` | V2 | p01 | v1.1 s3, s4, s6, s7 |
-| `active/v11-p11-collectors-github.md` | V2 | p01 | v1.1 s3, s4, s6, s7 |
-| `active/v11-p12-police-bureau.md` | V2 | p01, p02, p03 | Contract 1.1; v1.1 s8 |
-| `active/v11-p13-workflow.md` | V2 | p01 | v1.1 s5, s7, s10, s14 |
-| `active/v11-p14-directory-search.md` | V2 | p01, p02 | v1.1 s7, s10 |
-| `active/v11-p15-ui-issues.md` | V2 | p04 | design-ui-sentry.md s9.3 |
-| `active/v11-p16-ui-ops.md` | V2 | p04 | design-ui-sentry.md s9.3, s9.4 |
-| `active/v11-p17-api-issues.md` | V3 | p05, p06, p07, p14 | design-api-and-ui.md v1.1 endpoints |
-| `active/v11-p18-api-ops.md` | V3 | p05, p06, p08, p12, p13, p14 | design-api-and-ui.md v1.1 endpoints |
-| `active/v11-p19-wiring.md` | V4 | p05-p14, p17, p18 | v1.1 s12, s14 |
-| `active/v11-p20-docs-examples.md` | V4 | p13, p17, p18 | v1.1 s1, s7; command.md |
-| `active/v11-p21-leak-e2e.md` | V5 | p19, p20, p15, p16 | v1.1 s13 |
+| `completed/v11-p01-foundation.md` | V1 | - | v1.1 s2, s9, s10; command.md |
+| `completed/v11-p02-db-migration.md` | V1 | - | design-data-model.md v1.1 additions |
+| `completed/v11-p03-police-contract.md` | V1 | - | design-police-contract.md Contract 1.1 |
+| `completed/v11-p04-ui-foundation.md` | V1 | - | design-ui-sentry.md s9 |
+| `completed/v11-p05-issues-record.md` | V2 | p01, p02 | v1.1 s3-s5, s7, s9-s12 |
+| `completed/v11-p06-issues-remediation.md` | V2 | p01, p02 | v1.1 s5, s7, s9, s11, s12 |
+| `completed/v11-p07-policy-risk.md` | V2 | p01, p02 | v1.1 s4, s10 |
+| `completed/v11-p08-collectors-core.md` | V2 | p01, p02 | v1.1 s5, s6, s8 |
+| `completed/v11-p09-collectors-slack.md` | V2 | p01 | v1.1 s3, s4, s6, s7 |
+| `completed/v11-p10-collectors-google.md` | V2 | p01 | v1.1 s3, s4, s6, s7 |
+| `completed/v11-p11-collectors-github.md` | V2 | p01 | v1.1 s3, s4, s6, s7 |
+| `completed/v11-p12-police-bureau.md` | V2 | p01, p02, p03 | Contract 1.1; v1.1 s8 |
+| `completed/v11-p13-workflow.md` | V2 | p01 | v1.1 s5, s7, s10, s14 |
+| `completed/v11-p14-directory-search.md` | V2 | p01, p02 | v1.1 s7, s10 |
+| `completed/v11-p15-ui-issues.md` | V2 | p04 | design-ui-sentry.md s9.3 |
+| `completed/v11-p16-ui-ops.md` | V2 | p04 | design-ui-sentry.md s9.3, s9.4 |
+| `completed/v11-p17-api-issues.md` | V3 | p05, p06, p07, p14 | design-api-and-ui.md v1.1 endpoints |
+| `completed/v11-p18-api-ops.md` | V3 | p05, p06, p08, p12, p13, p14 | design-api-and-ui.md v1.1 endpoints |
+| `completed/v11-p19-wiring.md` | V4 | p05-p14, p17, p18 | v1.1 s12, s14 |
+| `completed/v11-p20-docs-examples.md` | V4 | p13, p17, p18 | v1.1 s1, s7; command.md |
+| `completed/v11-p21-leak-e2e.md` | V5 | p19, p20, p15, p16 | v1.1 s13 |
 
-## Completed Plans
+### v1
 
 | Plan | Wave | Completed | Design Reference |
 |------|------|-----------|------------------|
@@ -125,11 +136,11 @@ Only plans from eligible phases should be read to minimize context loading.
 | 5 | COMPLETED | Phase 4 |
 | 6 | COMPLETED | Phase 5 |
 | 7 | COMPLETED | Phase 6 |
-| 8 (v1.1 wave V1) | READY | Phase 7 |
-| 9 (v1.1 wave V2) | NOT_STARTED | Phase 8 (per-plan dependencies) |
-| 10 (v1.1 wave V3) | NOT_STARTED | Phase 9 |
-| 11 (v1.1 wave V4) | NOT_STARTED | Phase 10 |
-| 12 (v1.1 wave V5) | NOT_STARTED | Phase 11 |
+| 8 (v1.1 wave V1) | COMPLETED | Phase 7 |
+| 9 (v1.1 wave V2) | COMPLETED | Phase 8 (per-plan dependencies) |
+| 10 (v1.1 wave V3) | COMPLETED | Phase 9 |
+| 11 (v1.1 wave V4) | COMPLETED | Phase 10 |
+| 12 (v1.1 wave V5) | COMPLETED | Phase 11 |
 
 Run B added `p30-ui-design-system.md` and `p31-ui-mock-api.md` (wave B1, before the
 reworked p12, p13 and p14), split the end-to-end and leak tests into p28b and p28c after

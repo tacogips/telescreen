@@ -11,6 +11,11 @@ refinement and the reason for it. Table and column details are in `design-data-m
 contract minor version is in `design-police-contract.md` ("Contract 1.1"), and the UI is in
 `design-ui-sentry.md` section 9.
 
+Status: implemented (2026-10-11). F1-F10 shipped on `main` through the 21 v1.1 plans
+`v11-p01` to `v11-p21`. All of them are integration-accepted and archived under
+`impl-plans/completed/`, and their run manifests are under `impl-plans/completed/dispatch/`.
+The extended leak matrix and the v1.1 end-to-end flows (P1, P2, R1, R2, O1-O4) pass offline.
+
 ## Overview
 
 Source research (public documents, source code read at fixed commits, and papers, surveyed
