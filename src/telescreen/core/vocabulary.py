@@ -22,6 +22,16 @@ class Severity(StrEnum):
 
     HIGH = "high"
     MEDIUM = "medium"
+    CRITICAL = "critical"
+
+
+def severity_rank(s: Severity) -> int:
+    """Return the total ordering rank for an issue severity."""
+    if s is Severity.CRITICAL:
+        return 3
+    if s is Severity.HIGH:
+        return 2
+    return 1
 
 
 class DetectorKind(StrEnum):
@@ -64,6 +74,8 @@ class IssueStatus(StrEnum):
     RESOLVED = "resolved"
     IGNORED = "ignored"
     REGRESSED = "regressed"
+    ALLOWED = "allowed"
+    PENDING_VERIFICATION = "pending_verification"
 
 
 class IssueResolution(StrEnum):
@@ -71,6 +83,13 @@ class IssueResolution(StrEnum):
 
     MANUAL = "manual"
     AUTO = "auto"
+    VERIFIED_REMOVED = "verified_removed"
+    RESOURCE_DELETED = "resource_deleted"
+    EXPOSURE_REDUCED = "exposure_reduced"
+    POLICY_CHANGED = "policy_changed"
+    FALSE_POSITIVE = "false_positive"
+    ACCEPTED_RISK = "accepted_risk"
+    MANUAL_UNVERIFIED = "manual_unverified"
 
 
 class IssueHistoryKind(StrEnum):
@@ -85,6 +104,16 @@ class IssueHistoryKind(StrEnum):
     WORKFLOW_STARTED = "workflow_started"
     EVIDENCE_ADDED = "evidence_added"
     SLA_BREACHED = "sla_breached"
+    EXPOSURE_CHANGED = "exposure_changed"
+    POLICY_REEVALUATED = "policy_reevaluated"
+    VERIFICATION_REQUESTED = "verification_requested"
+    VERIFICATION_FAILED = "verification_failed"
+    VERIFICATION_INCONCLUSIVE = "verification_inconclusive"
+    EXCEPTION_REQUESTED = "exception_requested"
+    EXCEPTION_APPROVED = "exception_approved"
+    EXCEPTION_REJECTED = "exception_rejected"
+    EXCEPTION_REVOKED = "exception_revoked"
+    EXCEPTION_EXPIRED = "exception_expired"
 
 
 class IssueEventKind(StrEnum):
@@ -238,6 +267,9 @@ class EngineTaskKind(StrEnum):
     MAP_DISPATCH = "map_dispatch"
     MAP_SHARD = "map_shard"
     MAP_REDUCE = "map_reduce"
+    VERIFY_RESCAN = "verify_rescan"
+    POLICY_REEVALUATE = "policy_reevaluate"
+    OWNER_DIGEST = "owner_digest"
 
 
 class EngineTaskStatus(StrEnum):
@@ -255,6 +287,7 @@ class HumanTaskKind(StrEnum):
 
     APPROVAL = "approval"
     EVIDENCE = "evidence"
+    OWNER_REVIEW = "owner_review"
 
 
 class HumanTaskStatus(StrEnum):
@@ -411,6 +444,188 @@ class ErrorCode(StrEnum):
     RECIPIENT_UNKNOWN = "recipient_unknown"
     CHAIN_BROKEN = "chain_broken"
     INDEX_GUARD_REJECTED = "index_guard_rejected"
+    SCAN_INCOMPLETE = "scan_incomplete"
+
+
+class Visibility(StrEnum):
+    """Exposure visibility of a scanned resource."""
+
+    PUBLIC = "public"
+    ANYONE_WITH_LINK = "anyone_with_link"
+    EXTERNAL_SHARED = "external_shared"
+    DOMAIN = "domain"
+    INTERNAL = "internal"
+    PRIVATE = "private"
+    UNKNOWN = "unknown"
+
+
+def visibility_rank(v: Visibility) -> int | None:
+    """Return the exposure rank, or None when visibility is unknown."""
+    if v is Visibility.PUBLIC:
+        return 6
+    if v is Visibility.ANYONE_WITH_LINK:
+        return 5
+    if v is Visibility.EXTERNAL_SHARED:
+        return 4
+    if v is Visibility.DOMAIN:
+        return 3
+    if v is Visibility.INTERNAL:
+        return 2
+    if v is Visibility.PRIVATE:
+        return 1
+    return None
+
+
+class ChannelKind(StrEnum):
+    """Slack channel exposure category."""
+
+    PUBLIC = "public"
+    PRIVATE = "private"
+    DM = "dm"
+    CONNECT = "connect"
+
+
+class RepoVisibility(StrEnum):
+    """Repository visibility reported by a source provider."""
+
+    PUBLIC = "public"
+    INTERNAL = "internal"
+    PRIVATE = "private"
+
+
+class CoverageState(StrEnum):
+    """Coverage result for a resource scan."""
+
+    SCANNED = "scanned"
+    PARTIAL = "partial"
+    UNSUPPORTED = "unsupported"
+    TOO_LARGE = "too_large"
+    PERMISSION_DENIED = "permission_denied"
+    FETCH_FAILED = "fetch_failed"
+
+
+class UnsupportedReason(StrEnum):
+    """Reason that a resource could not be fully inspected."""
+
+    ENCRYPTED = "encrypted"
+    PASSWORD_PROTECTED = "password_protected"
+    IMAGE = "image"
+    ARCHIVE_TOO_DEEP = "archive_too_deep"
+    BINARY = "binary"
+    UNSUPPORTED_TYPE = "unsupported_type"
+
+
+class PlacementKind(StrEnum):
+    """Provider container kind used for keyed placement references."""
+
+    GDRIVE_DRIVE = "gdrive_drive"
+    GDRIVE_FOLDER = "gdrive_folder"
+    SLACK_CHANNEL = "slack_channel"
+    GITHUB_OWNER = "github_owner"
+    GITHUB_REPO = "github_repo"
+
+
+class IdentityKind(StrEnum):
+    """Transient provider identity category."""
+
+    EMAIL = "email"
+    SLACK_USER = "slack_user"
+    GITHUB_LOGIN = "github_login"
+
+
+class IdentityOrigin(StrEnum):
+    """Origin of a configured or observed identity."""
+
+    MEMBER_EMAIL = "member_email"
+    MEMBER_SLACK = "member_slack"
+    MANUAL = "manual"
+
+
+class PolicyEffect(StrEnum):
+    """Policy decision effect."""
+
+    ALLOW = "allow"
+    VIOLATE = "violate"
+
+
+class RemediationAction(StrEnum):
+    """Read-only remediation requested from a resource owner."""
+
+    REMOVE = "remove"
+    RESTRICT = "restrict"
+
+
+class ExceptionDuration(StrEnum):
+    """Supported exception expiration periods."""
+
+    DAYS_7 = "7d"
+    DAYS_30 = "30d"
+    DAYS_90 = "90d"
+    UNTIL_REGRESSED = "until_regressed"
+    FOREVER = "forever"
+
+
+class ExceptionStatus(StrEnum):
+    """Lifecycle state of an approved exception."""
+
+    REQUESTED = "requested"
+    ACTIVE = "active"
+    REJECTED = "rejected"
+    REVOKED = "revoked"
+    EXPIRED = "expired"
+
+
+class HealthCondition(StrEnum):
+    """Collector or Police health condition."""
+
+    STALE_SUCCESS = "stale_success"
+    WATCH_EXPIRING = "watch_expiring"
+    CONSECUTIVE_FAILURES = "consecutive_failures"
+    UNSCANNABLE_PUBLIC = "unscannable_public"
+    POLICE_SILENT = "police_silent"
+
+
+class HealthStatus(StrEnum):
+    """Health state of a monitored integration."""
+
+    OK = "ok"
+    WARNING = "warning"
+    FAILING = "failing"
+    UNKNOWN = "unknown"
+
+
+class AssetTier(StrEnum):
+    """Risk weighting category for a protected asset."""
+
+    CLOUD_ROOT = "cloud_root"
+    DEPLOY_TOKEN = "deploy_token"
+    PERSONAL_TOKEN = "personal_token"
+    SECRET = "secret"
+    PII_HIGH = "pii_high"
+    PII = "pii"
+
+
+OPEN_STATUSES: tuple[IssueStatus, ...] = (
+    IssueStatus.UNRESOLVED,
+    IssueStatus.ACKNOWLEDGED,
+    IssueStatus.IN_PROGRESS,
+    IssueStatus.REGRESSED,
+    IssueStatus.PENDING_VERIFICATION,
+)
+RECONCILED_STATUSES: tuple[IssueStatus, ...] = OPEN_STATUSES + (IssueStatus.ALLOWED,)
+CREDENTIAL_CLASSES: tuple[RuleClass, ...] = (
+    RuleClass.CREDENTIAL,
+    RuleClass.TOKEN,
+    RuleClass.PRIVATE_KEY,
+    RuleClass.PASSWORD,
+)
+PII_CLASSES: tuple[RuleClass, ...] = (
+    RuleClass.PAYMENT_CARD,
+    RuleClass.NATIONAL_ID,
+    RuleClass.EMAIL,
+    RuleClass.PHONE,
+    RuleClass.ADDRESS,
+)
 
 
 def severity_for(rule_class: RuleClass) -> Severity:

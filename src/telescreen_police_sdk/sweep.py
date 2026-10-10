@@ -9,6 +9,7 @@ from telescreen_police_sdk import _json
 from telescreen_police_sdk.models import (
     MaskedFinding,
     PartitionResult,
+    ResourceExposure,
     ResultEnvelope,
     ResultError,
     ResultStatus,
@@ -25,6 +26,7 @@ class ResourceOutcome:
     locator: str = field(repr=False)
     findings: tuple[MaskedFinding, ...] = ()
     completed: bool = True
+    resource_exposures: tuple[ResourceExposure, ...] = ()
 
 
 type PartitionFunction = Callable[[TaskEnvelope], Awaitable[PartitionResult]]
@@ -60,6 +62,7 @@ class SweepHandler:
         resources_failed: int = 0
         complete_locators: list[str] = []
         findings: list[MaskedFinding] = []
+        resource_exposures: list[ResourceExposure] = []
         try:
             async for locator in self.enumerate_fn(task.input):
                 try:
@@ -71,6 +74,7 @@ class SweepHandler:
                     resources_scanned += 1
                     complete_locators.append(outcome.locator)
                     findings.extend(outcome.findings)
+                    resource_exposures.extend(outcome.resource_exposures)
                 else:
                     resources_failed += 1
             stats: ShardStats = ShardStats(resources_scanned, resources_failed, 0)
@@ -80,6 +84,7 @@ class SweepHandler:
                 findings=tuple(findings),
                 stats=stats,
                 complete_locators=tuple(complete_locators),
+                resource_exposures=tuple(resource_exposures),
             )
         except Exception:
             resources_failed += 1
@@ -90,6 +95,7 @@ class SweepHandler:
                 findings=tuple(findings),
                 stats=stats,
                 complete_locators=tuple(complete_locators),
+                resource_exposures=tuple(resource_exposures),
             )
 
     @staticmethod

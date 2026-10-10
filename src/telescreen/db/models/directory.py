@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String
+from sqlalchemy import Boolean, DateTime, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from telescreen.db.base import Base
@@ -35,6 +35,21 @@ class TeamRow(Base, kw_only=True):
     slack_channel: Mapped[str | None] = mapped_column(String(128), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    lead_member_id: Mapped[str | None] = mapped_column(String(36), default=None)
+
+
+class MemberIdentityRow(Base, kw_only=True):
+    """A keyed provider identity associated with a Bureau member."""
+
+    __tablename__ = "member_identities"
+    __table_args__ = (UniqueConstraint("kind", "identity_key"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    member_id: Mapped[str] = mapped_column(String(36), index=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    identity_key: Mapped[str] = mapped_column(String(64))
+    origin: Mapped[str] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class TeamMembershipRow(Base, kw_only=True):

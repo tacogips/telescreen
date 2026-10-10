@@ -56,7 +56,7 @@ async def _get(world: E2EWorld, path: str) -> httpx.Response:
 
 async def _task(world: E2EWorld, kind: str, assignee: str | None = None) -> TaskView:
     """Return the first open task with the requested kind and optional recipient."""
-    response: httpx.Response = await _get(world, "/api/human-tasks?status=open")
+    response: httpx.Response = await _get(world, "/api/human-tasks?status=open&assignee=all")
     assert response.status_code == 200, response.text
     return next(
         TaskView(item["id"], item["step_run_id"], item["assignee_ref"], item["kind"])
@@ -302,8 +302,11 @@ async def test_github_remediation_escalates_rejects_evidence_and_rechecks(tmp_pa
             assert any(
                 item["step_id"] == step_id and item["status"] == "succeeded"
                 for item in run.json()["steps"]
-            )
-        open_tasks: httpx.Response = await _get(world, "/api/human-tasks?status=open")
+            ), [
+                (item["step_id"], item["status"], item.get("output_json"), item.get("error_code"))
+                for item in run.json()["steps"]
+            ]
+        open_tasks: httpx.Response = await _get(world, "/api/human-tasks?status=open&assignee=all")
         assert open_tasks.json()["items"], open_tasks.text
         triage: TaskView = await _task(world, "approval")
         assert triage.assignee_ref == "team:secops-triage"

@@ -30,6 +30,8 @@ class DetectExecutor:
             return _result("found", step.outcomes.found, result.error_code)
         if result.kind is RescanKind.CLEAN:
             return _result("clean", step.outcomes.clean, result.error_code)
+        if result.kind is RescanKind.INCONCLUSIVE:
+            return _result("error", step.outcomes.error, ErrorCode.SCAN_INCOMPLETE)
         return _result("error", step.outcomes.error, result.error_code or ErrorCode.FETCH_FAILED)
 
     async def resume(self, ctx: StepContext, signal: StepSignal) -> StepOutcome:

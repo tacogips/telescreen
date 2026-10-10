@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { eventFixtures, historyFixtures, issueFixtures, maskedExamples } from "./fixtures/issues";
 import { auditFixtures, collectorFixtures, escalationFixtures, evidenceFixtures, mapJobFixtures, policeFixtures, runDetailFixture, runFixtures, searchFixtures, taskFixtures } from "./fixtures/operations";
 import { memberFixtures, teamFixtures } from "./fixtures/directory";
+import { coverageResourceFixtures, exceptionFixtures, occurrenceFixtures, policyFixtures, policyVersionFixtures, v11Issues } from "./fixtures/v11";
 
 function luhnValid(value: string): boolean {
   const digits = [...value].map(Number);
@@ -15,8 +16,12 @@ function luhnValid(value: string): boolean {
 }
 
 const serializedFixtures = JSON.stringify({ issueFixtures, eventFixtures, historyFixtures, maskedExamples, auditFixtures, collectorFixtures, escalationFixtures, evidenceFixtures, mapJobFixtures, policeFixtures, runDetailFixture, runFixtures, searchFixtures, taskFixtures, memberFixtures, teamFixtures });
+const serializedV11Fixtures = JSON.stringify({ v11Issues, occurrenceFixtures, exceptionFixtures, policyFixtures, policyVersionFixtures, coverageResourceFixtures });
 
 describe("masked fixture corpus", () => {
+  it("keeps the v1.1 fixtures free of file names", () => {
+    expect(serializedV11Fixtures).not.toMatch(/\.(xlsx|docx|pdf|csv)\b/i);
+  });
   it("contains no raw credential or personal-data patterns", () => {
     const patterns = [
       /AKIA[0-9A-Z]{16}/,

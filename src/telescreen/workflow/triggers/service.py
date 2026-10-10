@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.core.json import parse_json
-from telescreen.core.vocabulary import RunStatus, RunTrigger, Severity
+from telescreen.core.vocabulary import RunStatus, RunTrigger, severity_rank
 from telescreen.db.models import WorkflowDefinitionRow, WorkflowRunRow
 from telescreen.ports.issues import IssueEvent, IssueEventSink
 from telescreen.workflow.dsl.loader import compiled_from_json
@@ -64,8 +64,6 @@ def _matches(match: TriggerMatch, event: IssueEvent) -> bool:
         return False
     if match.rule_classes and event.rule_class not in match.rule_classes:
         return False
-    if match.min_severity is not None:
-        severity_order: tuple[Severity, ...] = (Severity.MEDIUM, Severity.HIGH)
-        if severity_order.index(event.severity) < severity_order.index(match.min_severity):
-            return False
-    return True
+    return match.min_severity is None or severity_rank(event.severity) >= severity_rank(
+        match.min_severity
+    )

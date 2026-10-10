@@ -1,8 +1,10 @@
 """Typed Google Drive v3 HTTP operations used by event and sweep collectors."""
 
-from dataclasses import asdict, dataclass
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import TypeVar
+from typing import Annotated, TypeVar
 from urllib.parse import quote
 
 import httpx
@@ -27,6 +29,37 @@ class DriveFile:
     trashed: bool = False
     drive_id: str | None = Field(default=None, alias="driveId")
     parents: tuple[str, ...] = ()
+    owners: tuple[DriveOwner, ...] = field(default=(), repr=False)
+    modified_time: str | None = Field(default=None, alias="modifiedTime")
+    size: str | None = None
+
+
+@dataclass(frozen=True)
+class DriveOwner:
+    """Transient Drive owner principal."""
+
+    email_address: Annotated[str, Field(alias="emailAddress")] = field(repr=False)
+
+
+@dataclass(frozen=True)
+class DrivePermission:
+    """Transient permission fields needed to compute exposure."""
+
+    type: str
+    role: str
+    domain: str | None = field(default=None, repr=False)
+    email_address: Annotated[str | None, Field(alias="emailAddress")] = field(
+        default=None, repr=False
+    )
+    allow_file_discovery: bool = Field(default=False, alias="allowFileDiscovery")
+
+
+@dataclass(frozen=True)
+class DrivePermissionPage:
+    """One page from Drive permissions.list."""
+
+    permissions: tuple[DrivePermission, ...] = ()
+    next_page_token: str | None = Field(default=None, alias="nextPageToken")
 
 
 @dataclass(frozen=True)
@@ -124,7 +157,8 @@ class DriveApi:
             ("supportsAllDrives", "true"),
             (
                 "fields",
-                "changes(fileId,removed,file(id,name,mimeType,trashed,driveId,parents)),"
+                "changes(fileId,removed,file(id,name,mimeType,trashed,driveId,parents,"
+                "owners(emailAddress),modifiedTime,size)),"
                 "nextPageToken,newStartPageToken",
             ),
         ]
@@ -192,7 +226,11 @@ class DriveApi:
             ("pageSize", min(page_size, 1000)),
             ("supportsAllDrives", "true"),
             ("includeItemsFromAllDrives", "true"),
-            ("fields", "files(id,name,mimeType,trashed,driveId,parents),nextPageToken"),
+            (
+                "fields",
+                "files(id,name,mimeType,trashed,driveId,parents,owners(emailAddress),modifiedTime,size),"
+                "nextPageToken",
+            ),
         ]
         if drive_id is not None:
             params.append(("driveId", drive_id))
@@ -205,10 +243,40 @@ class DriveApi:
         """Read metadata for one file."""
         response: httpx.Response = await self._get(
             f"/drive/v3/files/{quote(file_id, safe='')}",
-            (("fields", "id,name,mimeType,trashed,driveId,parents"),),
+            (
+                (
+                    "fields",
+                    "id,name,mimeType,trashed,driveId,parents,owners(emailAddress),modifiedTime,size",
+                ),
+            ),
             subject,
         )
         return _parse(response, DriveFile)
+
+    async def list_permissions(
+        self, file_id: str, subject: str | None = None
+    ) -> tuple[DrivePermission, ...]:
+        """Read transient permissions with read-only paginated GET requests."""
+        permissions: list[DrivePermission] = []
+        page_token: str | None = None
+        while True:
+            params: list[tuple[str, str | int | bool]] = [
+                ("supportsAllDrives", "true"),
+                (
+                    "fields",
+                    "permissions(type,role,domain,emailAddress,allowFileDiscovery),nextPageToken",
+                ),
+            ]
+            if page_token is not None:
+                params.append(("pageToken", page_token))
+            response: httpx.Response = await self._get(
+                f"/drive/v3/files/{quote(file_id, safe='')}/permissions", tuple(params), subject
+            )
+            page: DrivePermissionPage = _parse(response, DrivePermissionPage)
+            permissions.extend(page.permissions)
+            page_token = page.next_page_token
+            if page_token is None:
+                return tuple(permissions)
 
     async def files_get_media(self, file_id: str, subject: str | None = None) -> bytes:
         """Download file bytes without retaining or logging the response body."""
@@ -276,6 +344,8 @@ class DriveApi:
                 except ValueError:
                     retry_after = None
             raise RateLimited(retry_after)
+        if response.status_code == 403:
+            raise TelescreenError(ErrorCode.FORBIDDEN, "Google Drive access is forbidden")
         if response.is_error:
             raise TelescreenError(ErrorCode.FETCH_FAILED, "Google Drive request failed")
 

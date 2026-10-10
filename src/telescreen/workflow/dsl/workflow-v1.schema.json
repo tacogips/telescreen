@@ -20,7 +20,8 @@
         "required": ["id", "type"],
         "properties": {
           "id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
-          "type": {"enum": ["detect", "ai_agent", "condition", "human_task", "notify", "evidence_upload", "police_verify", "wait", "send_back", "parallel", "join", "sub_workflow", "map", "end"]}
+          "type": {"enum": ["detect", "ai_agent", "condition", "human_task", "notify", "evidence_upload", "police_verify", "wait", "send_back", "parallel", "join", "sub_workflow", "map", "end"]},
+          "kind": {"enum": ["approval", "owner_review"]}
         },
         "additionalProperties": true
       }

@@ -1,6 +1,6 @@
 # V11-P08 Collectors Core: Coverage Recording, Collector Health, Inconclusive Rescans
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-1-dspm-adoption.md sections 5 (`detect` / rescanner, `removed`), 6 (F4 coverage), 8 (F6 collector health)
 **Created**: 2026-10-10
 **Last Updated**: 2026-10-10
@@ -155,11 +155,15 @@ Use fake adapters and the SQLite harness; imitate `tests/collectors/core/test_ru
 - oversized content -> `too_large`;
 - a removed ref -> a capturing fake recorder receives a `ResourceScan` with
   `removed=True`, and the `resource_coverage` row is deleted (assert only these two);
+- handler resource task with unsupported/image coverage -> one job count and one
+  per-resource row; handler removed task -> removed/complete scan and row deletion;
+- sweeper REMOVED -> removed scan and row deletion; FAILED+FORBIDDEN ->
+  `permission_denied` per-resource coverage and job count;
 - rescanner:
   - incomplete content and no finding -> `INCONCLUSIVE` with coverage `partial`;
   - `ResourceGoneError` -> `RescanResult` CLEAN, and a capturing fake `ResourceScanner` /
     issue recorder receives a `ResourceScan` with `removed=True` and `complete=True`;
-  - a finding -> FOUND.
+  - a finding -> FOUND, including when the content is incomplete;
 
 These tests must not assert any issue `resolution` or `status` value. The end-to-end
 `resource_deleted` resolution is owned and asserted by v11-p05 (its removed=True
@@ -167,7 +171,7 @@ complete-scan test) and by v11-p21. p05 is not a p08 dependency and may not be m
 when p08 runs.
 - health:
   - 3 failed jobs -> `consecutive_failures` 3 and the condition opens once, with one
-    notification for 2 ticks;
+    notification for 2 ticks, including a second evaluation past the 60-second throttle;
   - a success resets it;
   - stale_success with cron `0 * * * *` and last success 3 h ago -> open;
   - watch expiring in 10 h -> open, in 20 h -> not;
@@ -191,11 +195,30 @@ All existing `tests/collectors/core` tests must still pass.
 
 ## Completion Criteria
 
-- [ ] Coverage and health modules plus integrations implemented; the rescanner returns
+- [x] Coverage and health modules plus integrations implemented; the rescanner returns
       INCONCLUSIVE and removed as specified.
-- [ ] Tests pass; scoped gates pass; the typelint grep is empty.
-- [ ] Progress Log complete.
+- [x] Tests pass; scoped gates pass; the typelint grep is empty.
+- [x] Progress Log complete.
 
 ## Progress Log
 
-(append sessions per conventions section 8)
+### Session: 2026-10-10 17:17 JST
+**Tasks Completed**: Added per-job and per-resource coverage recording/querying, collector health recording and open-condition alerts, coverage/removal hooks in collector task and sweep paths, accepted-event/watch health updates, and inconclusive/gone-resource rescan handling. Added SQLite tests for coverage classification, public-first cursor paging, removals, health thresholds/notifications, event/watch timestamps, stale/watch/public conditions, and rescan outcomes.
+**Tasks In Progress**: None.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `impl-plans/active/v11-p08-collectors-core.md` before=0c619c0177cb3e256a87f8a7967405b05730fb190f27e3fedc060d46fc2cd326 after=recorded in `/tmp/telescreen-v11-p08-plan-sha256.log`; `src/telescreen/collectors/tasks.py` before=b18facebd38e2aad308b70c8865b3eaa71ebebb4299eb58b82e41f82798da9d6 after=e4691f156159a6d635cdbddc5f669fe4d7126dd72cb438e63418df2ef52fae6c; `src/telescreen/collectors/sweep.py` before=b11d49b0502bd36803f8364099b38453d1573d1a79e0eeaf2ab30a7127ed47c9 after=fa520e7eb7ef682045e219c6344057e6082cde1f9a3c1e2074ef57f0d2c39932; `src/telescreen/collectors/service.py` before=edad1023fa2e194f1517f61a3c44d5c7671be8fdc82f84c818cee655cbe58cab after=e7f0a6de8f42dd3612468c949daf9596da11f6e6b9bdf410f50a49021425baf4; `src/telescreen/collectors/rescanner.py` before=36a9ceff932520ccc13d67588e158b9e0e75ebb7927ad6a591d5104dcd38f304 after=c5417a44cf1922353dbde46122d08e6365c580fb0b986321e51858c7a30ae62d; `src/telescreen/collectors/coverage.py` before=absent after=7f241dbffb1e3d82816d44b303e45f5312d1bd12e92a83c3f97c38279454595c; `src/telescreen/collectors/health.py` before=absent after=985e111ec544c6015e75fdb6c001d10a3aea98fd74f60f531262c58b998cd31e; `tests/collectors/core/test_v11_coverage_health.py` before=absent after=ea1cbc28efd6e18adbd47fa2ebfa2fb6abc0e37546d31b9dcaba404bca59f00b.
+**Verification**:
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/collectors/tasks.py src/telescreen/collectors/sweep.py src/telescreen/collectors/service.py src/telescreen/collectors/rescanner.py src/telescreen/collectors/coverage.py src/telescreen/collectors/health.py tests/collectors/core` -> exit 0 (log: `/tmp/telescreen-v11-p08-collectors-core-format.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/collectors/tasks.py src/telescreen/collectors/sweep.py src/telescreen/collectors/service.py src/telescreen/collectors/rescanner.py src/telescreen/collectors/coverage.py src/telescreen/collectors/health.py tests/collectors/core` -> exit 0 (log: `/tmp/telescreen-v11-p08-collectors-core-ruff.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/collectors/tasks.py src/telescreen/collectors/sweep.py src/telescreen/collectors/service.py src/telescreen/collectors/rescanner.py src/telescreen/collectors/coverage.py src/telescreen/collectors/health.py tests/collectors/core` -> exit 0 (log: `/tmp/telescreen-v11-p08-collectors-core-ty.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/collectors/core 2>&1 | tee /tmp/telescreen-v11-p08-collectors-core-pytest.log` -> exit 0, 19 passed, 0 failed (log: `/tmp/telescreen-v11-p08-collectors-core-pytest.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v11-p08-collectors-core-typelint.log 2>&1; ! grep -E '^(src/telescreen/collectors/(tasks|sweep|service|rescanner|coverage|health)\.py|tests/collectors/core/)' /tmp/telescreen-v11-p08-collectors-core-typelint.log` -> exit 0; no owned-path diagnostics.
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; test "$(grep -c '^- \[ \]' impl-plans/active/v11-p08-collectors-core.md)" -eq 0 && test "$(wc -l < impl-plans/active/v11-p08-collectors-core.md)" -lt 400 > /tmp/telescreen-v11-p08-plan-gate.log 2>&1; gate_result=$?; echo "exit=$gate_result" >> /tmp/telescreen-v11-p08-plan-gate.log; exit "$gate_result"` -> exit 0; no incomplete criteria and 400-line plan limit respected (log: `/tmp/telescreen-v11-p08-plan-gate.log`).
+**Notes**: Earlier in-progress gates exposed corrected cron-interval boundary math and SQLite UTC/order test assumptions; a first plan-gate shell wrapper also used zsh's readonly `status` variable. These were corrected. The per-resource unique insert now uses a nested transaction and reloads the winning row on conflict. Final scoped gates pass on the current tree. Formal review and integration acceptance remain downstream workflow steps.
+
+### Review revision: test-integrity findings TI-P08-001..003
+**Tasks Completed**: Added local SQLite integration tests for `CollectorScanHandler` and `CollectorSweeperImpl` coverage wiring, including removed-row deletion and FAILED+FORBIDDEN permission-denied counts. Extended health dedup coverage with a NOW+2min tick beyond the 60-second throttle. Made the rescan scanner outcome configurable and asserted FOUND takes precedence over incomplete content. No production files changed; no issue status or resolution assertions were added.
+**Verification**: The first revision pytest attempt exposed that the fake scanner did not capture the handler-created job id (1 failed, 20 passed; preserved captured log: `/tmp/telescreen-v11-p08-collectors-core-pytest-initial-failure.log`). The fake was corrected. Final scoped pytest: 21 passed, 0 failed, exit 0 (`/tmp/telescreen-v11-p08-collectors-core-pytest-final.log`). Final Ruff format check, Ruff lint, ty, and owned-path typelint grep all exit 0; logs are `/tmp/telescreen-v11-p08-collectors-core-format-final.log`, `/tmp/telescreen-v11-p08-collectors-core-ruff-final.log`, `/tmp/telescreen-v11-p08-collectors-core-ty-final.log`, and `/tmp/telescreen-v11-p08-collectors-core-typelint-final.log`.
+Plan gate: all Completion Criteria remain checked; the final checkbox and under-400-line command exited 0 (`/tmp/telescreen-v11-p08-plan-gate-review-revision.log`).
+**Hashes**: `src/telescreen/collectors/tasks.py` e4691f156159a6d635cdbddc5f669fe4d7126dd72cb438e63418df2ef52fae6c; `src/telescreen/collectors/sweep.py` fa520e7eb7ef682045e219c6344057e6082cde1f9a3c1e2074ef57f0d2c39932; `src/telescreen/collectors/service.py` e7f0a6de8f42dd3612468c949daf9596da11f6e6b9bdf410f50a49021425baf4; `src/telescreen/collectors/rescanner.py` c5417a44cf1922353dbde46122d08e6365c580fb0b986321e51858c7a30ae62d; `src/telescreen/collectors/coverage.py` 7f241dbffb1e3d82816d44b303e45f5312d1bd12e92a83c3f97c38279454595c; `src/telescreen/collectors/health.py` 985e111ec544c6015e75fdb6c001d10a3aea98fd74f60f531262c58b998cd31e; `tests/collectors/core/test_v11_coverage_health.py` 8c6a92c986fd035ebc4930b28ed54e64f40b448484ea109f1cc03937faca3c48.

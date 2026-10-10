@@ -37,12 +37,14 @@ import { IssueListRows } from "./IssueListRows";
 import "./issues.css";
 
 const TRANSITIONS: Readonly<Record<IssueStatus, readonly IssueStatus[]>> = {
-  unresolved: ["acknowledged", "in_progress", "resolved", "ignored"],
-  acknowledged: ["in_progress", "resolved", "ignored", "unresolved"],
-  in_progress: ["resolved", "ignored", "unresolved"],
-  regressed: ["acknowledged", "in_progress", "resolved", "ignored"],
+  unresolved: ["acknowledged", "in_progress"],
+  acknowledged: ["in_progress", "unresolved"],
+  in_progress: ["unresolved"],
+  regressed: ["acknowledged", "in_progress"],
   resolved: ["unresolved"],
   ignored: ["unresolved"],
+  allowed: ["unresolved"],
+  pending_verification: ["unresolved"],
 };
 
 type BulkData = Readonly<{
@@ -63,7 +65,7 @@ function normalizeQuery(value: string): string {
   for (const part of parts) {
     const separator = part.indexOf(":");
     const key = separator < 0 ? "" : part.slice(0, separator);
-    if (["is", "severity", "rule", "source", "assigned"].includes(key)) {
+    if (["is", "severity", "rule", "source", "assigned", "exposure"].includes(key)) {
       const previous = result.findIndex((item) => item.startsWith(`${key}:`));
       if (previous >= 0) result.splice(previous, 1);
     }
@@ -287,6 +289,16 @@ export function IssueList(): JSX.Element {
         "Started workflow",
       );
   };
+  const remediate = (): void => {
+    void runBulk(
+      (issue) =>
+        issuesApi.remediation(issue.id, {
+          action: "remove",
+          include_linked: false,
+        }),
+      "Marked remediated",
+    );
+  };
   const saveView = (): void => {
     const name = globalThis.window.prompt("Name this issue view");
     if (name === null) return;
@@ -380,6 +392,7 @@ export function IssueList(): JSX.Element {
           teams={bulk().teams}
           workflows={bulk().workflows}
           onStatus={changeStatus}
+          onRemediate={remediate}
           onAssign={assign}
           onStartWorkflow={startWorkflow}
           onClear={() => toggleAll(false)}

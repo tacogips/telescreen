@@ -56,3 +56,11 @@ Slack and GitHub webhooks return HTTP 401 until `TELESCREEN_SLACK_SIGNING_SECRET
 configured `file:/run/secrets/<name>` reference, create the matching file under `secrets/`,
 declare it under the Compose `secrets:` section, and mount it on the service that handles
 the webhook. The template leaves both webhook secrets unset.
+
+## v1.1 settings
+
+The `.env.example` includes commented placeholders for internal domains, owner routing,
+health recipients, and the weekly owner digest. Fingerprint key rotation is shown with
+`file:` secret references; keep version 1 configured because it remains the identity key.
+See [`design-docs/specs/command.md`](../../design-docs/specs/command.md) for all
+`TELESCREEN_*` settings and defaults.

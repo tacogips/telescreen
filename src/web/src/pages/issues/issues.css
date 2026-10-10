@@ -110,7 +110,7 @@
 .issue-table-head,
 .issue-row {
   display: grid;
-  grid-template-columns: 28px minmax(200px, 1fr) 86px 50px 60px 64px 66px;
+  grid-template-columns: 28px minmax(200px, 1fr) 86px 50px 60px 48px 64px 66px;
   align-items: center;
   gap: 8px;
   padding: 0 12px;
@@ -173,6 +173,7 @@
 .issue-last-seen,
 .issue-age,
 .issue-findings,
+.issue-risk,
 .issue-priority,
 .issue-assignee {
   color: var(--text-secondary);
@@ -219,16 +220,32 @@
 @container (max-width: 900px) {
   .issue-table-head,
   .issue-row {
-    grid-template-columns: 24px minmax(160px, 1fr) 70px 50px;
+    grid-template-columns: 24px minmax(160px, 1fr) 48px;
   }
 
+  .issue-table-head > :nth-child(3),
   .issue-table-head > :nth-child(4),
   .issue-table-head > :nth-child(5),
-  .issue-table-head > :nth-child(6),
+  .issue-table-head > :nth-child(7),
+  .issue-table-head > :nth-child(8),
+  .issue-row > :nth-child(3),
   .issue-row > :nth-child(4),
-  .issue-row > :nth-child(6),
-  .issue-row > :nth-child(7) {
+  .issue-row > :nth-child(5),
+  .issue-row > :nth-child(7),
+  .issue-row > :nth-child(8) {
     display: none;
+  }
+}
+
+@container (max-width: 447px) {
+  .issue-table-head > :nth-child(6),
+  .issue-row > :nth-child(6) {
+    display: none;
+  }
+
+  .issue-table-head,
+  .issue-row {
+    grid-template-columns: 24px minmax(0, 1fr);
   }
 }
 

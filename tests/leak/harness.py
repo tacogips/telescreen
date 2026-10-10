@@ -23,6 +23,9 @@ from telescreen.wiring import Container, build_container, close_container
 from tests.support.db import SqliteHarness, make_sqlite_harness
 from tests.support.samples import Sample, all_samples
 
+CANARY_FILENAME: str = "leakcanary-" + "fname-7f3a" + ".txt"
+CANARY_EMAIL: str = "owner-canary" + "@" + "example.com"
+
 
 @dataclass(frozen=True)
 class PairEnv(EnvSource):
@@ -41,6 +44,7 @@ class Recorder:
 
     requests: list[tuple[str, bytes]] = field(default_factory=list)
     responses: list[str] = field(default_factory=list)
+    response_paths: list[str] = field(default_factory=list)
     llm_responses: list[str] = field(default_factory=list)
 
     async def handle(self, request: Request) -> Response:
@@ -65,7 +69,22 @@ class Recorder:
             )
         if "api.github.com" in request.url.host:
             if "/contents/" in request.url.path:
-                content: str = _github_content()
+                if request.url.path.endswith("/binary.bin"):
+                    return Response(
+                        200,
+                        json={
+                            "content": base64.b64encode(b"\x00\xff").decode("ascii"),
+                            "encoding": "base64",
+                            "size": 2,
+                            "sha": "github-binary-sha",
+                        },
+                        request=request,
+                    )
+                content: str = (
+                    "secrets/ " + CANARY_EMAIL
+                    if request.url.path.endswith("/CODEOWNERS")
+                    else _github_content()
+                )
                 return Response(
                     200,
                     json={
@@ -73,6 +92,21 @@ class Recorder:
                         "encoding": "base64",
                         "size": len(content.encode()),
                         "sha": "github-content-sha",
+                    },
+                    request=request,
+                )
+            if request.url.path.endswith("/repos/sample/repo"):
+                return Response(
+                    200,
+                    json={
+                        "id": 7,
+                        "name": "repo",
+                        "full_name": "sample/repo",
+                        "default_branch": "main",
+                        "private": False,
+                        "visibility": "public",
+                        "fork": False,
+                        "owner": {"login": "sample"},
                     },
                     request=request,
                 )
@@ -142,6 +176,11 @@ async def make_leak_world(tmp: Path, with_llm: bool) -> LeakWorld:
         github_webhook_secret_ref="env:TELESCREEN_GITHUB_SECRET",
         anthropic_api_key_ref="env:TELESCREEN_ANTHROPIC_KEY" if with_llm else None,
         evidence_dir=str(tmp / "evidence"),
+        owner_routing=True,
+        default_team="security",
+        digest_cron="* * * * *",
+        health_recipients=("team:security",),
+        health_failure_threshold=3,
     )
     transport: httpx.AsyncClient = httpx.AsyncClient(
         transport=httpx.MockTransport(recorder.handle),
@@ -164,6 +203,12 @@ async def make_leak_world(tmp: Path, with_llm: bool) -> LeakWorld:
         ingest: CreatedToken = await TokenService(container.audit, clock).create(
             session, "leak-ingest", frozenset((ApiScope.INGEST,)), None
         )
+    security_team: Response = await client.post(
+        "/api/teams",
+        headers=auth(admin.token),
+        json={"slug": "security", "name": "Security", "email": CANARY_EMAIL},
+    )
+    assert security_team.status_code == 201, security_team.text
     return LeakWorld(
         database,
         clock,
@@ -185,6 +230,7 @@ def _record_response(recorder: Recorder) -> Callable[[Response], Awaitable[None]
 
     async def record(response: Response) -> None:
         await response.aread()
+        recorder.response_paths.append(response.request.url.path)
         recorder.responses.append(response.text)
 
     return record

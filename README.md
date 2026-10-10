@@ -20,6 +20,22 @@ The naming map keeps themed language to **Telescreen**, **Reporting Bureau**, an
 **Police**. Internal package, module, endpoint, and UI names are plain descriptions such
 as `telescreen.collectors`, `telescreen.detection`, `/api/issues`, and Issues.
 
+## Features (v1.1)
+
+- Exposure-aware severity uses placement and visibility, including the new `critical` level.
+- Versioned placement policies allow or flag findings and support the `max_age_days` condition.
+- Verified resolution moves issues to `pending_verification`; a rescan decides, and policy changes never count as remediation.
+- Scan coverage records scanned, partial, unsupported, denied, and failed resources; unscannable resources remain visible.
+- Owner routing assigns work for `owner_review`, weekly digests, and the My tasks page.
+- Collector and Police health report stale sources, failing scans, expiring watches, and silent workers.
+- Linked occurrences connect the same keyed fingerprint across resources with fingerprint key versioning.
+- Risk scores prioritize issues and support sorting and escalation with `min_risk`.
+- Exceptions record a reason and approver, expire on schedule, and can reopen issues.
+- Stale-data policies evaluate whether sensitive content exceeds a configured age.
+
+Telescreen does not check provider credential validity or reveal raw values (it links to
+the source location only), and it remains read-only on every monitored source.
+
 ## Data handling
 
 Monitored content is scanned in memory and is not stored as a source copy. Raw detected
@@ -27,7 +43,10 @@ values are not persisted, logged, indexed, sent in notifications, or returned by
 Stored findings use masked text and keyed HMAC fingerprints. Search indexing and outbound
 notifications pass their respective data-loss prevention guards. Secret settings use
 `env:NAME` or `file:/path` references; secret values are resolved only when needed.
-Evidence is stored only after scanning accepts it.
+Evidence is stored only after scanning accepts it. New exposure, owner, coverage, policy,
+health, and occurrence records contain only enums, counts, timestamps, keyed references,
+identifiers, operator configuration, and redacted text; they do not retain source copies,
+file names, email addresses, or raw values.
 
 ## Setup
 
@@ -63,8 +82,10 @@ The `telescreen` executable and `python -m telescreen` are equivalent entry poin
 
 The REST API is rooted at `/api`. It provides ingestion, issues, workflow definitions and
 runs, Police worker registration and task operations, evidence, audit search, and
-Assistant chat. The Police contract is published at `/api/police/v1/openapi.json` with
-versioned JSON schemas. See `design-docs/specs/design-api-and-ui.md` and
+Assistant chat. v1.1 adds issue policies and exceptions, linked occurrences, scan coverage,
+collector and Police health, directory identities and team leads, and owner-review task
+completion fields. The Police contract is published at `/api/police/v1/openapi.json` with
+versioned JSON schemas. See the v1.1 endpoint table in `design-docs/specs/design-api-and-ui.md` and
 `design-docs/specs/design-police-contract.md` for the contract details.
 
 ## Web application
@@ -81,16 +102,29 @@ Vite proxies API requests to `http://localhost:8000`; start the Bureau there whe
 against live data. To render every page with masked local fixtures and no backend, run
 `cd src/web && VITE_TELESCREEN_MOCK=1 bun run dev`. The mock data contains masked values.
 Run `cd src/web && bun run screenshots` for the screenshot smoke against the mock API
-(every page in light and dark themes plus the mobile Issues page, 27 images); it needs Chrome/Chromium or `TELESCREEN_SCREENSHOT_BROWSER` and writes images under
+(every page in light and dark themes plus the mobile Issues page, 35 images); it needs Chrome/Chromium or `TELESCREEN_SCREENSHOT_BROWSER` and writes images under
 `tmp/ui-screenshots/`. The visual reference is
 [`design-docs/specs/design-ui-sentry.md`](design-docs/specs/design-ui-sentry.md). The
 self-hosted Rubik and Roboto Mono fonts use the OFL licenses in `src/web/public/fonts/`;
 Lucide icons use ISC licensing.
 
+The v1.1 My tasks page brings together owner-review tasks, exception approvals, and issues
+assigned to the current member. The Policies page validates, versions, and activates
+placement policies.
+
 To serve a production build locally, run `cd src/web && bun run build`, then set
 `TELESCREEN_WEB_DIST=src/web/dist` when running `telescreen serve`. The directory must
 contain `index.html`; otherwise startup exits with code 3. The Python wheel does not
 include the separately built UI assets.
+
+## Configuration
+
+The v1.1 `TELESCREEN_*` settings for exposure, owner routing, digests, health alerts, risk
+weights, and fingerprint key rotation are listed in
+[`design-docs/specs/command.md`](design-docs/specs/command.md). To rotate fingerprint keys,
+add `2=<secret-ref>` to `TELESCREEN_FINGERPRINT_KEYS`, set
+`TELESCREEN_FINGERPRINT_ACTIVE_VERSION=2`, and keep version 1 configured because it
+remains the identity key for resources, placements, and owners.
 
 ## Police workers
 

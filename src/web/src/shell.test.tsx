@@ -28,9 +28,20 @@ describe("web shell", () => {
   it("renders the rail labels in order and the skip link", () => {
     render(() => <MemoryRouter root={AppShell}><AppRoutes /></MemoryRouter>);
     const rail = within(screen.getByRole("navigation", { name: "Primary navigation" }));
-    const labels = rail.getAllByRole("link").slice(1).map((link) => link.textContent?.trim());
-    expect(labels).toEqual(["Issues", "Search", "Workflows", "Police", "Collectors", "Escalation", "Audit", "Assistant", "Settings"]);
+    const labels = rail.getAllByRole("link").slice(1).map((link) => link.querySelector(":scope > span")?.textContent?.trim());
+    expect(labels).toEqual(["Issues", "My tasks", "Search", "Workflows", "Police", "Collectors", "Policies", "Escalation", "Audit", "Assistant", "Settings"]);
+    expect(screen.getByRole("link", { name: "For review" })).toHaveAttribute("href", "/issues?query=assigned%3Ame");
+    expect(screen.getByRole("link", { name: "Allowed" })).toHaveAttribute("href", "/issues?query=is%3Aallowed");
+    expect(screen.getByRole("link", { name: "Verifying" })).toHaveAttribute("href", "/issues?query=is%3Apending_verification");
     expect(screen.getByRole("link", { name: "Skip to main content" })).toHaveAttribute("href", "#main");
+  });
+
+  it("shows the combined attention badge on My tasks", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => String(input).startsWith("/api/human-tasks")
+      ? Response.json({ items: [{ id: "t1" }, { id: "t2" }] })
+      : Response.json({ items: [{ id: "e1" }] })));
+    render(() => <MemoryRouter root={AppShell}><AppRoutes /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByText("3").closest(".rail-count")).toHaveAttribute("aria-label", "3 items need attention"));
   });
 
   it("marks Workflows active on /runs and updates active state after navigation", async () => {
@@ -70,7 +81,7 @@ describe("web shell", () => {
   });
 
   it("shows the unavailable state when the injected page map lacks an area", () => {
-    render(() => <AreaPage area={AREAS[1]!} pages={new Map()} />);
+    render(() => <AreaPage area={AREAS.find((area) => area.key === "search")!} pages={new Map()} />);
     expect(screen.getByRole("heading", { name: "Search" })).toBeInTheDocument();
     expect(screen.getByText("This page is not available yet.")).toBeInTheDocument();
   });
@@ -78,7 +89,7 @@ describe("web shell", () => {
   it("renders a page from the injected page map", () => {
     const SearchPage: Component = () => <p>Search results</p>;
     const pageModules = new Map<AreaKey, Component>([["search", SearchPage]]);
-    render(() => <AreaPage area={AREAS[1]!} pages={pageModules} />);
+    render(() => <AreaPage area={AREAS.find((area) => area.key === "search")!} pages={pageModules} />);
     expect(screen.getByText("Search results")).toBeInTheDocument();
   });
 

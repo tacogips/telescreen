@@ -9,6 +9,7 @@ from croniter import croniter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.collectors.codec import CursorState, cursor_from_json, selector_to_json
+from telescreen.collectors.health import CollectorHealthRecorder
 from telescreen.collectors.registry import CollectorRegistry
 from telescreen.collectors.repository import CollectorRepository
 from telescreen.core.clock import Clock
@@ -65,6 +66,7 @@ class CollectorService:
     redactor: Redactor
     audit: AuditLog
     clock: Clock
+    health: CollectorHealthRecorder | None = None
 
     async def get(self, session: AsyncSession, collector_config_id: str) -> CollectorConfig | None:
         """Read a config by id."""
@@ -228,6 +230,8 @@ class CollectorService:
                 config_state.watch is None or config_state.watch.channel_id != check.config_hint
             ):
                 continue
+            if self.health is not None:
+                await self.health.event_received(session, config.id, self.clock.now())
             resources: EventResources = await self.registry.adapter(
                 config.kind
             ).resources_from_event(event, config)
@@ -267,6 +271,8 @@ class CollectorService:
             CursorState(current.cursor, watch, current.last_sweep_fire),
             self.clock.now(),
         )
+        if self.health is not None and watch is not None:
+            await self.health.watch_started(session, config_id, watch.expires_at, self.clock.now())
 
     async def _enqueue_ref(
         self,

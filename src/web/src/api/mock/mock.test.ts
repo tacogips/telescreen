@@ -23,6 +23,33 @@ describe("mock API mode", () => {
     await expect(client.apiFetch("/api/unknown")).rejects.toMatchObject({ status: 404, code: "not_found" });
   });
 
+  it("implements v1.1 remediation, approvals, policy versions, filters and risk order", async () => {
+    const client = await mockClient();
+    await client.issuesApi.remediation("iss-01", { action: "remove", include_linked: true });
+    expect((await client.issuesApi.get("iss-01")).status).toBe("pending_verification");
+    await client.exceptionsApi.approve("exc-01");
+    expect((await client.issuesApi.get("iss-02")).status).toBe("ignored");
+    const requested = await client.issuesApi.requestException("iss-03", { reason: "review", duration: "7d" });
+    expect(requested.status).toBe("active");
+    expect((await client.issuesApi.get("iss-03")).status).toBe("ignored");
+    const created = await client.policiesApi.create({ source_format: "yaml", source_text: "name: Example policy" });
+    expect(created.version).toBe(2);
+    const assigned = await client.issuesApi.list({ assignee: "me" });
+    expect(assigned.items.every((issue) => issue.assignee_member_id === "mem-01")).toBe(true);
+    const ranked = await client.issuesApi.list({ sort: "risk" });
+    expect(ranked.items[0]?.risk_score).toBeGreaterThanOrEqual(ranked.items[1]?.risk_score ?? 0);
+    const scores = (await client.issuesApi.list()).items.map((issue) => issue.risk_score ?? 0);
+    expect(Math.min(...scores)).toBe(5);
+    expect(Math.max(...scores)).toBe(95);
+    const exposed = await client.issuesApi.list({ exposure: "public" });
+    expect(exposed.items.every((issue) => issue.exposure_visibility === "public")).toBe(true);
+  });
+
+  it("returns 404 for unknown v1.1 API paths", async () => {
+    const client = await mockClient();
+    await expect(client.apiFetch("/api/policies/unknown/undeclared")).rejects.toMatchObject({ status: 404, code: "not_found" });
+  });
+
   it("persists issue status updates during the session", async () => {
     const client = await mockClient();
     await client.issuesApi.update("iss-01", { status: "acknowledged" });

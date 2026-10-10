@@ -23,6 +23,9 @@ const issue = (id: string, shortId: string): Record<string, unknown> => ({
   display_title: "Credential finding",
   rule_class: "credential",
   severity: "high",
+  base_severity: "medium",
+  exposure_visibility: "public",
+  risk_score: 92,
   status: "unresolved",
   assignee_member_id: null,
   assignee_team_id: null,
@@ -131,6 +134,19 @@ describe("IssueList", () => {
     );
   });
 
+  it("sends the risk sort to the issue list API", async () => {
+    stubStorage();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+      responseFor(String(input), init?.method ?? "GET", []),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    render(root);
+    fireEvent.change(await screen.findByLabelText("Sort"), { target: { value: "risk" } });
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) =>
+      String(input).includes("sort=risk"),
+    )).toBe(true));
+  });
+
   it("reactively shows a real-envelope server error after the list mounts", async () => {
     stubStorage();
     const fetchMock = vi.fn(
@@ -223,7 +239,22 @@ describe("IssueList", () => {
     ).toBe(false);
   });
 
-  it("resolves two selected loaded rows and reports one result toast", async () => {
+  it("shows risk, exposure, and critical severity in a v1.1 row", async () => {
+    stubStorage();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => responseFor("/api/issues", "GET", [
+        { ...issue("iss-01", "TELE-1"), severity: "critical" },
+      ])),
+    );
+    render(root);
+    expect(await screen.findByText("Public")).toBeTruthy();
+    expect(screen.getByLabelText("Risk score 92")).toBeTruthy();
+    expect(screen.getByLabelText("critical severity")).toBeTruthy();
+    expect(screen.getByTitle("Base severity: medium")).toBeTruthy();
+  });
+
+  it("marks selected issues remediated with one request per issue", async () => {
     stubStorage();
     const fetchMock = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) =>
@@ -237,13 +268,17 @@ describe("IssueList", () => {
     await screen.findByText("TELE-1");
     fireEvent.click(screen.getByLabelText("Select TELE-1"));
     fireEvent.click(screen.getByLabelText("Select TELE-2"));
-    fireEvent.click(screen.getByRole("button", { name: "Resolve" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mark remediated" }));
     await waitFor(() =>
       expect(
-        fetchMock.mock.calls.filter(([, init]) => init?.method === "PATCH")
+        fetchMock.mock.calls.filter(([input, init]) =>
+          String(input).endsWith("/remediation") && init?.method === "POST",
+        )
           .length,
       ).toBe(2),
     );
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/remediation"))
+      .every(([, init]) => JSON.parse(String(init?.body)).action === "remove" && JSON.parse(String(init?.body)).include_linked === false)).toBe(true);
     expect(await screen.findByText(/2 succeeded, 0 failed/)).toBeTruthy();
   });
 

@@ -34,6 +34,13 @@
         "$ref": "masked-finding.schema.json"
       }
     },
+    "resource_exposures": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "$ref": "resource-exposure.schema.json"
+      }
+    },
     "payload": {
       "type": "object",
       "additionalProperties": true

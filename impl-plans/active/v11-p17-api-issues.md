@@ -1,6 +1,6 @@
 # V11-P17 API: Issues (v1.1 fields, remediation, resolve, occurrences), Exceptions and Policies Routers
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-api-and-ui.md ("v1.1 endpoints": Issues, Exceptions, Policies rows); design-docs/specs/design-v1-1-dspm-adoption.md sections 4, 5, 9, 11
 **Created**: 2026-10-10
 **Last Updated**: 2026-10-10
@@ -142,18 +142,39 @@ Conventions section 7 with
 `<src>` = `src/telescreen/api/routers/issues.py src/telescreen/api/routers/exceptions.py src/telescreen/api/routers/policies.py`
 and `<tests>` = `tests/api/v11_issues tests/issues/test_issues_api.py`. Also
 `uv run --frozen pytest -p no:cacheprovider tests/issues tests/e2e > /tmp/telescreen-v11-p17-api-issues-wide.log 2>&1; echo "exit=$?"`
--> `exit=0`. The only tolerated failures are tests that exercise
+-> `exit=0`, or only failures in tests exercising
 `src/telescreen/api/routers/{collectors,police,directory,human_tasks}.py` while the
 concurrent wave-3 plan v11-p18 is still in progress; record their test ids in the
 Progress Log as informational. Every failure in a path this plan owns blocks completion.
 
 ## Completion Criteria
 
-- [ ] All endpoints of the three rows exist with the stated scopes and shapes.
-- [ ] Tests pass; scoped gates pass; the typelint grep is empty; the wide pytest exit is
-      0.
-- [ ] Progress Log complete.
+- [x] All endpoints of the three rows exist with the stated scopes and shapes.
+- [x] Tests pass; scoped gates pass; the typelint grep is empty; the wide pytest exits 0
+      or fails only on the named concurrent v11-p18 router paths.
+- [x] Progress Log complete.
 
 ## Progress Log
 
-(append sessions per conventions section 8)
+### Session: 2026-10-10 18:20
+**Tasks Completed**: Added issue list exposure/risk filters and risk keyset cursor; v1.1 list/detail projections; member and team assignee resolution; remediation, reasoned resolve, release, linked occurrence, exception request/list/decision, and placement policy endpoints. Added feature-off 503 `internal_error` responses and API regression tests for the endpoint contracts, privacy, scopes, state changes, and pagination.
+**Tasks In Progress**: Downstream p19 router wiring and independent workflow review remain with their owning steps.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `src/telescreen/api/routers/issues.py` before=4bd4364ea318e4d498167a4091005d35e347ac8c9bdca30a6e9a0ad806b82fc5 after=182468fa1d4b2cc6f61f44e392b39addc4051df29a472cf3f3d8ac912951cebc; `src/telescreen/api/routers/exceptions.py` before=absent after=e612335590f9084873f97383352e157adb07942ca7e0e688f8e611b8622d281c; `src/telescreen/api/routers/policies.py` before=absent after=72f34bff0dc025e92395f638b19a2ffcf8c61b28c971d068a6f9fcae18a2e19d; `tests/api/v11_issues/test_issues_router.py` before=absent after=802d5c91561b6b2add25df2a0c98e417956772d1c91d5cc58dffddb16e152369; `tests/issues/test_issues_api.py` before=b9019c02389e179c63bc39467b243655b1d26c8f13d239481ffc3a68941c0ef1 after=b9019c02389e179c63bc39467b243655b1d26c8f13d239481ffc3a68941c0ef1.
+**Verification**:
+- `uv run --frozen ruff format --check --no-cache src/telescreen/api/routers/issues.py src/telescreen/api/routers/exceptions.py src/telescreen/api/routers/policies.py tests/api/v11_issues tests/issues/test_issues_api.py` -> exit 0 (log: `/tmp/telescreen-v11-p17-api-issues-format-final5.log`).
+- `uv run --frozen ruff check --no-cache src/telescreen/api/routers/issues.py src/telescreen/api/routers/exceptions.py src/telescreen/api/routers/policies.py tests/api/v11_issues tests/issues/test_issues_api.py` -> exit 0 (log: `/tmp/telescreen-v11-p17-api-issues-ruff-final5.log`).
+- `uv run --frozen ty check src/telescreen/api/routers/issues.py src/telescreen/api/routers/exceptions.py src/telescreen/api/routers/policies.py tests/api/v11_issues tests/issues/test_issues_api.py` -> exit 0 (log: `/tmp/telescreen-v11-p17-api-issues-ty-final5.log`).
+- `uv run --frozen pytest -p no:cacheprovider tests/api/v11_issues tests/issues/test_issues_api.py` -> exit 0, 5 passed (log: `/tmp/telescreen-v11-p17-api-issues-pytest-final5.log`).
+- `uv run --frozen python tools/typelint.py` plus the `(^|/)` owned-path grep -> typelint exit 0, zero owned diagnostics (logs: `/tmp/telescreen-v11-p17-api-issues-typelint-final5.log`, `/tmp/telescreen-v11-p17-api-issues-typelint-owned-final5.log`).
+- `uv run --frozen pytest -p no:cacheprovider tests/issues tests/e2e` -> exit 1, 90 passed and 1 failed (log: `/tmp/telescreen-v11-p17-api-issues-wide-final4.log`). The sole failure is `tests/e2e/test_flow_github_remediation.py::test_github_remediation_escalates_rejects_evidence_and_rechecks`, at its `/api/human-tasks?status=open` assertion; this exercises the concurrent p18-owned human-tasks router. The earlier wide run's issue-detail failures were fixed in this plan and do not recur in final4.
+**Notes**: All implementation changes are within the plan writePaths. The working tree contains concurrent sibling edits elsewhere. Feature-off service routes return HTTP 503 with static `internal_error`; existing issue detail remains readable before p19 binds owner lookup, with safe null refs. Per-edit intentions and the pre-node snapshot reference are in `tmp/telescreen-v11-20261010-c1/v11-p17-api-issues/session-step6/`; downstream wiring and formal review are not claimed complete.
+
+### Session: 2026-10-10 18:27 — adversarial repair
+**Finding addressed**: `P17-ADV-OWNER-MEMBER-REF-001`. `get_issue` now returns the single `member_for_owner` result directly as `owner.member_ref`; it no longer passes a `member:<handle>` through `member_ref()`. The regression test seeds `MemberIdentityRow` for `member-api-owner`, asserts `owner.present` is true and `owner.member_ref` is `member:api-owner`, and checks both `email:` plus the 64-character identity key and the key alone are absent from response bytes. Assignee reference lookups remain unchanged.
+**Reconciliation request**: `src/telescreen/issues/routing.py:43-45` (v11-p05 ownership) has the same `member_for_owner` result being treated as a member ID. The p17 branch did not edit that file; v11-p05 or serial reconciliation should use the result directly and add a real `DirectoryOwnerResolver` routing test.
+**Verification**: The six p17 gates were rerun after the repair. Format, Ruff, ty, scoped pytest, typelint, owned-path filter, and completion-checkbox gate all exited 0. Scoped pytest reports 5 passed. Logs: `/tmp/telescreen-v11-p17-api-issues-format-resume2-final1.log`, `-ruff-resume2-final1.log`, `-ty-resume2-final1.log`, `-pytest-resume2-final1.log`, `-typelint-resume2-final1.log`; empty owned-path output: `/tmp/telescreen-v11-p17-api-issues-typelint-owned-resume2-final1.log`. Typelint used `(^|/)` and reported zero owned diagnostics. Focused regression run: `/tmp/telescreen-v11-p17-owner-member-ref-regression.log`, 1 passed.
+**Hashes after repair**: `issues.py` `621aec9abdea4d21fbc324b07e424299615efbfd886e003f9b2e96602ed722f8`; `exceptions.py` `e612335590f9084873f97383352e157adb07942ca7e0e688f8e611b8622d281c`; `policies.py` `72f34bff0dc025e92395f638b19a2ffcf8c61b28c971d068a6f9fcae18a2e19d`; `test_issues_router.py` `fc127a58a10376a3d2f4ed0256534b971c13ba3e7710fd96578700ce62174585`; unchanged `tests/issues/test_issues_api.py` `b9019c02389e179c63bc39467b243655b1d26c8f13d239481ffc3a68941c0ef1`.
+**Integration note**: The earlier wide `tests/issues tests/e2e` aggregate remains nonzero due to the recorded v11-p18 human-tasks failure. Serial integration/v11-p21 must rerun it on the combined tree without tolerance after p18 and p19 land. This is not p17-owned.
+**Evidence**: Per-edit intentions and the pre-node snapshot reference are recorded under `tmp/telescreen-v11-20261010-c1/v11-p17-api-issues/session-step6/`.

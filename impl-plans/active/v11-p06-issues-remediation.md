@@ -1,6 +1,6 @@
 # V11-P06 Issues Remediation: Verification Requests, Reasoned Resolution, Exceptions, Occurrences, Digest
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-1-dspm-adoption.md sections 5 (mark remediated, verify_rescan, resolve with a reason), 7 (release_to_team, weekly digest), 9 (linked occurrences), 11 (exceptions), 12 (exception maintenance)
 **Created**: 2026-10-10
 **Last Updated**: 2026-10-10
@@ -206,10 +206,24 @@ and `<tests>` = `tests/issues/v11_remediation`.
 
 ## Completion Criteria
 
-- [ ] All six modules exist with the stated classes; each file is under 1000 lines.
-- [ ] Every test case above passes; scoped gates pass; the typelint grep is empty.
-- [ ] Progress Log complete.
+- [x] All six modules exist with the stated classes; each file is under 1000 lines.
+- [x] Every test case above passes; scoped gates pass; the typelint grep is empty.
+- [x] Progress Log complete.
 
 ## Progress Log
 
-(append sessions per conventions section 8)
+### Session: 2026-10-10 17:20 JST
+**Tasks Completed**: Implemented the six remediation modules and SQLite behavior tests for verification requests, reasoned resolution, exceptions, linked occurrences, rescan handling, owner digest and maintenance. The record-path `until_regressed` transition remains owned by v11-p05 as specified in that plan; p06 does not edit or import its record-path modules.
+**Tasks In Progress**: None in this plan.
+**Blockers**: None.
+**Reconciliation requests**: None; the accepted v11-p05 plan directly implements same-key-version `until_regressed` handling in its record path.
+**Hashes**: `src/telescreen/issues/lifecycle.py` before=absent after=51dd504de8debee55ebf86fac0b7cb26e77bdafa423fe5d153e645b3778bd9a1; `src/telescreen/issues/exceptions.py` before=absent after=d572ca83ed3fc3d5759e659bebec5d33485b7cd6324f3575171eea361a295735; `src/telescreen/issues/occurrences.py` before=absent after=56614d97cb03d35c5cc760e248faf51339d66fb2daa4377af7b50dcd97135226; `src/telescreen/issues/verification.py` before=absent after=cd5c9a9af3c2e23fe8df57df7ec21f81205b52f291c76cc883325abb66de252c; `src/telescreen/issues/digest.py` before=absent after=a488413f215d558584fb95ee52e6731b94e403ee7f518844798f50326b57788c; `src/telescreen/issues/maintenance.py` before=absent after=4cb46b360f051ad7b9c35c7aed1f5f1639e7d4680ad9414497d2315bd750ae5a; `tests/issues/v11_remediation/test_remediation.py` before=absent after=a9f0b82052049f1bb9e7fe1a2095c771528aa51a3614aef3cbb9cb0e8bdab829.
+**Verification**:
+- `uv run --frozen ruff format --check --no-cache src/telescreen/issues/lifecycle.py src/telescreen/issues/exceptions.py src/telescreen/issues/occurrences.py src/telescreen/issues/verification.py src/telescreen/issues/digest.py src/telescreen/issues/maintenance.py tests/issues/v11_remediation` -> exit 0 (log: `/tmp/telescreen-v11-p06-issues-remediation-format-check-final.log`).
+- `uv run --frozen ruff check --no-cache src/telescreen/issues/lifecycle.py src/telescreen/issues/exceptions.py src/telescreen/issues/occurrences.py src/telescreen/issues/verification.py src/telescreen/issues/digest.py src/telescreen/issues/maintenance.py tests/issues/v11_remediation` -> exit 0 (log: `/tmp/telescreen-v11-p06-issues-remediation-ruff-check-final.log`).
+- `uv run --frozen ty check src/telescreen/issues/lifecycle.py src/telescreen/issues/exceptions.py src/telescreen/issues/occurrences.py src/telescreen/issues/verification.py src/telescreen/issues/digest.py src/telescreen/issues/maintenance.py tests/issues/v11_remediation` -> exit 0 (log: `/tmp/telescreen-v11-p06-issues-remediation-ty-check-final.log`).
+- `uv run --frozen pytest -p no:cacheprovider tests/issues/v11_remediation` -> exit 0, 11 passed, 0 failed (log: `/tmp/telescreen-v11-p06-issues-remediation-pytest-final.log`).
+- `uv run --frozen python tools/typelint.py` plus the p06 path filter `grep -E '(^|/)(src/telescreen/issues/(lifecycle|exceptions|occurrences|verification|digest|maintenance)\.py|tests/issues/v11_remediation/)' /tmp/telescreen-v11-p06-issues-remediation-typelint-final-2.log` -> scoped grep has no matches (overall scoped gate exit 0); whole-repository typelint exits 1 with 61 diagnostics in sibling-owned paths (complete log: `/tmp/telescreen-v11-p06-issues-remediation-typelint-final-2.log`).
+- `wc -l` of the six modules and test file -> 297, 443, 78, 122, 158, 49 and 745 lines respectively; all are below 1000.
+- `git status --short` scoped to this plan's write paths -> only the plan, six new modules and new tests directory are changed.
+**Notes**: Superseded source iterations had these failures, all resolved by the final source-matched passing gates above: scoped `uv run --frozen ruff check --no-cache <src> <tests>` exited 1 with 22 lint findings (log: `/tmp/telescreen-v11-p06-issues-remediation-ruff-initial.log`); scoped `uv run --frozen ty check <src> <tests>` exited 1 with 6 diagnostics due to the wrong `RescanKind` import (log: `/tmp/telescreen-v11-p06-issues-remediation-ty-3.log`); scoped `uv run --frozen pytest -p no:cacheprovider tests/issues/v11_remediation` exited 1 with 7 passed and 3 failed on interim fixture/timestamp/cron assumptions (log: `/tmp/telescreen-v11-p06-issues-remediation-pytest-3.log`). The current-source focused suite is 11 passed, 0 failed; no tests are skipped, xfailed or weakened.

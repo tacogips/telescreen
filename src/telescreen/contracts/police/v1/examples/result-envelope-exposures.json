@@ -1,0 +1,22 @@
+{
+  "contract_version": "1.1",
+  "task_id": "task-example",
+  "status": "completed",
+  "findings": [
+    {
+      "locator": "docs/example.txt",
+      "rule_id": "example-rule",
+      "rule_class": "credential",
+      "masked_snippet": "m***[8]",
+      "location": "body",
+      "confidence": 0.9,
+      "external_fingerprint": "0123456789abcdef"
+    }
+  ],
+  "resource_exposures": [
+    {
+      "locator": "docs/example.txt",
+      "visibility": "public"
+    }
+  ]
+}

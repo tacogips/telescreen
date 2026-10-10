@@ -5,6 +5,7 @@
       {
         "after": "PT4H",
         "assign_to": "team:secops-tier2",
+        "min_risk": 60,
         "notify": ["team:secops-tier2", "email:secops-leads@example.invalid"],
         "channels": ["slack", "email"]
       },

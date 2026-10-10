@@ -1,16 +1,18 @@
 import { lazy, type Component, type JSX } from "solid-js";
 import { Navigate, Route, useLocation } from "@solidjs/router";
 import { Unavailable } from "./components/Unavailable";
-export type AreaKey = "issues" | "search" | "workflows" | "runs" | "police" | "collectors" | "escalation" | "audit" | "chat" | "settings";
+export type AreaKey = "issues" | "tasks" | "search" | "workflows" | "runs" | "police" | "collectors" | "policies" | "escalation" | "audit" | "chat" | "settings";
 export type Area = Readonly<{ key: AreaKey; label: string; path: string; group: AreaKey }>;
 export type PageModule = Readonly<{ default: () => JSX.Element }>;
 export const AREAS: readonly Area[] = [
   { key: "issues", label: "Issues", path: "/issues", group: "issues" },
+  { key: "tasks", label: "My tasks", path: "/my-tasks", group: "tasks" },
   { key: "search", label: "Search", path: "/search", group: "search" },
   { key: "workflows", label: "Workflows", path: "/workflows", group: "workflows" },
   { key: "runs", label: "Runs", path: "/runs", group: "workflows" },
   { key: "police", label: "Police", path: "/police", group: "police" },
   { key: "collectors", label: "Collectors", path: "/collectors", group: "collectors" },
+  { key: "policies", label: "Policies", path: "/policies", group: "policies" },
   { key: "escalation", label: "Escalation Policies", path: "/escalation", group: "escalation" },
   { key: "audit", label: "Audit", path: "/audit", group: "audit" },
   { key: "chat", label: "Assistant", path: "/assistant", group: "chat" },

@@ -1,11 +1,18 @@
-import type { CollectorConfig, Issue, MapJob, PoliceWorker, WorkflowVersion, WorkflowVersionRef } from "../types";
-import { issueFixtures } from "./fixtures/issues";
+import type { CollectorConfig, Issue, IssueException, MapJob, MemberIdentity, PolicySummary, PolicyVersion, PoliceWorker, WorkflowVersion, WorkflowVersionRef } from "../types";
 import { collectorFixtures, mapJobFixtures, policeFixtures } from "./fixtures/operations";
 import { memberFixtures, teamFixtures } from "./fixtures/directory";
 import { auditFixtures, escalationFixtures, evidenceFixtures, runFixtures, searchFixtures, taskFixtures, runDetailFixture } from "./fixtures/operations";
+import { coverageResourceFixtures, coverageSummaryFixture, exceptionFixtures, occurrenceFixtures, policyFixtures, policyVersionFixtures, v11Issues } from "./fixtures/v11";
 
 export const state = {
-  issues: structuredClone(issueFixtures) as Issue[],
+  issues: structuredClone(v11Issues) as Issue[],
+  exceptions: structuredClone(exceptionFixtures) as IssueException[],
+  policies: structuredClone(policyFixtures) as PolicySummary[],
+  policyVersions: structuredClone(policyVersionFixtures) as PolicyVersion[],
+  identities: [] as MemberIdentity[],
+  occurrences: structuredClone(occurrenceFixtures),
+  coverageSummary: structuredClone(coverageSummaryFixture),
+  coverageResources: structuredClone(coverageResourceFixtures),
   collectors: structuredClone(collectorFixtures) as CollectorConfig[],
   mapJobs: structuredClone(mapJobFixtures) as MapJob[],
   police: structuredClone(policeFixtures) as PoliceWorker[],
@@ -28,6 +35,9 @@ export const state = {
   nextCollectorNumber: 8,
   nextWorkflowNumber: 3,
   nextRunNumber: 6,
+  nextExceptionNumber: 2,
+  nextPolicyVersion: 2,
+  isMockAdmin: true,
 };
 
 export function workflowRefs(): WorkflowVersionRef[] {

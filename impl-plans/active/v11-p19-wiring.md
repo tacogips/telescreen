@@ -1,6 +1,6 @@
 # V11-P19 Wiring: Bind v1.1 Services, Handlers, Schedule Providers and Routers
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-1-dspm-adoption.md sections 2, 12, 14 (wave rule); design-docs/specs/architecture.md section 4 (L4 composition)
 **Created**: 2026-10-10
 **Last Updated**: 2026-10-10
@@ -153,12 +153,45 @@ whole-repository gate with no tolerances.
 
 ## Completion Criteria
 
-- [ ] Every v1.1 component is bound; the providers, handlers and routers are registered.
-- [ ] Full ruff, typelint, ty and pytest all exit 0 (or fail only in `tests/examples`
+- [x] Every v1.1 component is bound; the providers, handlers and routers are registered.
+- [x] Full ruff, typelint, ty and pytest all exit 0 (or fail only in `tests/examples`
       while v11-p20 is in progress, with the reruns above showing `exit=0`); the wiring
       files are under 1000 lines.
-- [ ] Progress Log complete.
+- [x] Progress Log complete.
 
 ## Progress Log
 
-(append sessions per conventions section 8)
+### Session: 2026-10-10 19:44 JST
+**Tasks Completed**: Bound the v1.1 policy/risk, owner directory, remediation/exception, coverage/health and police-health services; registered their routers, handlers and scheduler providers. Added API route and composition coverage. Added a UTC-normalizing risk scorer adapter after the E2E rescan exposed naive SQLite `first_seen` values.
+**Tasks In Progress**: None. Assigned p19 implementation and required verification are complete.
+**Blockers**: None. The owner-review example order was corrected in v11-p20 and the combined-tree full pytest gate passes; see the integration rerun below.
+**Reconciliation requests**: None open. The p20 outcome-order request was resolved by the owner. The p07 naive-timestamp finding is handled at the p19 wiring boundary by the local `UtcRiskScorer` adapter; the E2E and full pytest gates pass.
+**Hashes**: after: `src/telescreen/wiring.py`=58c4ecedc4f1bb5095b2bdb375c841e160d4098a06e24173a579914efafc3d6d; `src/telescreen/wiring_v11.py`=a4bd673c5830479b4101c04eca70eccebe421c25fe8932a771e70d8692fa6e21; `src/telescreen/wiring_collectors.py`=b8e47f4fe173925eb311dec382ec9dadaa24d5dee92776e263ff56285d336733; `tests/e2e/test_api_routes.py`=7d6465ba286fc6797badec2ab4d74da8fb6054c7be1f0e2b5640a18b7db157f6; `tests/e2e/test_flow_github_remediation.py`=0b655f75e4afea41726bb3e6f7ef5429dbc0f4afa64fbe02a1352662ef2cc4a7 (owner-authorized p18 caller reconciliation plus p19 failure diagnostics); `tests/e2e/test_wiring_v11.py`=16368f018e1ec5f1f90d0b042918dde4b6f00f07ed35b07b86fd8cbf7d01c6d9; `impl-plans/active/v11-p19-wiring.md`=a202ae0d6bc0955f96b2ce1a8a84097d513ba82c278926e32356040cc0d06fe4.
+**Verification**:
+- `uv run --frozen ruff format --check --no-cache src/telescreen/wiring.py src/telescreen/wiring_v11.py src/telescreen/wiring_collectors.py tests/e2e` -> exit 0 (log: `/tmp/telescreen-v11-p19-wiring-format-scoped-final.log`).
+- `uv run --frozen ruff check --no-cache src/telescreen/wiring.py src/telescreen/wiring_v11.py src/telescreen/wiring_collectors.py tests/e2e` -> exit 0 (log: `/tmp/telescreen-v11-p19-wiring-ruff-scoped-final.log`).
+- `uv run --frozen ty check src/telescreen/wiring.py src/telescreen/wiring_v11.py src/telescreen/wiring_collectors.py tests/e2e` -> exit 0 (log: `/tmp/telescreen-v11-p19-wiring-ty-scoped-final.log`).
+- `uv run --frozen ty check` -> exit 0 (log: `/tmp/telescreen-v11-p19-wiring-ty-final.log`).
+- `uv run --frozen pytest -p no:cacheprovider tests/e2e` -> exit 0, 18 passed (log: `/tmp/telescreen-v11-p19-wiring-pytest-e2e-final.log`).
+- `uv run --frozen ruff format --check --no-cache .` -> exit 0 (log: `/tmp/telescreen-v11-p19-wiring-format-final.log`).
+- `uv run --frozen ruff check --no-cache .` -> exit 0 (log: `/tmp/telescreen-v11-p19-wiring-ruff-final.log`).
+- `uv run --frozen python tools/typelint.py` -> exit 0, 346 files clean; owned-path grep empty (log: `/tmp/telescreen-v11-p19-wiring-typelint-final.log`).
+- `wc -l src/telescreen/wiring.py src/telescreen/wiring_v11.py` -> exit 0, 733 and 243 lines (log: `/tmp/telescreen-v11-p19-wiring-wc-final.log`).
+- `uv run --frozen pytest -p no:cacheprovider` -> exit 1, 556 passed, 1 failed, 4 skipped (log: `/tmp/telescreen-v11-p19-wiring-pytest-final.log`). This was unresolved at the initial session boundary; the later v11-p20 integration rerun below passes the full suite.
+- `uv run --frozen pytest -p no:cacheprovider -vv tests/workflow/test_v11_workflow.py::test_example_workflows_keep_compiled_json_round_trip` -> exit 1, 4 passed, 1 failed (detail log: `/tmp/telescreen-v11-p19-wiring-workflow-failure-detail.log`).
+**Notes**: Focused composition tests pass. No formal review, integration acceptance, commit or push is claimed; these are downstream workflow steps.
+
+**Owner resolution (2026-10-10)**: The only failing test was the compiled-JSON round trip of `examples/workflows/owner-review.yaml` (v11-p20), whose human-task outcomes were authored out of key order while canonical JSON sorts keys by design. The owner reordered the example outcomes alphabetically (exception, not_mine, remove, restrict); outcome order is not semantic. `tests/workflow/test_v11_workflow.py` passes. Re-run the full gate; not a blocker. Report per conventions 7a.
+
+### Integration rerun: 2026-10-10
+**Status**: Completed. The accepted v11-p20 changes are present in the combined tree. Full repository format, lint, typelint, type-check and pytest gates pass; wiring files remain below 1000 lines. No implementation blockers remain for p19.
+**Attempt history**: The first combined-tree pytest run logged one failure in `tests/contract/test_bureau_contract.py::test_sdk_pull_cycle_registers_claims_heartbeats_and_submits_result` (`raw_value_detected`), with 556 passed and 4 skipped (`/tmp/telescreen-v11-p19-wiring-pytest-integrated-final.log`). That test passed in isolation (1 passed; `/tmp/telescreen-v11-p19-wiring-bureau-contract-isolated.log`), and the subsequent full suite passed (557 passed, 4 skipped; `/tmp/telescreen-v11-p19-wiring-pytest-rerun-2.log`). The earlier workflow outcome-order failure is also resolved by the p20 canonical example order. Failed attempts remain history and are not represented as passing gates.
+**Final verification**:
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache .` -> exit 0, 347 files formatted (log: `/tmp/telescreen-v11-p19-wiring-format-integrated.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache .` -> exit 0 (log: `/tmp/telescreen-v11-p19-wiring-ruff-integrated.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py` -> exit 0, 346 files clean (log: `/tmp/telescreen-v11-p19-wiring-typelint-integrated.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check` -> exit 0 (log: `/tmp/telescreen-v11-p19-wiring-ty-integrated.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider` -> exit 0, 557 passed, 4 skipped (log: `/tmp/telescreen-v11-p19-wiring-pytest-rerun-2.log`).
+- `wc -l src/telescreen/wiring.py src/telescreen/wiring_v11.py` -> exit 0, 733 and 243 lines.
+- Combined-tree p20 checks: `ruff format --check tests/examples` exit 0 (`/tmp/telescreen-v11-p19-wiring-p20-format.log`); `ruff check tests/examples` exit 0 (`/tmp/telescreen-v11-p19-wiring-p20-ruff.log`); `ty check tests/examples` exit 0 (`/tmp/telescreen-v11-p19-wiring-p20-ty.log`); `pytest -p no:cacheprovider tests/examples` exit 0, 16 passed (`/tmp/telescreen-v11-p19-wiring-p20-pytest.log`); typelint exit 0 and `(^|/)tests/examples/` grep empty (`/tmp/telescreen-v11-p19-wiring-p20-typelint.log`); offline validation of `examples/workflows/owner-review.yaml` exit 0 (`/tmp/telescreen-v11-p19-wiring-p20-validate.log`).
+**Notes**: Focused composition tests and full gates pass. Formal review, integration acceptance, the v11-p21 no-tolerance final gates, commit and push remain downstream workflow steps.

@@ -4,6 +4,8 @@ export { Tag } from "./Tag";
 export { StatusIndicator } from "./StatusIndicator";
 export { SeverityBar } from "./SeverityBar";
 export { PriorityBadge } from "./PriorityBadge";
+export { ExposureBadge } from "./ExposureBadge";
+export { RiskPill } from "./RiskPill";
 export { ProgressMarker } from "./ProgressMarker";
 export { SearchQueryBuilder } from "./SearchQueryBuilder";
 export { PageFilterBar } from "./PageFilterBar";

@@ -40,13 +40,20 @@ EXPECTED_TABLES: set[str] = {
     "police_tasks",
     "audit_records",
     "audit_chain_head",
+    # v1.1 (design-v1-1-dspm-adoption.md)
+    "placement_policies",
+    "resource_coverage",
+    "scan_coverage",
+    "collector_health",
+    "member_identities",
+    "issue_exceptions",
 }
 
 
 def test_metadata_has_the_exact_table_contract() -> None:
     """Expose every planned table in the ORM metadata."""
     assert set(Base.metadata.tables) == EXPECTED_TABLES
-    assert len(Base.metadata.tables) == 27
+    assert len(Base.metadata.tables) == 33
 
 
 @pytest.mark.asyncio

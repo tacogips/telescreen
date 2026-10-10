@@ -136,7 +136,17 @@ class ResourceScannerImpl:
             scan_job_id,
             reference_json,
             findings,
-            complete,
+            complete and (content.coverage is None or content.coverage.state.value == "scanned"),
             content.sweep_covered,
             observed_at,
+            exposure=content.exposure,
+            owner_ref=(
+                self.fingerprinter.owner_ref(content.owner) if content.owner is not None else None
+            ),
+            placement_keys=tuple(
+                self.fingerprinter.placement_key(item.kind, item.value)
+                for item in content.placement
+            ),
+            modified_at=content.modified_at,
+            removed=content.removed,
         )

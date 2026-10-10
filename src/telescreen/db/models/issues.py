@@ -15,6 +15,7 @@ class IssueRow(Base, kw_only=True):
     __table_args__ = (
         Index("ix_issues_sweep_lookup", "collector_config_id", "status", "last_checked_at"),
         Index("ix_issues_status_last_seen", "status", "last_seen"),
+        Index("ix_issues_status_risk", "status", "risk_score"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
@@ -42,6 +43,25 @@ class IssueRow(Base, kw_only=True):
     resolution: Mapped[str | None] = mapped_column(String(32), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    base_severity: Mapped[str] = mapped_column(
+        String(32), default="medium", server_default="medium"
+    )
+    exposure_visibility: Mapped[str] = mapped_column(
+        String(32), default="unknown", server_default="unknown", index=True
+    )
+    exposure_json: Mapped[str | None] = mapped_column(Text, default=None)
+    exposure_changed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    placement_keys_json: Mapped[str | None] = mapped_column(Text, default=None)
+    resource_modified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    owner_ref: Mapped[str | None] = mapped_column(String(80), default=None)
+    policy_name: Mapped[str | None] = mapped_column(String(64), default=None)
+    policy_version: Mapped[int | None] = mapped_column(Integer, default=None)
+    risk_score: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    asset_tier: Mapped[str | None] = mapped_column(String(32), default=None)
 
 
 class FindingRow(Base, kw_only=True):
@@ -50,6 +70,7 @@ class FindingRow(Base, kw_only=True):
     __tablename__ = "findings"
     __table_args__ = (
         UniqueConstraint("issue_id", "scan_job_id", "fingerprint", name="uq_findings_observation"),
+        Index("ix_findings_key_fingerprint", "fingerprint_key_version", "fingerprint"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
@@ -67,6 +88,49 @@ class FindingRow(Base, kw_only=True):
     fingerprint: Mapped[str] = mapped_column(String(64))
     fingerprint_key_id: Mapped[str] = mapped_column(String(64))
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    fingerprint_key_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+
+
+class PlacementPolicyRow(Base, kw_only=True):
+    """Versioned placement policy source and compiled configuration."""
+
+    __tablename__ = "placement_policies"
+    __table_args__ = (UniqueConstraint("name", "version"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    name: Mapped[str] = mapped_column(String(64))
+    version: Mapped[int] = mapped_column(Integer)
+    source_format: Mapped[str] = mapped_column(String(16))
+    source_text: Mapped[str] = mapped_column(Text)
+    compiled_json: Mapped[str] = mapped_column(Text)
+    effect: Mapped[str] = mapped_column(String(16))
+    enabled: Mapped[bool] = mapped_column(Boolean)
+    active: Mapped[bool] = mapped_column(Boolean)
+    owner_team: Mapped[str | None] = mapped_column(String(128), default=None)
+    created_by: Mapped[str] = mapped_column(String(256))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class IssueExceptionRow(Base, kw_only=True):
+    """A requested or approved time-bounded exception for an issue."""
+
+    __tablename__ = "issue_exceptions"
+    __table_args__ = (
+        Index("ix_issue_exceptions_issue", "issue_id"),
+        Index("ix_issue_exceptions_status_expiry", "status", "expires_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    issue_id: Mapped[str] = mapped_column(String(36))
+    reason: Mapped[str] = mapped_column(Text)
+    duration: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(32))
+    requested_by: Mapped[str] = mapped_column(String(256))
+    approver_ref: Mapped[str | None] = mapped_column(String(256), default=None)
+    decided_by: Mapped[str | None] = mapped_column(String(256), default=None)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class IssueHistoryRow(Base, kw_only=True):

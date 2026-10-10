@@ -1,15 +1,29 @@
 import { For, Show, type JSX } from "solid-js";
+import { A } from "@solidjs/router";
+import {
+  Ban,
+  CircleCheck,
+  CircleHelp,
+  CircleX,
+  ClipboardList,
+  Clock3,
+  Eye,
+  RefreshCw,
+  ScanSearch,
+} from "lucide-solid";
 import type { IssueEvent } from "../../../api/types";
+import { StatusBadge } from "../../../components/StatusBadge";
 import { RelativeTime } from "../../../components/RelativeTime";
 import {
   Button,
+  ExposureBadge,
   FoldSection,
   MiniBarChart,
   Redacted,
   Tag,
   Timeline,
 } from "../../../components/ui";
-import type { DetailData } from "./types";
+import { historyLabel, type DetailData } from "./types";
 
 function eventDate(event: IssueEvent): string {
   return new Date(event.observed_at).toISOString().slice(0, 10);
@@ -52,6 +66,20 @@ function jumpTo(id: string): void {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 }
 
+function historyIcon(kind: string): JSX.Element {
+  if (kind === "exposure_changed") return <Eye size={14} aria-hidden="true" />;
+  if (kind === "policy_reevaluated") return <RefreshCw size={14} aria-hidden="true" />;
+  if (kind === "verification_requested") return <ScanSearch size={14} aria-hidden="true" />;
+  if (kind === "verification_failed" || kind === "exception_rejected")
+    return <CircleX size={14} aria-hidden="true" />;
+  if (kind === "verification_inconclusive") return <CircleHelp size={14} aria-hidden="true" />;
+  if (kind === "exception_requested") return <ClipboardList size={14} aria-hidden="true" />;
+  if (kind === "exception_approved") return <CircleCheck size={14} aria-hidden="true" />;
+  if (kind === "exception_revoked") return <Ban size={14} aria-hidden="true" />;
+  if (kind === "exception_expired") return <Clock3 size={14} aria-hidden="true" />;
+  return <span aria-hidden="true">•</span>;
+}
+
 export function IssueDetailSections(
   props: Readonly<{
     detail: DetailData;
@@ -83,6 +111,10 @@ export function IssueDetailSections(
     location()
       .split(/\s*>\s*|\/|:/)
       .filter(Boolean);
+  const credential = (): boolean =>
+    ["credential", "token", "private_key", "password"].includes(
+      props.detail.issue.rule_class,
+    );
   return (
     <main class="issue-detail-main">
       <section class="finding-chart-block">
@@ -193,7 +225,12 @@ export function IssueDetailSections(
           <dt>Confidence</dt>
           <dd>{props.selectedEvent?.confidence ?? "Unknown"}</dd>
           <dt>Severity</dt>
-          <dd>{props.detail.issue.severity}</dd>
+          <dd>
+            {props.detail.issue.severity}
+            {props.detail.issue.base_severity && props.detail.issue.base_severity !== props.detail.issue.severity
+              ? ` (base ${props.detail.issue.base_severity})`
+              : ""}
+          </dd>
           <dt>Location</dt>
           <dd>
             <Redacted
@@ -239,14 +276,40 @@ export function IssueDetailSections(
           )}
         </For>
       </FoldSection>
+      <Show when={credential()}>
+        <FoldSection
+          id="linked-occurrences"
+          title={`Linked occurrences (${props.detail.occurrences.items.length})`}
+        >
+          <p>Links are limited to fingerprints of one key version. A key rotation starts new groups.</p>
+          <Show when={props.detail.occurrences.key_versions.length > 1}>
+            <p>Occurrences span key versions {props.detail.occurrences.key_versions.join(", ")}.</p>
+          </Show>
+          <ul>
+            <For each={props.detail.occurrences.items}>
+              {(occurrence) => (
+                <li>
+                  <A href={`/issues/${encodeURIComponent(occurrence.issue_id)}`}>
+                    {occurrence.short_id} · {occurrence.source} · {occurrence.display_locator}
+                  </A>
+                  <StatusBadge status={occurrence.status} />
+                  <ExposureBadge visibility={occurrence.exposure_visibility} compact />
+                </li>
+              )}
+            </For>
+          </ul>
+        </FoldSection>
+      </Show>
       <FoldSection id="timeline" title="Timeline">
         <Timeline>
           <For each={props.detail.history}>
             {(item) => (
               <li>
-                <span class="timeline-dot" aria-hidden="true" />
+                <span class={`timeline-dot timeline-${item.kind}`}>
+                  {historyIcon(item.kind)}
+                </span>
                 <div>
-                  <strong>{item.kind.replaceAll("_", " ")}</strong>
+                  <strong>{historyLabel(item.kind)}</strong>
                   <p>
                     {[item.from_value, item.to_value]
                       .filter((value) => value !== null)

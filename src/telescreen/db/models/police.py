@@ -29,6 +29,9 @@ class PoliceWorkerRow(Base, kw_only=True):
     )
     last_delivery_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    health_alerted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
 
 
 class PoliceTaskRow(Base, kw_only=True):

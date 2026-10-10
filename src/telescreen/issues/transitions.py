@@ -6,32 +6,24 @@ from telescreen.core.vocabulary import ErrorCode, IssueStatus
 USER_TRANSITIONS: tuple[tuple[IssueStatus, tuple[IssueStatus, ...]], ...] = (
     (
         IssueStatus.UNRESOLVED,
-        (
-            IssueStatus.ACKNOWLEDGED,
-            IssueStatus.IN_PROGRESS,
-            IssueStatus.RESOLVED,
-            IssueStatus.IGNORED,
-        ),
+        (IssueStatus.ACKNOWLEDGED, IssueStatus.IN_PROGRESS),
     ),
     (
         IssueStatus.ACKNOWLEDGED,
         (
             IssueStatus.IN_PROGRESS,
-            IssueStatus.RESOLVED,
-            IssueStatus.IGNORED,
             IssueStatus.UNRESOLVED,
         ),
     ),
-    (IssueStatus.IN_PROGRESS, (IssueStatus.RESOLVED, IssueStatus.IGNORED, IssueStatus.UNRESOLVED)),
+    (IssueStatus.IN_PROGRESS, (IssueStatus.UNRESOLVED,)),
     (
         IssueStatus.REGRESSED,
         (
             IssueStatus.ACKNOWLEDGED,
             IssueStatus.IN_PROGRESS,
-            IssueStatus.RESOLVED,
-            IssueStatus.IGNORED,
         ),
     ),
+    (IssueStatus.PENDING_VERIFICATION, (IssueStatus.UNRESOLVED,)),
     (IssueStatus.RESOLVED, (IssueStatus.UNRESOLVED,)),
     (IssueStatus.IGNORED, (IssueStatus.UNRESOLVED,)),
 )

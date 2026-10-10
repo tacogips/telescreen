@@ -1,6 +1,6 @@
 export type ButtonVariant =
   "default" | "primary" | "danger" | "transparent" | "link";
-export type TagVariant = "muted" | "info" | "danger" | "warning" | "success";
+export type TagVariant = "muted" | "info" | "danger" | "warning" | "success" | "critical";
 export type QueryKeySpec = Readonly<{
   key: string;
   values?: readonly string[];

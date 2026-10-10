@@ -9,23 +9,41 @@ from datetime import datetime, timedelta
 from typing import Protocol
 from uuid import uuid4
 
-from telescreen.collectors.google.drive import DriveApi, DriveFile, DrivePage, WatchResponse
+from telescreen.collectors.google.drive import (
+    DriveApi,
+    DriveFile,
+    DrivePage,
+    DrivePermission,
+    WatchResponse,
+)
+from telescreen.collectors.google.exposure import drive_exposure
 from telescreen.collectors.google.sheets import SheetsApi, SheetValues
 from telescreen.core.clock import Clock, ensure_utc
 from telescreen.core.errors import TelescreenError
 from telescreen.core.json import JsonKind, JsonValue, parse_json
-from telescreen.core.vocabulary import CollectorKind, ErrorCode
+from telescreen.core.vocabulary import (
+    CollectorKind,
+    CoverageState,
+    ErrorCode,
+    IdentityKind,
+    PlacementKind,
+    UnsupportedReason,
+)
 from telescreen.ports.collectors import (
     ChangePage,
     CollectorConfig,
     CollectorCursor,
     CollectorSecrets,
     CollectorSelector,
+    Coverage,
     DriveSelector,
     EventCheck,
     EventCheckKind,
     EventResources,
+    Exposure,
     InboundWebhook,
+    OwnerIdentity,
+    PlacementRef,
     RateLimited,
     ResourceContent,
     ResourceGoneError,
@@ -66,6 +84,7 @@ class GoogleAdapter:
     channel_token_key: bytes = field(repr=False)
     public_base_url: str | None = None
     max_bytes: int = 5 * 1024 * 1024
+    internal_domains: tuple[str, ...] = ()
 
     async def verify_event(self, event: InboundWebhook, secrets: CollectorSecrets) -> EventCheck:
         """Verify the Drive channel token using constant-time HMAC comparison."""
@@ -138,8 +157,13 @@ class GoogleAdapter:
             return await self._fetch_content(config, ref, subject)
         except (ResourceGoneError, RateLimited):
             raise
-        except TelescreenError:
-            return self._content(config, ref, "", (), False, False)
+        except TelescreenError as error:
+            state: CoverageState = (
+                CoverageState.PERMISSION_DENIED
+                if error.code is ErrorCode.FORBIDDEN
+                else CoverageState.FETCH_FAILED
+            )
+            return self._content(config, ref, "", (), False, False, coverage=Coverage(state))
 
     async def _fetch_content(
         self, config: CollectorConfig, ref: ResourceRef, subject: str | None
@@ -150,6 +174,31 @@ class GoogleAdapter:
             file: DriveFile = await drive.files_get_meta(_file_id(ref), subject)
             if file.trashed or not _matches(file, _drive_selector(config.selector), self.kind):
                 raise TelescreenError(ErrorCode.NOT_FOUND, "Google Drive resource is unavailable")
+            exposure: Exposure | None = None
+            try:
+                permissions: tuple[DrivePermission, ...] = await drive.list_permissions(
+                    file.id, subject
+                )
+                exposure = drive_exposure(permissions, file.drive_id, self.internal_domains)
+            except TelescreenError:
+                exposure = None
+            if self.kind is CollectorKind.GDRIVE and not _text_like(file.mime_type):
+                reason: UnsupportedReason = (
+                    UnsupportedReason.IMAGE
+                    if file.mime_type.startswith("image/")
+                    else UnsupportedReason.UNSUPPORTED_TYPE
+                )
+                return self._content(
+                    config,
+                    ref,
+                    file.name,
+                    (),
+                    False,
+                    True,
+                    file,
+                    exposure,
+                    Coverage(CoverageState.UNSUPPORTED, reason),
+                )
             if self.kind is CollectorKind.GDOCS:
                 payload: bytes = await drive.files_export(file.id, subject=subject)
                 segments: tuple[Segment, ...] = _line_segments(payload.decode("utf-8"))
@@ -167,7 +216,20 @@ class GoogleAdapter:
             else:
                 payload = await drive.files_get_media(file.id, subject)
                 if not _text_like(file.mime_type) or len(payload) > self.max_bytes:
-                    return self._content(config, ref, file.name, (), False, True)
+                    return self._content(
+                        config,
+                        ref,
+                        file.name,
+                        (),
+                        False,
+                        True,
+                        file,
+                        exposure,
+                        Coverage(
+                            CoverageState.PARTIAL,
+                            truncated_bytes=max(0, len(payload) - self.max_bytes),
+                        ),
+                    )
                 segments = _line_segments(payload.decode("utf-8"))
             complete: bool = len(payload) <= self.max_bytes
             return self._content(
@@ -177,6 +239,12 @@ class GoogleAdapter:
                 segments if complete else (),
                 complete,
                 True,
+                file,
+                exposure,
+                Coverage(
+                    CoverageState.SCANNED if complete else CoverageState.PARTIAL,
+                    truncated_bytes=max(0, len(payload) - self.max_bytes),
+                ),
             )
         except UnicodeDecodeError:
             raise TelescreenError(
@@ -238,6 +306,9 @@ class GoogleAdapter:
         segments: tuple[Segment, ...],
         complete: bool,
         sweep_covered: bool,
+        file: DriveFile | None = None,
+        exposure: Exposure | None = None,
+        coverage: Coverage | None = None,
     ) -> ResourceContent:
         """Create a transient source payload with sweep coverage derived from selector."""
         return ResourceContent(
@@ -249,6 +320,30 @@ class GoogleAdapter:
             raw_locator=ref.raw_locator,
             display_title=title,
             ref=ref,
+            exposure=exposure,
+            owner=(
+                OwnerIdentity(IdentityKind.EMAIL, file.owners[0].email_address)
+                if file is not None and file.owners
+                else None
+            ),
+            placement=(
+                tuple(
+                    [PlacementRef(PlacementKind.GDRIVE_DRIVE, file.drive_id)]
+                    if file.drive_id is not None
+                    else []
+                )
+                + tuple(
+                    PlacementRef(PlacementKind.GDRIVE_FOLDER, parent) for parent in file.parents
+                )
+                if file is not None
+                else ()
+            ),
+            modified_at=(
+                _parse_modified_time(file.modified_time)
+                if file is not None and file.modified_time is not None
+                else None
+            ),
+            coverage=coverage,
         )
 
 
@@ -304,7 +399,12 @@ def _matches(file: DriveFile, selector: DriveSelector, kind: CollectorKind) -> b
         return False
     if kind is CollectorKind.GSHEETS and file.mime_type != GOOGLE_SPREADSHEET:
         return False
-    if kind is CollectorKind.GDRIVE and not _text_like(file.mime_type):
+    if (
+        kind is CollectorKind.GDRIVE
+        and not _text_like(file.mime_type)
+        and not file.mime_type.startswith("image/")
+        and not selector.mime_types
+    ):
         return False
     if selector.mime_types and file.mime_type not in selector.mime_types:
         return False
@@ -340,6 +440,15 @@ def _text_like(mime_type: str) -> bool:
         or mime_type.endswith("+xml")
         or mime_type.endswith("+json")
     )
+
+
+def _parse_modified_time(value: str) -> datetime | None:
+    """Parse a provider RFC 3339 timestamp and normalize it to UTC."""
+    try:
+        parsed: datetime = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return ensure_utc(parsed)
 
 
 def _line_segments(text: str) -> tuple[Segment, ...]:

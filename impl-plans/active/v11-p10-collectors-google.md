@@ -1,6 +1,6 @@
 # V11-P10 Google Drive Collector: Exposure, Owner, Placement, Modified Time, Coverage
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-1-dspm-adoption.md sections 3 (Drive row), 4 (placement `gdrive_drive`, `gdrive_folder`), 6 (coverage, `permission_denied`), 7 (owner identity: `owners[0].emailAddress`)
 **Created**: 2026-10-10
 **Last Updated**: 2026-10-10
@@ -160,12 +160,47 @@ assertion is `test_sweep.py` line 188 (`FETCH_FAILED` -> `FORBIDDEN`).
 
 ## Completion Criteria
 
-- [ ] Exposure, owner, placement, modified time and coverage populated as specified.
-- [ ] Non-quota 403 -> `FORBIDDEN`; 404 -> `ResourceGoneError` unchanged (regression
+- [x] Exposure, owner, placement, modified time and coverage populated as specified.
+- [x] Non-quota 403 -> `FORBIDDEN`; 404 -> `ResourceGoneError` unchanged (regression
       test passes).
-- [ ] GET-only assertion passes; scoped gates pass; the typelint grep is empty.
-- [ ] Progress Log complete.
+- [x] GET-only assertion passes; scoped gates pass; the typelint grep is empty.
+- [x] Progress Log complete.
 
 ## Progress Log
 
-(append sessions per conventions section 8)
+### Session: 2026-10-10 17:09 JST
+**Tasks Completed**: Added Drive owner/modified/size metadata, paginated permissions GET, count-only exposure mapping, transient owner and placement context, modified-time parsing, coverage states, non-quota 403 classification, and MockTransport regressions. Changed exactly the planned denied-file assertion in `test_sweep.py`.
+**Tasks In Progress**: None.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `drive.py` before=834f0fe4526a43b243a0ffbea0a3fbbe87250d45751942f1fc35d0a59725206e after=e8b344b1aea045518c7f50c643a4bfb003f4930c41b370a89047e0514d6b9a77; `adapter.py` before=459ad10a2c9f9614cdfdbd9e2bcd096df43435b6c53a339981a15a4ab206509b after=523c88d960034ab96693de87291b549e68f255aded79bb32c12e731207d42fa9; `exposure.py` before=absent after=64969ba24875ab77182bc59a520f3527ecce7cf1217a27dc4e32101335655d28; `test_v11_context.py` before=absent after=5b394680900c543a1bc71d4a0d2e2aa995e7134d6a9e6a36176c0b32ba7f8cae; `test_sweep.py` before=6f9f6817acbad389e1d66944b0cb88788235501787d59a45ba410077f0a2875a after=40fdadcbd6c905415a482cffd0c70aca1a74f86658eee253943596e82bd8c668.
+**Verification**:
+- `uv run --frozen ruff format --check --no-cache src/telescreen/collectors/google tests/collectors/google` -> exit 0 (log: `/tmp/telescreen-v11-p10-collectors-google-format-final2.log`).
+- `uv run --frozen ruff check --no-cache src/telescreen/collectors/google tests/collectors/google` -> exit 0 (log: `/tmp/telescreen-v11-p10-collectors-google-ruff-final2.log`).
+- `uv run --frozen ty check src/telescreen/collectors/google tests/collectors/google` -> exit 0 (log: `/tmp/telescreen-v11-p10-collectors-google-ty-final2.log`).
+- `uv run --frozen pytest -p no:cacheprovider tests/collectors/google` -> exit 0, 23 passed, 0 failed (log: `/tmp/telescreen-v11-p10-collectors-google-pytest-final2.log`).
+- `uv run --frozen python tools/typelint.py > /tmp/telescreen-v11-p10-collectors-google-typelint-final2.log 2>&1; ! grep -E '^(.*/)?(src/telescreen/collectors/google/|tests/collectors/google/)' /tmp/telescreen-v11-p10-collectors-google-typelint-final2.log` -> overall exit 0; whole-repository typelint reports diagnostics outside p10, while this absolute-path-aware p10 grep finds none.
+- `grep -n '404' src/telescreen/collectors/google/drive.py` -> exit 0, 404 branch remains first and raises `ResourceGoneError` (log: `/tmp/telescreen-v11-p10-collectors-google-404-check.log`).
+- `git diff --stat -- tests/collectors/google/test_sweep.py` -> exit 0, exactly 1 insertion and 1 deletion (log: `/tmp/telescreen-v11-p10-collectors-google-sweep-diff-stat.log`).
+- `test "$(grep -c '^- \[ \]' impl-plans/active/v11-p10-collectors-google.md)" -eq 0` -> exit 0 (final log: `/tmp/telescreen-v11-p10-collectors-google-checkbox-final.log`).
+- `git diff --check -- src/telescreen/collectors/google/drive.py src/telescreen/collectors/google/adapter.py src/telescreen/collectors/google/exposure.py tests/collectors/google/test_v11_context.py tests/collectors/google/test_sweep.py impl-plans/active/v11-p10-collectors-google.md` -> exit 0 (final log: `/tmp/telescreen-v11-p10-collectors-google-diff-check-final.log`).
+**Notes**: The initial focused pytest log `/tmp/telescreen-v11-p10-collectors-google-pytest-initial.log` records 1 failure and 17 passes: direct test DTO construction used Pydantic `FieldInfo` defaults. The test now supplies explicit constructor fields; final source run passes 23 tests. Initial Ruff findings were corrected. The first typelint grep used a relative-path prefix and missed absolute-path diagnostics in this test; annotated all three locals and reran with the absolute-path-aware grep, which finds no p10 diagnostics. The whole-repository typelint still reports findings outside p10. All plan criteria are checked.
+
+### Session: 2026-10-10 17:20 JST (P10-TIC-001 repair)
+**Tasks Completed**: Replaced Pydantic `Field(repr=False)` defaults on stdlib dataclasses with `dataclasses.field(repr=False)` for `DriveOwner.email_address`, `DrivePermission.domain`, `DrivePermission.email_address`, and `DriveFile.owners`. Kept Google camelCase aliases in `Annotated[..., Field(alias=...)]`. Added a regression test that parses the DTOs through `TypeAdapter`, confirms values, and confirms repr excludes emails and domains. `tests/collectors/google/test_sweep.py` remains unchanged from its single planned line-188 assertion.
+**Tasks In Progress**: Independent test-integrity and adversarial re-review of P10-TIC-001 is downstream.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `drive.py` after=3d6502111240ce72487885b3ab7663c4937376e1ea321cb2c9311ac7f69e557d; `test_v11_context.py` after=f4f567ffe73355cbdf937f729d73db81414c11f04f0eb0730c6bd81371bb2d53; unchanged `adapter.py`=523c88d960034ab96693de87291b549e68f255aded79bb32c12e731207d42fa9; unchanged `exposure.py`=64969ba24875ab77182bc59a520f3527ecce7cf1217a27dc4e32101335655d28; `test_sweep.py`=40fdadcbd6c905415a482cffd0c70aca1a74f86658eee253943596e82bd8c668.
+**Verification**:
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/collectors/google/test_v11_context.py -k drive_principal_aliases_parse_without_repr_leaks 2>&1 | tee /tmp/telescreen-v11-p10-collectors-google-tic2-repr-pytest.log` -> exit 0, 1 passed (8 deselected).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python -c 'from pydantic import TypeAdapter; from telescreen.collectors.google.drive import DrivePermission, DriveFile; permission = TypeAdapter(DrivePermission).validate_json(b"{\"type\":\"user\",\"role\":\"reader\",\"emailAddress\":\"c@d.invalid\",\"domain\":\"d.invalid\"}"); drive_file = TypeAdapter(DriveFile).validate_json(b"{\"id\":\"x\",\"owners\":[{\"emailAddress\":\"a@b.invalid\"}]}"); print(repr(permission)); print(repr(drive_file)); assert "@" not in repr(permission) and "d.invalid" not in repr(permission); assert "@" not in repr(drive_file) and "b.invalid" not in repr(drive_file); assert permission.email_address == "c@d.invalid" and permission.domain == "d.invalid"; assert drive_file.owners[0].email_address == "a@b.invalid"' 2>&1 | tee /tmp/telescreen-v11-p10-collectors-google-tic2-repr-repro.log` -> exit 0; both printed reprs omit email/domain strings and the parsed values remain populated.
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/collectors/google tests/collectors/google 2>&1 | tee /tmp/telescreen-v11-p10-collectors-google-tic2-format.log` -> exit 0.
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/collectors/google tests/collectors/google 2>&1 | tee /tmp/telescreen-v11-p10-collectors-google-tic2-ruff.log` -> exit 0.
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/collectors/google tests/collectors/google 2>&1 | tee /tmp/telescreen-v11-p10-collectors-google-tic2-ty.log` -> exit 0.
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/collectors/google 2>&1 | tee /tmp/telescreen-v11-p10-collectors-google-tic2-pytest.log` -> exit 0, 24 passed, 0 failed.
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v11-p10-collectors-google-tic2-typelint.log 2>&1; ! grep -E '^(.*/)?(src/telescreen/collectors/google/|tests/collectors/google/)' /tmp/telescreen-v11-p10-collectors-google-tic2-typelint.log` -> compound exit 0; whole-repository typelint reports 39 diagnostics outside p10, and the p10 absolute-path-aware grep is empty.
+- `set -o pipefail; grep -n '404' src/telescreen/collectors/google/drive.py 2>&1 | tee /tmp/telescreen-v11-p10-collectors-google-tic2-404.log` -> exit 0, the 404 handling branch remains present.
+- `set -o pipefail; git diff --stat -- tests/collectors/google/test_sweep.py 2>&1 | tee /tmp/telescreen-v11-p10-collectors-google-tic2-sweep-diff.log` -> exit 0, exactly 1 insertion and 1 deletion.
+- `test "$(grep -c '^- \[ \]' impl-plans/active/v11-p10-collectors-google.md)" -eq 0` -> exit 0 (complete log: `/tmp/telescreen-v11-p10-collectors-google-tic2-checkbox.log`); `git diff --check -- src/telescreen/collectors/google/drive.py src/telescreen/collectors/google/adapter.py src/telescreen/collectors/google/exposure.py tests/collectors/google/test_v11_context.py tests/collectors/google/test_sweep.py impl-plans/active/v11-p10-collectors-google.md` -> exit 0 (complete log: `/tmp/telescreen-v11-p10-collectors-google-tic2-diff-check.log`).
+**Notes**: Previous test-integrity disposition `P10-TIC-001` was a mid finding: stdlib dataclass reprs exposed transient email/domain values. The source-matched regression and full Google suite now pass. No acceptance decision is claimed; independent review remains pending.

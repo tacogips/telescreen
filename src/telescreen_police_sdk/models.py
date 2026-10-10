@@ -7,7 +7,7 @@ from enum import StrEnum
 
 from telescreen_police_sdk import _json
 
-CONTRACT_VERSION: str = "1.0"
+CONTRACT_VERSION: str = "1.1"
 
 
 class Mode(StrEnum):
@@ -43,6 +43,35 @@ class RuleClass(StrEnum):
     EMAIL = "email"
     PHONE = "phone"
     ADDRESS = "address"
+
+
+class Visibility(StrEnum):
+    """Resource exposure visibility categories."""
+
+    PUBLIC = "public"
+    ANYONE_WITH_LINK = "anyone_with_link"
+    EXTERNAL_SHARED = "external_shared"
+    DOMAIN = "domain"
+    INTERNAL = "internal"
+    PRIVATE = "private"
+    UNKNOWN = "unknown"
+
+
+class ChannelKind(StrEnum):
+    """Supported collaboration channel visibility kinds."""
+
+    PUBLIC = "public"
+    PRIVATE = "private"
+    DM = "dm"
+    CONNECT = "connect"
+
+
+class RepoVisibility(StrEnum):
+    """Supported repository visibility values."""
+
+    PUBLIC = "public"
+    INTERNAL = "internal"
+    PRIVATE = "private"
 
 
 def _member(value: _json.Json, name: str, required: bool = True) -> _json.Json | None:
@@ -325,6 +354,82 @@ class MaskedFinding:
 
 
 @dataclass(frozen=True)
+class ResourceExposure:
+    """Exposure context for one scanned resource."""
+
+    locator: str = field(repr=False)
+    visibility: Visibility
+    external_principal_count: int | None = None
+    shared_drive: bool | None = None
+    channel_kind: ChannelKind | None = None
+    repo_visibility: RepoVisibility | None = None
+    is_fork: bool | None = None
+
+    def to_json(self) -> _json.Json:
+        """Serialize resource exposure context."""
+        return _object(
+            (
+                ("locator", _json.string(self.locator)),
+                ("visibility", _json.string(self.visibility.value)),
+                (
+                    "external_principal_count",
+                    _json.integer(self.external_principal_count)
+                    if self.external_principal_count is not None
+                    else None,
+                ),
+                (
+                    "shared_drive",
+                    _json.boolean(self.shared_drive) if self.shared_drive is not None else None,
+                ),
+                (
+                    "channel_kind",
+                    _json.string(self.channel_kind.value)
+                    if self.channel_kind is not None
+                    else None,
+                ),
+                (
+                    "repo_visibility",
+                    _json.string(self.repo_visibility.value)
+                    if self.repo_visibility is not None
+                    else None,
+                ),
+                ("is_fork", _json.boolean(self.is_fork) if self.is_fork is not None else None),
+            )
+        )
+
+    @staticmethod
+    def from_json(value: _json.Json) -> ResourceExposure:
+        """Parse resource exposure context."""
+        external_count_value: _json.Json | None = _member(value, "external_principal_count", False)
+        shared_drive_value: _json.Json | None = _member(value, "shared_drive", False)
+        channel_text: str | None = _string(value, "channel_kind", False)
+        repo_text: str | None = _string(value, "repo_visibility", False)
+        is_fork_value: _json.Json | None = _member(value, "is_fork", False)
+        external_count: int | None = (
+            external_count_value.as_int() if external_count_value is not None else None
+        )
+        shared_drive: bool | None = (
+            shared_drive_value.as_bool() if shared_drive_value is not None else None
+        )
+        is_fork: bool | None = is_fork_value.as_bool() if is_fork_value is not None else None
+        if external_count_value is not None and external_count is None:
+            raise ValueError("invalid contract member")
+        if shared_drive_value is not None and shared_drive is None:
+            raise ValueError("invalid contract member")
+        if is_fork_value is not None and is_fork is None:
+            raise ValueError("invalid contract member")
+        return ResourceExposure(
+            _string(value, "locator") or "",
+            Visibility(_string(value, "visibility") or ""),
+            external_count,
+            shared_drive,
+            ChannelKind(channel_text) if channel_text else None,
+            RepoVisibility(repo_text) if repo_text else None,
+            is_fork,
+        )
+
+
+@dataclass(frozen=True)
 class ResultError:
     """Static task failure details."""
 
@@ -396,6 +501,7 @@ class ResultEnvelope:
     stats: ShardStats | None = None
     complete_locators: tuple[str, ...] = field(default=(), repr=False)
     contract_version: str = CONTRACT_VERSION
+    resource_exposures: tuple[ResourceExposure, ...] = field(default=(), repr=False)
 
     def to_json(self) -> _json.Json:
         """Serialize a result envelope."""
@@ -418,6 +524,12 @@ class ResultEnvelope:
                 ("result_token", _json.string(self.result_token) if self.result_token else None),
                 ("stats", self.stats.to_json() if self.stats else None),
                 ("complete_locators", locator_json),
+                (
+                    "resource_exposures",
+                    _json.array(tuple(item.to_json() for item in self.resource_exposures))
+                    if self.resource_exposures
+                    else None,
+                ),
             )
         )
 
@@ -440,6 +552,12 @@ class ResultEnvelope:
         locators: tuple[str, ...] = (
             _strings(value, "complete_locators") if value.get("complete_locators") else ()
         )
+        exposures_json: _json.Json | None = _member(value, "resource_exposures", False)
+        exposure_values: tuple[_json.Json, ...] | None = (
+            exposures_json.as_list() if exposures_json is not None else None
+        )
+        if exposures_json is not None and exposure_values is None:
+            raise ValueError("invalid contract member")
         return ResultEnvelope(
             _string(value, "task_id") or "",
             ResultStatus(status_text or ""),
@@ -452,6 +570,7 @@ class ResultEnvelope:
             ShardStats.from_json(stats_value) if stats_value else None,
             locators,
             _string(value, "contract_version") or "",
+            tuple(ResourceExposure.from_json(item) for item in exposure_values or ()),
         )
 
 

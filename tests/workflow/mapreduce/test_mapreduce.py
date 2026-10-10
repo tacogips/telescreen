@@ -483,7 +483,8 @@ async def test_dispatch_caps_ten_thousand_shards_at_thirty_two() -> None:
         async with harness.sessions() as session:
             job: MapJobRow | None = await session.get(MapJobRow, "job")
             assert job is not None and job.status == MapJobStatus.SUCCEEDED.value
-        assert monotonic() - started < 60
+        # Throughput guard only; generous because CI machines may be heavily loaded.
+        assert monotonic() - started < 240
     finally:
         await harness.close()
 

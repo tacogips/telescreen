@@ -3,11 +3,12 @@ import {
   ApiError,
   directoryApi,
   evidenceApi,
+  exceptionsApi,
   issuesApi,
   runsApi,
   workflowsApi,
 } from "../../api/client";
-import type { IssueEvent, IssueStatus } from "../../api/types";
+import type { ExceptionDuration, IssueEvent, IssueStatus } from "../../api/types";
 import { ErrorBanner } from "../../components/ErrorBanner";
 import { showToast } from "../../components/ui";
 import { EvidenceRejectedError, uploadEvidence } from "./uploadEvidence";
@@ -27,8 +28,14 @@ export function IssueDetail(props: Readonly<{ id: string }>): JSX.Element {
   const [data, { refetch }] = createResource(
     () => props.id,
     async (id): Promise<DetailData> => {
+      const issue = await issuesApi.get(id);
+      const isCredential = [
+        "credential",
+        "token",
+        "private_key",
+        "password",
+      ].includes(issue.rule_class);
       const [
-        issue,
         eventPage,
         historyPage,
         runPage,
@@ -36,8 +43,8 @@ export function IssueDetail(props: Readonly<{ id: string }>): JSX.Element {
         membersPage,
         teamsPage,
         workflowPage,
+        occurrences,
       ] = await Promise.all([
-        issuesApi.get(id),
         issuesApi.events(id),
         issuesApi.history(id),
         runsApi.list(new URLSearchParams({ issue_id: id })),
@@ -45,6 +52,9 @@ export function IssueDetail(props: Readonly<{ id: string }>): JSX.Element {
         directoryApi.members(),
         directoryApi.teams(),
         workflowsApi.list(),
+        isCredential
+          ? issuesApi.occurrences(id)
+          : Promise.resolve({ items: [], key_versions: [] }),
       ]);
       const active = runPage.items
         .filter(
@@ -55,6 +65,7 @@ export function IssueDetail(props: Readonly<{ id: string }>): JSX.Element {
         active === undefined ? null : await runsApi.get(active.id);
       return {
         issue,
+        occurrences,
         events: eventPage.items,
         history: historyPage.items,
         runs: runPage.items,
@@ -105,8 +116,31 @@ export function IssueDetail(props: Readonly<{ id: string }>): JSX.Element {
   };
   const updateStatus = (status: IssueStatus): void => {
     const issue = data()?.issue;
+    if (status === "resolved" || status === "ignored") return;
     if (issue !== undefined)
       void run(() => issuesApi.update(issue.id, { status }));
+  };
+  const remediate = (action: "remove" | "restrict", includeLinked: boolean): void => {
+    const issue = data()?.issue;
+    if (issue !== undefined)
+      void run(() => issuesApi.remediation(issue.id, { action, include_linked: includeLinked }));
+  };
+  const resolve = (reason: "false_positive" | "manual_unverified", note: string): void => {
+    const issue = data()?.issue;
+    if (issue !== undefined) void run(() => issuesApi.resolve(issue.id, { reason, note }));
+  };
+  const requestException = (reason: string, duration: ExceptionDuration): void => {
+    const issue = data()?.issue;
+    if (issue !== undefined) void run(() => issuesApi.requestException(issue.id, { reason, duration }));
+  };
+  const decideException = (action: "approve" | "reject"): void => {
+    const exception = data()?.issue.active_exception;
+    if (exception === null || exception === undefined) return;
+    void run(() =>
+      action === "approve"
+        ? exceptionsApi.approve(exception.id)
+        : exceptionsApi.reject(exception.id),
+    );
   };
   const updateAssignee = (value: string): void => {
     const issue = data()?.issue;
@@ -178,6 +212,9 @@ export function IssueDetail(props: Readonly<{ id: string }>): JSX.Element {
               detail={detail()}
               assignee={assignee()}
               onStatus={updateStatus}
+              onRemediation={remediate}
+              onResolve={resolve}
+              onRequestException={requestException}
               onAssignee={updateAssignee}
               onStartWorkflow={startWorkflow}
               onCopyMarkdown={() => void copyMarkdown()}
@@ -212,6 +249,7 @@ export function IssueDetail(props: Readonly<{ id: string }>): JSX.Element {
                   onCommentChange={setComment}
                   onComment={submitComment}
                   onClose={() => setSidebarOpen(false)}
+                  onExceptionDecision={decideException}
                 />
               </Show>
               <Show when={!sidebarOpen()}>

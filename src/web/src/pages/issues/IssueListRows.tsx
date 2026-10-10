@@ -6,16 +6,18 @@ import { RelativeTime } from "../../components/RelativeTime";
 import { StatusBadge } from "../../components/StatusBadge";
 import {
   EmptyState,
+  ExposureBadge,
   Placeholder,
   PriorityBadge,
   Redacted,
+  RiskPill,
   SeverityBar,
 } from "../../components/ui";
 import { sourceLabel } from "../../components/labels";
 
-function severity(value: string): "high" | "medium" | "low" {
-  if (value === "high" || value === "medium") return value;
-  return "low";
+function severity(value: string): "critical" | "high" | "medium" {
+  if (value === "critical" || value === "high") return value;
+  return "medium";
 }
 
 export function IssueListRows(
@@ -67,6 +69,7 @@ export function IssueListRows(
           <span>Last seen</span>
           <span>Age</span>
           <span>Findings</span>
+          <span>Risk</span>
           <span>Priority</span>
           <span>Assignee</span>
         </div>
@@ -107,8 +110,19 @@ export function IssueListRows(
                     {sourceLabel(issue.source)} ·{" "}
                     {issue.display_locator.split(/[/:]/).slice(-1)[0]}
                   </span>
+                  <Show when={issue.exposure_visibility}>
+                    {(visibility) => (
+                      <ExposureBadge visibility={visibility()} compact />
+                    )}
+                  </Show>
+                  <span title="Scan coverage">
+                    {issue.sweep_covered ? "Scanned" : "Unscanned"}
+                  </span>
                   <Show when={issue.status !== "unresolved"}>
-                    <StatusBadge status={issue.status} />
+                    <StatusBadge
+                      status={issue.status}
+                      resolution={issue.resolution}
+                    />
                   </Show>
                 </div>
               </div>
@@ -121,8 +135,13 @@ export function IssueListRows(
               <div class="issue-findings">
                 <span title="Since first seen">{issue.times_seen}</span>
               </div>
+              <div class="issue-risk">
+                {issue.risk_score === undefined ? "—" : <RiskPill score={issue.risk_score} />}
+              </div>
               <div class="issue-priority">
-                <PriorityBadge level={severity(issue.severity)} />
+                <span title={issue.base_severity && issue.base_severity !== issue.severity ? `Base severity: ${issue.base_severity}` : undefined}>
+                  <PriorityBadge level={severity(issue.severity)} />
+                </span>
               </div>
               <div class="issue-assignee">
                 {issue.assignee_member_id ??

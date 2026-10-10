@@ -27,11 +27,27 @@ from telescreen.core.json import (
     json_null,
     json_object,
     json_str,
+    parse_json,
 )
-from telescreen.core.vocabulary import ApiScope, ErrorCode, IssueStatus, RuleClass, Severity
-from telescreen.db.models import FindingRow, IssueHistoryRow, IssueRow
+from telescreen.core.vocabulary import (
+    ApiScope,
+    ErrorCode,
+    ExceptionDuration,
+    ExceptionStatus,
+    IssueResolution,
+    IssueStatus,
+    RemediationAction,
+    RuleClass,
+    Severity,
+    Visibility,
+)
+from telescreen.db.models import FindingRow, IssueExceptionRow, IssueHistoryRow, IssueRow
+from telescreen.issues.exceptions import ExceptionService
+from telescreen.issues.lifecycle import IssueRemediationService
+from telescreen.issues.occurrences import OccurrenceResult, linked
 from telescreen.issues.service import IssueService
-from telescreen.ports.directory import AssigneeIds
+from telescreen.ports.directory import AssigneeIds, OwnerDirectory, RecipientResolver
+from telescreen.ports.issues import RemediationReceipt
 from telescreen.ports.search import SearchIndexer
 
 
@@ -50,6 +66,31 @@ class CommentBody:
     body: str
 
 
+@pydantic.dataclasses.dataclass(frozen=True)
+class RemediationBody:
+    """Validated read-only remediation request."""
+
+    action: RemediationAction
+    include_linked: bool = False
+    note: str | None = None
+
+
+@pydantic.dataclasses.dataclass(frozen=True)
+class ResolveBody:
+    """Validated reasoned issue resolution."""
+
+    reason: IssueResolution
+    note: str
+
+
+@pydantic.dataclasses.dataclass(frozen=True)
+class ExceptionRequestBody:
+    """Validated exception request."""
+
+    reason: str
+    duration: ExceptionDuration
+
+
 @dataclass(frozen=True)
 class IssuesRouterDeps:
     """Dependencies needed by issue routes."""
@@ -57,6 +98,10 @@ class IssuesRouterDeps:
     ctx: ApiContext
     service: IssueService
     indexer: SearchIndexer
+    remediation: IssueRemediationService | None = None
+    exceptions: ExceptionService | None = None
+    owners: OwnerDirectory | None = None
+    resolver: RecipientResolver | None = None
 
 
 def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
@@ -73,10 +118,12 @@ def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
         severity: Severity | None = None,
         assignee: str | None = None,
         q: str | None = None,
-        sort: Annotated[str, Query(pattern="^(last_seen|first_seen|times_seen)$")] = "last_seen",
+        exposure: Visibility | None = None,
+        sort: Annotated[
+            str, Query(pattern="^(last_seen|first_seen|times_seen|risk)$")
+        ] = "last_seen",
     ) -> Response:
         """Return filtered issues with an opaque keyset cursor."""
-        del principal
         async with deps.ctx.sessions() as session:
             query: Select[tuple[IssueRow]] = select(IssueRow)
             if status is not None:
@@ -87,12 +134,46 @@ def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
                 query = query.where(IssueRow.rule_class == rule_class.value)
             if severity is not None:
                 query = query.where(IssueRow.severity == severity.value)
+            if exposure is not None:
+                query = query.where(IssueRow.exposure_visibility == exposure.value)
             if assignee is not None:
-                assignment: AssigneeIds = await deps.service.resolver.assignee_of(session, assignee)
-                if assignment.member_id is not None:
-                    query = query.where(IssueRow.assignee_member_id == assignment.member_id)
+                if assignee in ("me", "my_teams"):
+                    if principal.member_id is None:
+                        raise TelescreenError(ErrorCode.FORBIDDEN, "member identity required")
+                    if deps.owners is None:
+                        return _unavailable()
+                    resolver: RecipientResolver = deps.resolver or deps.service.resolver
+                    if assignee == "me":
+                        member_ref: str | None = await deps.owners.member_ref(
+                            session, principal.member_id
+                        )
+                        if member_ref is None:
+                            raise TelescreenError(ErrorCode.FORBIDDEN, "member identity required")
+                        assignment: AssigneeIds = await resolver.assignee_of(session, member_ref)
+                        query = query.where(IssueRow.assignee_member_id == assignment.member_id)
+                    else:
+                        team_refs: tuple[str, ...] = await deps.owners.team_refs_of(
+                            session, principal.member_id
+                        )
+                        team_ids: list[str] = []
+                        for team_ref in team_refs:
+                            team_assignment: AssigneeIds = await resolver.assignee_of(
+                                session, team_ref
+                            )
+                            if team_assignment.team_id is not None:
+                                team_ids.append(team_assignment.team_id)
+                        query = (
+                            query.where(IssueRow.assignee_team_id.in_(team_ids))
+                            if team_ids
+                            else query.where(IssueRow.id == "")
+                        )
                 else:
-                    query = query.where(IssueRow.assignee_team_id == assignment.team_id)
+                    resolver = deps.resolver or deps.service.resolver
+                    assignment = await resolver.assignee_of(session, assignee)
+                    if assignment.member_id is not None:
+                        query = query.where(IssueRow.assignee_member_id == assignment.member_id)
+                    else:
+                        query = query.where(IssueRow.assignee_team_id == assignment.team_id)
             if q is not None:
                 query = query.where(
                     IssueRow.display_title.like(f"%{q}%") | IssueRow.display_locator.like(f"%{q}%")
@@ -115,6 +196,18 @@ def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
                         | ((IssueRow.times_seen == marker_count) & (IssueRow.id < identifier))
                     )
                     query = query.order_by(IssueRow.times_seen.desc(), IssueRow.id.desc())
+                elif sort == "risk":
+                    try:
+                        marker_risk: int = int(marker)
+                    except ValueError:
+                        raise TelescreenError(
+                            ErrorCode.VALIDATION_ERROR, "invalid cursor"
+                        ) from None
+                    query = query.where(
+                        (IssueRow.risk_score < marker_risk)
+                        | ((IssueRow.risk_score == marker_risk) & (IssueRow.id < identifier))
+                    )
+                    query = query.order_by(IssueRow.risk_score.desc(), IssueRow.id.desc())
                 else:
                     try:
                         marker_at: datetime = ensure_utc(datetime.fromisoformat(marker))
@@ -131,6 +224,8 @@ def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
                     query = query.order_by(column.desc(), IssueRow.id.desc())
             elif sort == "times_seen":
                 query = query.order_by(IssueRow.times_seen.desc(), IssueRow.id.desc())
+            elif sort == "risk":
+                query = query.order_by(IssueRow.risk_score.desc(), IssueRow.id.desc())
             elif sort == "first_seen":
                 query = query.order_by(IssueRow.first_seen.desc(), IssueRow.id.desc())
             else:
@@ -146,6 +241,8 @@ def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
                 marker_value = ensure_utc(last.last_seen).isoformat()
             elif sort == "first_seen":
                 marker_value = ensure_utc(last.first_seen).isoformat()
+            elif sort == "risk":
+                marker_value = str(last.risk_score)
             next_cursor = encode_cursor((marker_value, last.id))
         return _response(
             json_object(
@@ -296,12 +393,189 @@ def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
         principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
     ) -> Response:
         """Return a masked issue record."""
-        del principal
         async with deps.ctx.sessions() as session:
             issue: IssueRow | None = await deps.service.repository.by_id(session, issue_id)
+            if issue is None:
+                raise TelescreenError(ErrorCode.NOT_FOUND, "issue not found")
+            assignee_ref: str | None = None
+            owner_member_ref: str | None = None
+            if deps.owners is not None:
+                owner_member_ref = (
+                    await deps.owners.member_for_owner(session, issue.owner_ref)
+                    if issue.owner_ref is not None
+                    else None
+                )
+                if issue.assignee_member_id is not None:
+                    assignee_ref = await deps.owners.member_ref(session, issue.assignee_member_id)
+                elif issue.assignee_team_id is not None:
+                    assignee_ref = await deps.owners.team_ref(session, issue.assignee_team_id)
+            active_exception: IssueExceptionRow | None = await session.scalar(
+                select(IssueExceptionRow)
+                .where(
+                    IssueExceptionRow.issue_id == issue.id,
+                    IssueExceptionRow.status.in_(
+                        (ExceptionStatus.REQUESTED.value, ExceptionStatus.ACTIVE.value)
+                    ),
+                )
+                .order_by(IssueExceptionRow.created_at.desc())
+            )
         if issue is None:
             raise TelescreenError(ErrorCode.NOT_FOUND, "issue not found")
+        return _response(
+            _issue_detail_json(
+                issue,
+                assignee_ref,
+                issue.owner_ref is not None,
+                owner_member_ref,
+                active_exception,
+            )
+        )
+
+    @router.get("/api/issues/{issue_id}/occurrences")
+    async def issue_occurrences(
+        issue_id: str,
+        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+    ) -> Response:
+        """Return linked credential occurrences without raw identity keys."""
+        del principal
+        async with deps.ctx.sessions() as session:
+            if await deps.service.repository.by_id(session, issue_id) is None:
+                raise TelescreenError(ErrorCode.NOT_FOUND, "issue not found")
+            result: OccurrenceResult = await linked(session, issue_id)
+        values: list[JsonValue] = []
+        for item in result.items:
+            values.append(
+                json_object(
+                    (
+                        ("issue_id", json_str(item.issue_id)),
+                        ("short_id", json_str(item.short_id)),
+                        ("source", json_str(item.source)),
+                        ("display_locator", json_str(item.display_locator)),
+                        ("status", json_str(item.status.value)),
+                        ("severity", json_str(item.severity.value)),
+                        ("exposure_visibility", json_str(item.exposure_visibility.value)),
+                    )
+                )
+            )
+        return _response(
+            json_object(
+                (
+                    ("items", json_array(tuple(values))),
+                    (
+                        "key_versions",
+                        json_array(tuple(json_int(value) for value in result.key_versions)),
+                    ),
+                )
+            )
+        )
+
+    @router.post("/api/issues/{issue_id}/remediation")
+    async def remediate_issue(
+        issue_id: str,
+        body: RemediationBody,
+        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.WRITE))],
+    ) -> Response:
+        """Request read-only remediation and verification rescans."""
+        if deps.remediation is None:
+            return _unavailable()
+        try:
+            async with deps.ctx.sessions.begin() as session:
+                receipt: RemediationReceipt = await deps.remediation.request_verification(
+                    session,
+                    issue_id,
+                    body.action,
+                    body.include_linked,
+                    principal.actor_ref(),
+                    body.note,
+                )
+        except TelescreenError as error:
+            if error.code is ErrorCode.INVALID_TRANSITION:
+                return _invalid_transition()
+            raise
+        for linked_issue_id in receipt.issue_ids:
+            await deps.indexer.index_issue(linked_issue_id)
+        return _response(
+            json_object(
+                (
+                    (
+                        "issue_ids",
+                        json_array(tuple(json_str(value) for value in receipt.issue_ids)),
+                    ),
+                    ("rescans_enqueued", json_int(receipt.rescans_enqueued)),
+                )
+            )
+        )
+
+    @router.post("/api/issues/{issue_id}/resolve")
+    async def resolve_issue(
+        issue_id: str,
+        body: ResolveBody,
+        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.WRITE))],
+    ) -> Response:
+        """Resolve an issue with a reason and required note."""
+        if deps.remediation is None:
+            return _unavailable()
+        async with deps.ctx.sessions.begin() as session:
+            await deps.remediation.resolve_with_reason(
+                session,
+                issue_id,
+                body.reason,
+                body.note,
+                principal.actor_ref(),
+                principal.has(ApiScope.ADMIN),
+            )
+            issue: IssueRow | None = await deps.service.repository.by_id(session, issue_id)
+            if issue is None:
+                raise TelescreenError(ErrorCode.NOT_FOUND, "issue not found")
+        await deps.indexer.index_issue(issue_id)
         return _response(_issue_json(issue))
+
+    @router.post("/api/issues/{issue_id}/release")
+    async def release_issue(
+        issue_id: str,
+        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.WRITE))],
+    ) -> Response:
+        """Release a member assignment to the policy or default team."""
+        if deps.remediation is None:
+            return _unavailable()
+        async with deps.ctx.sessions.begin() as session:
+            await deps.remediation.release_to_team(session, issue_id, principal.actor_ref())
+            issue: IssueRow | None = await deps.service.repository.by_id(session, issue_id)
+            if issue is None:
+                raise TelescreenError(ErrorCode.NOT_FOUND, "issue not found")
+        await deps.indexer.index_issue(issue_id)
+        return _response(_issue_json(issue))
+
+    @router.post("/api/issues/{issue_id}/exceptions", status_code=201)
+    async def request_issue_exception(
+        issue_id: str,
+        body: ExceptionRequestBody,
+        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.WRITE))],
+    ) -> Response:
+        """Request an exception through the issue lifecycle service."""
+        if deps.remediation is None:
+            return _unavailable()
+        async with deps.ctx.sessions.begin() as session:
+            exception_id: str = await deps.remediation.request_exception(
+                session,
+                issue_id,
+                body.reason,
+                body.duration,
+                principal.actor_ref(),
+                principal.has(ApiScope.ADMIN),
+            )
+            row: IssueExceptionRow | None = await session.get(IssueExceptionRow, exception_id)
+            if row is None:
+                raise TelescreenError(ErrorCode.INTERNAL_ERROR, "internal error")
+            issue: IssueRow | None = await session.get(IssueRow, issue_id)
+            if issue is None:
+                raise TelescreenError(ErrorCode.NOT_FOUND, "issue not found")
+            issue_status: str = issue.status
+        await deps.indexer.index_issue(issue_id)
+        return _response(
+            json_object((("id", json_str(exception_id)), ("status", json_str(issue_status)))),
+            status_code=201,
+        )
 
     @router.patch("/api/issues/{issue_id}")
     async def patch_issue(
@@ -315,6 +589,8 @@ def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
             if issue is None:
                 raise TelescreenError(ErrorCode.NOT_FOUND, "issue not found")
             if body.status is not None:
+                if body.status in (IssueStatus.RESOLVED, IssueStatus.IGNORED):
+                    return _invalid_transition()
                 issue = await deps.service.change_status(
                     session, issue_id, body.status, principal.actor_ref()
                 )
@@ -375,6 +651,14 @@ def _issue_json(issue: IssueRow) -> JsonValue:
             ("display_title", json_str(issue.display_title)),
             ("rule_class", json_str(issue.rule_class)),
             ("severity", json_str(issue.severity)),
+            ("base_severity", json_str(issue.base_severity)),
+            ("exposure_visibility", json_str(issue.exposure_visibility)),
+            ("risk_score", json_int(issue.risk_score)),
+            ("policy_name", _optional_string(issue.policy_name)),
+            (
+                "policy_version",
+                json_int(issue.policy_version) if issue.policy_version is not None else json_null(),
+            ),
             ("status", json_str(issue.status)),
             ("assignee_member_id", _optional_string(issue.assignee_member_id)),
             ("assignee_team_id", _optional_string(issue.assignee_team_id)),
@@ -388,6 +672,112 @@ def _issue_json(issue: IssueRow) -> JsonValue:
             ("resolved_at", _optional_string(resolved_at)),
             ("resolution", _optional_string(issue.resolution)),
         )
+    )
+
+
+def _issue_detail_json(
+    issue: IssueRow,
+    assignee_ref: str | None,
+    owner_present: bool,
+    owner_member_ref: str | None,
+    active_exception: IssueExceptionRow | None,
+) -> JsonValue:
+    """Serialize issue detail with safe exposure and owner projections."""
+    members: list[tuple[str, JsonValue]] = [
+        (member.name, member.value) for member in _issue_json(issue).members
+    ]
+    active_exception_json: JsonValue = json_null()
+    if active_exception is not None:
+        active_exception_json = json_object(
+            (
+                ("id", json_str(active_exception.id)),
+                ("status", json_str(active_exception.status)),
+                ("duration", json_str(active_exception.duration)),
+                ("expires_at", _timestamp(active_exception.expires_at)),
+                ("approver_ref", _optional_string(active_exception.approver_ref)),
+            )
+        )
+    members.extend(
+        (
+            ("exposure", _safe_exposure(issue.exposure_json)),
+            ("exposure_changed_at", _timestamp(issue.exposure_changed_at)),
+            ("asset_tier", _optional_string(issue.asset_tier)),
+            ("assignee_ref", _optional_string(assignee_ref)),
+            (
+                "owner",
+                json_object(
+                    (
+                        ("present", json_bool(owner_present)),
+                        ("member_ref", _optional_string(owner_member_ref)),
+                    )
+                ),
+            ),
+            ("active_exception", active_exception_json),
+        )
+    )
+    return json_object(members)
+
+
+def _safe_exposure(text: str | None) -> JsonValue:
+    """Project persisted exposure JSON to its closed enum/count shape."""
+    if text is None:
+        return json_null()
+    value: JsonValue = parse_json(text)
+    names: tuple[str, ...] = (
+        "visibility",
+        "external_principal_count",
+        "shared_drive",
+        "channel_kind",
+        "repo_visibility",
+        "is_fork",
+    )
+    return json_object(
+        tuple((name, child) for name in names if (child := value.get(name)) is not None)
+    )
+
+
+def _timestamp(value: datetime | None) -> JsonValue:
+    """Serialize an optional UTC timestamp."""
+    return json_str(ensure_utc(value).isoformat()) if value is not None else json_null()
+
+
+def _unavailable() -> Response:
+    """Return the static feature-off dependency response."""
+    return _response(
+        json_object(
+            (
+                (
+                    "error",
+                    json_object(
+                        (
+                            ("code", json_str("internal_error")),
+                            ("detail", json_str("internal error")),
+                        )
+                    ),
+                ),
+            )
+        ),
+        status_code=503,
+    )
+
+
+def _invalid_transition() -> Response:
+    """Return the v1.1 422 response for dedicated-transition-only operations."""
+    return _response(
+        json_object(
+            (
+                (
+                    "error",
+                    json_object(
+                        (
+                            ("code", json_str("invalid_transition")),
+                            ("detail", json_str("invalid issue transition")),
+                        )
+                    ),
+                ),
+            )
+        ),
+        status_code=422,
     )
 
 

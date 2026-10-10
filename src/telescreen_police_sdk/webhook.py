@@ -108,6 +108,7 @@ class WebhookHandler:
             stats=result.stats,
             complete_locators=result.complete_locators,
             contract_version=result.contract_version,
+            resource_exposures=result.resource_exposures,
         )
         try:
             await self.client.callback(callback.url, callback_result, self.secret)

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from telescreen.core.vocabulary import DetectorKind, RuleClass, Severity
+from telescreen.ports.collectors import Exposure
 
 
 @dataclass(frozen=True)
@@ -21,6 +22,7 @@ class MaskedFinding:
     location: str
     fingerprint: str
     fingerprint_key_id: str
+    fingerprint_key_version: int = 1
 
 
 @dataclass(frozen=True)
@@ -38,6 +40,19 @@ class ResourceScan:
     complete: bool
     sweep_covered: bool
     observed_at: datetime
+    exposure: Exposure | None = None
+    owner_ref: str | None = None
+    placement_keys: tuple[str, ...] = ()
+    modified_at: datetime | None = None
+    removed: bool = False
+
+
+@dataclass(frozen=True)
+class LocatorExposure:
+    """Exposure context associated with one external locator."""
+
+    locator: str
+    exposure: Exposure
 
 
 @dataclass(frozen=True)
@@ -65,6 +80,7 @@ class ExternalScan:
     complete_locators: tuple[str, ...]
     sweep_covered: bool
     observed_at: datetime
+    exposures: tuple[LocatorExposure, ...] = ()
 
 
 @dataclass(frozen=True)

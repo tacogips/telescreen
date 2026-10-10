@@ -5,14 +5,21 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from telescreen.collectors.coverage import CoverageRecorder, coverage_state
 from telescreen.collectors.registry import CollectorRegistry
 from telescreen.collectors.repository import CollectorRepository, ScanJobStoreImpl
 from telescreen.core.clock import Clock
 from telescreen.core.errors import TelescreenError
-from telescreen.core.vocabulary import ErrorCode, ScanJobStatus
+from telescreen.core.vocabulary import CoverageState, ErrorCode, ScanJobStatus, Visibility
 from telescreen.masking.fingerprint import Fingerprinter
 from telescreen.masking.redact import Redactor
-from telescreen.ports.collectors import CollectorConfig, RateLimited, ResourceContent, ResourceRef
+from telescreen.ports.collectors import (
+    CollectorConfig,
+    Coverage,
+    RateLimited,
+    ResourceContent,
+    ResourceRef,
+)
 from telescreen.ports.findings import RecordOutcome, ResourceScan
 from telescreen.ports.issues import IssueRecorder, ResourceScanner
 from telescreen.ports.sweeps import (
@@ -40,6 +47,7 @@ class CollectorSweeperImpl(CollectorSweeper):
     fingerprinter: Fingerprinter
     redactor: Redactor
     clock: Clock
+    coverage: CoverageRecorder | None = None
 
     async def partition(self, collector_config_id: str, request: PartitionRequest) -> PartitionPage:
         """Delegate partitioning to a source adapter."""
@@ -71,6 +79,7 @@ class CollectorSweeperImpl(CollectorSweeper):
                     outcome: RecordOutcome = await self.scanner.scan_resource(
                         entry.content, scan_job_id
                     )
+                    await self._record_coverage(entry.content, config, scan_job_id, outcome)
                     byte_count += sum(
                         len(segment.text.encode("utf-8")) for segment in entry.content.segments
                     )
@@ -87,10 +96,19 @@ class CollectorSweeperImpl(CollectorSweeper):
                     failed += 1
                     await self._record_entry_failure(config, entry, scan_job_id)
             elif entry.kind is ShardEntryKind.REMOVED:
-                await self._record_empty(config, entry.content, entry.ref, scan_job_id, True)
+                await self._record_empty(
+                    config, entry.content, entry.ref, scan_job_id, True, removed=True
+                )
             else:
                 failed += 1
-                await self._record_empty(config, entry.content, entry.ref, scan_job_id, False)
+                await self._record_empty(
+                    config,
+                    entry.content,
+                    entry.ref,
+                    scan_job_id,
+                    False,
+                    error_code=entry.error_code,
+                )
         async with self.sessions.begin() as session:
             await self.scan_jobs.finish(
                 session,
@@ -125,6 +143,8 @@ class CollectorSweeperImpl(CollectorSweeper):
         ref: ResourceRef,
         job_id: str,
         complete: bool,
+        removed: bool = False,
+        error_code: ErrorCode | None = None,
     ) -> None:
         """Record a removed or failed item with no raw content persisted."""
         raw_locator: str = content.raw_locator if content is not None else ref.raw_locator
@@ -141,6 +161,59 @@ class CollectorSweeperImpl(CollectorSweeper):
             complete,
             True,
             self.clock.now(),
+            removed=removed,
         )
         async with self.sessions.begin() as session:
+            resource_key: str = self.fingerprinter.resource_key(config.kind.value, raw_locator)
+            if removed:
+                if self.coverage is not None:
+                    await self.coverage.remove(session, config.id, resource_key)
+            elif self.coverage is not None:
+                coverage_type: CoverageState = (
+                    CoverageState.PERMISSION_DENIED
+                    if error_code is ErrorCode.FORBIDDEN
+                    else CoverageState.FETCH_FAILED
+                )
+                visibility: Visibility = (
+                    content.exposure.visibility
+                    if content is not None and content.exposure is not None
+                    else Visibility.UNKNOWN
+                )
+                await self.coverage.record(
+                    session,
+                    config.id,
+                    job_id or None,
+                    config.kind.value,
+                    resource_key,
+                    Coverage(coverage_type),
+                    visibility,
+                    self.clock.now(),
+                )
             await self.issues.record_scan(session, scan)
+
+    async def _record_coverage(
+        self,
+        content: ResourceContent,
+        config: CollectorConfig,
+        job_id: str,
+        outcome: RecordOutcome,
+    ) -> None:
+        """Persist aggregate and per-resource coverage after a successful fetch."""
+        if self.coverage is None:
+            return
+        resource_key: str = self.fingerprinter.resource_key(config.kind.value, content.raw_locator)
+        visibility: Visibility = (
+            content.exposure.visibility if content.exposure is not None else Visibility.UNKNOWN
+        )
+        coverage: Coverage = coverage_state(content, outcome)
+        async with self.sessions.begin() as session:
+            await self.coverage.record(
+                session,
+                config.id,
+                job_id or None,
+                config.kind.value,
+                resource_key,
+                coverage,
+                visibility,
+                self.clock.now(),
+            )

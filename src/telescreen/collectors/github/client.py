@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass, field
 from urllib.parse import quote, urljoin
 
@@ -54,6 +55,10 @@ class GitHubApi:
             f"repos/{quote(owner)}/{quote(repo)}/branches/{quote(branch, safe='')}"
         )
 
+    async def commit(self, owner: str, repo: str, sha: str) -> JsonValue:
+        """Return metadata for one immutable commit SHA."""
+        return await self._get(f"repos/{quote(owner)}/{quote(repo)}/commits/{quote(sha, safe='')}")
+
     async def compare(self, owner: str, repo: str, base: str, head: str) -> JsonValue:
         """Compare two commits or branches."""
         endpoint: str = (
@@ -87,6 +92,8 @@ class GitHubApi:
         response: httpx.Response = await self._request("GET", endpoint)
         if response.status_code == 404:
             raise ResourceGoneError
+        if response.status_code == 403:
+            raise TelescreenError(ErrorCode.FORBIDDEN, "GitHub access is forbidden")
         return self._decode(response)
 
     async def blob(self, owner: str, repo: str, sha: str) -> JsonValue:
@@ -96,7 +103,40 @@ class GitHubApi:
         )
         if response.status_code == 404:
             raise ResourceGoneError
+        if response.status_code == 403:
+            raise TelescreenError(ErrorCode.FORBIDDEN, "GitHub access is forbidden")
         return self._decode(response)
+
+    async def codeowners(self, owner: str, repo: str, ref: str) -> str | None:
+        """Read CODEOWNERS transiently, trying GitHub's supported locations."""
+        for path in (".github/CODEOWNERS", "CODEOWNERS", "docs/CODEOWNERS"):
+            try:
+                value: JsonValue = await self.contents(owner, repo, path, ref)
+            except ResourceGoneError:
+                continue
+            except Exception:
+                return None
+            encoded: str | None = _member(value, "content").as_str()
+            encoding: str | None = _member(value, "encoding").as_str()
+            if encoded is None or encoding != "base64":
+                return None
+            try:
+                return base64.b64decode(encoded.replace("\n", ""), validate=True).decode("utf-8")
+            except (ValueError, UnicodeDecodeError):
+                return None
+        return None
+
+    async def last_commit_for_path(
+        self, owner: str, repo: str, path: str, ref: str
+    ) -> JsonValue | None:
+        """Return the latest commit affecting a path without persisting its principal."""
+        endpoint: str = (
+            f"repos/{quote(owner)}/{quote(repo)}/commits?path={quote(path, safe='')}"
+            f"&sha={quote(ref, safe='')}&per_page=1"
+        )
+        value: JsonValue = await self._get(endpoint)
+        commits: tuple[JsonValue, ...] | None = value.as_list()
+        return commits[0] if commits else None
 
     async def pull_files(self, owner: str, repo: str, number: int) -> tuple[JsonValue, ...]:
         """Return every file changed by a pull request."""

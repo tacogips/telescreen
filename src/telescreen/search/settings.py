@@ -17,8 +17,8 @@ INDEX_SETTINGS: tuple[tuple[IndexName, IndexSettings], ...] = (
     (
         IndexName.ISSUES,
         IndexSettings(
-            ("status", "source", "rule_class", "severity", "assignee"),
-            ("last_seen_ts", "first_seen_ts", "times_seen"),
+            ("status", "source", "rule_class", "severity", "assignee", "exposure_visibility"),
+            ("last_seen_ts", "first_seen_ts", "times_seen", "risk_score"),
         ),
     ),
     (IndexName.FINDINGS, IndexSettings(("issue_id", "rule_class"), ())),

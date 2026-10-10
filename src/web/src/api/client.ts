@@ -1,9 +1,9 @@
 import type {
   ApiErrorBody, ApiMessage, AuditRecord, AuditSearchResponse, AuditVerify, ChatResponse, CollectorConfig,
-  Evidence, EscalationPolicy, HumanTask, IngestFindingsResult, IngestScanResult, Issue, IssueEvent, IssueHistory,
-  IssueStatsBuckets, JsonValue, MapJob, MapJobSummary, Member, Page, PoliceClaim, PoliceCredentials,
+  CoverageResource, CoverageSummary, Evidence, EscalationPolicy, ExceptionDuration, HumanTask, IngestFindingsResult, IngestScanResult, Issue, IssueDetail, IssueEvent, IssueException, IssueHistory,
+  IssueStatsBuckets, JsonValue, MapJob, MapJobSummary, Member, MemberIdentity, Page, PoliceClaim, PoliceCredentials,
   PoliceHeartbeat, PoliceHeartbeatResponse, PoliceManifest, PoliceResult, PoliceWorker, SearchResponse,
-  Team, ValidateResponse, WorkflowVersion, WorkflowVersionRef, RunDetail, RunSummary, RunHumanTask,
+  OccurrencesResponse, PolicySummary, PolicyValidation, PolicyVersion, RemediationReceipt, Team, ValidateResponse, WorkflowVersion, WorkflowVersionRef, RunDetail, RunSummary, RunHumanTask,
 } from "./types";
 
 const TOKEN_KEY = "telescreen.token";
@@ -11,6 +11,13 @@ const MOCK = import.meta.env.VITE_TELESCREEN_MOCK === "1";
 
 type ApiRequestInit = Omit<RequestInit, "body"> & Readonly<{ body?: BodyInit | null; json?: JsonValue }>;
 type UnknownRecord = Readonly<Record<string, unknown>>;
+type IssueListFilters = Readonly<{ exposure?: string; sort?: "last_seen" | "first_seen" | "times_seen" | "risk"; assignee?: "me" | "my_teams" | string; status?: string; source?: string; rule_class?: string; severity?: string; q?: string }>;
+type QueryFilters = Readonly<{ state?: string; limit?: number; cursor?: string }>;
+
+function params(filters: URLSearchParams | IssueListFilters | QueryFilters): URLSearchParams {
+  if (filters instanceof URLSearchParams) return filters;
+  return new URLSearchParams(Object.entries(filters).flatMap(([key, value]) => value === undefined ? [] : [[key, String(value)]]));
+}
 
 export class ApiError extends Error {
   readonly status: number;
@@ -119,8 +126,8 @@ function normalizePage<T>(value: Readonly<{ items: T[]; next_cursor?: string | n
 export const healthApi = { get: (): Promise<Readonly<{ status: string }>> => apiFetch("/api/health") };
 
 export const issuesApi = {
-  list: (filters: URLSearchParams = new URLSearchParams()): Promise<Page<Issue>> => apiFetch(`/api/issues${query(filters)}`),
-  get: (id: string): Promise<Issue> => apiFetch(`/api/issues/${encodeURIComponent(id)}`),
+  list: (filters: URLSearchParams | IssueListFilters = new URLSearchParams()): Promise<Page<Issue>> => apiFetch(`/api/issues${query(params(filters))}`),
+  get: (id: string): Promise<IssueDetail> => apiFetch(`/api/issues/${encodeURIComponent(id)}`),
   events: (id: string, cursor?: string): Promise<Page<IssueEvent>> => {
     const params = new URLSearchParams(); if (cursor !== undefined) params.set("cursor", cursor);
     return apiFetch(`/api/issues/${encodeURIComponent(id)}/events${query(params)}`);
@@ -134,7 +141,28 @@ export const issuesApi = {
     return apiFetch(`/api/issues/stats${query(search)}`);
   },
   update: (id: string, patch: Readonly<{ status?: string; assignee_ref?: string | null }>): Promise<Issue> => apiFetch(`/api/issues/${encodeURIComponent(id)}`, json("PATCH", patch)),
+  remediation: (id: string, value: Readonly<{ action: "remove" | "restrict"; include_linked: boolean; note?: string }>): Promise<RemediationReceipt> => apiFetch(`/api/issues/${encodeURIComponent(id)}/remediation`, json("POST", value)),
+  resolve: (id: string, value: Readonly<{ reason: "false_positive" | "manual_unverified"; note: string }>): Promise<Issue> => apiFetch(`/api/issues/${encodeURIComponent(id)}/resolve`, json("POST", value)),
+  occurrences: (id: string): Promise<OccurrencesResponse> => apiFetch(`/api/issues/${encodeURIComponent(id)}/occurrences`),
+  requestException: (id: string, value: Readonly<{ reason: string; duration: ExceptionDuration }>): Promise<IssueException> => apiFetch(`/api/issues/${encodeURIComponent(id)}/exceptions`, json("POST", value)),
   comment: (id: string, body: string): Promise<Readonly<{ accepted: boolean }>> => apiFetch(`/api/issues/${encodeURIComponent(id)}/comments`, json("POST", { body })),
+};
+
+export const exceptionsApi = {
+  list: (filters: Readonly<{ status?: string; issue_id?: string; approver?: string }> = {}): Promise<Page<IssueException>> => apiFetch(`/api/exceptions${query(params(filters))}`),
+  approve: (id: string, note?: string): Promise<IssueException> => apiFetch(`/api/exceptions/${encodeURIComponent(id)}/approve`, json("POST", note === undefined ? {} : { note })),
+  reject: (id: string, note?: string): Promise<IssueException> => apiFetch(`/api/exceptions/${encodeURIComponent(id)}/reject`, json("POST", note === undefined ? {} : { note })),
+  revoke: (id: string): Promise<IssueException> => apiFetch(`/api/exceptions/${encodeURIComponent(id)}/revoke`, json("POST")),
+};
+
+export const policiesApi = {
+  list: (): Promise<Page<PolicySummary>> => apiFetch("/api/policies"),
+  get: (name: string): Promise<Readonly<{ name: string; versions: PolicyVersion[] }>> => apiFetch(`/api/policies/${encodeURIComponent(name)}`),
+  version: (name: string, version: number): Promise<PolicyVersion> => apiFetch(`/api/policies/${encodeURIComponent(name)}/versions/${version}`),
+  validate: (body: Readonly<{ source_format: "yaml" | "json"; source_text: string }>): Promise<PolicyValidation> => apiFetch("/api/policies/validate", json("POST", body)),
+  create: (body: Readonly<{ source_format: "yaml" | "json"; source_text: string }>): Promise<PolicyVersion> => apiFetch("/api/policies", json("POST", body)),
+  activate: (name: string, version: number): Promise<PolicySummary> => apiFetch(`/api/policies/${encodeURIComponent(name)}/activate`, json("POST", { version })),
+  disable: (name: string): Promise<PolicySummary> => apiFetch(`/api/policies/${encodeURIComponent(name)}/disable`, json("POST")),
 };
 
 export const workflowsApi = {
@@ -156,7 +184,7 @@ export const runsApi = {
 
 export const humanTasksApi = {
   list: async (filters: URLSearchParams = new URLSearchParams()): Promise<Page<HumanTask>> => normalizePage(await apiFetch<{ items: HumanTask[] }>(`/api/human-tasks${query(filters)}`)),
-  complete: (id: string, outcome: string, comment?: string): Promise<Readonly<{ id: string; status: string }>> => apiFetch(`/api/human-tasks/${encodeURIComponent(id)}/complete`, json("POST", comment === undefined ? { outcome } : { outcome, comment })),
+  complete: (id: string, outcome: string, comment?: string, exception_duration?: ExceptionDuration): Promise<Readonly<{ id: string; status: string }>> => apiFetch(`/api/human-tasks/${encodeURIComponent(id)}/complete`, json("POST", { outcome, ...(comment === undefined ? {} : { comment }), ...(exception_duration === undefined ? {} : { exception_duration }) })),
 };
 
 export const evidenceApi = {
@@ -186,8 +214,12 @@ export const directoryApi = {
   members: (filters: URLSearchParams = new URLSearchParams()): Promise<Page<Member>> => apiFetch(`/api/members${query(filters)}`),
   createMember: (value: Readonly<{ handle: string; display_name: string; email?: string; slack_user_id?: string }>): Promise<Member> => apiFetch("/api/members", json("POST", value)),
   teams: (filters: URLSearchParams = new URLSearchParams()): Promise<Page<Team>> => apiFetch(`/api/teams${query(filters)}`),
-  createTeam: (value: Readonly<{ slug: string; name: string; email?: string; slack_channel?: string }>): Promise<Team> => apiFetch("/api/teams", json("POST", value)),
-  setTeamMembers: async (slug: string, handles: string[]): Promise<void> => { await apiFetch<void>(`/api/teams/${encodeURIComponent(slug)}/members`, json("PUT", { handles })); },
+  createTeam: (value: Readonly<{ slug: string; name: string; email?: string; slack_channel?: string; lead?: string | null }>): Promise<Team> => apiFetch("/api/teams", json("POST", value)),
+  identities: (handle: string): Promise<Page<MemberIdentity>> => apiFetch(`/api/members/${encodeURIComponent(handle)}/identities`),
+  addIdentity: (handle: string, value: Readonly<{ kind: string; value: string }>): Promise<MemberIdentity> => apiFetch(`/api/members/${encodeURIComponent(handle)}/identities`, json("POST", value)),
+  removeIdentity: (handle: string, id: string): Promise<void> => apiFetch(`/api/members/${encodeURIComponent(handle)}/identities/${encodeURIComponent(id)}`, json("DELETE")),
+  setTeamLead: async (slug: string, lead: string | null): Promise<void> => { await apiFetch<void>(`/api/teams/${encodeURIComponent(slug)}/lead`, json("PUT", { lead })); },
+  setTeamMembers: async (slug: string, handles: string[], lead?: string | null): Promise<void> => { await apiFetch<void>(`/api/teams/${encodeURIComponent(slug)}/members`, json("PUT", { handles, ...(lead === undefined ? {} : { lead }) })); },
 };
 
 type CollectorBody = Readonly<{ name: string; kind: string; trigger_mode: string; cron: string | null; sweep_cron: string | null; selector_json: string; credential_ref: string | null; enabled: boolean }>;
@@ -197,6 +229,8 @@ export const collectorsApi = {
   update: (id: string, value: CollectorBody): Promise<Readonly<{ id: string }>> => apiFetch(`/api/collectors/${encodeURIComponent(id)}`, json("PATCH", value)),
   run: (id: string): Promise<Readonly<{ id: string }>> => apiFetch(`/api/collectors/${encodeURIComponent(id)}/run`, json("POST")),
   sweep: (id: string): Promise<Readonly<{ map_job_id: string }>> => apiFetch(`/api/collectors/${encodeURIComponent(id)}/sweep`, json("POST")),
+  coverage: (id: string): Promise<CoverageSummary> => apiFetch(`/api/collectors/${encodeURIComponent(id)}/coverage`),
+  coverageResources: (id: string, filters: Readonly<{ state?: string; limit?: number; cursor?: string }> = {}): Promise<Page<CoverageResource>> => apiFetch(`/api/collectors/${encodeURIComponent(id)}/coverage/resources${query(params(filters))}`),
 };
 
 export const mapJobsApi = {

@@ -10,6 +10,7 @@ from typing import ClassVar
 from telescreen.core.json import JsonValue
 from telescreen.core.vocabulary import (
     DetectorKind,
+    HumanTaskKind,
     IssueEventKind,
     NotificationChannel,
     RuleClass,
@@ -208,6 +209,7 @@ class HumanTaskStep:
     sla: timedelta | None = None
     escalation_policy: str | None = None
     notify_on_assign: bool = True
+    kind: HumanTaskKind = HumanTaskKind.APPROVAL
     step_type: ClassVar[StepType] = StepType.HUMAN_TASK
 
 

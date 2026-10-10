@@ -185,7 +185,7 @@ async def test_shard_stream_classifies_fetched_removed_and_failed_resources() ->
         fetched_entry: ShardEntry = next(
             entry for entry in entries if entry.ref.raw_locator == "gdrive:ok"
         )
-        assert failed_entry.error_code is ErrorCode.FETCH_FAILED
+        assert failed_entry.error_code is ErrorCode.FORBIDDEN
         assert fetched_entry.content is not None and fetched_entry.content.complete
     finally:
         await bundle.close()

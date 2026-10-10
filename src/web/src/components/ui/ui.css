@@ -140,6 +140,10 @@
   background: var(--success-muted-bg);
   color: var(--success-content);
 }
+.ui-tag.critical {
+  background: var(--critical-muted-bg);
+  color: var(--critical-content);
+}
 .status-indicator {
   display: inline-flex;
   align-items: center;
@@ -168,6 +172,9 @@
 }
 .severity-bar.high {
   background: var(--danger);
+}
+.severity-bar.critical {
+  background: var(--critical);
 }
 .severity-bar.medium {
   background: var(--warning);
@@ -466,6 +473,17 @@ select {
   height: 14px;
   fill: currentColor;
 }
+.risk-pill {
+  display: inline-flex;
+  min-width: 32px;
+  justify-content: center;
+  border-radius: 4px;
+  padding: 2px 6px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.priority-signal.critical rect:nth-child(n + 5) { opacity: 0.25; }
 .priority-signal.low rect:nth-child(n + 2),
 .priority-signal.medium rect:nth-child(1) {
   opacity: 0.25;

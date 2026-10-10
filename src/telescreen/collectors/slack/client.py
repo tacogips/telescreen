@@ -27,6 +27,15 @@ class SlackMessage:
 
     ts: str
     text: str = field(repr=False)
+    user: str | None = field(default=None, repr=False)
+    edited: SlackEdited | None = None
+
+
+@dataclass(frozen=True)
+class SlackEdited:
+    """Slack edit timestamp carried by a message."""
+
+    ts: str
 
 
 @dataclass(frozen=True)
@@ -34,6 +43,18 @@ class SlackChannel:
     """Conversation identifier returned by Slack."""
 
     id: str
+
+
+@dataclass(frozen=True)
+class SlackConversationInfo:
+    """Conversation exposure fields returned by Slack."""
+
+    id: str
+    is_private: bool = False
+    is_im: bool = False
+    is_mpim: bool = False
+    is_ext_shared: bool = False
+    connected_team_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -46,6 +67,24 @@ class SlackFile:
     size: int
     url_private: str = field(repr=False)
     timestamp: int | None = None
+    user: str | None = field(default=None, repr=False)
+    is_public: bool = False
+    public_url_shared: bool = False
+    updated: int | None = None
+    channels: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ConversationInfoResponse:
+    """Validated Slack conversation detail response."""
+
+    ok: bool
+    channel: SlackConversationInfo
+    error: str | None = None
+
+
+class SlackPermissionDenied(Exception):
+    """A Slack read operation was denied by the provider."""
 
 
 @dataclass(frozen=True)
@@ -171,6 +210,15 @@ class SlackApi:
             TypeAdapter(ChannelListResponse),
         )
 
+    async def conversations_info(self, channel_id: str) -> SlackConversationInfo:
+        """Fetch read-only exposure metadata for one conversation."""
+        response: ConversationInfoResponse = await self._call(
+            "conversations.info",
+            (("channel", channel_id),),
+            TypeAdapter(ConversationInfoResponse),
+        )
+        return response.channel
+
     async def files_list(
         self, channel: str, ts_from: str | None, cursor: str | None
     ) -> FileListResponse:
@@ -243,6 +291,13 @@ class SlackApi:
             if not status.ok:
                 if status.error in ("message_not_found", "file_not_found"):
                     raise ResourceGoneError("Slack resource is gone")
+                if status.error in (
+                    "not_in_channel",
+                    "missing_scope",
+                    "restricted_action",
+                    "access_denied",
+                ):
+                    raise SlackPermissionDenied()
                 raise TelescreenError(ErrorCode.FETCH_FAILED, "Slack API request failed")
             result: T = adapter.validate_json(response.content)
         except (ValidationError, ValueError):
@@ -261,5 +316,7 @@ class SlackApi:
             raise RateLimited(retry_after)
         if response.status_code == 404:
             raise ResourceGoneError("Slack resource is gone")
+        if response.status_code == 403:
+            raise SlackPermissionDenied()
         if not response.is_success:
             raise TelescreenError(ErrorCode.FETCH_FAILED, "Slack request failed")

@@ -1,6 +1,6 @@
 # V11-P09 Slack Collector: Exposure, Owner, Placement, Modified Time, Coverage
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-1-dspm-adoption.md sections 3 (Slack row), 4 (placement `slack_channel`, `modified_at`), 6 (coverage), 7 (owner identity: Slack `user`)
 **Created**: 2026-10-10
 **Last Updated**: 2026-10-10
@@ -130,12 +130,19 @@ Conventions section 7 with `<src>` = `src/telescreen/collectors/slack` and `<tes
 
 ## Completion Criteria
 
-- [ ] Every Slack `ResourceContent` carries exposure, owner, placement, modified time and
+- [x] Every Slack `ResourceContent` carries exposure, owner, placement, modified time and
       coverage as specified.
-- [ ] Read-only call assertion test passes; scoped gates pass; the typelint grep is
+- [x] Read-only call assertion test passes; scoped gates pass; the typelint grep is
       empty.
-- [ ] Progress Log complete.
+- [x] Progress Log complete.
 
 ## Progress Log
 
-(append sessions per conventions section 8)
+### Session: 2026-10-10 17:09
+**Tasks Completed**: Added typed Slack conversation exposure metadata, transient exposure mapping, owner and placement references, UTC modified timestamps, explicit file coverage, and permission-denied coverage to adapter and sweep results. Added MockTransport tests for exposure mappings, owner repr privacy, placement, timestamps, unsupported and oversized files, info failures, access denial, and read-only calls. All Completion Criteria are checked.
+**Tasks In Progress**: None.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `src/telescreen/collectors/slack/client.py` before=c6e0293d670eb2f5d886b7121fd31647ce3321daa82f8ffaca28ee1bff47de4d after=b1640b99f7fa1aed1ac6d21fda16c818ace62c4038cfbc82816bce889d6fe8fa; `src/telescreen/collectors/slack/adapter.py` before=074dafb59b3767e82f80e76a09dc715f9b806ddc584a6615dc3de741c5c2d1fc after=a6970243ee4f67e447284f713e75a1f2d8746e85d82a1f3047a10cadfbf2536b; `src/telescreen/collectors/slack/sweep.py` before=5d2b3c4efaf39772beea44b8b72a3d0a1908c26aa3e44cadc13dfc869f422575 after=bdf2dfaf7e168106245a375c287a7a0b185c6df7c9aac11c5fe317b854ead87e; `src/telescreen/collectors/slack/exposure.py` before=absent after=47f55b74a5d79a9ba8dfd3ab24e46b3117643a0589092a6f4675396f7581073f; `tests/collectors/slack/test_v11_context.py` before=absent after=60d7d46d2cf4d0426700d6eec8c88611a031c70f7204e3928535a318bd2f2099; this plan before=c82bca7fa70f4a41ce6a4d4c0da4bc5c941ef66c3486635a2ef2f5775a9616e2.
+**Verification**: `uv run --frozen ruff format --check --no-cache src/telescreen/collectors/slack tests/collectors/slack` -> exit 0 (log: `/tmp/telescreen-v11-p09-collectors-slack-format.log`); `uv run --frozen ruff check --no-cache src/telescreen/collectors/slack tests/collectors/slack` -> exit 0 (log: `/tmp/telescreen-v11-p09-collectors-slack-ruff.log`); `uv run --frozen ty check src/telescreen/collectors/slack tests/collectors/slack` -> exit 0 (log: `/tmp/telescreen-v11-p09-collectors-slack-ty.log`); `uv run --frozen pytest -p no:cacheprovider tests/collectors/slack 2>&1 | tee /tmp/telescreen-v11-p09-collectors-slack-pytest.log` -> exit 0, 36 passed (log: `/tmp/telescreen-v11-p09-collectors-slack-pytest.log`); whole-repository `tools/typelint.py` output was filtered against both the manifest relative prefixes and the actual absolute-path prefixes, with zero Slack-path matches (log: `/tmp/telescreen-v11-p09-collectors-slack-typelint.log`).
+**Notes**: The first new-test run had 12 passed and one failure because its sweep mock omitted the read-only `files.list` response; the mock was corrected, and the final complete Slack suite passed. An initial lint pass also found import ordering and test annotations, which were corrected. The whole-repository typelint command reports concurrent sibling-path diagnostics; none are in the Slack collector or Slack test paths. Plan-local edit intent is recorded at `tmp/telescreen-v11-20261010-c1/v11-p09-collectors-slack/step6-attempt-1/edit-intentions.md`.

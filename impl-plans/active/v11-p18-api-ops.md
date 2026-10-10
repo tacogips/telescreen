@@ -1,6 +1,6 @@
 # V11-P18 API: Collectors (Health, Coverage), Police Health, Directory Identities and Team Lead, Human Tasks (assignee=me fix, owner_review)
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-api-and-ui.md ("v1.1 endpoints": Coverage, Collectors, Police, Human tasks, Directory rows); design-docs/specs/design-v1-1-dspm-adoption.md sections 6, 7, 8
 **Created**: 2026-10-10
 **Last Updated**: 2026-10-10
@@ -156,11 +156,53 @@ Progress Log as informational. Every failure in a path this plan owns blocks com
 
 ## Completion Criteria
 
-- [ ] Endpoints, fields and the `assignee=me` fix implemented as specified.
-- [ ] Tests pass; scoped gates pass; the typelint grep is empty; the wide pytest exit is
+- [x] Endpoints, fields and the `assignee=me` fix implemented as specified.
+- [x] Tests pass; scoped gates pass; the typelint grep is empty; the wide pytest exit is
       0.
-- [ ] Progress Log complete.
+- [x] Progress Log complete.
 
 ## Progress Log
 
-(append sessions per conventions section 8)
+### Session 2026-10-10 (Step 6 implementation)
+
+- Implemented collector health and coverage list/detail endpoints, Police worker health,
+  team lead and keyed identity endpoints, member/team-scoped `assignee=me`, and atomic
+  `owner_review` completion outcomes. Added API regressions under `tests/api/v11_ops`.
+- Hashes (before -> after):
+  - `src/telescreen/api/routers/collectors.py`: `44863a05` -> `32d5a57b`.
+  - `src/telescreen/api/routers/police.py`: `f7a18dac` -> `62d3a9c7`.
+  - `src/telescreen/api/routers/directory.py`: `d4b3f2d4` -> `1bd48d3f`.
+  - `src/telescreen/api/routers/human_tasks.py`: `aba40918` -> `ec030798`.
+  - `tests/api/v11_ops/test_api_ops.py`: absent -> `d6e85ad4`.
+  - This plan: `1adc6c19` before this session update; final hash recorded after update.
+- Passing gates:
+  - `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/api/routers/collectors.py src/telescreen/api/routers/police.py src/telescreen/api/routers/directory.py src/telescreen/api/routers/human_tasks.py tests/api/v11_ops && uv run --frozen ruff check --no-cache src/telescreen/api/routers/collectors.py src/telescreen/api/routers/police.py src/telescreen/api/routers/directory.py src/telescreen/api/routers/human_tasks.py tests/api/v11_ops && uv run --frozen ty check src/telescreen/api/routers/collectors.py src/telescreen/api/routers/police.py src/telescreen/api/routers/directory.py src/telescreen/api/routers/human_tasks.py tests/api/v11_ops` -> exit 0; 5 files formatted, Ruff and ty passed.
+  - `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/api/v11_ops 2>&1 | tee /tmp/telescreen-v11-p18-api-ops-pytest.log` -> exit 0; 4 passed.
+  - `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v11-p18-api-ops-typelint.log 2>&1; lint_status=$?; grep -E '(^|/)(src/telescreen/api/routers/(collectors|police|directory|human_tasks)\\.py|tests/api/v11_ops/)' /tmp/telescreen-v11-p18-api-ops-typelint.log > /tmp/telescreen-v11-p18-api-ops-typelint-owned.log; filter_status=$?; if [ -s /tmp/telescreen-v11-p18-api-ops-typelint-owned.log ]; then cat /tmp/telescreen-v11-p18-api-ops-typelint-owned.log; exit 1; fi; printf 'typelint_exit=%s scoped_filter_exit=%s owned_diagnostics=0 exit=0\\n' "$lint_status" "$filter_status"` -> exit 0; whole repository `typelint: 344 file(s) clean`, no owned diagnostics.
+- Required wide verification (not passing):
+  - `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/e2e tests/api tests/collectors tests/police > /tmp/telescreen-v11-p18-api-ops-wide.log 2>&1; exit_status=$?; tail -n 35 /tmp/telescreen-v11-p18-api-ops-wide.log; printf 'exit=%s\\n' "$exit_status"; exit "$exit_status"` -> exit 1; 147 passed, 1 failed in `tests/e2e/test_flow_github_remediation.py::test_github_remediation_escalates_rejects_evidence_and_rechecks`.
+  - The failing e2e uses a memberless admin token and omits `assignee`, then expects an unfiltered `{items}` list. The accepted contract and plan require 403 for a memberless token when `assignee` is omitted or `me`; admin callers may explicitly request `assignee=all`. Do not relax the fail-closed behavior to satisfy the old test.
+- Reconciliation request: the required wide suite cannot pass until the e2e caller at `tests/e2e/test_flow_github_remediation.py` explicitly requests `assignee=all` (or uses a member-scoped token). That path is outside this plan's `writePaths`. Assign the test update to serial reconciliation or amend this plan's writePaths before rerunning the wide gate. Until then the combined verification criterion remains open and this plan is Blocked.
+- A pre-fix typelint run identified one missing local `MemberRow` annotation in the new test. It was corrected; the final whole-repository typelint run above is clean.
+
+**Owner resolution (2026-10-10)**: The fail-closed contract stands (memberless token with
+omitted or `me` assignee gets 403; admins request `assignee=all`). The owner updated the v1 caller
+`tests/e2e/test_flow_github_remediation.py` (both `/api/human-tasks?status=open` calls now pass
+`&assignee=all`). `pytest tests/e2e/test_flow_github_remediation.py tests/api/v11_ops` passes
+(5 passed). Re-run the wide gate; this is not a blocker. Report per conventions 7a.
+
+### Session: 2026-10-10 (Step 6 verification rerun)
+**Tasks Completed**: Re-ran p18 scoped gates and the required wide suite after the owner-supplied e2e caller correction; closed the completion criterion.
+**Tasks In Progress**: None.
+**Blockers**: None.
+**Reconciliation requests**: None. The owner correction in `tests/e2e/test_flow_github_remediation.py` remains outside this plan's writePaths and was preserved as supplied.
+**Hashes**: `impl-plans/active/v11-p18-api-ops.md` before=`e0ff552cfe331a4a7417ab3d3d253aed9e230238d2419ddf457cfcd7d8c4eaa1`; after=`d21677fc205bc6fb1c352668407c657e88e1fc3ac37a43326292a2302305de99` before this audit detail.
+**Verification**:
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/api/routers/collectors.py src/telescreen/api/routers/police.py src/telescreen/api/routers/directory.py src/telescreen/api/routers/human_tasks.py tests/api/v11_ops` -> exit 0, 5 files already formatted.
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/api/routers/collectors.py src/telescreen/api/routers/police.py src/telescreen/api/routers/directory.py src/telescreen/api/routers/human_tasks.py tests/api/v11_ops` -> exit 0, all checks passed.
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/api/routers/collectors.py src/telescreen/api/routers/police.py src/telescreen/api/routers/directory.py src/telescreen/api/routers/human_tasks.py tests/api/v11_ops` -> exit 0, all checks passed.
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/api/v11_ops 2>&1 | tee /tmp/telescreen-v11-p18-api-ops-pytest-final.log` -> exit 0, 4 passed (log: `/tmp/telescreen-v11-p18-api-ops-pytest-final.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v11-p18-api-ops-typelint-final-verified.log 2>&1; lint_exit=$?; grep -E '(^|/)(src/telescreen/api/routers/(collectors|police|directory|human_tasks)[.]py|tests/api/v11_ops/)' /tmp/telescreen-v11-p18-api-ops-typelint-final-verified.log > /tmp/telescreen-v11-p18-api-ops-typelint-owned-final-verified.log; grep_exit=$?; if [ -s /tmp/telescreen-v11-p18-api-ops-typelint-owned-final-verified.log ]; then cat /tmp/telescreen-v11-p18-api-ops-typelint-owned-final-verified.log; exit 1; fi; printf 'typelint_exit=%s scoped_grep_exit=%s owned_diagnostics=0 exit=0\\n' "$lint_exit" "$grep_exit"` -> exit 0; whole-repository typelint `344 file(s) clean`, no p18 diagnostics (logs: `/tmp/telescreen-v11-p18-api-ops-typelint-final-verified.log`, `/tmp/telescreen-v11-p18-api-ops-typelint-owned-final-verified.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/e2e tests/api tests/collectors tests/police > /tmp/telescreen-v11-p18-api-ops-wide-final-rerun.log 2>&1` -> exit 0, 148 passed (log: `/tmp/telescreen-v11-p18-api-ops-wide-final-rerun.log`).
+- `git diff --check -- impl-plans/active/v11-p18-api-ops.md && test "$(grep -c '^- \\[ \\]' impl-plans/active/v11-p18-api-ops.md)" -eq 0` -> exit 0; no whitespace errors and all completion criteria checked; plan is under 400 lines.
+**Notes**: The initial wide rerun wrapper used zsh's read-only `status` variable for exit capture and returned a shell error after pytest. It is superseded by the complete successful rerun above. The owner-supplied e2e change explicitly requests `assignee=all`; the fail-closed API behavior is unchanged.

@@ -15,14 +15,13 @@ export function IssueBulkActions(
     teams: readonly Team[];
     workflows: readonly WorkflowVersionRef[];
     onStatus(status: IssueStatus): void;
+    onRemediate(): void;
     onAssign(value: string): void;
     onStartWorkflow(name: string): void;
     onClear(): void;
   }>,
 ): JSX.Element {
   const statusLabel = (status: IssueStatus): string => {
-    if (status === "resolved") return "Resolve";
-    if (status === "ignored") return "Ignore";
     if (status === "acknowledged") return "Acknowledge";
     if (status === "in_progress") return "Mark in progress";
     return "Reopen";
@@ -37,6 +36,9 @@ export function IssueBulkActions(
           </Button>
         )}
       </For>
+      <Button size="xs" onClick={props.onRemediate}>
+        Mark remediated
+      </Button>
       <label>
         Assign to
         <select

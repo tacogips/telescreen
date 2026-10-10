@@ -11,7 +11,7 @@ function resourceError(failure: unknown): ApiError | null {
   return failure instanceof ApiError ? failure : new ApiError(0, "request_failed", "The request could not be completed.");
 }
 
-type Tier = Readonly<{ after: string; assign_to: string; notify: string[]; channels: string[] }>;
+type Tier = Readonly<{ after: string; assign_to: string; notify: string[]; channels: string[]; min_risk?: number }>;
 type EscalationDocument = Readonly<{ name: string; tiers: Tier[] }>;
 type UnknownRecord = Readonly<Record<string, unknown>>;
 type ValidationIssue = Readonly<{ path: string; code: string }>;
@@ -48,6 +48,9 @@ function validateEscalationDocument(value: unknown): ValidationIssue[] {
     }
     if (typeof tier.assign_to !== "string") {
       issues.push({ path: `${path}/assign_to`, code: "missing_field" });
+    }
+    if (tier.min_risk !== undefined && (typeof tier.min_risk !== "number" || !Number.isInteger(tier.min_risk) || tier.min_risk < 1 || tier.min_risk > 100)) {
+      issues.push({ path: `${path}/min_risk`, code: "invalid_risk_threshold" });
     }
     const assignTo: string = typeof tier.assign_to === "string" ? tier.assign_to : "";
     if (!RECIPIENT_PATTERN.test(assignTo)) {
@@ -95,7 +98,8 @@ function parseEscalationDocument(source: string): EscalationDocument | null {
     for (const item of value.tiers) {
       if (!isRecord(item) || typeof item.after !== "string" || typeof item.assign_to !== "string" ||
         !isStringArray(item.notify) || !isStringArray(item.channels)) return null;
-      tiers.push({ after: item.after, assign_to: item.assign_to, notify: item.notify, channels: item.channels });
+      if (item.min_risk !== undefined && typeof item.min_risk !== "number") return null;
+      tiers.push({ after: item.after, assign_to: item.assign_to, notify: item.notify, channels: item.channels, ...(typeof item.min_risk === "number" ? { min_risk: item.min_risk } : {}) });
     }
     return { name: value.name, tiers };
   } catch { return null; }
@@ -159,7 +163,7 @@ export default function EscalationPage() {
           <For each={policies()}>{(policy) => {
             const document = parseEscalationDocument(policy.tiers_json);
             return <tr><td><strong>{policy.name}</strong></td>
-              <td>{document === null ? <Tag variant="warning">Invalid policy</Tag> : <For each={document.tiers}>{(tier, index) => <Tag>Tier {index() + 1} · {tier.after} · {tier.assign_to}</Tag>}</For>}</td>
+              <td>{document === null ? <Tag variant="warning">Invalid policy</Tag> : <For each={document.tiers}>{(tier, index) => <Tag>Tier {index() + 1} · {tier.after} · {tier.assign_to}{tier.min_risk === undefined ? "" : ` · min risk ${tier.min_risk}`}</Tag>}</For>}</td>
               <td>{document === null ? "—" : document.tiers.flatMap((tier) => [tier.assign_to, ...tier.notify]).join(", ") || "—"}</td>
               <td><code>{policy.tiers_json}</code></td><td><button class="button-secondary" onClick={() => edit(policy)}>Edit</button></td>
             </tr>;
@@ -170,7 +174,7 @@ export default function EscalationPage() {
     <Drawer open={formOpen()} title={selected() === null ? "New escalation policy" : `Edit ${selected()!.name}`} onClose={() => setFormOpen(false)}>
       <form class="page-drawer-content" onSubmit={(event) => void save(event)}>
         <label class="field">Policy name<input value={name()} onInput={(event) => setName(event.currentTarget.value)} required disabled={selected() !== null} /></label>
-        <Panel title="Escalation tiers"><For each={parseEscalationDocument(source())?.tiers ?? []}>{(tier, index) => <PanelItem><strong>Tier {index() + 1}</strong><span>After {tier.after}</span><span>Assign to {tier.assign_to}</span><span>Notify {tier.notify.join(", ") || "—"}</span><span>Channels {tier.channels.join(", ") || "—"}</span></PanelItem>}</For></Panel>
+        <Panel title="Escalation tiers"><For each={parseEscalationDocument(source())?.tiers ?? []}>{(tier, index) => <PanelItem><strong>Tier {index() + 1}</strong><span>After {tier.after}</span><span>Assign to {tier.assign_to}</span><Show when={tier.min_risk !== undefined}><span>Minimum risk {tier.min_risk}</span></Show><span>Notify {tier.notify.join(", ") || "—"}</span><span>Channels {tier.channels.join(", ") || "—"}</span></PanelItem>}</For></Panel>
         <JsonTextArea label="JSON source" value={source()} onInput={setSource} errors={errors()} />
         <div class="row-actions"><button class="button-primary" type="submit">Save policy</button><button class="button-secondary" type="button" onClick={() => setFormOpen(false)}>Cancel</button></div>
       </form>

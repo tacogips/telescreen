@@ -43,13 +43,58 @@ function byId<T extends Readonly<{ id: string }>>(items: T[], id: string): T | u
 function issuePage(url: URL): Readonly<{ items: Issue[]; next_cursor: string | null }> {
   let items = filtered(state.issues, url, ["status", "source", "rule_class", "severity"]);
   const assignee = url.searchParams.get("assignee");
-  if (assignee !== null) items = items.filter((item) => assignee === `member:${item.assignee_member_id}` || assignee === `team:${item.assignee_team_id}` || assignee === item.assignee_member_id || assignee === item.assignee_team_id);
+  if (assignee === "me") items = items.filter((item) => item.assignee_member_id === "mem-01");
+  else if (assignee === "my_teams") items = items.filter((item) => item.assignee_team_id === "team-01");
+  else if (assignee !== null) items = items.filter((item) => assignee === `member:${item.assignee_member_id}` || assignee === `team:${item.assignee_team_id}` || assignee === item.assignee_member_id || assignee === item.assignee_team_id);
+  const exposure = url.searchParams.get("exposure");
+  if (exposure !== null) items = items.filter((item) => item.exposure_visibility === exposure);
   const sort = url.searchParams.get("sort") ?? "last_seen";
-  items.sort((left, right) => sort === "times_seen" ? right.times_seen - left.times_seen : (right[sort === "first_seen" ? "first_seen" : "last_seen"].localeCompare(left[sort === "first_seen" ? "first_seen" : "last_seen"])));
+  items.sort((left, right) => sort === "risk" ? (right.risk_score ?? 0) - (left.risk_score ?? 0) : sort === "times_seen" ? right.times_seen - left.times_seen : (right[sort === "first_seen" ? "first_seen" : "last_seen"].localeCompare(left[sort === "first_seen" ? "first_seen" : "last_seen"])));
   return page(items, url);
 }
 const routes: MockRoute[] = [
   { method: "GET", pattern: /^\/api\/health$/, handler: () => response({ status: "ok" }) },
+  { method: "GET", pattern: /^\/api\/exceptions$/, handler: (url) => { let items = filtered(state.exceptions, url, ["status", "issue_id"]); const approver = url.searchParams.get("approver"); if (approver === "me") items = items.filter((item) => item.approver_ref === "member:alex"); else if (approver !== null) items = items.filter((item) => item.approver_ref === approver); return response(page(items, url)); } },
+  { method: "POST", pattern: /^\/api\/exceptions\/([^/]+)\/(approve|reject|revoke)$/, handler: async (_url, request, match) => {
+    const item = byId(state.exceptions, match[1]!); if (!item) return error("not_found", "Not found.", 404);
+    const action = match[2]!; const updated = { ...item, status: action === "approve" ? "active" as const : action === "reject" ? "rejected" as const : "revoked" as const, decided_by: "member:alex", decided_at: new Date().toISOString(), expires_at: action === "approve" && item.duration !== "until_regressed" ? new Date(Date.now() + (item.duration === "7d" ? 7 : item.duration === "30d" ? 30 : 90) * 86_400_000).toISOString() : null };
+    state.exceptions[state.exceptions.findIndex((entry) => entry.id === item.id)] = updated;
+    if (action === "approve") { const issue = byId(state.issues, item.issue_id); if (issue) state.issues[state.issues.findIndex((entry) => entry.id === issue.id)] = { ...issue, status: "ignored" }; }
+    return response(updated);
+  } },
+  { method: "GET", pattern: /^\/api\/policies$/, handler: (url) => response(page(state.policies, url)) },
+  { method: "POST", pattern: /^\/api\/policies\/validate$/, handler: async (_url, request) => { const value = await body(request); const valid = typeof value.source_text === "string" && value.source_text.trim().length > 0; return response({ valid, errors: valid ? [] : [{ path: "$", code: "policy_empty" }] }); } },
+  { method: "POST", pattern: /^\/api\/policies$/, handler: async (_url, request) => {
+    const value = await body(request); const name = typeof value.source_text === "string" ? (/^name:\s*(.+)$/m.exec(value.source_text)?.[1]?.trim() ?? "New policy") : "New policy";
+    const version = state.nextPolicyVersion++; const policyVersion = { name, version, source_format: value.source_format === "yaml" ? "yaml" as const : "json" as const, source_text: String(value.source_text ?? ""), active: false };
+    state.policyVersions.push(policyVersion); if (!state.policies.some((item) => item.name === name)) state.policies.push({ name, active_version: null, effect: "violate", enabled: false, owner_team: null });
+    return response(policyVersion, 201);
+  } },
+  { method: "GET", pattern: /^\/api\/policies\/([^/]+)\/versions\/(\d+)$/, handler: (_url, _request, match) => { const item = state.policyVersions.find((entry) => entry.name === decodeURIComponent(match[1]!) && entry.version === Number(match[2])); return item ? response(item) : error("not_found", "Not found.", 404); } },
+  { method: "POST", pattern: /^\/api\/policies\/([^/]+)\/(activate|disable)$/, handler: async (_url, request, match) => {
+    const name = decodeURIComponent(match[1]!); const policy = state.policies.find((item) => item.name === name); if (!policy) return error("not_found", "Not found.", 404);
+    const value = await body(request); const activate = match[2] === "activate"; const activeVersion = Number(value.version ?? 0);
+    const updated = { ...policy, enabled: activate, active_version: activate ? activeVersion : policy.active_version }; state.policies[state.policies.findIndex((entry) => entry.name === name)] = updated;
+    state.policyVersions = state.policyVersions.map((entry) => entry.name === name ? { ...entry, active: activate && entry.version === activeVersion } : entry); return response(updated);
+  } },
+  { method: "GET", pattern: /^\/api\/policies\/([^/]+)$/, handler: (_url, _request, match) => { const name = decodeURIComponent(match[1]!); return response({ name, versions: state.policyVersions.filter((item) => item.name === name) }); } },
+  { method: "GET", pattern: /^\/api\/collectors\/([^/]+)\/coverage$/, handler: () => response(state.coverageSummary) },
+  { method: "GET", pattern: /^\/api\/collectors\/([^/]+)\/coverage\/resources$/, handler: (url) => response(page(filtered(state.coverageResources, url, ["state"]), url)) },
+  { method: "GET", pattern: /^\/api\/members\/([^/]+)\/identities$/, handler: (_url, _request, match) => response({ items: state.identities.filter((identity) => identity.id.startsWith(`${decodeURIComponent(match[1]!)}:`)), next_cursor: null }) },
+  { method: "POST", pattern: /^\/api\/members\/([^/]+)\/identities$/, handler: async (_url, request, match) => { const value = await body(request); const identity = { id: `${decodeURIComponent(match[1]!)}:identity-${state.identities.length + 1}`, kind: String(value.kind ?? "provider"), origin: "manual", key_prefix: "hmac:v1:", created_at: new Date().toISOString() }; state.identities.push(identity); return response(identity, 201); } },
+  { method: "DELETE", pattern: /^\/api\/members\/([^/]+)\/identities\/([^/]+)$/, handler: (_url, _request, match) => { state.identities = state.identities.filter((identity) => identity.id !== decodeURIComponent(match[2]!)); return response(null, 204); } },
+  { method: "POST", pattern: /^\/api\/issues\/([^/]+)\/(remediation|resolve|exceptions)$/, handler: async (_url, request, match) => {
+    const issue = byId(state.issues, match[1]!); if (!issue) return error("not_found", "Not found.", 404); const value = await body(request); const action = match[2]!;
+    if (action === "remediation") { const updated = { ...issue, status: "pending_verification" as const }; state.issues[state.issues.findIndex((entry) => entry.id === issue.id)] = updated; return response({ issue_ids: [issue.id], rescans_enqueued: 1 }, 202); }
+    if (action === "resolve") { const updated = { ...issue, status: "resolved" as const, resolution: String(value.reason ?? "false_positive") }; state.issues[state.issues.findIndex((entry) => entry.id === issue.id)] = updated; return response(updated); }
+    const duration = ["7d", "30d", "90d", "until_regressed"].includes(String(value.duration)) ? String(value.duration) as "7d" | "30d" | "90d" | "until_regressed" : "7d";
+    const decidedAt = state.isMockAdmin ? new Date().toISOString() : null;
+    const expiryDays = duration === "7d" ? 7 : duration === "30d" ? 30 : duration === "90d" ? 90 : 0;
+    const expiresAt = state.isMockAdmin && expiryDays > 0 ? new Date(Date.now() + expiryDays * 86_400_000).toISOString() : null;
+    const exception = { id: `exc-0${state.nextExceptionNumber++}`, issue_id: issue.id, status: state.isMockAdmin ? "active" as const : "requested" as const, reason: "Mock exception request", duration, requested_by: "member:alex", decided_by: state.isMockAdmin ? "member:alex" : null, approver_ref: "member:alex", expires_at: expiresAt, created_at: new Date().toISOString(), decided_at: decidedAt };
+    state.exceptions.push(exception); if (state.isMockAdmin) state.issues[state.issues.findIndex((entry) => entry.id === issue.id)] = { ...issue, status: "ignored" }; return response(exception, 201);
+  } },
+  { method: "GET", pattern: /^\/api\/issues\/([^/]+)\/occurrences$/, handler: (_url, _request, match) => response({ items: state.occurrences.filter((item) => item.issue_id === match[1] || match[1] === "iss-01" && ["iss-01", "iss-06"].includes(item.issue_id)), key_versions: [1] }) },
   { method: "GET", pattern: /^\/api\/issues$/, handler: (url) => response(issuePage(url)) },
   { method: "GET", pattern: /^\/api\/issues\/stats$/, handler: (url) => {
     const days = Number(url.searchParams.get("days") ?? 14);
@@ -58,7 +103,7 @@ const routes: MockRoute[] = [
   { method: "GET", pattern: /^\/api\/issues\/([^/]+)\/events$/, handler: (_url, _request, match) => response({ items: eventFixtures.filter((item) => item.issue_id === match[1]), next_cursor: null }) },
   { method: "GET", pattern: /^\/api\/issues\/([^/]+)\/history$/, handler: (_url, _request, match) => response({ items: historyFixtures.filter((item) => item.issue_id === match[1]), next_cursor: null }) },
   { method: "GET", pattern: /^\/api\/issues\/([^/]+)$/, handler: (_url, _request, match) => {
-    const issue = byId(state.issues, match[1]!); return issue ? response(issue) : error("not_found", "Not found.", 404);
+    const issue = byId(state.issues, match[1]!); return issue ? response({ ...issue, exposure: { visibility: issue.exposure_visibility ?? "unknown", external_principal_count: issue.exposure_visibility === "external_shared" ? 2 : 0, shared_drive: false, channel_kind: null, repo_visibility: null, is_fork: false }, exposure_changed_at: null, asset_tier: "standard", assignee_ref: issue.assignee_member_id === null ? null : `member:${issue.assignee_member_id}`, owner: { present: false, member_ref: null }, active_exception: state.exceptions.find((item) => item.issue_id === issue.id && item.status === "active") ?? null }) : error("not_found", "Not found.", 404);
   } },
   { method: "PATCH", pattern: /^\/api\/issues\/([^/]+)$/, handler: async (_url, request, match) => {
     const issue = byId(state.issues, match[1]!); if (!issue) return error("not_found", "Not found.", 404);
@@ -122,7 +167,7 @@ const routes: MockRoute[] = [
     if (run) { const index = state.runs.findIndex((item) => item.id === run.id); state.runs[index] = { ...run, status: "cancelled" }; }
     return response({ run_id: match[1], status: "cancelled" });
   } },
-  { method: "GET", pattern: /^\/api\/human-tasks$/, handler: (url) => response({ items: filtered(state.tasks, url, ["status", "assignee_ref"]) }) },
+  { method: "GET", pattern: /^\/api\/human-tasks$/, handler: (url) => { const assignee = url.searchParams.get("assignee"); let tasks = filtered(state.tasks, url, ["status"]); if (assignee === "me") tasks = tasks.filter((task) => task.assignee_ref === "member:alex"); else if (assignee !== null) tasks = tasks.filter((task) => task.assignee_ref === assignee); return response({ items: tasks }); } },
   { method: "POST", pattern: /^\/api\/human-tasks\/([^/]+)\/complete$/, handler: (_url, _request, match) => {
     const task = byId(state.tasks, match[1]!);
     if (task) { const index = state.tasks.findIndex((item) => item.id === task.id); state.tasks[index] = { ...task, status: "completed" }; }
@@ -152,8 +197,10 @@ const routes: MockRoute[] = [
   } },
   { method: "GET", pattern: /^\/api\/members$/, handler: (url) => response(page(memberFixtures, url)) },
   { method: "GET", pattern: /^\/api\/teams$/, handler: (url) => response(page(teamFixtures, url)) },
-  { method: "PUT", pattern: /^\/api\/teams\/([^/]+)\/members$/, handler: () => response(null, 204) },
-  { method: "GET", pattern: /^\/api\/collectors$/, handler: () => response({ items: state.collectors }) },
+  { method: "POST", pattern: /^\/api\/teams$/, handler: async (_url, request) => { const value = await body(request); const team = { id: `team-${state.teams.length + 1}`, slug: String(value.slug ?? "new-team"), name: String(value.name ?? "New team"), email: null, slack_channel: null, lead: typeof value.lead === "string" ? value.lead : null }; state.teams.push(team); return response(team, 201); } },
+  { method: "PUT", pattern: /^\/api\/teams\/([^/]+)\/lead$/, handler: async (_url, request, match) => { const team = state.teams.find((item) => item.slug === decodeURIComponent(match[1]!)); if (!team) return error("not_found", "Not found.", 404); const value = await body(request); const lead = typeof value.lead === "string" ? value.lead : null; state.teams[state.teams.findIndex((item) => item.id === team.id)] = { ...team, lead }; return response(null, 204); } },
+  { method: "PUT", pattern: /^\/api\/teams\/([^/]+)\/members$/, handler: async (_url, request, match) => { const team = state.teams.find((item) => item.slug === decodeURIComponent(match[1]!)); if (!team) return error("not_found", "Not found.", 404); const value = await body(request); if (typeof value.lead === "string" || value.lead === null) state.teams[state.teams.findIndex((item) => item.id === team.id)] = { ...team, lead: value.lead }; return response(null, 204); } },
+  { method: "GET", pattern: /^\/api\/collectors$/, handler: () => response({ items: state.collectors.map((item) => ({ ...item, health: item.health ?? { status: "ok", conditions: [], last_success_at: null, last_failure_at: null, consecutive_failures: 0, last_event_at: null, watch_expires_at: null, event_only: false } })) }) },
   { method: "POST", pattern: /^\/api\/collectors$/, handler: async (_url, request) => {
     const value = await body(request); const config = { ...value, id: `col-0${state.nextCollectorNumber}` } as unknown as typeof state.collectors[number];
     state.nextCollectorNumber += 1; state.collectors.push(config); return response({ id: config.id }, 201);
@@ -172,7 +219,7 @@ const routes: MockRoute[] = [
     if (job) { const index = state.mapJobs.findIndex((item) => item.id === job.id); state.mapJobs[index] = { ...job, status }; }
     return response({ id: match[1], status });
   } },
-  { method: "GET", pattern: /^\/api\/police\/workers$/, handler: () => response({ items: state.police, next_cursor: null }) },
+  { method: "GET", pattern: /^\/api\/police\/workers$/, handler: () => response({ items: state.police.map((item) => ({ ...item, health: item.health ?? { status: "ok", conditions: [] } })), next_cursor: null }) },
   { method: "POST", pattern: /^\/api\/police\/workers\/([^/]+)\/disable$/, handler: (_url, _request, match) => {
     const worker = byId(state.police, match[1]!);
     if (worker) {

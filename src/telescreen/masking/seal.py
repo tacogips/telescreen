@@ -39,6 +39,7 @@ class Masker:
                         finding.rule_id, value, finding.rule_class
                     ),
                     fingerprint_key_id=self.fingerprinter.key_id,
+                    fingerprint_key_version=self.fingerprinter.key_version,
                 )
             )
         return sealed

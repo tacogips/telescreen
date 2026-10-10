@@ -15,6 +15,7 @@
       "HeartbeatResponse": {"$ref": "./heartbeat-response.schema.json"},
       "TaskEnvelope": {"$ref": "./task-envelope.schema.json"},
       "ResultEnvelope": {"$ref": "./result-envelope.schema.json"},
+      "ResourceExposure": {"$ref": "./resource-exposure.schema.json"},
       "Error": {"$ref": "./error.schema.json"},
       "PartitionResult": {"$ref": "./partition-result.schema.json"}
     },

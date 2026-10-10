@@ -18,16 +18,24 @@ from telescreen.core.json import (
 )
 from telescreen.core.vocabulary import (
     ActorKind,
+    ChannelKind,
     DetectorKind,
     ErrorCode,
     PoliceTaskStatus,
+    RepoVisibility,
     RuleClass,
+    Visibility,
 )
 from telescreen.db.models import PoliceTaskRow, PoliceWorkerRow
 from telescreen.masking.redact import Redactor
 from telescreen.ports.audit import AuditEntry, AuditLog
-from telescreen.ports.collectors import CollectorConfig, CollectorConfigReader
-from telescreen.ports.findings import ExternalFinding, ExternalScan, RecordOutcome
+from telescreen.ports.collectors import CollectorConfig, CollectorConfigReader, Exposure
+from telescreen.ports.findings import (
+    ExternalFinding,
+    ExternalScan,
+    LocatorExposure,
+    RecordOutcome,
+)
 from telescreen.ports.issues import IssueRecorder
 from telescreen.ports.sweeps import (
     MapResultSink,
@@ -101,6 +109,41 @@ def _external_findings(value: JsonValue | None) -> tuple[ExternalFinding, ...]:
     return tuple(findings)
 
 
+def _resource_exposures(
+    value: JsonValue | None, valid_locators: frozenset[str]
+) -> tuple[tuple[LocatorExposure, ...], int]:
+    """Decode and retain exposure entries for resources represented by the result."""
+    if value is None or value.kind is not JsonKind.ARRAY:
+        return (), 0
+    exposures: list[LocatorExposure] = []
+    dropped: int = 0
+    for item in value.items:
+        locator: str = _str(_member(item, "locator"))
+        if locator not in valid_locators:
+            dropped += 1
+            continue
+        visibility: Visibility = Visibility(_str(_member(item, "visibility")))
+        count: JsonValue | None = _member(item, "external_principal_count")
+        shared_drive: JsonValue | None = _member(item, "shared_drive")
+        is_fork: JsonValue | None = _member(item, "is_fork")
+        channel: JsonValue | None = _member(item, "channel_kind")
+        repository: JsonValue | None = _member(item, "repo_visibility")
+        exposures.append(
+            LocatorExposure(
+                locator,
+                Exposure(
+                    visibility,
+                    _int(count),
+                    shared_drive.bool_value if shared_drive is not None else False,
+                    ChannelKind(_str(channel)) if channel is not None else None,
+                    RepoVisibility(_str(repository)) if repository is not None else None,
+                    is_fork.bool_value if is_fork is not None else False,
+                ),
+            )
+        )
+    return tuple(exposures), dropped
+
+
 @dataclass(frozen=True)
 class ResultService:
     """Accept only schema-valid, redactor-clean worker results."""
@@ -156,6 +199,8 @@ class ResultService:
         status: str = _str(_member(result, "status"))
         outcome: str = _str(_member(result, "outcome"))
         findings: tuple[ExternalFinding, ...] = _external_findings(_member(result, "findings"))
+        exposures: tuple[LocatorExposure, ...] = ()
+        exposures_dropped: int = 0
         record_outcome: RecordOutcome | None = None
         config_name: str | None = None
         if task.collector_config_id is not None:
@@ -180,6 +225,12 @@ class ResultService:
             )
             if task.task_type == "scan_shard" and _int(_member(stats, "resources_failed")) > 0:
                 complete_locators = ()
+            allowed_locators: frozenset[str] = frozenset(
+                (*complete_locators, *(finding.locator for finding in findings))
+            )
+            exposures, exposures_dropped = _resource_exposures(
+                _member(result, "resource_exposures"), allowed_locators
+            )
             record_outcome = await self.issues.record_external(
                 session,
                 ExternalScan(
@@ -191,6 +242,7 @@ class ResultService:
                     complete_locators,
                     True,
                     self.clock.now(),
+                    exposures,
                 ),
             )
             if task.task_type == "scan_shard":
@@ -234,6 +286,14 @@ class ResultService:
         task.result_json = _safe_result_json(result)
         task.outcome = outcome or ("error" if status == "failed" else None)
         task.completed_at = self.clock.now()
+        audit_details: JsonValue = json_object(
+            (("task_id", json_str(task.id)),)
+            + (
+                (("exposures_dropped", json_int(exposures_dropped)),)
+                if exposures_dropped > 0
+                else ()
+            )
+        )
         await self.audit.append(
             session,
             AuditEntry(
@@ -243,7 +303,7 @@ class ResultService:
                 "police_task",
                 task.id,
                 "Police result accepted",
-                json_object((("task_id", json_str(task.id)),)),
+                audit_details,
             ),
         )
 

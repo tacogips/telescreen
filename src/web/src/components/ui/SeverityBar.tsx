@@ -1,6 +1,6 @@
 import type { JSX } from "solid-js";
 export function SeverityBar(
-  props: Readonly<{ severity: "high" | "medium" | "low" }>,
+  props: Readonly<{ severity: "critical" | "high" | "medium" | "low" }>,
 ): JSX.Element {
   return (
     <span

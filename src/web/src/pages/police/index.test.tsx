@@ -37,3 +37,12 @@ it("shows the API error when disabling a worker fails", async () => {
   expect(alert).toHaveTextContent("internal_error");
   await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/police/workers/pol-01/disable", expect.objectContaining({ method: "POST" })));
 });
+
+it("uses reported Police health and exposes police_silent in the tooltip", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(JSON.stringify({ items: [
+    { id: "pol-03", name: "Silent worker", version: "3", mode: "pull", task_types: ["scan_shard"], labels: [], concurrency: 1, status: "active", last_heartbeat_at: new Date().toISOString(), health: { status: "failing", conditions: ["police_silent"] } },
+  ], next_cursor: null })));
+  render(() => <PolicePage />);
+  expect(await screen.findByText("failing")).toBeInTheDocument();
+  expect(screen.getByText("failing").closest("[title]")).toHaveAttribute("title", "police_silent");
+});

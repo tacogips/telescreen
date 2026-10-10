@@ -49,12 +49,37 @@ async def test_assembled_feature_list_routes_return_200() -> None:
         app: FastAPI = create_app(container)
         transport: ASGITransport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
+            collector_response: httpx.Response = await client.post(
+                "/api/collectors",
+                json={
+                    "name": "route-smoke-collector",
+                    "kind": "custom",
+                    "trigger_mode": "event",
+                    "cron": None,
+                    "sweep_cron": None,
+                    "selector_json": '{"paths":["**"]}',
+                    "credential_ref": None,
+                    "enabled": True,
+                },
+                headers={"Authorization": f"Bearer {token.token}"},
+            )
+            assert collector_response.status_code == 200, collector_response.text
+            member_response: httpx.Response = await client.post(
+                "/api/members",
+                json={"handle": "route-smoke-member", "display_name": "Route Smoke"},
+                headers={"Authorization": f"Bearer {token.token}"},
+            )
+            assert member_response.status_code == 201, member_response.text
             for path in (
                 "/api/issues",
                 "/api/workflows",
                 "/api/runs",
                 "/api/police/workers",
                 "/api/collectors",
+                f"/api/collectors/{collector_response.json()['id']}/coverage",
+                "/api/members/route-smoke-member/identities",
+                "/api/policies",
+                "/api/exceptions",
                 "/api/escalation-policies",
                 "/api/map-jobs",
             ):

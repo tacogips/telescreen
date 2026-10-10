@@ -13,6 +13,13 @@ it("lists backend-shaped policies and renders their tier fields", async () => {
   expect(screen.queryByText("Invalid policy")).toBeNull();
 });
 
+it("renders a configured minimum risk and accepts it in the JSON editor", async () => {
+  const tiersJson = JSON.stringify({ name: "Risk policy", tiers: [{ after: "PT1H", assign_to: "team:triage", notify: [], channels: ["email"], min_risk: 70 }] });
+  vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(JSON.stringify({ items: [{ id: "esc-risk", name: "Risk policy", tiers_json: tiersJson }], next_cursor: null })));
+  render(() => <EscalationPage />);
+  expect(await screen.findByText("Tier 1 · PT1H · team:triage · min risk 70")).toBeInTheDocument();
+});
+
 it("creates a policy with a backend-shaped JSON document", async () => {
   const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(JSON.stringify({ items: [], next_cursor: null }))).mockResolvedValueOnce(new Response(JSON.stringify({ id: "esc-01", name: "Primary", tiers_json: "{}" }))).mockResolvedValueOnce(new Response(JSON.stringify({ items: [], next_cursor: null })));
   render(() => <EscalationPage />);

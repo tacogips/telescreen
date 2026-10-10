@@ -1,6 +1,6 @@
 # V11-P14 Directory Owner Identities and Team Lead; Search Exposure and Risk
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-1-dspm-adoption.md section 7 (directory mapping, team lead, `OwnerDirectory`), section 10 (search document); design-docs/specs/design-api-and-ui.md ("v1.1 endpoints", Search paragraph)
 **Created**: 2026-10-10
 **Last Updated**: 2026-10-10
@@ -141,11 +141,18 @@ Conventions section 7 with
 
 ## Completion Criteria
 
-- [ ] Identity service, team lead, `DirectoryOwnerResolver` and the search fields
+- [x] Identity service, team lead, `DirectoryOwnerResolver` and the search fields
       implemented.
-- [ ] Tests pass; scoped gates pass; the typelint grep is empty.
-- [ ] Progress Log complete.
+- [x] Tests pass; scoped gates pass; the typelint grep is empty.
+- [x] Progress Log complete.
 
 ## Progress Log
 
-(append sessions per conventions section 8)
+### Session: 2026-10-10 17:08 JST
+**Tasks Completed**: Added keyed derived/manual member identities, team lead management, `DirectoryOwnerResolver`, issue exposure/risk document fields, issue Meilisearch settings, and focused directory/search tests.
+**Tasks In Progress**: None.
+**Blockers**: None.
+**Reconciliation requests**: None. The in-memory backend already supports scalar equality filters and numeric sorting; regression tests confirm the new fields.
+**Hashes**: `src/telescreen/directory/identities.py` before=absent after=b0bc5f4b3aa91be383fb2ba888b493db1d58b61c632aeb5df52805223f558c8c; `src/telescreen/directory/owners.py` before=absent after=49119418c960be50d314e4dd42f4f8afd2466ba9f74c9bb3bbb95960976d9cfb; `src/telescreen/directory/service.py` before=b50c592e3e320a5170d63b8a7e05d45434d3209a2d190ecfde7160dc1d77d402 after=97370aa976eca20214a38e5f645fe91a863fafea9e2290b94dc76a7ee0d13e1c; `src/telescreen/search/documents.py` before=bf499437d0775b79a66fefd2e75b0ab58a42ea0e04748d67eb9254938e19b0f1 after=024481593aa92115f8872cdd1a0bf23c45c9a66aa85141bdfc6a480a2f4dd455; `src/telescreen/search/settings.py` before=bd93186a35d6d388150ef4787a237ed8a67a123816ad89e8570ffd69ca8d2dec after=33c3d29cbc018dcf590cb756ec13d2e16bdf96df612c1b427fcfb773f7704c24; `tests/directory/test_v11_identities.py` before=absent after=91526c7f56b4d39a9a44a744fe6ab2cfa506a2066060be74fb6949d914273be2; `tests/search/test_v11_search.py` before=absent after=8dd5e2c319753103625fd767e5176383c00bb712b28291464d64b8f9c2d103e1.
+**Verification**: `uv run --frozen ruff format --check --no-cache src/telescreen/directory src/telescreen/search tests/directory tests/search` -> exit 0 (log: `/tmp/telescreen-v11-p14-directory-search-format-final.log`); `uv run --frozen ruff check --no-cache src/telescreen/directory src/telescreen/search tests/directory tests/search` -> exit 0 (log: `/tmp/telescreen-v11-p14-directory-search-ruff-final.log`); `uv run --frozen ty check src/telescreen/directory src/telescreen/search tests/directory tests/search` -> exit 0 (log: `/tmp/telescreen-v11-p14-directory-search-ty-final.log`); `uv run --frozen pytest -p no:cacheprovider tests/directory tests/search` -> exit 0, 11 passed and 1 expected offline integration skip (log: `/tmp/telescreen-v11-p14-directory-search-pytest-final.log`); `test "$(grep -c '^- \[ \]' impl-plans/active/v11-p14-directory-search.md)" -eq 0` -> exit 0; repository typelint reports diagnostics in unrelated concurrent-plan collector/issues/workflow paths (exit 1), while the p14 path filter is empty (gate log: `/tmp/telescreen-v11-p14-directory-search-typelint-gate.log`).
+**Notes**: The initial format check and Ruff check exited 1 only because five p14-owned files needed formatting (logs: `/tmp/telescreen-v11-p14-directory-search-format.log`, `/tmp/telescreen-v11-p14-directory-search-ruff.log`). After targeted formatting, both final checks passed. No raw identity values are stored in `member_identities`, returned in identity views, or included in identity audit details. Dependency readiness was satisfied by runtime `acceptedPlanIds` for v11-p01 and v11-p02. Formal review and serial integration remain downstream workflow steps.

@@ -7,8 +7,14 @@ from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
-from telescreen.core.vocabulary import IssueStatus
-from telescreen.db.models import CounterRow, FindingRow, IssueHistoryRow, IssueRow
+from telescreen.core.vocabulary import RECONCILED_STATUSES
+from telescreen.db.models import (
+    CounterRow,
+    FindingRow,
+    IssueExceptionRow,
+    IssueHistoryRow,
+    IssueRow,
+)
 
 
 class IssueRepository:
@@ -46,10 +52,18 @@ class IssueRepository:
         return (await session.scalars(query)).all()
 
     async def distinct_fingerprints(self, session: AsyncSession, issue_id: str) -> int:
-        """Count the distinct fingerprints recorded for an issue."""
+        """Count fingerprints at the highest key version recorded for an issue."""
+        highest_version: int | None = await session.scalar(
+            select(func.max(FindingRow.fingerprint_key_version)).where(
+                FindingRow.issue_id == issue_id
+            )
+        )
+        if highest_version is None:
+            return 0
         count: int | None = await session.scalar(
             select(func.count(distinct(FindingRow.fingerprint))).where(
-                FindingRow.issue_id == issue_id
+                FindingRow.issue_id == issue_id,
+                FindingRow.fingerprint_key_version == highest_version,
             )
         )
         return count or 0
@@ -64,15 +78,7 @@ class IssueRepository:
         self, session: AsyncSession, resource_key: str
     ) -> Sequence[IssueRow]:
         """Return lifecycle states eligible for automatic resolution."""
-        open_statuses: tuple[str, ...] = tuple(
-            status.value
-            for status in (
-                IssueStatus.UNRESOLVED,
-                IssueStatus.ACKNOWLEDGED,
-                IssueStatus.IN_PROGRESS,
-                IssueStatus.REGRESSED,
-            )
-        )
+        open_statuses: tuple[str, ...] = tuple(status.value for status in RECONCILED_STATUSES)
         return (
             await session.scalars(
                 select(IssueRow).where(
@@ -105,15 +111,7 @@ class IssueRepository:
         self, session: AsyncSession, collector_config_id: str, checked_before: datetime
     ) -> Sequence[IssueRow]:
         """Find sweep-covered open issues older than a reconciliation watermark."""
-        open_statuses: tuple[str, ...] = tuple(
-            status.value
-            for status in (
-                IssueStatus.UNRESOLVED,
-                IssueStatus.ACKNOWLEDGED,
-                IssueStatus.IN_PROGRESS,
-                IssueStatus.REGRESSED,
-            )
-        )
+        open_statuses: tuple[str, ...] = tuple(status.value for status in RECONCILED_STATUSES)
         return (
             await session.scalars(
                 select(IssueRow).where(
@@ -124,3 +122,54 @@ class IssueRepository:
                 )
             )
         ).all()
+
+    async def reconciled_issues(
+        self, session: AsyncSession, offset: int, limit: int
+    ) -> Sequence[IssueRow]:
+        """Return one ordered batch of issues eligible for policy evaluation."""
+        statuses: tuple[str, ...] = tuple(status.value for status in RECONCILED_STATUSES)
+        return (
+            await session.scalars(
+                select(IssueRow)
+                .where(IssueRow.status.in_(statuses))
+                .order_by(IssueRow.number)
+                .offset(offset)
+                .limit(limit)
+            )
+        ).all()
+
+    async def requested_exceptions(
+        self, session: AsyncSession, issue_id: str
+    ) -> Sequence[IssueExceptionRow]:
+        """Return exception requests awaiting a decision for one issue."""
+        return (
+            await session.scalars(
+                select(IssueExceptionRow).where(
+                    IssueExceptionRow.issue_id == issue_id,
+                    IssueExceptionRow.status == "requested",
+                )
+            )
+        ).all()
+
+    async def active_until_regressed_exception(
+        self, session: AsyncSession, issue_id: str
+    ) -> IssueExceptionRow | None:
+        """Return an active until-regressed exception, if present."""
+        return await session.scalar(
+            select(IssueExceptionRow).where(
+                IssueExceptionRow.issue_id == issue_id,
+                IssueExceptionRow.status == "active",
+                IssueExceptionRow.duration == "until_regressed",
+            )
+        )
+
+    async def active_exception(
+        self, session: AsyncSession, issue_id: str
+    ) -> IssueExceptionRow | None:
+        """Return any active exception for a manually reopened issue."""
+        return await session.scalar(
+            select(IssueExceptionRow).where(
+                IssueExceptionRow.issue_id == issue_id,
+                IssueExceptionRow.status == "active",
+            )
+        )

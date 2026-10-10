@@ -1,14 +1,16 @@
 import { For, Show, type JSX } from "solid-js";
 import { A } from "@solidjs/router";
 import type { IssueStatus, RunHumanTask } from "../../../api/types";
+import { StatusBadge } from "../../../components/StatusBadge";
 import { RelativeTime } from "../../../components/RelativeTime";
-import { Button, ProgressMarker, Timeline } from "../../../components/ui";
-import type { DetailData } from "./types";
+import { Button, ExposureBadge, ProgressMarker, RiskPill, Timeline } from "../../../components/ui";
+import { historyLabel, type DetailData } from "./types";
 
 function progressFor(status: IssueStatus): 0 | 1 | 2 | 3 | 4 {
   if (status === "acknowledged") return 1;
   if (status === "in_progress") return 2;
   if (status === "resolved") return 4;
+  if (status === "pending_verification") return 3;
   return 0;
 }
 
@@ -21,6 +23,7 @@ export function IssueDetailSidebar(
     onCommentChange(value: string): void;
     onComment(event: SubmitEvent): void;
     onClose(): void;
+    onExceptionDecision(action: "approve" | "reject"): void;
   }>,
 ): JSX.Element {
   const activeTask = (): RunHumanTask | undefined =>
@@ -41,10 +44,57 @@ export function IssueDetailSidebar(
         <p>
           Last <RelativeTime iso={props.detail.issue.last_seen} />
         </p>
+        <p>Coverage: {props.detail.issue.sweep_covered ? "Scanned" : "Not covered"}</p>
+        <p>Last checked <RelativeTime iso={props.detail.issue.last_checked_at} /></p>
       </section>
       <section>
+        <h3>Exposure</h3>
+        <p><ExposureBadge visibility={props.detail.issue.exposure.visibility} externalPrincipalCount={props.detail.issue.exposure.external_principal_count} /></p>
+        <p>External principals: {props.detail.issue.exposure.external_principal_count}</p>
+        <p>Shared drive: {props.detail.issue.exposure.shared_drive ? "Yes" : "No"}</p>
+        <Show when={props.detail.issue.exposure.channel_kind}><p>Channel: {props.detail.issue.exposure.channel_kind}</p></Show>
+        <Show when={props.detail.issue.exposure.repo_visibility}><p>Repository: {props.detail.issue.exposure.repo_visibility}</p></Show>
+        <Show when={props.detail.issue.exposure.is_fork !== null}><p>Fork: {props.detail.issue.exposure.is_fork ? "Yes" : "No"}</p></Show>
+        <Show when={props.detail.issue.exposure_changed_at}><p>Changed <RelativeTime iso={props.detail.issue.exposure_changed_at ?? ""} /></p></Show>
+      </section>
+      <section>
+        <h3>Risk</h3>
+        <p>{props.detail.issue.risk_score === undefined ? "Risk unavailable" : <RiskPill score={props.detail.issue.risk_score} />}</p>
+        <p>Effective severity: {props.detail.issue.severity}</p>
+        <Show when={props.detail.issue.base_severity && props.detail.issue.base_severity !== props.detail.issue.severity}>
+          <p>Base severity: {props.detail.issue.base_severity}</p>
+        </Show>
+        <p>Asset tier: {props.detail.issue.asset_tier ?? "Unknown"}</p>
+        <p>Age: <RelativeTime iso={props.detail.issue.first_seen} /></p>
+      </section>
+      <section>
+        <h3>Owner</h3>
+        <p>{props.detail.issue.owner.present ? `Mapped to ${props.detail.issue.owner.member_ref ?? "member"}` : "Owner not mapped"}</p>
+      </section>
+      <section>
+        <h3>Policy</h3>
+        <p>{props.detail.issue.policy_name ? `${props.detail.issue.policy_name} v${props.detail.issue.policy_version ?? "?"}` : "No matching policy"}</p>
+        <StatusBadge status={props.detail.issue.status} resolution={props.detail.issue.resolution} />
+      </section>
+      <Show when={props.detail.issue.active_exception}>
+        {(exception) => (
+          <section>
+            <h3>Exception</h3>
+            <p>Status: {exception().status}</p>
+            <p>Duration: {exception().duration}</p>
+            <p>{exception().expires_at ? `Expires ${exception().expires_at}` : "No expiry"}</p>
+            <Show when={exception().status === "requested"}>
+              <Button size="xs" onClick={() => props.onExceptionDecision("approve")}>Approve</Button>
+              <Button size="xs" onClick={() => props.onExceptionDecision("reject")}>Reject</Button>
+            </Show>
+          </section>
+        )}
+      </Show>
+      <section>
         <h3>Workflow runs</h3>
-        <ProgressMarker step={progressFor(props.detail.issue.status)} />
+        <Show when={props.detail.issue.status !== "allowed"}>
+          <ProgressMarker step={progressFor(props.detail.issue.status)} />
+        </Show>
         <ul>
           <For each={props.detail.runs}>
             {(run) => (
@@ -92,7 +142,7 @@ export function IssueDetailSidebar(
           <For each={props.detail.history}>
             {(item) => (
               <li>
-                <strong>{item.kind.replaceAll("_", " ")}</strong>
+                <strong>{historyLabel(item.kind)}</strong>
                 <RelativeTime iso={item.at} />
               </li>
             )}

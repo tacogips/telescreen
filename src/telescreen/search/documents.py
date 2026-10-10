@@ -30,6 +30,8 @@ def issue_document(row: IssueRow, assignee: str | None) -> SearchDocument:
             ("source", row.source),
             ("rule_class", row.rule_class),
             ("severity", row.severity),
+            ("exposure_visibility", row.exposure_visibility),
+            ("risk_score", row.risk_score),
             ("display_locator", row.display_locator),
             ("assignee", assignee),
             ("times_seen", row.times_seen),

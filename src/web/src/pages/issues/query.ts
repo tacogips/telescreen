@@ -11,6 +11,19 @@ export const ISSUE_STATUSES = [
   "resolved",
   "ignored",
   "regressed",
+  "allowed",
+  "pending_verification",
+  "public",
+] as const;
+
+export const ISSUE_EXPOSURES = [
+  "public",
+  "anyone_with_link",
+  "external_shared",
+  "domain",
+  "internal",
+  "private",
+  "unknown",
 ] as const;
 
 export const ISSUE_SOURCES = [
@@ -37,20 +50,39 @@ export const ISSUE_RULE_CLASSES = [
 
 export const ISSUE_QUERY_KEYS: readonly QueryKeySpec[] = [
   { key: "is", values: ISSUE_STATUSES, description: "Issue status" },
-  { key: "severity", values: ["high", "medium"], description: "Severity" },
+  {
+    key: "severity",
+    values: ["critical", "high", "medium"],
+    description: "Severity",
+  },
   { key: "rule", values: ISSUE_RULE_CLASSES, description: "Rule class" },
   { key: "source", values: ISSUE_SOURCES, description: "Source" },
   {
     key: "assigned",
+    values: ["me", "my_teams", "none"],
     description: "member:<handle> or team:<slug>",
+  },
+  {
+    key: "exposure",
+    values: ISSUE_EXPOSURES,
+    description: "Exposure visibility",
   },
 ];
 
-const valuesByKey = new Map<string, readonly string[]>([
+const validValuesByKey = new Map<string, readonly string[]>([
   ["is", ISSUE_STATUSES],
-  ["severity", ["high", "medium"]],
+  ["severity", ["critical", "high", "medium"]],
   ["rule", ISSUE_RULE_CLASSES],
   ["source", ISSUE_SOURCES],
+  ["exposure", ISSUE_EXPOSURES],
+]);
+
+const valuesByKey = new Map<string, readonly string[]>([
+  ["is", ISSUE_STATUSES],
+  ["severity", ["critical", "high", "medium"]],
+  ["rule", ISSUE_RULE_CLASSES],
+  ["source", ISSUE_SOURCES],
+  ["exposure", ISSUE_EXPOSURES],
 ]);
 
 export function issueQueryToParams(
@@ -66,15 +98,24 @@ export function issueQueryToParams(
     }
     if (!token.valid || token.negated) continue;
     const values = valuesByKey.get(token.key);
-    if (values !== undefined && values.includes(token.value)) {
+    if (token.key === "is" && token.value === "public") {
+      params.set("exposure", "public");
+    } else if (values !== undefined && values.includes(token.value)) {
       params.set(
         token.key === "is"
           ? "status"
           : token.key === "rule"
             ? "rule_class"
-            : token.key,
+            : token.key === "exposure"
+              ? "exposure"
+              : token.key,
         token.value,
       );
+    } else if (
+      token.key === "assigned" &&
+      ["me", "my_teams", "none"].includes(token.value)
+    ) {
+      params.set("assignee", token.value);
     } else if (
       token.key === "assigned" &&
       /^(member|team):[a-z0-9_-]+$/i.test(token.value)
@@ -89,5 +130,15 @@ export function issueQueryToParams(
 }
 
 export function issueQueryTokens(query: string): QueryToken[] {
-  return parseQuery(query, ISSUE_QUERY_KEYS);
+  return parseQuery(query, ISSUE_QUERY_KEYS).map((token) => {
+    if (token.kind !== "filter" || !token.valid) return token;
+    const allowed = validValuesByKey.get(token.key);
+    const valid = allowed?.includes(token.value) ??
+      (token.key === "assigned" &&
+        (["me", "my_teams", "none"].includes(token.value) ||
+          /^(member|team):[a-z0-9_-]+$/i.test(token.value)));
+    return valid
+      ? token
+      : { ...token, valid: false, reason: "Unsupported filter value" };
+  });
 }

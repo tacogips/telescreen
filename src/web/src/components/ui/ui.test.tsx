@@ -4,9 +4,11 @@ import { createSignal } from "solid-js";
 import {
   Button,
   Drawer,
+  ExposureBadge,
   FoldSection,
   MiniBarChart,
   PriorityBadge,
+  RiskPill,
   parseQuery,
   Redacted,
   SearchQueryBuilder,
@@ -37,6 +39,27 @@ afterEach(() => {
 });
 
 describe("design system primitives", () => {
+  it("renders exposure labels and omits quiet visibilities in compact mode", () => {
+    const visibilities = ["public", "anyone_with_link", "external_shared", "domain", "internal", "private", "unknown"] as const;
+    for (const visibility of visibilities) {
+      const view = render(() => <ExposureBadge visibility={visibility} compact/>);
+      if (["internal", "private", "unknown"].includes(visibility)) expect(view.container.firstChild).toBeNull();
+      else expect(view.container.textContent).toContain(visibility === "external_shared" ? "Shared externally" : visibility === "anyone_with_link" ? "Link sharing" : visibility[0]!.toUpperCase() + visibility.slice(1));
+      view.unmount();
+    }
+    render(() => <ExposureBadge visibility="external_shared" externalPrincipalCount={2}/>);
+    expect(screen.getByText("Shared externally (2)")).toBeInTheDocument();
+  });
+
+  it("renders the ordinal risk value and its tooltip", () => {
+    render(() => <RiskPill score={83}/>);
+    expect(screen.getByTitle("Ordinal risk 0-100: severity x exposure x asset x age")).toHaveTextContent("83");
+  });
+
+  it("uses four signal bars for critical priority", () => {
+    const view = render(() => <PriorityBadge level="critical"/>);
+    expect(view.container.querySelectorAll(".priority-signal rect")).toHaveLength(4);
+  });
   it("marks a busy button disabled and busy", () => {
     render(() => <Button busy>Save</Button>);
     expect(screen.getByRole("button")).toHaveAttribute("aria-busy", "true");

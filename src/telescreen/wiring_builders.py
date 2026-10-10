@@ -52,12 +52,22 @@ def build_primitives(
     """Build database, masking, audit and guarded search primitives."""
     if settings.database_url is None:
         raise ConfigError("TELESCREEN_DATABASE_URL is required")
-    if settings.fingerprint_key_ref is None:
+    configured_keys: tuple[tuple[int, str], ...]
+    if settings.fingerprint_keys:
+        configured_keys = tuple((item.version, item.ref) for item in settings.fingerprint_keys)
+    elif settings.fingerprint_key_ref is not None:
+        configured_keys = ((1, settings.fingerprint_key_ref),)
+    else:
         raise ConfigError("TELESCREEN_FINGERPRINT_KEY is required")
     selected_clock: Clock = clock or SystemClock()
     redactor: Redactor = Redactor.default()
-    fingerprint_key: SecretValue = resolve_secret(settings.fingerprint_key_ref, env)
-    fingerprinter: Fingerprinter = Fingerprinter.from_secret(fingerprint_key)
+    resolved_keys: list[tuple[int, SecretValue]] = [
+        (version, resolve_secret(ref, env)) for version, ref in configured_keys
+    ]
+    fingerprint_key: SecretValue = next(secret for version, secret in resolved_keys if version == 1)
+    fingerprinter: Fingerprinter = Fingerprinter.from_versions(
+        tuple(resolved_keys), settings.fingerprint_active_version
+    )
     engine: AsyncEngine = create_engine(settings.database_url)
     selected_sessions: async_sessionmaker[AsyncSession] = sessions or create_sessionmaker(engine)
     audit: AuditLogService = AuditLogService(selected_clock, redactor)

@@ -1,6 +1,6 @@
 # V11-P04 UI Foundation: API Types, Client, Mock API, Components, Shell, Screenshots
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-ui-sentry.md section 9 (9.1, 9.2, 9.4, 9.5) and section 8 (still binding where 9 is silent); design-docs/specs/design-api-and-ui.md ("v1.1 endpoints")
 **Created**: 2026-10-10
 **Last Updated**: 2026-10-10
@@ -213,13 +213,31 @@ not required here.
 
 ## Completion Criteria
 
-- [ ] Types, client methods and mock endpoints exist for every v1.1 endpoint in
+- [x] Types, client methods and mock endpoints exist for every v1.1 endpoint in
       design-api-and-ui.md.
-- [ ] New components, tokens, rail items, panel links and screenshot routes exist.
-- [ ] typecheck, test and build pass; the fixture leak test passes.
-- [ ] No file under `src/web/src/pages/**` changed by this plan.
-- [ ] Progress Log complete.
+- [x] New components, tokens, rail items, panel links and screenshot routes exist.
+- [x] typecheck, test and build pass; the fixture leak test passes.
+- [x] No file under `src/web/src/pages/**` changed by this plan.
+- [x] Progress Log complete.
 
 ## Progress Log
 
-(append sessions per conventions section 8)
+### Session: 2026-10-10 16:34
+**Tasks Completed**: Added v1.1 API unions and DTOs, client methods, safe mock fixtures and endpoint behavior, exposure/risk/status components, critical styling, tasks/policies routes and navigation, attention badge, and screenshot targets. Added client, mock, fixture-safety, component and shell assertions.
+**Tasks In Progress**: The frontend typecheck remains blocked by two existing exhaustive status maps in the downstream issues-page plan.
+**Blockers**: None. Reconciliation request below is owned by v11-p15, not a missing dependency for this plan.
+**Reconciliation requests**: v11-p15: update `src/web/src/pages/issues/detail/IssueDetailHeader.tsx` and `src/web/src/pages/issues/IssueList.tsx` transition maps for `allowed` and `pending_verification` (empty transition lists are appropriate until the page defines supported actions). This is required for the repository typecheck after IssueStatus widened. Both files are outside this plan's writePaths and were left untouched.
+**Hashes**: `src/web/src/api/types.ts` before=eb211899449ddeee072a226478829067118b9c8474d391e3f565af91c1f99c2e after=6aff94867bf125a0044274dac8be4d3da6886a06f339a15cc577b4a4c1e69ab5; `src/web/src/api/client.ts` before=recorded in edit-02-client.before.sha after=b5067090de5976faac90bd27396af6a551609f46715d49d71923375a9881474d; `src/web/src/api/mock/router.ts` before=recorded in edit-05-router.before.sha after=e94564a231b8def2758e21be33c84127568d45be1132e9c3d639e3afaa88cdb4; `src/web/src/api/mock/fixtures/v11.ts` before=absent after=6da1875c7f4120057bd0039a7f3eb3ce9259ab317a066d5b0a4d250a5cd5e45a; remaining changed-file hashes are preserved in `tmp/telescreen-v11-20261010-c1/v11-p04-ui-foundation/final-hashes.txt`.
+**Verification**: `bun install --frozen-lockfile` -> exit 0 (log: `/tmp/telescreen-v11-p04-ui-foundation-install.log`); `bun run typecheck` -> exit 2, missing the two status keys noted above (log: `/tmp/telescreen-v11-p04-ui-foundation-typecheck.log`); `bun run test` -> exit 0, 123 passed / 0 failed (log: `/tmp/telescreen-v11-p04-ui-foundation-test.log`); `bun run build --outDir /tmp/telescreen-v11-p04-ui-foundation-web --emptyOutDir` -> exit 0 (log: `/tmp/telescreen-v11-p04-ui-foundation-build.log`); `uv run --frozen pytest -p no:cacheprovider tests/leak/test_ui_fixtures.py` -> exit 0, 1 passed / 0 failed (log: `/tmp/telescreen-v11-p04-ui-foundation-fixture-leak.log`); `test -z "$(git diff --name-only HEAD -- src/web/package.json src/web/bun.lock)"` -> exit 0. Initial test attempt failed only the newly added risk tooltip assertion (122 passed / 1 failed); corrected the assertion to target the tooltip wrapper, then the final full test run passed.
+**Notes**: No page files or dependency manifests changed. `bun run screenshots` is owned by v11-p16 after its pages exist and was not run here.
+
+**Owner resolution (2026-10-10)**: The owner added placeholder entries `allowed: []` and `pending_verification: []` to the exhaustive transition maps in `src/web/src/pages/issues/detail/IssueDetailHeader.tsx` and `src/web/src/pages/issues/IssueList.tsx` (v11-p15 replaces them with real transitions). `bun run typecheck` exits 0. Report fixed findings only in addressedFeedback (conventions 7a).
+
+### Session: 2026-10-10 16:49
+**Tasks Completed**: Re-ran the assigned frontend and fixture-leak gates on the combined tree; all passed. The owner-provided issue-page transition placeholders allowed typecheck to pass. No page or dependency-manifest files were edited by this plan.
+**Tasks In Progress**: None for v11-p04.
+**Blockers**: None.
+**Reconciliation requests**: The earlier v11-p15 transition-map request is resolved by the owner-provided placeholders; v11-p15 owns replacing them with real transitions.
+**Hashes**: `impl-plans/active/v11-p04-ui-foundation.md` before=67782864c2b3520f94f9fc7c0f99d9a26234ec503cdfb481b4530b3a4ddf9b96; after recorded after this entry is written.
+**Verification**: `cd src/web && bun install --frozen-lockfile` -> exit 0 (log: `/tmp/telescreen-v11-p04-ui-foundation-install.log`); `cd src/web && bun run typecheck` -> exit 0 (log: `/tmp/telescreen-v11-p04-ui-foundation-typecheck.log`); `cd src/web && bun run test` -> exit 0, 26 files and 123 tests passed / 0 failed (log: `/tmp/telescreen-v11-p04-ui-foundation-test.log`); `cd src/web && bun run build --outDir /tmp/telescreen-v11-p04-ui-foundation-web --emptyOutDir` -> exit 0 (log: `/tmp/telescreen-v11-p04-ui-foundation-build.log`); `uv run --frozen pytest -p no:cacheprovider tests/leak/test_ui_fixtures.py` -> exit 0, 1 passed / 0 failed (log: `/tmp/telescreen-v11-p04-ui-foundation-fixture-leak.log`); `test -z "$(git diff --name-only HEAD -- src/web/package.json src/web/bun.lock)"` -> exit 0.
+**Notes**: Frozen install and all required verification gates passed against the combined tree. Screenshot smoke remains assigned to v11-p16 after its pages exist.

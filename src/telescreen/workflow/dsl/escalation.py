@@ -12,6 +12,7 @@ from telescreen.core.json import (
     JsonKind,
     JsonValue,
     json_array,
+    json_int,
     json_object,
     json_str,
     parse_json,
@@ -30,6 +31,7 @@ class EscalationTier:
     assign_to: str
     notify: tuple[str, ...]
     channels: tuple[NotificationChannel, ...]
+    min_risk: int | None = None
 
 
 @dataclass(frozen=True)
@@ -78,6 +80,12 @@ def _tier(value: JsonValue, index: int, issues: list[ValidationIssue]) -> Escala
     if value.kind is not JsonKind.OBJECT:
         issues.append(ValidationIssue(path, "invalid_type"))
         return EscalationTier(timedelta(0), "", (), ())
+    min_risk_value: JsonValue | None = value.get("min_risk")
+    min_risk: int | None = min_risk_value.as_int() if min_risk_value is not None else None
+    if min_risk_value is not None and min_risk is None:
+        issues.append(ValidationIssue(f"{path}/min_risk", "invalid_type"))
+    elif min_risk is not None and not 0 <= min_risk <= 100:
+        issues.append(ValidationIssue(f"{path}/min_risk", "invalid_value"))
     after_value: JsonValue | None = value.get("after")
     after_text: str | None = after_value.as_str() if after_value is not None else None
     try:
@@ -105,7 +113,7 @@ def _tier(value: JsonValue, index: int, issues: list[ValidationIssue]) -> Escala
             channels.append(NotificationChannel(raw))
         except ValueError:
             issues.append(ValidationIssue(f"{path}/channels/{channel_index}", "invalid_value"))
-    return EscalationTier(after, assign_to, notify, tuple(channels))
+    return EscalationTier(after, assign_to, notify, tuple(channels), min_risk)
 
 
 def _read_string_array(
@@ -131,30 +139,23 @@ def escalation_to_json(policy: EscalationPolicySpec) -> JsonValue:
             ("name", json_str(policy.name)),
             (
                 "tiers",
-                json_array(
-                    tuple(
-                        json_object(
-                            (
-                                ("after", json_str(format_duration(tier.after))),
-                                ("assign_to", json_str(tier.assign_to)),
-                                (
-                                    "notify",
-                                    json_array(tuple(json_str(item) for item in tier.notify)),
-                                ),
-                                (
-                                    "channels",
-                                    json_array(
-                                        tuple(json_str(item.value) for item in tier.channels)
-                                    ),
-                                ),
-                            )
-                        )
-                        for tier in policy.tiers
-                    )
-                ),
+                json_array(tuple(_tier_json(tier) for tier in policy.tiers)),
             ),
         )
     )
+
+
+def _tier_json(tier: EscalationTier) -> JsonValue:
+    """Serialize one tier while omitting the optional threshold when absent."""
+    members: list[tuple[str, JsonValue]] = [
+        ("after", json_str(format_duration(tier.after))),
+        ("assign_to", json_str(tier.assign_to)),
+        ("notify", json_array(tuple(json_str(item) for item in tier.notify))),
+        ("channels", json_array(tuple(json_str(item.value) for item in tier.channels))),
+    ]
+    if tier.min_risk is not None:
+        members.append(("min_risk", json_int(tier.min_risk)))
+    return json_object(members)
 
 
 def escalation_from_json(value: JsonValue) -> EscalationPolicySpec:

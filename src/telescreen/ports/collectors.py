@@ -1,5 +1,7 @@
 """Collector adapter DTOs and protocols."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
@@ -9,12 +11,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.core.json import JsonValue
 from telescreen.core.vocabulary import (
+    ChannelKind,
     CollectorKind,
+    CoverageState,
     DetectorKind,
     ErrorCode,
+    IdentityKind,
+    PlacementKind,
+    RepoVisibility,
     ScanJobStatus,
     ScanTrigger,
     TriggerMode,
+    UnsupportedReason,
+    Visibility,
 )
 
 
@@ -95,6 +104,49 @@ class ResourceContent:
     raw_locator: str = field(repr=False)
     display_title: str = field(repr=False)
     ref: ResourceRef | None = None
+    exposure: Exposure | None = None
+    owner: OwnerIdentity | None = None
+    placement: tuple[PlacementRef, ...] = ()
+    modified_at: datetime | None = None
+    coverage: Coverage | None = None
+    removed: bool = False
+
+
+@dataclass(frozen=True)
+class Exposure:
+    """Transient, count-only exposure context from a provider."""
+
+    visibility: Visibility
+    external_principal_count: int = 0
+    shared_drive: bool = False
+    channel_kind: ChannelKind | None = None
+    repo_visibility: RepoVisibility | None = None
+    is_fork: bool = False
+
+
+@dataclass(frozen=True)
+class Coverage:
+    """Safe resource scan coverage summary."""
+
+    state: CoverageState
+    reason: UnsupportedReason | None = None
+    truncated_bytes: int = 0
+
+
+@dataclass(frozen=True)
+class OwnerIdentity:
+    """Transient provider owner identity, excluded from representations."""
+
+    kind: IdentityKind
+    value: str = field(repr=False)
+
+
+@dataclass(frozen=True)
+class PlacementRef:
+    """Transient provider container reference, excluded from representations."""
+
+    kind: PlacementKind
+    value: str = field(repr=False)
 
 
 @dataclass(frozen=True)
@@ -253,6 +305,7 @@ class RescanKind(StrEnum):
     FOUND = "found"
     CLEAN = "clean"
     ERROR = "error"
+    INCONCLUSIVE = "inconclusive"
 
 
 @dataclass(frozen=True)
@@ -261,6 +314,7 @@ class RescanResult:
 
     kind: RescanKind
     error_code: ErrorCode | None = None
+    coverage: CoverageState | None = None
 
 
 class ResourceRescanner(Protocol):

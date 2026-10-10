@@ -1,6 +1,6 @@
 # V11-P12 Police Bureau: Accept resource_exposures, Claim Liveness, Police Health
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-police-contract.md ("Contract 1.1"); design-docs/specs/design-v1-1-dspm-adoption.md sections 3 (Police row) and 8 (Police health)
 **Created**: 2026-10-10
 **Last Updated**: 2026-10-10
@@ -120,10 +120,24 @@ Conventions section 7 with `<src>` = `src/telescreen/police` and `<tests>` =
 
 ## Completion Criteria
 
-- [ ] Exposures parsed, filtered and forwarded; claim liveness; health provider and view.
-- [ ] Tests pass; scoped gates pass; the typelint grep is empty.
-- [ ] Progress Log complete.
+- [x] Exposures parsed, filtered and forwarded; claim liveness; health provider and view.
+- [x] Tests pass; scoped gates pass; the typelint grep is empty.
+- [x] Progress Log complete.
 
 ## Progress Log
 
-(append sessions per conventions section 8)
+### Session: 2026-10-10 17:13 JST
+**Tasks Completed**: Parsed Contract 1.1 resource exposures for detect and scan_shard, filtered them against finding/complete locators, forwarded safe DTOs, counted dropped entries in audit details, retained finding exposures on partial shard failures, updated every active authenticated pull claim as a heartbeat, and added worker health view/provider with transition alerts.
+**Tasks In Progress**: None.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: src/telescreen/police/results.py before=0fa8b43f42addf08ce09b101315f0c5cbf4b12b122844e034453b1ca5d4030d2 after=800afa13b4e815007249acfd5538247ba418d40dd7c3571dc15a8ac7afab3b26; src/telescreen/police/claims.py before=729f2a421cb2f992ebc85d2fb838a139350475fde878ee1285dae1ddc30e204c after=ff5c99dec10cccb67b251c94b9b0423b289f4c3a7d43ad2feb1fba2cc30d893a; src/telescreen/police/health.py before=absent after=d7ca41a2d85f52fccc166810e4b4f40b39d474ef174f8fb43adbbb5b870d7a3e; tests/police/test_v11_police.py before=absent after=b2f42231b3628fd49469dd0cad83376cb9f3a16a2c78e785130c69d04e51e07c; this plan before=c6fb44e91c6087da949e0d71d6c1db518a4c0979631905c955de7e0895b5c2cd.
+**Verification**:
+- set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/police tests/police -> exit 0 (14 files formatted).
+- set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/police tests/police -> exit 0 (all checks passed).
+- set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/police tests/police -> exit 0 (all checks passed).
+- set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/police 2>&1 | tee /tmp/telescreen-v11-p12-police-bureau-pytest.log -> exit 0, 25 passed (log: /tmp/telescreen-v11-p12-police-bureau-pytest.log).
+- set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/contract > /tmp/telescreen-v11-p12-police-bureau-contract.log 2>&1 -> exit 0, 18 passed (log: /tmp/telescreen-v11-p12-police-bureau-contract.log).
+- set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v11-p12-police-bureau-typelint.log 2>&1; ! grep -E '^(src/telescreen/police/|tests/police/)' /tmp/telescreen-v11-p12-police-bureau-typelint.log -> exit 0 (no matching diagnostics).
+- test "$(grep -c '^- \\[ \\]' impl-plans/active/v11-p12-police-bureau.md)" -eq 0 -> exit 0 (all Completion Criteria checked).
+**Notes**: Superseded initial Police test run was 1 failed/23 passed because SQLite read the UTC heartbeat back without tzinfo; the assertion now normalizes via ensure_utc, and final current-source Police tests pass 25/25. Captured failure output is preserved at tmp/telescreen-v11-20261010-c1/v11-p12-police-bureau/step6-implement/prior-attempt-1-police-pytest.txt. Initial formatter and lint issues were corrected before final passing gates. Contract and health alerts contain no task inputs or locators. Final plan hash is recorded in tmp/telescreen-v11-20261010-c1/v11-p12-police-bureau/step6-implement/final-hashes.txt.

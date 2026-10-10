@@ -52,6 +52,7 @@ class ClaimService:
                 )
                 if active_worker is None or active_worker.status != PoliceWorkerStatus.ACTIVE.value:
                     return ()
+                active_worker.last_heartbeat_at = now
                 tasks: tuple[PoliceTaskRow, ...] = await matching_pull_tasks(
                     session, active_worker, types, limit
                 )
@@ -61,7 +62,6 @@ class ClaimService:
                     task.attempt += 1
                     task.lease_expires_at = now + timedelta(seconds=60)
                 if tasks:
-                    active_worker.last_heartbeat_at = now
                     claimed_ids = tuple(task.id for task in tasks)
             if claimed_ids:
                 async with sessions() as session:

@@ -10,6 +10,7 @@ from telescreen.contracts.validator import validate
 from telescreen_police_sdk import _json
 from telescreen_police_sdk.models import (
     Callback,
+    ChannelKind,
     ClaimRequest,
     Manifest,
     MaskedFinding,
@@ -17,6 +18,8 @@ from telescreen_police_sdk.models import (
     Outcome,
     PartitionResult,
     Registration,
+    RepoVisibility,
+    ResourceExposure,
     ResultEnvelope,
     ResultError,
     ResultStatus,
@@ -24,6 +27,7 @@ from telescreen_police_sdk.models import (
     Shard,
     ShardStats,
     TaskEnvelope,
+    Visibility,
 )
 
 
@@ -65,6 +69,18 @@ def test_sdk_models_emit_schema_valid_payloads() -> None:
         outcome=Outcome.PASSED,
         result_token="result-token",
     )
+    exposure: ResourceExposure = ResourceExposure(
+        "resource-1",
+        Visibility.PUBLIC,
+        external_principal_count=2,
+        shared_drive=True,
+        channel_kind=ChannelKind.CONNECT,
+        repo_visibility=RepoVisibility.INTERNAL,
+        is_fork=False,
+    )
+    exposure_result: ResultEnvelope = ResultEnvelope(
+        "task-exposure", ResultStatus.COMPLETED, resource_exposures=(exposure,)
+    )
     heartbeat: _json.Json = _json.obj((("task_ids", _json.array((_json.string("task-1"),))),))
     error_response: _json.Json = _json.obj(
         (("error", ResultError("validation_error", "The request is invalid.").to_json()),)
@@ -82,6 +98,7 @@ def test_sdk_models_emit_schema_valid_payloads() -> None:
         ("result-envelope.schema.json", failed.to_json()),
         ("result-envelope.schema.json", scan_shard.to_json()),
         ("result-envelope.schema.json", callback_result.to_json()),
+        ("result-envelope.schema.json", exposure_result.to_json()),
         ("heartbeat-request.schema.json", heartbeat),
         ("error.schema.json", error_response),
     )
@@ -93,7 +110,7 @@ def test_sdk_parses_every_shared_contract_example() -> None:
     """Every contract example round-trips through its SDK model or closed JSON model."""
     examples: Traversable = files("telescreen.contracts").joinpath("police", "v1", "examples")
     names: tuple[str, ...] = tuple(sorted(item.name for item in examples.iterdir()))
-    assert len(names) == 14
+    assert len(names) == 16
     for name in names:
         value: _json.Json = _json.parse(examples.joinpath(name).read_bytes())
         round_trip: _json.Json = value
@@ -115,6 +132,8 @@ def test_sdk_parses_every_shared_contract_example() -> None:
             round_trip = PartitionResult.from_json(value).to_json()
         elif name == "registration.json":
             round_trip = Registration.from_json(value).to_json()
+        elif name == "resource-exposure.json":
+            round_trip = ResourceExposure.from_json(value).to_json()
         elif name.startswith("result-envelope"):
             round_trip = ResultEnvelope.from_json(value).to_json()
         elif name == "task-envelope.json":

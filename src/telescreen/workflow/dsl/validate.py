@@ -99,7 +99,14 @@ def _validate_step(step: StepSpec, path: str, issues: list[ValidationIssue]) -> 
     if isinstance(step, HumanTaskStep):
         if not step.outcomes:
             issues.append(ValidationIssue(f"{path}/outcomes", "empty_outcomes"))
-        _recipient(step.assignee, f"{path}/assignee", issues)
+        if step.kind.value == "owner_review":
+            names: frozenset[str] = frozenset(route.name for route in step.outcomes)
+            if len(step.outcomes) != 4 or names != frozenset(
+                ("remove", "restrict", "exception", "not_mine")
+            ):
+                issues.append(ValidationIssue(f"{path}/outcomes", "owner_review_outcomes"))
+        if step.assignee != "issue:assignee":
+            _recipient(step.assignee, f"{path}/assignee", issues)
     if isinstance(step, EvidenceUploadStep):
         _recipient(step.assignee, f"{path}/assignee", issues)
     if isinstance(step, SendBackStep) and step.max_send_backs < 1:

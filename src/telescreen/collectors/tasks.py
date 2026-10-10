@@ -7,19 +7,29 @@ from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from telescreen.collectors.codec import CursorState, cursor_from_json
+from telescreen.collectors.coverage import CoverageRecorder, coverage_state
+from telescreen.collectors.health import CollectorHealthRecorder
 from telescreen.collectors.registry import CollectorRegistry
 from telescreen.collectors.repository import CollectorRepository
 from telescreen.collectors.service import CollectorService
 from telescreen.core.clock import Clock
 from telescreen.core.errors import TelescreenError
 from telescreen.core.json import JsonValue, json_object, json_str
-from telescreen.core.vocabulary import EngineTaskKind, ErrorCode, ScanJobStatus, ScanTrigger
+from telescreen.core.vocabulary import (
+    EngineTaskKind,
+    ErrorCode,
+    ScanJobStatus,
+    ScanTrigger,
+    Visibility,
+)
+from telescreen.db.models import ScanJobRow
 from telescreen.masking.fingerprint import Fingerprinter
 from telescreen.masking.redact import Redactor
 from telescreen.ports.collectors import (
     ChangePage,
     CollectorConfig,
     CollectorCursor,
+    Coverage,
     RateLimited,
     ResourceContent,
     ResourceGoneError,
@@ -57,6 +67,8 @@ class CollectorScanHandler(TaskHandler):
     clock: Clock
     max_pages: int = 20
     kind: EngineTaskKind = EngineTaskKind.COLLECTOR_SCAN
+    coverage: CoverageRecorder | None = None
+    health: CollectorHealthRecorder | None = None
 
     async def handle(self, task: ClaimedTask) -> TaskResult:
         """Handle one collector scan and map transient failures to stable retries."""
@@ -93,18 +105,24 @@ class CollectorScanHandler(TaskHandler):
                     raise TelescreenError(ErrorCode.VALIDATION_ERROR, "invalid resource reference")
                 ref: ResourceRef = self.registry.adapter(config.kind).ref_from_json(ref_json)
                 if mode == "removed":
-                    outcome: RecordOutcome = await self._record_empty(config, ref, job_id, True)
+                    outcome: RecordOutcome = await self._record_empty(
+                        config, ref, job_id, True, removed=True
+                    )
                 else:
                     try:
                         content: ResourceContent = await self.registry.adapter(config.kind).fetch(
                             config, ref
                         )
                         outcome = await self.scanner.scan_resource(content, job_id)
+                        resource_key: str = self.fingerprinter.resource_key(
+                            config.kind.value, ref.raw_locator
+                        )
+                        await self._record_coverage(config, content, resource_key, job_id, outcome)
                         progress.scanned += 1
                         progress.skipped += int(outcome.skipped)
                         progress.findings += outcome.findings_inserted
                     except ResourceGoneError:
-                        outcome = await self._record_empty(config, ref, job_id, True)
+                        outcome = await self._record_empty(config, ref, job_id, True, removed=True)
                 await self._finish(
                     job_id,
                     ScanJobStatus.SUCCEEDED,
@@ -210,14 +228,15 @@ class CollectorScanHandler(TaskHandler):
                         config, ref
                     )
                     outcome: RecordOutcome = await self.scanner.scan_resource(content, job_id)
+                    await self._record_coverage(config, content, resource_key, job_id, outcome)
                     progress.findings += outcome.findings_inserted
                     progress.skipped += int(outcome.skipped)
                     progress.scanned += 1
                 except ResourceGoneError:
-                    await self._record_empty(config, ref, job_id, True)
+                    await self._record_empty(config, ref, job_id, True, removed=True)
                     progress.scanned += 1
             for ref in page.removed:
-                await self._record_empty(config, ref, job_id, True)
+                await self._record_empty(config, ref, job_id, True, removed=True)
                 progress.scanned += 1
             cursor = page.next_cursor
             state = CursorState(
@@ -244,7 +263,7 @@ class CollectorScanHandler(TaskHandler):
                     empty_ref: ResourceRef = self.registry.adapter(config.kind).ref_from_json(
                         open_ref.ref_json
                     )
-                    await self._record_empty(config, empty_ref, job_id, True)
+                    await self._record_empty(config, empty_ref, job_id, True, removed=True)
         await self._finish(
             job_id,
             ScanJobStatus.SUCCEEDED,
@@ -276,7 +295,12 @@ class CollectorScanHandler(TaskHandler):
                 )
 
     async def _record_empty(
-        self, config: CollectorConfig, ref: ResourceRef, job_id: str, complete: bool
+        self,
+        config: CollectorConfig,
+        ref: ResourceRef,
+        job_id: str,
+        complete: bool,
+        removed: bool = False,
     ) -> RecordOutcome:
         """Record a content-free complete or incomplete scan for a reference."""
         display: str = self.redactor.redact(ref.raw_locator).text
@@ -292,9 +316,42 @@ class CollectorScanHandler(TaskHandler):
             complete,
             True,
             self.clock.now(),
+            removed=removed,
         )
         async with self.sessions.begin() as session:
+            if removed and self.coverage is not None:
+                resource_key: str = self.fingerprinter.resource_key(
+                    config.kind.value, ref.raw_locator
+                )
+                await self.coverage.remove(session, config.id, resource_key)
             return await self.issues.record_scan(session, scan)
+
+    async def _record_coverage(
+        self,
+        config: CollectorConfig,
+        content: ResourceContent,
+        resource_key: str,
+        job_id: str,
+        outcome: RecordOutcome,
+    ) -> None:
+        """Record one fetched resource's aggregate and latest coverage state."""
+        if self.coverage is None:
+            return
+        visibility: Visibility = (
+            content.exposure.visibility if content.exposure is not None else Visibility.UNKNOWN
+        )
+        coverage: Coverage = coverage_state(content, outcome)
+        async with self.sessions.begin() as session:
+            await self.coverage.record(
+                session,
+                config.id,
+                job_id,
+                config.kind.value,
+                resource_key,
+                coverage,
+                visibility,
+                self.clock.now(),
+            )
 
     async def _finish(
         self,
@@ -307,9 +364,14 @@ class CollectorScanHandler(TaskHandler):
     ) -> None:
         """Persist count-only task outcome."""
         async with self.sessions.begin() as session:
+            job: ScanJobRow | None = await session.get(ScanJobRow, job_id)
             await self.scan_jobs.finish(
                 session, job_id, status, scanned, skipped, findings, error, self.clock.now()
             )
+            if self.health is not None and job is not None and job.collector_config_id is not None:
+                await self.health.job_finished(
+                    session, job.collector_config_id, status, self.clock.now()
+                )
 
 
 @dataclass(frozen=True)

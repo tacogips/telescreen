@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Annotated
 
 import pydantic
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy import Select, select
 
@@ -13,7 +13,14 @@ from telescreen.api.common.auth import Principal, require_scope
 from telescreen.api.common.context import ApiContext
 from telescreen.core.errors import TelescreenError
 from telescreen.core.json import json_str, parse_json
-from telescreen.core.vocabulary import ActorKind, ApiScope, ErrorCode
+from telescreen.core.vocabulary import (
+    ActorKind,
+    ApiScope,
+    ErrorCode,
+    ExceptionDuration,
+    HumanTaskKind,
+    RemediationAction,
+)
 from telescreen.db.models import (
     HumanTaskRow,
     StepRunRow,
@@ -21,8 +28,9 @@ from telescreen.db.models import (
     WorkflowRunRow,
 )
 from telescreen.masking.redact import Redactor
-from telescreen.ports.directory import RecipientResolver
+from telescreen.ports.directory import OwnerDirectory, RecipientResolver
 from telescreen.ports.evidence import EvidenceQuery
+from telescreen.ports.issues import IssueRemediation
 from telescreen.ports.workflow import RunSignaler, StepSignal, StepSignalKind
 from telescreen.workflow.dsl.loader import CompiledWorkflow, compiled_from_json
 from telescreen.workflow.dsl.model import EvidenceUploadStep, HumanTaskStep, StepSpec
@@ -39,6 +47,8 @@ class HumanTasksRouterDeps:
     signaler: RunSignaler
     repository: WorkflowRepository
     redactor: Redactor
+    owners: OwnerDirectory | None = None
+    remediation: IssueRemediation | None = None
 
 
 @pydantic.dataclasses.dataclass(frozen=True)
@@ -47,6 +57,7 @@ class CompleteHumanTaskBody:
 
     outcome: str
     comment: str | None = None
+    exception_duration: ExceptionDuration | None = None
 
 
 @dataclass(frozen=True)
@@ -72,17 +83,29 @@ def build_human_tasks_router(deps: HumanTasksRouterDeps) -> APIRouter:
         assignee: str | None = None,
         status: str | None = None,
     ) -> JSONResponse:
-        selected: str = (
-            (f"member:{principal.member_id}" if assignee == "me" or assignee is None else assignee)
-            if principal.member_id
-            else (assignee or "")
-        )
-        if principal.member_id is None and not principal.has(ApiScope.ADMIN) and not selected:
+        wants_me: bool = assignee == "me" or assignee is None
+        if principal.member_id is None and wants_me:
             raise TelescreenError(ErrorCode.FORBIDDEN, "task assignment scope is required")
+        if principal.member_id is not None and wants_me and deps.owners is None:
+            raise HTTPException(status_code=503, detail="owner directory unavailable")
+        if assignee == "all" and not principal.has(ApiScope.ADMIN):
+            raise TelescreenError(ErrorCode.FORBIDDEN, "administrator permission is required")
         async with deps.ctx.sessions() as session:
             query: Select[tuple[HumanTaskRow]] = select(HumanTaskRow)
-            if selected and selected != "me":
-                query = query.where(HumanTaskRow.assignee_ref == selected)
+            if wants_me and principal.member_id is not None and deps.owners is not None:
+                member_ref: str | None = await deps.owners.member_ref(session, principal.member_id)
+                team_refs: tuple[str, ...] = await deps.owners.team_refs_of(
+                    session, principal.member_id
+                )
+                assignee_refs: tuple[str, ...] = (
+                    (member_ref,) if member_ref is not None else ()
+                ) + team_refs
+                if assignee_refs:
+                    query = query.where(HumanTaskRow.assignee_ref.in_(assignee_refs))
+                else:
+                    return JSONResponse(content={"items": []})
+            elif assignee is not None and assignee != "all":
+                query = query.where(HumanTaskRow.assignee_ref == assignee)
             if status is not None:
                 query = query.where(HumanTaskRow.status == status)
             rows: list[HumanTaskRow] = list((await session.scalars(query)).all())
@@ -137,6 +160,45 @@ def build_human_tasks_router(deps: HumanTasksRouterDeps) -> APIRouter:
             safe_comment: str | None = None
             if body.comment is not None:
                 safe_comment = deps.redactor.redact(body.comment).text
+            if task.kind == HumanTaskKind.OWNER_REVIEW.value:
+                if deps.remediation is None:
+                    raise HTTPException(status_code=503, detail="issue remediation unavailable")
+                if run.issue_id is None:
+                    raise TelescreenError(ErrorCode.CONFLICT, "owner review has no issue")
+                if body.outcome == "exception":
+                    if (
+                        body.comment is None
+                        or not body.comment.strip()
+                        or safe_comment is None
+                        or not safe_comment.strip()
+                        or body.exception_duration is None
+                        or body.exception_duration is ExceptionDuration.FOREVER
+                    ):
+                        raise TelescreenError(
+                            ErrorCode.VALIDATION_ERROR,
+                            "exception comment and duration are required",
+                        )
+                    await deps.remediation.request_exception(
+                        session,
+                        run.issue_id,
+                        safe_comment,
+                        body.exception_duration,
+                        principal.actor_ref(),
+                        principal.has(ApiScope.ADMIN),
+                    )
+                elif body.outcome in ("remove", "restrict"):
+                    await deps.remediation.request_verification(
+                        session,
+                        run.issue_id,
+                        RemediationAction(body.outcome),
+                        False,
+                        principal.actor_ref(),
+                        safe_comment,
+                    )
+                elif body.outcome == "not_mine":
+                    await deps.remediation.release_to_team(
+                        session, run.issue_id, principal.actor_ref()
+                    )
             now: datetime = deps.ctx.clock.now()
             task.status = "completed"
             task.outcome = body.outcome

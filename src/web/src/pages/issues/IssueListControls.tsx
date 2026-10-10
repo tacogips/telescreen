@@ -22,6 +22,7 @@ const SORTS = [
     detail: "When the issue was first reported",
   },
   { value: "times_seen", label: "Findings", detail: "Number of findings" },
+  { value: "risk", label: "Risk", detail: "Highest risk first" },
 ] as const;
 
 export function IssueListControls(

@@ -295,7 +295,7 @@ async def test_grouping_counts_duplicate_scans_auto_resolve_and_regress() -> Non
             )
         assert resolved_token is not None
         assert resolved_token.status == IssueStatus.RESOLVED.value
-        assert resolved_token.resolution == "auto"
+        assert resolved_token.resolution == "verified_removed"
         assert any(item.kind == IssueHistoryKind.AUTO_RESOLVED.value for item in history)
 
         harness.clock.advance(timedelta(hours=1))
@@ -330,9 +330,12 @@ async def test_ignored_issue_only_updates_counters() -> None:
         event_count: int = len(harness.events.events)
         async with harness.db.sessions.begin() as session:
             issue: IssueRow = list((await session.scalars(select(IssueRow))).all())[0]
-            await harness.service.change_status(
-                session, issue.id, IssueStatus.IGNORED, "member:test"
-            )
+            with pytest.raises(TelescreenError) as error:
+                await harness.service.change_status(
+                    session, issue.id, IssueStatus.IGNORED, "member:test"
+                )
+            assert error.value.code is ErrorCode.INVALID_TRANSITION
+            issue.status = IssueStatus.IGNORED.value
         async with harness.db.sessions.begin() as session:
             outcome: RecordOutcome = await harness.service.record_scan(
                 session,
@@ -412,6 +415,10 @@ async def test_resolve_unchecked_only_resolves_old_sweep_covered_issues() -> Non
             issue.status for issue in issues if issue.display_locator == "covered-recent"
         )
         assert covered_status == IssueStatus.RESOLVED.value
+        covered_issue: IssueRow = next(
+            issue for issue in issues if issue.display_locator == "covered-old"
+        )
+        assert covered_issue.resolution == "resource_deleted"
         assert uncovered_status == IssueStatus.UNRESOLVED.value
         assert recent_status == IssueStatus.UNRESOLVED.value
     finally:

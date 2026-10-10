@@ -8,10 +8,12 @@ from datetime import timedelta
 from sqlalchemy import select
 
 from telescreen.core.clock import Clock
+from telescreen.core.errors import TelescreenError
 from telescreen.core.ids import new_id
 from telescreen.core.json import json_object, json_str
 from telescreen.core.vocabulary import (
     EngineTaskKind,
+    ErrorCode,
     HumanTaskKind,
     NotificationChannel,
     StepType,
@@ -19,6 +21,7 @@ from telescreen.core.vocabulary import (
 from telescreen.db.models import EscalationPolicyRow, HumanTaskRow
 from telescreen.masking.redact import Redactor
 from telescreen.ports.directory import RecipientResolver
+from telescreen.ports.issues import IssueReader, IssueSnapshot
 from telescreen.ports.notifications import NotificationRequest, NotificationSender
 from telescreen.ports.workflow import StepSignal, StepSignalKind, TaskSpec
 from telescreen.workflow.dsl.model import EvidenceUploadStep, HumanTaskStep, NamedRoute
@@ -38,14 +41,31 @@ class HumanTaskExecutor:
     clock: Clock
     redactor: Redactor
     step_type: StepType = StepType.HUMAN_TASK
+    issues: IssueReader | None = None
+    public_base_url: str | None = None
 
     async def execute(self, ctx: StepContext) -> StepOutcome:
         """Persist a human task and schedule its notification and SLA check."""
         if isinstance(ctx.step, HumanTaskStep):
             step: HumanTaskStep = ctx.step
-            kind: HumanTaskKind = HumanTaskKind.APPROVAL
-            title: str = render(step.title, ctx.context)
+            kind: HumanTaskKind = step.kind
             assignee: str = step.assignee
+            issue_snapshot: IssueSnapshot | None = None
+            if kind is HumanTaskKind.OWNER_REVIEW or assignee == "issue:assignee":
+                if ctx.issue_id is None or self.issues is None:
+                    return StepOutcome.failed(ErrorCode.RECIPIENT_UNKNOWN, False)
+                issue_snapshot = await self.issues.get(ctx.session, ctx.issue_id)
+                if issue_snapshot is None:
+                    return StepOutcome.failed(ErrorCode.RECIPIENT_UNKNOWN, False)
+            if assignee == "issue:assignee":
+                if issue_snapshot is None or issue_snapshot.assignee_ref is None:
+                    return StepOutcome.failed(ErrorCode.RECIPIENT_UNKNOWN, False)
+                assignee = issue_snapshot.assignee_ref
+            title: str = (
+                f"Telescreen: review TELE-{issue_snapshot.number}"
+                if kind is HumanTaskKind.OWNER_REVIEW and issue_snapshot is not None
+                else render(step.title, ctx.context)
+            )
             sla: timedelta | None = step.sla
             policy_name: str | None = step.escalation_policy
             notify: bool = step.notify_on_assign
@@ -58,9 +78,6 @@ class HumanTaskExecutor:
             policy_name = step_evidence.escalation_policy
             notify = True
         else:
-            from telescreen.core.errors import TelescreenError
-            from telescreen.core.vocabulary import ErrorCode
-
             raise TelescreenError(ErrorCode.WORKFLOW_INVALID, "workflow step type mismatch")
         safe_title: str = self.redactor.redact(title).text[:512]
         safe_assignee: str = self.redactor.redact(assignee).text[:256]
@@ -86,7 +103,14 @@ class HumanTaskExecutor:
         ctx.session.add(row)
         await ctx.session.flush()
         if notify:
-            await self._notify(ctx, human_task_id, assignee, safe_title)
+            await self._notify(
+                ctx,
+                human_task_id,
+                assignee,
+                safe_title,
+                issue_snapshot if isinstance(ctx.step, HumanTaskStep) else None,
+                kind is HumanTaskKind.OWNER_REVIEW,
+            )
         if sla is not None:
             await self.queue.enqueue(
                 ctx.session,
@@ -125,7 +149,15 @@ class HumanTaskExecutor:
             route,
         )
 
-    async def _notify(self, ctx: StepContext, task_id: str, assignee: str, title: str) -> None:
+    async def _notify(
+        self,
+        ctx: StepContext,
+        task_id: str,
+        assignee: str,
+        title: str,
+        issue: IssueSnapshot | None,
+        owner_review: bool,
+    ) -> None:
         """Queue assignee notifications by recipient reference on every reachable channel.
 
         The sender resolves references at delivery time, so the assignee reference itself is
@@ -135,6 +167,34 @@ class HumanTaskExecutor:
         reachable: tuple[ReachableRef, ...] = await reachable_refs(
             self.resolver, ctx.session, (assignee,)
         )
+        if owner_review and assignee.startswith("member:"):
+            channel: NotificationChannel = (
+                NotificationChannel.SLACK
+                if refs_for_channel(reachable, NotificationChannel.SLACK)
+                else NotificationChannel.EMAIL
+            )
+            refs: tuple[str, ...] = refs_for_channel(reachable, channel)
+            if refs and issue is not None:
+                body_lines: list[str] = [
+                    f"TELE-{issue.number} {issue.short_id}",
+                    f"{issue.rule_class.value} {issue.severity.value} {issue.visibility.value}",
+                    f"risk {issue.risk_score}",
+                ]
+                if self.public_base_url is not None:
+                    body_lines.append(f"{self.public_base_url.rstrip('/')}/my-tasks")
+                await self.notifications.send(
+                    ctx.session,
+                    NotificationRequest(
+                        channel,
+                        refs,
+                        f"Telescreen: review TELE-{issue.number}",
+                        "\n".join(body_lines),
+                        "system:workflow",
+                        ctx.run_id,
+                        ctx.issue_id,
+                    ),
+                )
+            return
         for channel in (NotificationChannel.EMAIL, NotificationChannel.SLACK):
             refs: tuple[str, ...] = refs_for_channel(reachable, channel)
             if refs:

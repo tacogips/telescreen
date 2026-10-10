@@ -1,6 +1,6 @@
 # V11-P20 Docs and Examples: README v1.1 Features, Owner-Review Workflow Example, Compose Settings
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-1-dspm-adoption.md sections 1 (F1-F10), 7 (owner-review example), 15 (owner decisions); design-docs/specs/command.md (v1.1 environment variables)
 **Created**: 2026-10-10
 **Last Updated**: 2026-10-10
@@ -98,11 +98,39 @@ first, and record the command actually used.
 
 ## Completion Criteria
 
-- [ ] README sections updated as listed; the example workflow, escalation tier and env
+- [x] README sections updated as listed; the example workflow, escalation tier and env
       placeholders added.
-- [ ] Example tests and the validate command pass.
-- [ ] Progress Log complete.
+- [x] Example tests and the validate command pass.
+- [x] Progress Log complete.
 
 ## Progress Log
 
-(append sessions per conventions section 8)
+### Session: 2026-10-10 10:36 UTC
+**Tasks Completed**: Added the README Features (v1.1), data-handling, API, Web application,
+and configuration updates; added the owner-review workflow and `min_risk` escalation
+example; added v1.1 Compose placeholders and settings notes; extended example tests for
+owner-review semantics, escalation risk, and env-template privacy. No design-doc or
+application source files changed.
+**Tasks In Progress**: None.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: README.md after=9a9c32e76a1eea5755986f445367cd7b6f03fe27d575152bb54d85528490673e;
+examples/workflows/owner-review.yaml after=baa25b27e3d68173e7c78f6294ed95a7b4f6b8c0f836ffca86ecad5e872ab6f2;
+examples/workflows/escalation-policies.json after=b7ced8c77816977c3599b895e803588adf7e74a01a08cf92d73d0fd94feac796;
+examples/compose/.env.example after=5cd1f624b9cd6c5971218bf93474954b92154c3eb3cffd48a70a32843a989757;
+examples/compose/README.md after=f1b52eb8518ed61445a67a3b0c115acf2ae4e8c3b31981a891f3b12b93cfaebd;
+tests/examples/test_examples.py after=2e78a1a52e73fc1f8a7fe51712ab7e43c4ea0c8a8abb2ddec2abf3261a0b4773.
+**Verification**:
+- `uv run --frozen python -m telescreen --help` -> exit 0 (log: `/tmp/telescreen-v11-p20-docs-examples-cli-help.log`).
+- `uv run --frozen ruff format --check --no-cache tests/examples` -> exit 0 (log: `/tmp/telescreen-v11-p20-docs-examples-format-verified.log`).
+- `uv run --frozen ruff check --no-cache tests/examples` -> exit 0 (log: `/tmp/telescreen-v11-p20-docs-examples-ruff-verified.log`).
+- `uv run --frozen ty check tests/examples` -> exit 0 (log: `/tmp/telescreen-v11-p20-docs-examples-ty-verified.log`).
+- `uv run --frozen pytest -p no:cacheprovider tests/examples` -> exit 0, 16 passed (log: `/tmp/telescreen-v11-p20-docs-examples-pytest-verified.log`).
+- `uv run --frozen python tools/typelint.py` plus owned-path grep `(^|/)tests/examples/` -> exit 0, 346 files clean and no owned-path findings (log: `/tmp/telescreen-v11-p20-docs-examples-typelint-verified.log`).
+- `uv run --frozen python -m telescreen workflow validate examples/workflows/owner-review.yaml` -> exit 0 (log: `/tmp/telescreen-v11-p20-docs-examples-validate-verified.log`).
+- `grep -c '^- \[ \]' impl-plans/active/v11-p20-docs-examples.md` -> 0 unchecked criteria.
+**Notes**: Intermediate verification found and fixed an import-order issue, aligned the
+Compose password example with the built-in placeholder detector, and updated the env
+placeholder test to accept its exact `changeme` token. The corresponding earlier Ruff
+and pytest runs exited nonzero and are superseded by the passing final runs above. No
+shared-path or ownership conflicts observed. Plan length remains below 400 lines.

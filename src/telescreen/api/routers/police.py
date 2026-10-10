@@ -31,6 +31,7 @@ from telescreen.core.vocabulary import ApiScope, ErrorCode, PoliceTaskStatus, Po
 from telescreen.db.models import PoliceTaskRow, PoliceWorkerRow
 from telescreen.db.replay import ReplayNonceStore
 from telescreen.police.claims import ClaimRequest, ClaimService
+from telescreen.police.health import WorkerHealth, list_worker_health
 from telescreen.police.registration import RegistrationService, hash_token, worker_by_token
 from telescreen.police.repository import PoliceRepository
 from telescreen.police.results import ResultService
@@ -295,6 +296,9 @@ def build_police_router(deps: PoliceRouterDeps) -> APIRouter:
         del principal
         async with deps.ctx.sessions() as session:
             workers: tuple[PoliceWorkerRow, ...] = await deps.repository.workers(session)
+            health: tuple[tuple[str, WorkerHealth], ...] = await list_worker_health(
+                session, deps.ctx.clock.now()
+            )
         return JSONResponse(
             content={
                 "items": [
@@ -309,6 +313,14 @@ def build_police_router(deps: PoliceRouterDeps) -> APIRouter:
                         "status": worker.status,
                         "last_heartbeat_at": worker.last_heartbeat_at.isoformat()
                         if worker.last_heartbeat_at
+                        else None,
+                        "health": {
+                            "status": worker_health.status.value,
+                            "conditions": [
+                                condition.value for condition in worker_health.conditions
+                            ],
+                        }
+                        if (worker_health := _health_for(health, worker.id)) is not None
                         else None,
                     }
                     for worker in workers
@@ -345,6 +357,13 @@ def build_police_router(deps: PoliceRouterDeps) -> APIRouter:
         return JSONResponse(content={"id": worker_id, "status": PoliceWorkerStatus.DISABLED.value})
 
     return router
+
+
+def _health_for(
+    health: tuple[tuple[str, WorkerHealth], ...], worker_id: str
+) -> WorkerHealth | None:
+    """Find the calculated health view for a worker."""
+    return next((view for candidate, view in health if candidate == worker_id), None)
 
 
 async def _worker_for_token(

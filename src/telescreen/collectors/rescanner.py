@@ -4,15 +4,24 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from telescreen.collectors.coverage import CoverageRecorder, coverage_state
 from telescreen.collectors.registry import CollectorRegistry
 from telescreen.collectors.repository import CollectorRepository, ScanJobStoreImpl
 from telescreen.core.clock import Clock
-from telescreen.core.vocabulary import DetectorKind, ErrorCode, ScanJobStatus, ScanTrigger
+from telescreen.core.vocabulary import (
+    CoverageState,
+    DetectorKind,
+    ErrorCode,
+    ScanJobStatus,
+    ScanTrigger,
+    Visibility,
+)
 from telescreen.masking.fingerprint import Fingerprinter
 from telescreen.masking.redact import Redactor
 from telescreen.ports.collectors import (
     CollectorAdapter,
     CollectorConfig,
+    Coverage,
     RescanKind,
     RescanResult,
     ResourceContent,
@@ -36,6 +45,7 @@ class CollectorRescanner:
     fingerprinter: Fingerprinter
     redactor: Redactor
     clock: Clock
+    coverage: CoverageRecorder | None = None
 
     async def rescan(
         self, issue_id: str, detectors: tuple[DetectorKind, ...] | None = None
@@ -68,6 +78,7 @@ class CollectorRescanner:
                 ref.raw_locator,
                 snapshot.display_title,
                 ref,
+                removed=True,
             )
         except Exception:
             return RescanResult(RescanKind.ERROR, ErrorCode.FETCH_FAILED)
@@ -101,5 +112,26 @@ class CollectorRescanner:
                 None,
                 self.clock.now(),
             )
-        kind: RescanKind = RescanKind.FOUND if issue_id in outcome.issue_ids else RescanKind.CLEAN
-        return RescanResult(kind)
+            resource_key: str = self.fingerprinter.resource_key(config.kind.value, ref.raw_locator)
+            state: Coverage = coverage_state(content, outcome)
+            if self.coverage is not None:
+                visibility: Visibility = (
+                    content.exposure.visibility
+                    if content.exposure is not None
+                    else Visibility.UNKNOWN
+                )
+                await self.coverage.record(
+                    session,
+                    config.id,
+                    job_id,
+                    config.kind.value,
+                    resource_key,
+                    state,
+                    visibility,
+                    self.clock.now(),
+                )
+        if issue_id in outcome.issue_ids:
+            return RescanResult(RescanKind.FOUND)
+        if outcome.skipped or state.state is not CoverageState.SCANNED:
+            return RescanResult(RescanKind.INCONCLUSIVE, ErrorCode.SCAN_INCOMPLETE, state.state)
+        return RescanResult(RescanKind.CLEAN)

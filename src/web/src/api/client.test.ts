@@ -1,9 +1,53 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, WorkflowValidationError, apiFetch, auditApi, collectorsApi, evidenceApi, getToken, issuesApi, rawFetch, setToken, workflowsApi } from "./client";
+import { ApiError, WorkflowValidationError, apiFetch, auditApi, collectorsApi, directoryApi, evidenceApi, exceptionsApi, getToken, humanTasksApi, issuesApi, policiesApi, rawFetch, setToken, workflowsApi } from "./client";
 
 afterEach(() => { vi.unstubAllGlobals(); sessionStorage.clear(); });
 
 describe("API wire contract", () => {
+  it("sends the v1.1 UI endpoints with their designed paths and bodies", async () => {
+    const calls: Readonly<{ path: string; method: string; body: string | undefined }>[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ path: String(input), method: init?.method ?? "GET", body: typeof init?.body === "string" ? init.body : undefined });
+      return Response.json({ items: [], next_cursor: null });
+    }));
+    await issuesApi.list({ exposure: "public", sort: "risk", assignee: "me" });
+    await issuesApi.remediation("iss-01", { action: "remove", include_linked: true, note: "reviewed" });
+    await issuesApi.resolve("iss-01", { reason: "false_positive", note: "reviewed" });
+    await issuesApi.occurrences("iss-01");
+    await issuesApi.requestException("iss-01", { reason: "reviewed", duration: "7d" });
+    await exceptionsApi.list({ status: "requested", issue_id: "iss-01", approver: "me" });
+    await exceptionsApi.approve("exc-01", "approved");
+    await exceptionsApi.reject("exc-01");
+    await exceptionsApi.revoke("exc-01");
+    await policiesApi.list();
+    await policiesApi.get("Example policy");
+    await policiesApi.version("Example policy", 2);
+    await policiesApi.validate({ source_format: "yaml", source_text: "name: Example" });
+    await policiesApi.create({ source_format: "yaml", source_text: "name: Example" });
+    await policiesApi.activate("Example policy", 2);
+    await policiesApi.disable("Example policy");
+    await collectorsApi.coverage("col-01");
+    await collectorsApi.coverageResources("col-01", { state: "partial", limit: 5 });
+    await directoryApi.identities("alex");
+    await directoryApi.addIdentity("alex", { kind: "slack", value: "masked" });
+    await directoryApi.removeIdentity("alex", "identity-1");
+    await directoryApi.createTeam({ slug: "response", name: "Response", lead: "alex" });
+    await directoryApi.setTeamMembers("response", ["alex"], "alex");
+    await humanTasksApi.complete("task-01", "exception", "reviewed", "30d");
+    expect(calls.map(({ path, method }) => `${method} ${path}`)).toEqual([
+      "GET /api/issues?exposure=public&sort=risk&assignee=me",
+      "POST /api/issues/iss-01/remediation", "POST /api/issues/iss-01/resolve", "GET /api/issues/iss-01/occurrences",
+      "POST /api/issues/iss-01/exceptions", "GET /api/exceptions?status=requested&issue_id=iss-01&approver=me",
+      "POST /api/exceptions/exc-01/approve", "POST /api/exceptions/exc-01/reject", "POST /api/exceptions/exc-01/revoke",
+      "GET /api/policies", "GET /api/policies/Example%20policy", "GET /api/policies/Example%20policy/versions/2",
+      "POST /api/policies/validate", "POST /api/policies", "POST /api/policies/Example%20policy/activate", "POST /api/policies/Example%20policy/disable", "GET /api/collectors/col-01/coverage",
+      "GET /api/collectors/col-01/coverage/resources?state=partial&limit=5", "GET /api/members/alex/identities",
+      "POST /api/members/alex/identities", "DELETE /api/members/alex/identities/identity-1", "POST /api/teams", "PUT /api/teams/response/members", "POST /api/human-tasks/task-01/complete",
+    ]);
+    expect(calls[1]?.body).toBe(JSON.stringify({ action: "remove", include_linked: true, note: "reviewed" }));
+    expect(calls[23]?.body).toBe(JSON.stringify({ outcome: "exception", comment: "reviewed", exception_duration: "30d" }));
+    expect(calls[22]?.body).toBe(JSON.stringify({ handles: ["alex"], lead: "alex" }));
+  });
   it("uses global issue stats and its query parameters", async () => {
     const fetchSpy = vi.fn(async (_input: RequestInfo | URL) => new Response(JSON.stringify({ buckets: [] }), { status: 200 }));
     vi.stubGlobal("fetch", fetchSpy);

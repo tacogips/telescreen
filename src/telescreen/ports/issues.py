@@ -8,11 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.core.vocabulary import (
     DetectorKind,
+    ExceptionDuration,
     IssueEventKind,
     IssueHistoryKind,
     IssueStatus,
+    RemediationAction,
     RuleClass,
     Severity,
+    Visibility,
 )
 from telescreen.ports.collectors import ResourceContent
 from telescreen.ports.findings import ExternalScan, RecordOutcome, ResourceScan
@@ -84,6 +87,68 @@ class IssueSnapshot:
     last_seen: datetime
     collector_config_id: str | None
     ref_json: str | None
+    assignee_ref: str | None = None
+    risk_score: int = 0
+    visibility: Visibility = Visibility.UNKNOWN
+
+
+@dataclass(frozen=True)
+class ResourceIssueRef:
+    """Safe link between a resource and one open issue."""
+
+    resource_key: str
+    issue_id: str
+    short_id: str
+
+
+@dataclass(frozen=True)
+class RemediationReceipt:
+    """Count-only result of requesting issue verification."""
+
+    issue_ids: tuple[str, ...]
+    rescans_enqueued: int
+
+
+class ResourceIssueReader(Protocol):
+    """Read open issue references for a set of keyed resources."""
+
+    async def open_issues_for_resources(
+        self, session: AsyncSession, resource_keys: tuple[str, ...]
+    ) -> tuple[ResourceIssueRef, ...]:
+        """Return open issue refs attached to the supplied resource keys."""
+        ...
+
+
+class IssueRemediation(Protocol):
+    """Request verification, exceptions, or team reassignment for an issue."""
+
+    async def request_verification(
+        self,
+        session: AsyncSession,
+        issue_id: str,
+        action: RemediationAction,
+        include_linked: bool,
+        actor_ref: str,
+        note: str | None,
+    ) -> RemediationReceipt:
+        """Queue read-only verification rescans for an issue."""
+        ...
+
+    async def request_exception(
+        self,
+        session: AsyncSession,
+        issue_id: str,
+        reason: str,
+        duration: ExceptionDuration,
+        actor_ref: str,
+        is_admin: bool,
+    ) -> str:
+        """Request a time-bounded business exception and return its id."""
+        ...
+
+    async def release_to_team(self, session: AsyncSession, issue_id: str, actor_ref: str) -> None:
+        """Release an issue from its current member assignee to its team."""
+        ...
 
 
 @dataclass(frozen=True)

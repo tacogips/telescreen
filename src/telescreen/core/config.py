@@ -1,9 +1,12 @@
 """Typed environment configuration for Telescreen."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TypeVar
 
+from croniter import croniter
+
 from telescreen.core.errors import ConfigError
+from telescreen.core.risk_weights import RiskWeights, parse_risk_weights
 from telescreen.core.secrets import EnvSource
 from telescreen.core.vocabulary import (
     DetectorKind,
@@ -13,6 +16,14 @@ from telescreen.core.vocabulary import (
 )
 
 _EnumType = TypeVar("_EnumType", bound=str)
+
+
+@dataclass(frozen=True)
+class FingerprintKeyRef:
+    """Configured key version and external secret reference."""
+
+    version: int
+    ref: str = field(repr=False)
 
 
 @dataclass(frozen=True)
@@ -65,6 +76,16 @@ class TelescreenSettings:
     worker_poll_seconds: float = 1.0
     web_dist: str | None = None
     log_level: str = "INFO"
+    fingerprint_keys: tuple[FingerprintKeyRef, ...] = ()
+    fingerprint_active_version: int = 1
+    internal_domains: tuple[str, ...] = ()
+    owner_routing: bool = False
+    default_team: str | None = None
+    digest_cron: str | None = "0 9 * * 1"
+    health_recipients: tuple[str, ...] = ()
+    health_failure_threshold: int = 3
+    alert_unscannable_public: bool = True
+    risk_weights: RiskWeights = RiskWeights()
 
 
 def _read(env: EnvSource, name: str) -> str | None:
@@ -104,6 +125,79 @@ def _number(env: EnvSource, name: str, default: float, minimum: float = 0.0) -> 
     if value <= minimum:
         raise ConfigError(f"TELESCREEN_{name} is outside the allowed range")
     return value
+
+
+def _fingerprint_key_settings(
+    env: EnvSource,
+) -> tuple[tuple[FingerprintKeyRef, ...], int, str | None]:
+    """Read versioned keys and retain the version-one compatibility reference."""
+    legacy_ref: str | None = _read(env, "FINGERPRINT_KEY")
+    keys_raw: str | None = _read(env, "FINGERPRINT_KEYS")
+    if legacy_ref is not None and keys_raw is not None:
+        raise ConfigError("TELESCREEN_FINGERPRINT_KEY and TELESCREEN_FINGERPRINT_KEYS conflict")
+    if keys_raw is None:
+        active_raw: str | None = _read(env, "FINGERPRINT_ACTIVE_VERSION")
+        if not legacy_ref:
+            if active_raw is not None:
+                raise ConfigError("TELESCREEN_FINGERPRINT_ACTIVE_VERSION is not configured")
+            return (), 1, None
+        if active_raw is not None and active_raw != "1":
+            raise ConfigError("TELESCREEN_FINGERPRINT_ACTIVE_VERSION is not configured")
+        return (FingerprintKeyRef(1, legacy_ref),), 1, legacy_ref
+    configured: list[FingerprintKeyRef] = []
+    versions: set[int] = set()
+    for entry in keys_raw.split(","):
+        if "=" not in entry:
+            raise ConfigError("TELESCREEN_FINGERPRINT_KEYS is invalid")
+        version_text: str
+        ref: str
+        version_text, ref = entry.split("=", 1)
+        try:
+            version: int = int(version_text.strip())
+        except ValueError:
+            raise ConfigError("TELESCREEN_FINGERPRINT_KEYS is invalid") from None
+        if version <= 0 or version in versions or not ref.strip():
+            raise ConfigError("TELESCREEN_FINGERPRINT_KEYS is invalid")
+        versions.add(version)
+        configured.append(FingerprintKeyRef(version, ref.strip()))
+    if 1 not in versions:
+        raise ConfigError("TELESCREEN_FINGERPRINT_KEYS must include version 1")
+    active_version: int = max(versions)
+    active_raw: str | None = _read(env, "FINGERPRINT_ACTIVE_VERSION")
+    if active_raw is not None:
+        try:
+            active_version = int(active_raw)
+        except ValueError:
+            raise ConfigError("TELESCREEN_FINGERPRINT_ACTIVE_VERSION must be an integer") from None
+    if active_version <= 0 or active_version not in versions:
+        raise ConfigError("TELESCREEN_FINGERPRINT_ACTIVE_VERSION is not configured")
+    version_one_ref: str = next(item.ref for item in configured if item.version == 1)
+    return tuple(configured), active_version, version_one_ref
+
+
+def _comma_values(env: EnvSource, name: str, *, lowercase: bool = False) -> tuple[str, ...]:
+    """Read a normalized comma-separated setting as a tuple."""
+    raw: str | None = _read(env, name)
+    if raw is None or not raw.strip():
+        return ()
+    values: tuple[str, ...] = tuple(
+        (part.strip().lower() if lowercase else part.strip()) for part in raw.split(",")
+    )
+    if any(not value for value in values):
+        raise ConfigError(f"TELESCREEN_{name} is invalid")
+    return values
+
+
+def _digest_cron(env: EnvSource) -> str | None:
+    """Read an optional cron schedule, with an empty value disabling it."""
+    raw: str | None = _read(env, "DIGEST_CRON")
+    if raw is None:
+        return "0 9 * * 1"
+    if not raw.strip():
+        return None
+    if not croniter.is_valid(raw):
+        raise ConfigError("TELESCREEN_DIGEST_CRON is invalid")
+    return raw
 
 
 def _boolean(env: EnvSource, name: str, default: bool) -> bool:
@@ -152,9 +246,15 @@ def load_settings(env: EnvSource) -> TelescreenSettings:
     model: str | None = _optional(env, "MANAGED_LLM_MODEL")
     if provider is ManagedLlmProvider.CODEX and model is None:
         raise ConfigError("TELESCREEN_MANAGED_LLM_MODEL is required for codex")
+    fingerprint_keys: tuple[FingerprintKeyRef, ...]
+    fingerprint_active_version: int
+    fingerprint_key_ref: str | None
+    fingerprint_keys, fingerprint_active_version, fingerprint_key_ref = _fingerprint_key_settings(
+        env
+    )
     return TelescreenSettings(
         database_url=_optional(env, "DATABASE_URL"),
-        fingerprint_key_ref=_optional(env, "FINGERPRINT_KEY"),
+        fingerprint_key_ref=fingerprint_key_ref,
         police_signing_key_ref=_optional(env, "POLICE_SIGNING_KEY"),
         police_enrollment_token_ref=_optional(env, "POLICE_ENROLLMENT_TOKEN"),
         police_allow_http=_boolean(env, "POLICE_ALLOW_HTTP", False),
@@ -199,4 +299,14 @@ def load_settings(env: EnvSource) -> TelescreenSettings:
         worker_poll_seconds=_number(env, "WORKER_POLL_SECONDS", 1.0),
         web_dist=_optional(env, "WEB_DIST"),
         log_level=_optional(env, "LOG_LEVEL") or "INFO",
+        fingerprint_keys=fingerprint_keys,
+        fingerprint_active_version=fingerprint_active_version,
+        internal_domains=_comma_values(env, "INTERNAL_DOMAINS", lowercase=True),
+        owner_routing=_boolean(env, "OWNER_ROUTING", False),
+        default_team=_optional(env, "DEFAULT_TEAM"),
+        digest_cron=_digest_cron(env),
+        health_recipients=_comma_values(env, "HEALTH_RECIPIENTS"),
+        health_failure_threshold=_integer(env, "HEALTH_FAILURE_THRESHOLD", 3),
+        alert_unscannable_public=_boolean(env, "ALERT_UNSCANNABLE_PUBLIC", True),
+        risk_weights=parse_risk_weights(_read(env, "RISK_WEIGHTS")),
     )

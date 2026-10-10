@@ -7,13 +7,24 @@ import fnmatch
 import hashlib
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
+from datetime import datetime
 
 from telescreen.core.errors import TelescreenError
 from telescreen.core.json import JsonValue, dump_json, json_int, json_object, json_str
-from telescreen.core.vocabulary import CollectorKind, ErrorCode
+from telescreen.core.vocabulary import (
+    CollectorKind,
+    CoverageState,
+    ErrorCode,
+    PlacementKind,
+    UnsupportedReason,
+)
 from telescreen.ports.collectors import (
     CollectorConfig,
+    Coverage,
+    Exposure,
     GitHubSelector,
+    OwnerIdentity,
+    PlacementRef,
     ResourceContent,
     ResourceGoneError,
     ResourceRef,
@@ -28,6 +39,8 @@ from telescreen.ports.sweeps import (
 )
 
 from .client import GitHubApi
+from .codeowners import CommitContext, commit_context, match_owner
+from .exposure import repo_exposure
 
 
 @dataclass(frozen=True)
@@ -90,6 +103,15 @@ class GitHubSweep:
         repository: JsonValue = await api.repo_by_id(repo_id)
         owner: str = _string(_get(_get(repository, "owner"), "login"))
         repo: str = _string(_get(repository, "name"))
+        exposure: Exposure = repo_exposure(repository)
+        branch_ref: str = (
+            branch_name if branch_name.startswith("refs/heads/") else f"refs/heads/{branch_name}"
+        )
+        codeowners_text: str | None = await api.codeowners(owner, repo, branch_ref)
+        placement: tuple[PlacementRef, ...] = (
+            PlacementRef(PlacementKind.GITHUB_OWNER, owner.casefold()),
+            PlacementRef(PlacementKind.GITHUB_REPO, f"{owner}/{repo}".casefold()),
+        )
         branch: JsonValue = await api.branch(owner, repo, branch_name)
         head_sha: str = _string(_get(_get(branch, "commit"), "sha"))
         tree: JsonValue = await api.tree(owner, repo, head_sha)
@@ -103,19 +125,49 @@ class GitHubSweep:
                 continue
             size: int = _integer(_get(entry, "size"))
             ref: ResourceRef = self._ref(owner, repo, branch_name, path)
+            codeowners_owner: OwnerIdentity | None = (
+                match_owner(codeowners_text, path) if codeowners_text is not None else None
+            )
+            try:
+                commit: JsonValue | None = await api.last_commit_for_path(
+                    owner, repo, path, branch_ref
+                )
+            except Exception:
+                commit = None
+            context: CommitContext = commit_context(commit)
+            owner_identity: OwnerIdentity | None = codeowners_owner or context.owner
             if size > self.max_bytes:
-                content: ResourceContent = self._incomplete_content(config, ref, path)
+                content: ResourceContent = self._incomplete_content(
+                    config,
+                    ref,
+                    path,
+                    exposure,
+                    owner_identity,
+                    placement,
+                    context.modified_at,
+                )
                 yield ShardEntry(ShardEntryKind.FETCHED, ref, content=content)
                 continue
             sha: str = _string(_get(entry, "sha"))
             try:
                 blob: JsonValue = await api.blob(owner, repo, sha)
-                content: ResourceContent = self._content(config, ref, path, sha, blob, size)
+                content: ResourceContent = self._content(
+                    config,
+                    ref,
+                    path,
+                    sha,
+                    blob,
+                    size,
+                    exposure,
+                    owner_identity,
+                    placement,
+                    context.modified_at,
+                )
             except ResourceGoneError:
                 yield ShardEntry(ShardEntryKind.REMOVED, ref)
                 continue
-            except TelescreenError:
-                yield ShardEntry(ShardEntryKind.FAILED, ref, error_code=ErrorCode.FETCH_FAILED)
+            except TelescreenError as error:
+                yield ShardEntry(ShardEntryKind.FAILED, ref, error_code=error.code)
                 continue
             yield ShardEntry(ShardEntryKind.FETCHED, ref, content=content)
 
@@ -147,6 +199,10 @@ class GitHubSweep:
         blob_sha: str,
         blob: JsonValue,
         size: int,
+        exposure: Exposure,
+        owner: OwnerIdentity | None,
+        placement: tuple[PlacementRef, ...],
+        modified_at: datetime | None,
     ) -> ResourceContent:
         """Build a transient scanner payload from a Git blob response."""
         encoded: str = _string(_get(blob, "content")).replace("\n", "")
@@ -156,10 +212,15 @@ class GitHubSweep:
         except (ValueError, UnicodeDecodeError):
             segments: tuple[Segment, ...] = ()
             complete: bool = False
+            coverage: Coverage = Coverage(
+                CoverageState.UNSUPPORTED,
+                UnsupportedReason.BINARY,
+            )
         else:
             if size > self.max_bytes:
                 segments = ()
                 complete = False
+                coverage = Coverage(CoverageState.TOO_LARGE)
             else:
                 short_sha: str = blob_sha[:7]
                 segments = tuple(
@@ -167,6 +228,7 @@ class GitHubSweep:
                     for index, line in enumerate(text.splitlines(), start=1)
                 )
                 complete = True
+                coverage = Coverage(CoverageState.SCANNED)
         return ResourceContent(
             source="github",
             collector_config_id=config.id,
@@ -176,10 +238,22 @@ class GitHubSweep:
             raw_locator=ref.raw_locator,
             display_title=path,
             ref=ref,
+            exposure=exposure,
+            owner=owner,
+            placement=placement,
+            coverage=coverage,
+            modified_at=modified_at,
         )
 
     def _incomplete_content(
-        self, config: CollectorConfig, ref: ResourceRef, path: str
+        self,
+        config: CollectorConfig,
+        ref: ResourceRef,
+        path: str,
+        exposure: Exposure,
+        owner: OwnerIdentity | None,
+        placement: tuple[PlacementRef, ...],
+        modified_at: datetime | None,
     ) -> ResourceContent:
         """Represent an oversized enumerated file without scanning or resolving it."""
         return ResourceContent(
@@ -191,6 +265,11 @@ class GitHubSweep:
             raw_locator=ref.raw_locator,
             display_title=path,
             ref=ref,
+            exposure=exposure,
+            owner=owner,
+            placement=placement,
+            coverage=Coverage(CoverageState.TOO_LARGE),
+            modified_at=modified_at,
         )
 
 

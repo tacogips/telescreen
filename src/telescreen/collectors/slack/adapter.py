@@ -7,6 +7,7 @@ import hmac
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 
 from pydantic import TypeAdapter, ValidationError
@@ -15,21 +16,36 @@ from telescreen.collectors.slack.client import (
     FileListResponse,
     HistoryResponse,
     SlackApi,
+    SlackConversationInfo,
     SlackFile,
     SlackMessage,
+    SlackPermissionDenied,
 )
+from telescreen.collectors.slack.exposure import slack_exposure
 from telescreen.core.errors import TelescreenError
 from telescreen.core.json import JsonKind, JsonValue, dump_json, json_object, json_str, parse_json
-from telescreen.core.vocabulary import CollectorKind, ErrorCode
+from telescreen.core.vocabulary import (
+    CollectorKind,
+    CoverageState,
+    ErrorCode,
+    IdentityKind,
+    PlacementKind,
+    UnsupportedReason,
+)
 from telescreen.ports.collectors import (
     ChangePage,
     CollectorConfig,
     CollectorCursor,
     CollectorSecrets,
+    Coverage,
     EventCheck,
     EventCheckKind,
     EventResources,
+    Exposure,
     InboundWebhook,
+    OwnerIdentity,
+    PlacementRef,
+    RateLimited,
     ResourceContent,
     ResourceGoneError,
     ResourceRef,
@@ -238,25 +254,29 @@ class SlackAdapter:
         payload: SlackRefPayload = TypeAdapter(SlackRefPayload).validate_json(ref.ref_json)
         api: SlackApi = self.api_factory(config)
         if payload.type == "message" and payload.channel is not None and payload.ts is not None:
-            if payload.thread_ts is not None and payload.thread_ts != payload.ts:
-                page: HistoryResponse = await api.conversations_replies(
-                    payload.channel,
-                    payload.thread_ts,
-                    payload.ts,
-                    payload.ts,
-                    None,
-                    2,
-                    inclusive=True,
-                )
-            else:
-                page = await api.conversations_history(
-                    payload.channel, payload.ts, payload.ts, None, 1, inclusive=True
-                )
+            try:
+                if payload.thread_ts is not None and payload.thread_ts != payload.ts:
+                    page: HistoryResponse = await api.conversations_replies(
+                        payload.channel,
+                        payload.thread_ts,
+                        payload.ts,
+                        payload.ts,
+                        None,
+                        2,
+                        inclusive=True,
+                    )
+                else:
+                    page = await api.conversations_history(
+                        payload.channel, payload.ts, payload.ts, None, 1, inclusive=True
+                    )
+            except SlackPermissionDenied:
+                return self._denied_message_content(config, ref, payload.channel, payload.ts)
             message: SlackMessage | None = next(
                 (item for item in page.messages if item.ts == payload.ts), None
             )
             if message is None:
                 raise ResourceGoneError("Slack message is gone")
+            exposure: Exposure | None = await self._exposure(api, payload.channel, payload.team)
             return ResourceContent(
                 source="slack",
                 collector_config_id=config.id,
@@ -266,13 +286,53 @@ class SlackAdapter:
                 raw_locator=ref.raw_locator,
                 display_title=f"#{payload.channel} message",
                 ref=ref,
+                exposure=exposure,
+                owner=(
+                    OwnerIdentity(IdentityKind.SLACK_USER, message.user)
+                    if message.user is not None
+                    else None
+                ),
+                placement=(PlacementRef(PlacementKind.SLACK_CHANNEL, payload.channel),),
+                modified_at=self._timestamp(message.edited.ts if message.edited else message.ts),
+                coverage=Coverage(CoverageState.SCANNED),
             )
         if payload.type == "file" and payload.file is not None:
-            file: SlackFile = await api.files_info(payload.file)
+            try:
+                file: SlackFile = await api.files_info(payload.file)
+            except SlackPermissionDenied:
+                return self._denied_file_content(config, ref)
+            channel_id: str | None = next(iter(file.channels), None)
+            exposure: Exposure | None = (
+                await self._exposure(api, channel_id, payload.team, file)
+                if channel_id is not None
+                else slack_exposure(None, payload.team, file)
+            )
             segments: tuple[Segment, ...] = ()
             complete: bool = False
+            coverage: Coverage
+            if file.size > self.max_file_bytes:
+                coverage = Coverage(CoverageState.TOO_LARGE)
+            elif not self._is_text_file(file.mimetype):
+                coverage = Coverage(
+                    CoverageState.UNSUPPORTED,
+                    self._unsupported_reason(file.mimetype),
+                )
+            else:
+                coverage = Coverage(CoverageState.FETCH_FAILED)
             if file.size <= self.max_file_bytes and self._is_text_file(file.mimetype):
-                contents: bytes = await api.download(file.url_private, self.max_file_bytes)
+                try:
+                    contents: bytes = await api.download(file.url_private, self.max_file_bytes)
+                except SlackPermissionDenied:
+                    return self._file_content(
+                        config,
+                        ref,
+                        file,
+                        channel_id,
+                        exposure,
+                        (),
+                        False,
+                        Coverage(CoverageState.PERMISSION_DENIED),
+                    )
                 if len(contents) <= self.max_file_bytes:
                     try:
                         text: str = contents.decode("utf-8")
@@ -284,6 +344,9 @@ class SlackAdapter:
                             for line_number, line in enumerate(text.splitlines(), start=1)
                         )
                         complete = True
+                        coverage = Coverage(CoverageState.SCANNED)
+                else:
+                    coverage = Coverage(CoverageState.TOO_LARGE)
             return ResourceContent(
                 source="slack",
                 collector_config_id=config.id,
@@ -293,6 +356,23 @@ class SlackAdapter:
                 raw_locator=ref.raw_locator,
                 display_title="Slack file",
                 ref=ref,
+                exposure=exposure,
+                owner=(
+                    OwnerIdentity(IdentityKind.SLACK_USER, file.user)
+                    if file.user is not None
+                    else None
+                ),
+                placement=(
+                    (PlacementRef(PlacementKind.SLACK_CHANNEL, channel_id),)
+                    if channel_id is not None
+                    else ()
+                ),
+                modified_at=self._timestamp(
+                    str(file.updated if file.updated is not None else file.timestamp)
+                    if file.updated is not None or file.timestamp is not None
+                    else None
+                ),
+                coverage=coverage,
             )
         raise TelescreenError(ErrorCode.VALIDATION_ERROR, "Slack reference was invalid")
 
@@ -421,4 +501,108 @@ class SlackAdapter:
             "text/csv",
             "application/yaml",
             "application/x-yaml",
+        )
+
+    @staticmethod
+    def _unsupported_reason(mimetype: str) -> UnsupportedReason:
+        """Classify a non-text Slack file without retaining its metadata."""
+        lowered: str = mimetype.casefold()
+        if lowered.startswith("image/"):
+            return UnsupportedReason.IMAGE
+        if lowered in ("", "application/octet-stream"):
+            return UnsupportedReason.BINARY
+        return UnsupportedReason.UNSUPPORTED_TYPE
+
+    @staticmethod
+    def _timestamp(value: str | None) -> datetime | None:
+        """Convert Slack epoch seconds into a UTC timestamp safely."""
+        if value is None:
+            return None
+        try:
+            return datetime.fromtimestamp(float(value), UTC)
+        except (OverflowError, ValueError, OSError):
+            return None
+
+    async def _exposure(
+        self,
+        api: SlackApi,
+        channel_id: str,
+        own_team_id: str,
+        file: SlackFile | None = None,
+    ) -> Exposure | None:
+        """Read channel exposure once for this resource, failing open to unknown."""
+        try:
+            info: SlackConversationInfo = await api.conversations_info(channel_id)
+        except (RateLimited, SlackPermissionDenied, TelescreenError):
+            return None
+        return slack_exposure(info, own_team_id, file)
+
+    def _denied_file_content(self, config: CollectorConfig, ref: ResourceRef) -> ResourceContent:
+        """Return an unscanned file outcome for a provider access denial."""
+        return ResourceContent(
+            source="slack",
+            collector_config_id=config.id,
+            segments=(),
+            complete=False,
+            sweep_covered=True,
+            raw_locator=ref.raw_locator,
+            display_title="Slack file",
+            ref=ref,
+            coverage=Coverage(CoverageState.PERMISSION_DENIED),
+        )
+
+    def _denied_message_content(
+        self, config: CollectorConfig, ref: ResourceRef, channel_id: str, timestamp: str
+    ) -> ResourceContent:
+        """Return an unscanned message outcome for a provider access denial."""
+        return ResourceContent(
+            source="slack",
+            collector_config_id=config.id,
+            segments=(),
+            complete=False,
+            sweep_covered=channel_id in self._selector(config).channel_ids,
+            raw_locator=ref.raw_locator,
+            display_title=f"#{channel_id} message",
+            ref=ref,
+            placement=(PlacementRef(PlacementKind.SLACK_CHANNEL, channel_id),),
+            modified_at=self._timestamp(timestamp),
+            coverage=Coverage(CoverageState.PERMISSION_DENIED),
+        )
+
+    def _file_content(
+        self,
+        config: CollectorConfig,
+        ref: ResourceRef,
+        file: SlackFile,
+        channel_id: str | None,
+        exposure: Exposure | None,
+        segments: tuple[Segment, ...],
+        complete: bool,
+        coverage: Coverage,
+    ) -> ResourceContent:
+        """Build transient file content with its safe context fields."""
+        return ResourceContent(
+            source="slack",
+            collector_config_id=config.id,
+            segments=segments,
+            complete=complete,
+            sweep_covered=True,
+            raw_locator=ref.raw_locator,
+            display_title="Slack file",
+            ref=ref,
+            exposure=exposure,
+            owner=(
+                OwnerIdentity(IdentityKind.SLACK_USER, file.user) if file.user is not None else None
+            ),
+            placement=(
+                (PlacementRef(PlacementKind.SLACK_CHANNEL, channel_id),)
+                if channel_id is not None
+                else ()
+            ),
+            modified_at=self._timestamp(
+                str(file.updated if file.updated is not None else file.timestamp)
+                if file.updated is not None or file.timestamp is not None
+                else None
+            ),
+            coverage=coverage,
         )

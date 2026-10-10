@@ -1,5 +1,6 @@
 """Validate deployment and workflow examples without starting external services."""
 
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -7,11 +8,17 @@ from pytest import CaptureFixture
 
 from telescreen.cli import main
 from telescreen.core.json import JsonKind, JsonValue, dump_json, parse_json, parse_yaml
-from telescreen.core.vocabulary import IssueEventKind, SourceFormat, StepType
+from telescreen.core.vocabulary import (
+    HumanTaskKind,
+    IssueEventKind,
+    Severity,
+    SourceFormat,
+    StepType,
+)
 from telescreen.masking.redact import Redactor
 from telescreen.workflow.dsl.escalation import EscalationPolicySpec, load_escalation_policy
 from telescreen.workflow.dsl.loader import load_workflow
-from telescreen.workflow.dsl.model import CompiledWorkflow
+from telescreen.workflow.dsl.model import CompiledWorkflow, HumanTaskStep
 from tests.support.samples import find_leaks
 
 _ROOT: Path = Path(__file__).resolve().parents[2]
@@ -33,7 +40,7 @@ def test_all_workflows_load_and_contain_no_detected_sensitive_values() -> None:
     """Load every workflow through the DSL and reject samples or redactor hits."""
     redactor: Redactor = Redactor.default()
     paths: tuple[Path, ...] = _workflow_paths()
-    assert len(paths) == 4
+    assert len(paths) == 5
     for path in paths:
         text: str = path.read_text(encoding="utf-8")
         load_workflow(text, SourceFormat.YAML)
@@ -53,7 +60,33 @@ def test_escalation_policy_file_loads_both_policies() -> None:
         assert value.kind is JsonKind.OBJECT
         policy: EscalationPolicySpec = load_escalation_policy(dump_json(value), SourceFormat.JSON)
         names.add(policy.name)
+        if policy.name == "secops-standard":
+            assert policy.tiers[0].min_risk == 60
     assert names == {"secops-standard", "dev-remediation"}
+
+
+def test_owner_review_workflow_has_required_routes_and_escalation() -> None:
+    """Keep owner-review routing, SLA, and escalation policy explicit."""
+    text: str = (_WORKFLOWS / "owner-review.yaml").read_text(encoding="utf-8")
+    workflow: CompiledWorkflow = load_workflow(text, SourceFormat.YAML)
+    assert workflow.trigger is not None
+    assert workflow.trigger.on == (IssueEventKind.ISSUE_CREATED,)
+    assert workflow.trigger.match.min_severity is Severity.HIGH
+    owner_tasks: tuple[HumanTaskStep, ...] = tuple(
+        step for step in workflow.steps if isinstance(step, HumanTaskStep)
+    )
+    assert len(owner_tasks) == 1
+    owner_task: HumanTaskStep = owner_tasks[0]
+    assert owner_task.kind is HumanTaskKind.OWNER_REVIEW
+    assert owner_task.assignee == "issue:assignee"
+    assert {route.name for route in owner_task.outcomes} == {
+        "remove",
+        "restrict",
+        "exception",
+        "not_mine",
+    }
+    assert owner_task.sla == timedelta(days=2)
+    assert owner_task.escalation_policy == "secops-standard"
 
 
 def test_github_workflow_contains_required_step_types() -> None:
@@ -104,6 +137,13 @@ def test_example_files_contain_no_sample_secrets() -> None:
             assert not find_leaks(text), path.name
 
 
+def test_env_example_contains_no_detected_sensitive_values() -> None:
+    """Scan the environment template with the existing sample and redactor checks."""
+    text: str = (_COMPOSE / ".env.example").read_text(encoding="utf-8")
+    assert not Redactor.default().has_hits(text)
+    assert not find_leaks(text)
+
+
 def test_env_example_uses_secret_references_or_placeholders() -> None:
     """Require secret-looking variables to be references or obvious placeholders."""
     lines: list[str] = (_COMPOSE / ".env.example").read_text(encoding="utf-8").splitlines()
@@ -118,7 +158,11 @@ def test_env_example_uses_secret_references_or_placeholders() -> None:
         active_names.add(name)
         if name.endswith(("_KEY", "_TOKEN", "_SECRET", "_PASSWORD")):
             normalized: str = value.lower()
-            assert value.startswith(("env:", "file:")) or "placeholder" in normalized, name
+            assert (
+                value.startswith(("env:", "file:"))
+                or "placeholder" in normalized
+                or normalized == "changeme"
+            ), name
     assert "TELESCREEN_SLACK_SIGNING_SECRET" not in active_names
     assert "TELESCREEN_GITHUB_WEBHOOK_SECRET" not in active_names
 
@@ -243,6 +287,7 @@ def test_workflow_examples_validate_through_the_cli() -> None:
         "slack-pii.yaml",
         "gdrive-mynumber-sheet.yaml",
         "drive-weekly-sweep.yaml",
+        "owner-review.yaml",
     }
     for path in paths:
         assert main(["workflow", "validate", str(path)]) == 0

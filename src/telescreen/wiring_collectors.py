@@ -2,7 +2,7 @@
 
 import hashlib
 import hmac
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import cast
 from urllib.parse import urlsplit
 
@@ -188,6 +188,11 @@ def build_collector_registry(
         channel_key,
         settings.public_base_url,
         settings.scan_max_bytes,
+    )
+    adapters = (
+        replace(adapters[0], internal_domains=settings.internal_domains),
+        replace(adapters[1], internal_domains=settings.internal_domains),
+        replace(adapters[2], internal_domains=settings.internal_domains),
     )
     admin: AdminApi | None = (
         AdminApi(http, auth, settings.google_delegated_admin)

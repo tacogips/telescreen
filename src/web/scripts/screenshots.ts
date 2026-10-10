@@ -27,13 +27,15 @@ else {
         const page = await browser.newPage(); let errors = 0;
         page.on("pageerror", (error) => { errors += 1; console.error(`[pageerror ${page.url()}] ${error.message}`); });
         page.on("response", (response) => { if (response.status() >= 400) console.error(`[http ${response.status()}] ${response.url()}`); }); page.on("console", (message) => { if (message.type() === "error") { errors += 1; console.error(`[console ${page.url()}] ${message.text()}`); } });
-        const pages = ["/issues", "/search?q=TELE", "/workflows", "/runs", "/police", "/collectors", "/escalation", "/audit", "/assistant", "/settings"];
+        const pages = ["/issues", "/my-tasks", "/search?q=TELE", "/workflows", "/runs", "/police", "/collectors", "/policies", "/escalation", "/audit", "/assistant", "/settings"];
         const discoverFirst = async (list: string, prefix: string): Promise<string | null> => { await page.goto(`http://127.0.0.1:4319${list}`, { waitUntil: "networkidle" }); return page.locator(`a[href^="${prefix}/"]`).first().getAttribute("href"); };
         const firstIssue = await discoverFirst("/issues", "/issues"); if (firstIssue !== null) pages.splice(1, 0, firstIssue);
         const firstWorkflow = await discoverFirst("/workflows", "/workflows"); if (firstWorkflow !== null) pages.push(firstWorkflow);
         const firstRun = await discoverFirst("/runs", "/runs"); if (firstRun !== null) pages.push(firstRun);
+        const firstPolicy = await discoverFirst("/policies", "/policies"); if (firstPolicy !== null) pages.push(firstPolicy);
+        const firstCollector = await discoverFirst("/collectors", "/collectors"); if (firstCollector !== null) pages.push(`${firstCollector}?tab=coverage`);
         const destination = resolve(root, "tmp/ui-screenshots"); await mkdir(destination, { recursive: true });
-        for (const theme of ["light", "dark"] as const) { await page.emulateMedia({ colorScheme: theme }); for (const path of pages) { await page.goto(`http://127.0.0.1:4319${path}`, { waitUntil: "networkidle" }); const name = path.slice(1).replaceAll("/", "-") || "issues"; await page.screenshot({ path: resolve(destination, `${name}-${theme}.png`), fullPage: true }); } }
+        for (const theme of ["light", "dark"] as const) { await page.emulateMedia({ colorScheme: theme }); for (const path of pages) { await page.goto(`http://127.0.0.1:4319${path}`, { waitUntil: "networkidle" }); const name = path.slice(1).replaceAll("/", "-").replace(/[?=]/g, "-") || "issues"; await page.screenshot({ path: resolve(destination, `${name}-${theme}.png`), fullPage: true }); } }
         await page.setViewportSize({ width: 390, height: 844 }); await page.goto("http://127.0.0.1:4319/issues", { waitUntil: "networkidle" }); await page.screenshot({ path: resolve(destination, "issues-mobile-light.png"), fullPage: true });
         if (errors > 0) { console.error(`Browser reported ${errors} errors.`); process.exitCode = 1; }
       } finally { await browser.close(); }

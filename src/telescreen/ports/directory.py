@@ -38,3 +38,27 @@ class RecipientResolver(Protocol):
     async def assignee_of(self, session: AsyncSession, ref: str) -> AssigneeIds:
         """Resolve a member or team assignment reference."""
         ...
+
+
+class OwnerDirectory(Protocol):
+    """Resolve keyed owner identities to application member and team refs."""
+
+    async def member_ref(self, session: AsyncSession, member_id: str) -> str | None:
+        """Return a stable member reference for an active member."""
+        ...
+
+    async def team_ref(self, session: AsyncSession, team_id: str) -> str | None:
+        """Return a stable team reference for a configured team."""
+        ...
+
+    async def team_refs_of(self, session: AsyncSession, member_id: str) -> tuple[str, ...]:
+        """Return team references associated with a member."""
+        ...
+
+    async def member_for_owner(self, session: AsyncSession, owner_ref: str) -> str | None:
+        """Resolve a keyed owner reference to an active member reference (member:<handle>)."""
+        ...
+
+    async def team_lead(self, session: AsyncSession, team_slug: str) -> str | None:
+        """Return the lead member reference for a team slug."""
+        ...

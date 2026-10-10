@@ -20,12 +20,14 @@ from telescreen.api.routers.collectors import (
 from telescreen.api.routers.directory import DirectoryRouterDeps, build_directory_router
 from telescreen.api.routers.escalation import EscalationRouterDeps, build_escalation_router
 from telescreen.api.routers.evidence import EvidenceRouterDeps, build_evidence_router
+from telescreen.api.routers.exceptions import ExceptionsRouterDeps, build_exceptions_router
 from telescreen.api.routers.health import build_health_router
 from telescreen.api.routers.human_tasks import HumanTasksRouterDeps, build_human_tasks_router
 from telescreen.api.routers.ingest import IngestRouterDeps, build_ingest_router
 from telescreen.api.routers.issues import IssuesRouterDeps, build_issues_router
 from telescreen.api.routers.map_jobs import MapJobsRouterDeps, build_map_jobs_router
 from telescreen.api.routers.police import PoliceRouterDeps, build_police_router
+from telescreen.api.routers.policies import PoliciesRouterDeps, build_policies_router
 from telescreen.api.routers.runs import RunsRouterDeps, build_runs_router
 from telescreen.api.routers.search import SearchRouterDeps, build_search_router
 from telescreen.api.routers.workflows import WorkflowsRouterDeps, build_workflows_router
@@ -90,6 +92,16 @@ from telescreen.wiring_collectors import (
     build_collector_registry,
     build_webhook_secrets,
     drive_channel_key,
+)
+from telescreen.wiring_v11 import (
+    DirectoryV11,
+    Health,
+    IssueOps,
+    PolicyRisk,
+    build_directory_v11,
+    build_health,
+    build_issue_ops,
+    build_policy_and_risk,
 )
 from telescreen.workflow.engine.child import ChildRunFinishedHandler
 from telescreen.workflow.engine.definitions import WorkflowService
@@ -199,10 +211,40 @@ def build_container(
     primitives: RuntimePrimitives = build_primitives(settings, env, http, sessions, clock)
     ctx: ApiContext = ApiContext(primitives.sessions, primitives.clock, primitives.audit)
     resolver: DirectoryRecipientResolver = DirectoryRecipientResolver()
-    directory: DirectoryService = DirectoryService(primitives.audit, primitives.clock)
+    directory: DirectoryService = DirectoryService(
+        primitives.audit, primitives.clock, fingerprinter=primitives.fingerprinter
+    )
     queue: SqlTaskQueue = SqlTaskQueue(primitives.clock)
+    collector_repository: CollectorRepository = CollectorRepository()
+    policy_risk: PolicyRisk = build_policy_and_risk(
+        settings,
+        primitives.redactor,
+        primitives.audit,
+        primitives.fingerprinter,
+        queue,
+        resolver,
+        primitives.clock,
+    )
+    directory_v11: DirectoryV11 = build_directory_v11(
+        primitives.fingerprinter, primitives.audit, primitives.clock
+    )
     detector: Detector = build_detector(settings, env, http, settings.detectors)
     dlp_detector: Detector = build_detector(settings, env, http, settings.dlp_detectors)
+    notification_service: NotificationService = NotificationService(
+        DlpGate(dlp_detector, primitives.redactor, settings.dlp_policy),
+        resolver,
+        queue,
+        primitives.audit,
+        primitives.clock,
+        NotificationRepository(),
+    )
+    health: Health = build_health(
+        settings,
+        collector_repository,
+        primitives.audit,
+        primitives.clock,
+        notification_service,
+    )
     masker: Masker = Masker(primitives.fingerprinter, primitives.redactor)
     deferred_events: DeferredIssueEventSink = DeferredIssueEventSink()
     issue_service: IssueService = IssueService(
@@ -213,8 +255,12 @@ def build_container(
         resolver,
         primitives.clock,
         IssueRepository(),
+        policy_risk.decider,
+        policy_risk.issue_scorer,
+        directory_v11.owners,
+        settings.owner_routing,
+        settings.default_team,
     )
-    collector_repository: CollectorRepository = CollectorRepository()
     scan_jobs: ScanJobStoreImpl = ScanJobStoreImpl(collector_repository)
     channel_key: bytes = drive_channel_key(primitives.fingerprint_key)
     collector_registry: CollectorRegistry = build_collector_registry(
@@ -251,6 +297,7 @@ def build_container(
         primitives.redactor,
         primitives.audit,
         primitives.clock,
+        health.collector_recorder,
     )
     sweeper: CollectorSweeperImpl = CollectorSweeperImpl(
         primitives.sessions,
@@ -262,6 +309,7 @@ def build_container(
         primitives.fingerprinter,
         primitives.redactor,
         primitives.clock,
+        health.coverage,
     )
     rescanner: CollectorRescanner = CollectorRescanner(
         primitives.sessions,
@@ -273,14 +321,22 @@ def build_container(
         primitives.fingerprinter,
         primitives.redactor,
         primitives.clock,
+        health.coverage,
     )
-    notification_service: NotificationService = NotificationService(
-        DlpGate(dlp_detector, primitives.redactor, settings.dlp_policy),
-        resolver,
-        queue,
+    issue_ops: IssueOps = build_issue_ops(
+        settings,
+        primitives.sessions,
         primitives.audit,
         primitives.clock,
-        NotificationRepository(),
+        primitives.redactor,
+        queue,
+        resolver,
+        directory_v11.owners,
+        policy_risk.decider,
+        issue_service,
+        rescanner,
+        notification_service,
+        primitives.indexer,
     )
     slack_token: SecretValue | None = (
         resolve_secret(settings.slack_bot_token_ref, env)
@@ -360,7 +416,13 @@ def build_container(
         executors.register(flow_executor)
     executors.register(
         HumanTaskExecutor(
-            notification_service, queue, resolver, primitives.clock, primitives.redactor
+            notification_service,
+            queue,
+            resolver,
+            primitives.clock,
+            primitives.redactor,
+            issues=issue_service,
+            public_base_url=settings.public_base_url,
         )
     )
     executors.register(
@@ -421,7 +483,15 @@ def build_container(
     )
     scheduler: Scheduler = Scheduler(
         primitives.sessions,
-        (collector_schedule, police_maintenance, audit_schedule),
+        (
+            collector_schedule,
+            police_maintenance,
+            audit_schedule,
+            issue_ops.policy_maintenance,
+            issue_ops.exception_maintenance,
+            health.collector_provider,
+            health.police_provider,
+        ),
         primitives.clock,
     )
     handlers: TaskHandlerRegistry = TaskHandlerRegistry()
@@ -433,6 +503,9 @@ def build_container(
         )
     )
     handlers.register(cast(TaskHandler, notification_handler))
+    handlers.register(issue_ops.verify_handler)
+    handlers.register(issue_ops.policy_handler)
+    handlers.register(issue_ops.digest_handler)
     handlers.register(
         CollectorScanHandler(
             primitives.sessions,
@@ -447,6 +520,8 @@ def build_container(
             primitives.redactor,
             primitives.clock,
             100,
+            coverage=health.coverage,
+            health=health.collector_recorder,
         )
     )
     handlers.register(WatchRenewHandler(primitives.sessions, collector))
@@ -483,6 +558,7 @@ def build_container(
             issue_service,
             primitives.audit,
             primitives.clock,
+            reader=issue_service,
         )
     )
     if signing_key is not None and settings.public_base_url is not None:
@@ -560,20 +636,51 @@ def build_container(
     collector_secrets: WebhookSecrets = build_webhook_secrets(settings, env, channel_key)
     routers: tuple[APIRouter, ...] = (
         build_health_router(),
-        build_directory_router(DirectoryRouterDeps(ctx, directory)),
-        build_issues_router(IssuesRouterDeps(ctx, issue_service, primitives.indexer)),
+        build_directory_router(DirectoryRouterDeps(ctx, directory, directory_v11.identities)),
+        build_issues_router(
+            IssuesRouterDeps(
+                ctx,
+                issue_service,
+                primitives.indexer,
+                issue_ops.remediation,
+                issue_ops.exceptions,
+                directory_v11.owners,
+                resolver,
+            )
+        ),
+        build_exceptions_router(
+            ExceptionsRouterDeps(
+                ctx, issue_ops.exceptions, primitives.indexer, directory_v11.owners
+            )
+        ),
+        build_policies_router(PoliciesRouterDeps(ctx, policy_risk.store)),
         build_ingest_router(IngestRouterDeps(ctx, ingest, collector_repository)),
         build_workflows_router(WorkflowsRouterDeps(ctx, workflow, run_engine)),
         build_runs_router(RunsRouterDeps(ctx, run_engine, workflow_repository)),
         build_human_tasks_router(
             HumanTasksRouterDeps(
-                ctx, resolver, evidence_query, run_engine, workflow_repository, primitives.redactor
+                ctx,
+                resolver,
+                evidence_query,
+                run_engine,
+                workflow_repository,
+                primitives.redactor,
+                directory_v11.owners,
+                issue_ops.remediation,
             )
         ),
         build_escalation_router(EscalationRouterDeps(ctx, escalation)),
         build_evidence_router(EvidenceRouterDeps(ctx, evidence, settings.evidence_max_bytes)),
         build_collectors_router(
-            CollectorsRouterDeps(ctx, collector, sweep_launcher, collector_secrets)
+            CollectorsRouterDeps(
+                ctx,
+                collector,
+                sweep_launcher,
+                collector_secrets,
+                health.coverage,
+                issue_service,
+                health.health_view,
+            )
         ),
         build_map_jobs_router(MapJobsRouterDeps(ctx, map_jobs, map_reducer)),
         build_police_router(

@@ -12,7 +12,9 @@ from telescreen.core.ids import new_id
 from telescreen.core.json import json_object, json_str
 from telescreen.core.vocabulary import ActorKind, ErrorCode
 from telescreen.db.models import MemberRow, TeamRow
+from telescreen.directory.identities import IdentityService
 from telescreen.directory.repository import DirectoryRepository
+from telescreen.masking.fingerprint import Fingerprinter
 from telescreen.ports.audit import AuditEntry, AuditLog
 
 
@@ -23,6 +25,7 @@ class DirectoryService:
     audit: AuditLog
     clock: Clock
     repository: DirectoryRepository = field(default_factory=DirectoryRepository)
+    fingerprinter: Fingerprinter | None = None
 
     async def create_member(
         self,
@@ -47,6 +50,11 @@ class DirectoryService:
             updated_at=now,
         )
         session.add(member)
+        if self.fingerprinter is not None:
+            identities: IdentityService = IdentityService(
+                self.fingerprinter, self.audit, self.clock
+            )
+            await identities.derive_for_member(session, member)
         await self.audit.append(
             session,
             AuditEntry(
@@ -68,10 +76,18 @@ class DirectoryService:
         name: str,
         email: str | None,
         slack_channel: str | None,
+        lead_handle: str | None = None,
     ) -> TeamRow:
         """Create a team and append an audit record in the caller transaction."""
         if await self.repository.team_by_slug(session, slug) is not None:
             raise TelescreenError(ErrorCode.CONFLICT, "team slug already exists")
+        lead: MemberRow | None = (
+            await self.repository.member_by_handle(session, lead_handle)
+            if lead_handle is not None
+            else None
+        )
+        if lead_handle is not None and (lead is None or not lead.active):
+            raise TelescreenError(ErrorCode.NOT_FOUND, "team lead not found")
         now: datetime = self.clock.now()
         team: TeamRow = TeamRow(
             id=new_id(),
@@ -81,6 +97,7 @@ class DirectoryService:
             slack_channel=slack_channel,
             created_at=now,
             updated_at=now,
+            lead_member_id=lead.id if lead is not None else None,
         )
         session.add(team)
         await self.audit.append(
@@ -96,6 +113,37 @@ class DirectoryService:
             ),
         )
         return team
+
+    async def set_team_lead(
+        self, session: AsyncSession, slug: str, lead_handle: str | None, actor_ref: str
+    ) -> None:
+        """Set or clear a team's active lead and append an audit record."""
+        team: TeamRow | None = await self.repository.team_by_slug(session, slug)
+        if team is None:
+            raise TelescreenError(ErrorCode.NOT_FOUND, "team not found")
+        lead: MemberRow | None = (
+            await self.repository.member_by_handle(session, lead_handle)
+            if lead_handle is not None
+            else None
+        )
+        if lead_handle is not None and (lead is None or not lead.active):
+            raise TelescreenError(ErrorCode.NOT_FOUND, "team lead not found")
+        team.lead_member_id = lead.id if lead is not None else None
+        team.updated_at = self.clock.now()
+        await self.audit.append(
+            session,
+            AuditEntry(
+                actor_kind=ActorKind.MEMBER,
+                actor_ref=actor_ref,
+                action="team.lead_changed",
+                target_kind="team",
+                target_id=team.id,
+                summary="Team lead changed",
+                details=json_object(
+                    (("lead_set", json_str("true" if lead is not None else "false")),)
+                ),
+            ),
+        )
 
     async def set_team_members(
         self, session: AsyncSession, slug: str, handles: Sequence[str]

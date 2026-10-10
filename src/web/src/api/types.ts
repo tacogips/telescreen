@@ -1,6 +1,29 @@
 export type Page<T> = Readonly<{ items: T[]; next_cursor: string | null }>;
 export type ItemsOnly<T> = Readonly<{ items: T[] }>;
-export type IssueStatus = "unresolved" | "acknowledged" | "in_progress" | "resolved" | "ignored" | "regressed";
+export type IssueStatus = "unresolved" | "acknowledged" | "in_progress" | "resolved" | "ignored" | "regressed" | "allowed" | "pending_verification";
+export type Severity = "critical" | "high" | "medium";
+export type Visibility = "public" | "anyone_with_link" | "external_shared" | "domain" | "internal" | "private" | "unknown";
+export type CoverageState = "scanned" | "partial" | "unsupported" | "fetch_failed";
+export type UnsupportedReason = "image" | "binary" | "unsupported_type" | "encrypted" | "password_protected" | "archive_too_deep" | "too_large" | "permission_denied" | "fetch_failed" | "scan_incomplete";
+export type HealthStatus = "ok" | "warning" | "failing" | "unknown";
+export type HealthCondition = "stale" | "watch_expiring" | "failing_scans" | "unscannable_public" | "police_silent";
+export type ExceptionStatus = "requested" | "active" | "rejected" | "revoked" | "expired";
+export type ExceptionDuration = "7d" | "30d" | "90d" | "until_regressed" | "forever";
+export type PolicyEffect = "allow" | "violate";
+export type ResolutionReason = "false_positive" | "manual_unverified" | "verify_rescan" | "resource_deleted";
+export type Exposure = Readonly<{ visibility: Visibility; external_principal_count: number; shared_drive: boolean; channel_kind: string | null; repo_visibility: string | null; is_fork: boolean | null }>;
+export type ActiveException = Readonly<{ id: string; status: ExceptionStatus; duration: ExceptionDuration; expires_at: string | null; approver_ref: string | null }>;
+export type Occurrence = Readonly<{ issue_id: string; short_id: string; source: string; display_locator: string; status: IssueStatus; severity: Severity; exposure_visibility: Visibility }>;
+export type OccurrencesResponse = Readonly<{ items: Occurrence[]; key_versions: number[] }>;
+export type RemediationReceipt = Readonly<{ issue_ids: string[]; rescans_enqueued: number }>;
+export type IssueException = Readonly<{ id: string; issue_id: string; status: ExceptionStatus; reason: string; duration: ExceptionDuration; requested_by: string; decided_by: string | null; approver_ref: string | null; expires_at: string | null; created_at: string; decided_at: string | null }>;
+export type PolicySummary = Readonly<{ name: string; active_version: number | null; effect: PolicyEffect; enabled: boolean; owner_team: string | null }>;
+export type PolicyVersion = Readonly<{ name: string; version: number; source_format: "yaml" | "json"; source_text: string; active: boolean }>;
+export type PolicyValidation = Readonly<{ valid: boolean; errors: Readonly<{ path: string; code: string }>[] }>;
+export type CoverageSummary = Readonly<{ since: string; counts: Readonly<{ state: CoverageState; reason: UnsupportedReason | null; count: number }>[]; unscannable_total: number }>;
+export type CoverageResource = Readonly<{ resource_id: string; source: string; state: CoverageState; reason: UnsupportedReason | null; truncated_bytes: number; exposure_visibility: Visibility; first_seen_at: string; last_attempt_at: string; issues: Readonly<{ issue_id: string; short_id: string }>[] }>;
+export type CollectorHealth = Readonly<{ status: HealthStatus; conditions: HealthCondition[]; last_success_at: string | null; last_failure_at: string | null; consecutive_failures: number; last_event_at: string | null; watch_expires_at: string | null; event_only: boolean }>;
+export type MemberIdentity = Readonly<{ id: string; kind: string; origin: string; key_prefix: string; created_at: string }>;
 export type RunStatus = "running" | "waiting" | "succeeded" | "failed" | "cancelled";
 export type StepStatus = "ready" | "running" | "waiting" | "succeeded" | "failed" | "cancelled";
 export type PoliceStatus = "active" | "disabled";
@@ -20,10 +43,12 @@ export type PoliceResult = Readonly<{ status: "succeeded" | "failed" | "rate_lim
 export type Issue = Readonly<{
   id: string; number: number; short_id: string; grouping_key: string; source: string; resource_key: string;
   display_locator: string; resource_ref_json: string | null; collector_config_id: string | null; display_title: string;
-  rule_class: string; severity: string; status: IssueStatus; assignee_member_id: string | null; assignee_team_id: string | null;
+  rule_class: string; severity: Severity; status: IssueStatus;
+  base_severity?: Severity; exposure_visibility?: Visibility; risk_score?: number; policy_name?: string | null; policy_version?: number | null; assignee_member_id: string | null; assignee_team_id: string | null;
   first_seen: string; last_seen: string; last_checked_at: string; sweep_covered: boolean; times_seen: number;
   distinct_fingerprints: number; regression_count: number; resolved_at: string | null; resolution: string | null;
 }>;
+export type IssueDetail = Issue & Readonly<{ exposure: Exposure; exposure_changed_at: string | null; asset_tier: string | null; assignee_ref: string | null; owner: Readonly<{ present: boolean; member_ref: string | null }>; active_exception: ActiveException | null }>;
 export type IssueEvent = Readonly<{
   id: string; issue_id: string; scan_job_id: string | null; source: string; resource_key: string; display_locator: string;
   location: string; rule_id: string; rule_class: string; detector: string; confidence: number | null;
@@ -41,12 +66,13 @@ export type Transition = Readonly<{ from_step_run_id: string | null; to_step_id:
 export type RunHumanTask = Readonly<{ id: string; step_run_id: string; kind: string; title: string; assignee_ref: string; status: string; outcome: string | null; outcomes: string[] }>;
 export type RunDetail = Readonly<{ run: RunSummary; steps: StepRun[]; transitions: Transition[]; human_tasks: RunHumanTask[] }>;
 export type HumanTask = Readonly<{ id: string; run_id: string; step_run_id: string; kind: string; title: string; assignee_ref: string; due_at: string | null; status: HumanTaskStatus; outcome: string | null }>;
-export type PoliceWorker = Readonly<{ id: string; name: string; version: string; mode: string; task_types: string[]; labels: string[]; concurrency: number; status: PoliceStatus; last_heartbeat_at: string | null }>;
+export type HumanTaskCompletion = Readonly<{ outcome: string; comment?: string; exception_duration?: ExceptionDuration }>;
+export type PoliceWorker = Readonly<{ id: string; name: string; version: string; mode: string; task_types: string[]; labels: string[]; concurrency: number; status: PoliceStatus; last_heartbeat_at: string | null; health?: Readonly<{ status: HealthStatus; conditions: HealthCondition[] }> }>;
 export type Evidence = Readonly<{ id: string; issue_id: string; step_run_id: string | null; display_filename: string; content_type: string; size_bytes: number; sha256: string | null; verdict: EvidenceVerdict; rejection_rule_classes: string[]; uploaded_by: string; created_at: string }>;
 export type EscalationPolicy = Readonly<{ id: string; name: string; tiers_json: string }>;
 export type Member = Readonly<{ id: string; handle: string; display_name: string; email: string | null; slack_user_id: string | null; active: boolean }>;
-export type Team = Readonly<{ id: string; slug: string; name: string; email: string | null; slack_channel: string | null }>;
-export type CollectorConfig = Readonly<{ id: string; name: string; kind: string; trigger_mode: TriggerMode; cron: string | null; sweep_cron: string | null; selector_json: string; credential_ref: string | null; enabled: boolean }>;
+export type Team = Readonly<{ id: string; slug: string; name: string; email: string | null; slack_channel: string | null; lead?: string | null }>;
+export type CollectorConfig = Readonly<{ id: string; name: string; kind: string; trigger_mode: TriggerMode; cron: string | null; sweep_cron: string | null; selector_json: string; credential_ref: string | null; enabled: boolean; health?: CollectorHealth }>;
 export type MapJobSummary = Readonly<{ id: string; origin: string; status: string; collector_config_id: string | null; created_at: string }>;
 export type MapJob = Readonly<{ id: string; origin: string; status: string; collector_config_id: string | null; counts: Readonly<Partial<Record<"ready" | "dispatched" | "succeeded" | "failed" | "cancelled", number>>>; partitions_done: number; partitions_total: number; findings_so_far: number; paused_until: string | null; failed_shards: Readonly<{ shard_key: string; error_code: string }[]>; result_json: string | null }>;
 export type SearchHit = Readonly<{ index: string; id: string; title: string; snippet: string | null; status: string | null; at: string | null }>;
@@ -60,3 +86,5 @@ export type ApiErrorBody = Readonly<{ error: Readonly<{ code: string; detail: st
 export type IngestScanResult = Readonly<{ scan_job_id: string; resources: number; findings: number; issue_ids: string[] }>;
 export type IngestFindingsResult = Readonly<{ findings_inserted: number; issue_ids: string[] }>;
 export type ApiMessage = Readonly<{ role: "user" | "assistant"; content: string }>;
+
+export type PolicyVersionDetail = PolicyVersion;

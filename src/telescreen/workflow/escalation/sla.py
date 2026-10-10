@@ -18,7 +18,7 @@ from telescreen.core.vocabulary import (
 from telescreen.db.models import EscalationPolicyRow, HumanTaskRow, WorkflowRunRow
 from telescreen.ports.audit import AuditEntry, AuditLog
 from telescreen.ports.directory import RecipientResolver
-from telescreen.ports.issues import IssueHistoryEntry, IssueRecorder
+from telescreen.ports.issues import IssueHistoryEntry, IssueReader, IssueRecorder, IssueSnapshot
 from telescreen.ports.notifications import NotificationRequest, NotificationSender
 from telescreen.ports.workflow import ClaimedTask, TaskResult, TaskSpec
 from telescreen.workflow.dsl.escalation import (
@@ -44,6 +44,7 @@ class SlaCheckHandler:
     audit: AuditLog
     clock: Clock
     kind: EngineTaskKind = EngineTaskKind.SLA_CHECK
+    reader: IssueReader | None = None
 
     async def handle(self, task: ClaimedTask) -> TaskResult:
         """Escalate only tasks that remain open when the SLA task runs."""
@@ -65,6 +66,30 @@ class SlaCheckHandler:
                 else None
             )
             now: datetime = self.clock.now()
+            tier: EscalationTier | None = (
+                policy.tiers[human_task.tier_index]
+                if policy is not None and human_task.tier_index < len(policy.tiers)
+                else None
+            )
+            if tier is not None and tier.min_risk is not None and run.issue_id is not None:
+                issue: IssueSnapshot | None = (
+                    await self.reader.get(session, run.issue_id)
+                    if self.reader is not None
+                    else None
+                )
+                if issue is not None and issue.risk_score < tier.min_risk:
+                    await self.issues.add_history(
+                        session,
+                        IssueHistoryEntry(
+                            run.issue_id,
+                            IssueHistoryKind.SLA_BREACHED,
+                            "system:workflow",
+                            now,
+                            "below risk threshold",
+                        ),
+                    )
+                    await self._audit(session, human_task, run, "sla.breached")
+                    return TaskResult.done()
             if run.issue_id is not None:
                 await self.issues.add_history(
                     session,
@@ -76,11 +101,6 @@ class SlaCheckHandler:
                         "Human task SLA breached",
                     ),
                 )
-            tier: EscalationTier | None = (
-                policy.tiers[human_task.tier_index]
-                if policy is not None and human_task.tier_index < len(policy.tiers)
-                else None
-            )
             if tier is None:
                 await self._audit(session, human_task, run, "sla.breached")
                 return TaskResult.done()

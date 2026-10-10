@@ -1,0 +1,61 @@
+apiVersion: telescreen.workflow/v1
+kind: Workflow
+name: owner-review
+description: Route high-severity issues to their data owner for review and verified remediation.
+trigger:
+  "on": [issue_created]
+  match:
+    min_severity: high
+start: owner_review
+steps:
+  - id: owner_review
+    type: human_task
+    kind: owner_review
+    title: Review the assigned sensitive-data issue
+    assignee: issue:assignee
+    sla: P2D
+    escalation_policy: secops-standard
+    outcomes:
+      exception: exception_recorded
+      not_mine: route_to_security
+      remove: verify_removal
+      restrict: verify_restriction
+  - id: verify_removal
+    type: detect
+    detectors: [rule]
+    outcomes:
+      found: removal_pending
+      clean: completed
+      error: verification_failed
+  - id: verify_restriction
+    type: detect
+    detectors: [rule]
+    outcomes:
+      found: restriction_pending
+      clean: completed
+      error: verification_failed
+  - id: route_to_security
+    type: notify
+    channel: email
+    to: [team:security]
+    subject: Owner review needs reassignment
+    body: Review this unassigned issue and route it to the responsible team.
+    next: reassigned
+  - id: removal_pending
+    type: end
+    result: succeeded
+  - id: restriction_pending
+    type: end
+    result: succeeded
+  - id: exception_recorded
+    type: end
+    result: succeeded
+  - id: completed
+    type: end
+    result: succeeded
+  - id: verification_failed
+    type: end
+    result: failed
+  - id: reassigned
+    type: end
+    result: succeeded

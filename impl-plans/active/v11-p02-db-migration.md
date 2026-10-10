@@ -1,6 +1,6 @@
 # V11-P02 Database Models and Idempotent Migration 0002_v1_1
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-data-model.md ("v1.1 additions (revision `0002_v1_1`)"); design-docs/specs/design-v1-1-dspm-adoption.md sections 3-11
 **Created**: 2026-10-10
 **Last Updated**: 2026-10-10
@@ -183,13 +183,32 @@ passing run or the passing deselected rerun goes in the step `verification` list
 
 ## Completion Criteria
 
-- [ ] All models and columns exist with the exact names; `db/models/__init__.py` exports
+- [x] All models and columns exist with the exact names; `db/models/__init__.py` exports
       them.
-- [ ] `0002_v1_1` is idempotent (fresh and v1-shaped paths tested) and downgrades.
-- [ ] Scoped gates pass; the typelint grep is empty; the full pytest exit is 0, or it fails
+- [x] `0002_v1_1` is idempotent (fresh and v1-shaped paths tested) and downgrades.
+- [x] Scoped gates pass; the typelint grep is empty; the full pytest exit is 0, or it fails
       only in the named v11-p01/v11-p03 paths and the deselected rerun shows `exit=0`.
-- [ ] Progress Log complete.
+- [x] Progress Log complete.
 
 ## Progress Log
 
-(append sessions per conventions section 8)
+### Session: 2026-10-10 16:28 JST
+**Tasks Completed**: Added all v1.1 database models and exports; added conditional `0002_v1_1` table/column/index creation, legacy severity backfill and downgrade; added fresh-schema, v1-shaped upgrade/backfill, downgrade/re-upgrade and constructor-default tests.
+**Tasks In Progress**: Scoped `tests/db` gate requires serial write-path reconciliation for the existing exact-table assertion.
+**Blockers**: `tests/db/test_models.py::test_metadata_has_the_exact_table_contract` fails because the six required v1.1 tables are extra relative to its v1-only `EXPECTED_TABLES`. `tests/db/test_models.py` is outside this plan's dispatch `writePaths` (only `tests/db/test_v11_migration.py` is authorized). Resume after serial reconciliation amends ownership to permit updating the expected table set/count, then rerun the scoped and full pytest gates.
+**Reconciliation requests**: Add `tests/db/test_models.py` to an authorized serial reconciliation write scope and update `EXPECTED_TABLES`/count for `placement_policies`, `issue_exceptions`, `member_identities`, `resource_coverage`, `scan_coverage`, and `collector_health`. No change made outside this plan's `writePaths`.
+**Hashes**: `impl-plans/active/v11-p02-db-migration.md` before=aac4f1b31f582e361d580a54b0049b0076c321a54a88be4e46701f649511df7c; final after-hash is recorded in the Step 6 payload because an in-file self-hash would change the file again. `src/telescreen/db/models/issues.py` before=2ec07e7db406957492ce0fcf3115a0f0f075a770274ce684ba3534deaf79c9e0 after=91809bc259f8e977edad838655e704f81bc2d6c004a51b3ecf97330395920cbc; `src/telescreen/db/models/directory.py` before=65c62f5fdbaf818e511d71b6f8b2c32fa53a06739bfdc6175e26c43f5e606d1e after=fbac9529228e016c307705cad55fd93f32f4ca946e556cb50c1b76cd9801c2df; `src/telescreen/db/models/collectors.py` before=30febff167c30c2e0755ebda86b40e2e5597c8aa751e7c56963be3b23ff9cdaf after=75e2e9fdb534d25f4995534cfa90745cae8f735537303c53c1002009fad9923f; `src/telescreen/db/models/police.py` before=13a2fccd97d1f5eaca85f76c4c562a07c28a595e8e50bc16a009fd69bc2a0deb after=dbc8cd06f3a8b4d6d126b9f514afa1a10f44c49b375caddbdc8b700303e0e9e0; `src/telescreen/db/models/__init__.py` before=6910f6c05a5ee353bdfc5796205a0d757240dcbce08a564f72e02d0268948973 after=db2fb71719c0440846aea64042f5e480dc9dfad474e7649ec50ee47a6b95c2a0; `src/telescreen/db/migrations/versions/0002_v1_1.py` before=absent after=f286646e56e6957a0a9f82459cf1782f073b60f0f82d9ea2ff8db6ea4ae561e3; `tests/db/test_v11_migration.py` before=absent after=3f70d3d1f13f8c8bb80b04ff73fc26a112f6a7624c13ff5781e5df49b3932527.
+**Verification**: `uv run --frozen ruff format --check --no-cache src/telescreen/db tests/db` -> exit 0 (log: `/tmp/telescreen-v11-p02-db-migration-format.log`); `uv run --frozen ruff check --no-cache src/telescreen/db tests/db` -> exit 0 (log: `/tmp/telescreen-v11-p02-db-migration-ruff.log`); `uv run --frozen ty check src/telescreen/db tests/db` -> exit 0 (log: `/tmp/telescreen-v11-p02-db-migration-ty.log`); `uv run --frozen python tools/typelint.py > /tmp/telescreen-v11-p02-db-migration-typelint.log 2>&1; ! grep -E '^(src/telescreen/db/|tests/db/)' /tmp/telescreen-v11-p02-db-migration-typelint.log` -> exit 0 (log: `/tmp/telescreen-v11-p02-db-migration-typelint.log`, no matching diagnostics); `uv run --frozen pytest -p no:cacheprovider tests/db/test_v11_migration.py` -> exit 0, 4 passed (log: `/tmp/telescreen-v11-p02-db-migration-regression.log`). `uv run --frozen pytest -p no:cacheprovider tests/db` -> exit 1, 1 failed, 8 passed, 1 skipped; failure is the out-of-scope table contract assertion above (log: `/tmp/telescreen-v11-p02-db-migration-pytest.log`). Full offline pytest was not run because the required scoped suite is blocked.
+**Notes**: `0001_initial.py` remains untouched. Other fanout paths are concurrently modified and were left unchanged.
+
+**Owner resolution (2026-10-10)**: The owner updated `tests/db/test_models.py` (outside your write paths) to include placement_policies, resource_coverage, scan_coverage, collector_health, member_identities and issue_exceptions with table count 33; `uv run pytest tests/db` passes (9 passed, 1 integration skip). This is no longer a blocker. Re-run the gates and report per conventions 7a.
+
+### Session: 2026-10-10 18:10 JST
+**Tasks Completed**: Re-ran all scoped p02 gates after the table-contract reconciliation. Checked the scoped-gates completion criterion; `0001_initial.py` remains untouched.
+**Tasks In Progress**: None for p02 implementation. Independent review and serial integration are downstream workflow steps.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `src/telescreen/db/models/__init__.py` after=`db2fb71719c0440846aea64042f5e480dc9dfad474e7649ec50ee47a6b95c2a0`; `src/telescreen/db/models/collectors.py` after=`75e2e9fdb534d25f4995534cfa90745cae8f735537303c53c1002009fad9923f`; `src/telescreen/db/models/directory.py` after=`fbac9529228e016c307705cad55fd93f32f4ca946e556cb50c1b76cd9801c2df`; `src/telescreen/db/models/issues.py` after=`91809bc259f8e977edad838655e704f81bc2d6c004a51b3ecf97330395920cbc`; `src/telescreen/db/models/police.py` after=`dbc8cd06f3a8b4d6d126b9f514afa1a10f44c49b375caddbdc8b700303e0e9e0`; `src/telescreen/db/migrations/versions/0002_v1_1.py` after=`f286646e56e6957a0a9f82459cf1782f073b60f0f82d9ea2ff8db6ea4ae561e3`; `tests/db/test_v11_migration.py` after=`3f70d3d1f13f8c8bb80b04ff73fc26a112f6a7624c13ff5781e5df49b3932527`.
+**Verification**: `uv run --frozen ruff format --check --no-cache src/telescreen/db tests/db` -> exit 0 (22 files already formatted; `/tmp/telescreen-v11-p02-db-migration-format-final.log`); `uv run --frozen ruff check --no-cache src/telescreen/db tests/db` -> exit 0 (`/tmp/telescreen-v11-p02-db-migration-ruff-final.log`); `uv run --frozen ty check src/telescreen/db tests/db` -> exit 0 (`/tmp/telescreen-v11-p02-db-migration-ty-final.log`); `uv run --frozen pytest -p no:cacheprovider tests/db` -> exit 0, 9 passed, 1 skipped (`/tmp/telescreen-v11-p02-db-migration-pytest-final.log`); `uv run --frozen python tools/typelint.py` plus scoped grep -> exit 0, 299 files clean and no p02 diagnostics (`/tmp/telescreen-v11-p02-db-migration-typelint-final.log`); `test -z "$(git diff --name-only HEAD -- src/telescreen/db/migrations/versions/0001_initial.py)"` -> exit 0.
+**Aggregate verification**: First full offline pytest run -> exit 1, 1 failed, 419 passed, 4 skipped; the audit search test failed and then passed isolated (`/tmp/telescreen-v11-p02-db-migration-pytest-all-final.log`, `/tmp/telescreen-v11-p02-db-migration-audit-isolated.log`). The next full run -> exit 1, 1 failed, 419 passed, 4 skipped; the sole failure was `tests/workflow/mapreduce/test_mapreduce.py::test_dispatch_caps_ten_thousand_shards_at_thirty_two`, owned by v11-p01 (`/tmp/telescreen-v11-p02-db-migration-pytest-all-rerun.log`). Its required deselected rerun -> exit 0, 419 passed, 4 skipped, 1 deselected (`/tmp/telescreen-v11-p02-db-migration-pytest-all-deselected-final.log`).
+**Notes**: The final full run showed no audit failure; the isolated audit rerun also passed. Only the named v11-p01 timing guard failed in the final aggregate, and the plan-required deselected rerun passed. `grep -c '^- \[ \]' impl-plans/active/v11-p02-db-migration.md` -> 0 after this update. Pre-edit plan SHA-256: `8d6cea4d04f0e3e2591944356701224fd1b83eb03361a49f44bd3d9221eff6f2`.

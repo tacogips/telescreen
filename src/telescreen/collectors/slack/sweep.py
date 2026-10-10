@@ -12,13 +12,26 @@ from telescreen.collectors.slack.client import (
     FileListResponse,
     HistoryResponse,
     SlackApi,
+    SlackConversationInfo,
     SlackFile,
+    SlackPermissionDenied,
 )
+from telescreen.collectors.slack.exposure import slack_exposure
 from telescreen.core.errors import TelescreenError
 from telescreen.core.json import JsonValue, json_object, json_str
-from telescreen.core.vocabulary import ErrorCode
+from telescreen.core.vocabulary import (
+    CoverageState,
+    ErrorCode,
+    IdentityKind,
+    PlacementKind,
+    UnsupportedReason,
+)
 from telescreen.ports.collectors import (
     CollectorConfig,
+    Coverage,
+    Exposure,
+    OwnerIdentity,
+    PlacementRef,
     RateLimited,
     ResourceContent,
     ResourceGoneError,
@@ -92,6 +105,11 @@ class SlackSweep:
         api: SlackApi = self._api(config)
         team_id: str = await api.team_id()
         adapter: SlackAdapter = SlackAdapter(self._api, self.max_file_bytes)
+        channel_info: SlackConversationInfo | None
+        try:
+            channel_info = await api.conversations_info(channel_id)
+        except (RateLimited, SlackPermissionDenied, TelescreenError):
+            channel_info = None
         cursor: str | None = None
         while True:
             page: HistoryResponse = await api.conversations_history(
@@ -99,6 +117,7 @@ class SlackSweep:
             )
             for message in page.messages:
                 ref: ResourceRef = adapter._message_ref(team_id, channel_id, message.ts)
+                exposure: Exposure | None = slack_exposure(channel_info, team_id)
                 content: ResourceContent = ResourceContent(
                     source="slack",
                     collector_config_id=config.id,
@@ -108,6 +127,17 @@ class SlackSweep:
                     raw_locator=ref.raw_locator,
                     display_title=f"#{channel_id} message",
                     ref=ref,
+                    exposure=exposure,
+                    owner=(
+                        OwnerIdentity(IdentityKind.SLACK_USER, message.user)
+                        if message.user is not None
+                        else None
+                    ),
+                    placement=(PlacementRef(PlacementKind.SLACK_CHANNEL, channel_id),),
+                    modified_at=adapter._timestamp(
+                        message.edited.ts if message.edited is not None else message.ts
+                    ),
+                    coverage=Coverage(CoverageState.SCANNED),
                 )
                 yield ShardEntry(ShardEntryKind.FETCHED, ref, content)
             cursor = page.response_metadata.next_cursor or None
@@ -118,7 +148,9 @@ class SlackSweep:
             while True:
                 file_page: FileListResponse = await api.files_list(channel_id, None, files_cursor)
                 for slack_file in file_page.files:
-                    async for entry in self._file_entry(adapter, api, config, team_id, slack_file):
+                    async for entry in self._file_entry(
+                        adapter, api, config, team_id, channel_id, channel_info, slack_file
+                    ):
                         yield entry
                 files_cursor = file_page.response_metadata.next_cursor or None
                 if files_cursor is None:
@@ -130,22 +162,53 @@ class SlackSweep:
         api: SlackApi,
         config: CollectorConfig,
         team_id: str,
+        channel_id: str,
+        channel_info: SlackConversationInfo | None,
         listed_file: SlackFile,
     ) -> AsyncIterator[ShardEntry]:
         """Fetch a text file or yield a safe removed/failed outcome."""
         ref: ResourceRef = adapter._file_ref(team_id, listed_file.id)
         try:
             file: SlackFile = await api.files_info(listed_file.id)
-            if file.size > self.max_file_bytes or not adapter._is_text_file(file.mimetype):
-                content: ResourceContent = ResourceContent(
-                    "slack", config.id, (), False, True, ref.raw_locator, "Slack file", ref
+            exposure: Exposure | None = slack_exposure(channel_info, team_id, file)
+            if file.size > self.max_file_bytes:
+                content: ResourceContent = adapter._file_content(
+                    config,
+                    ref,
+                    file,
+                    channel_id,
+                    exposure,
+                    (),
+                    False,
+                    Coverage(CoverageState.TOO_LARGE),
+                )
+                yield ShardEntry(ShardEntryKind.FETCHED, ref, content)
+                return
+            if not adapter._is_text_file(file.mimetype):
+                reason: UnsupportedReason = adapter._unsupported_reason(file.mimetype)
+                content = adapter._file_content(
+                    config,
+                    ref,
+                    file,
+                    channel_id,
+                    exposure,
+                    (),
+                    False,
+                    Coverage(CoverageState.UNSUPPORTED, reason),
                 )
                 yield ShardEntry(ShardEntryKind.FETCHED, ref, content)
                 return
             data: bytes = await api.download(file.url_private, self.max_file_bytes)
             if len(data) > self.max_file_bytes:
-                content = ResourceContent(
-                    "slack", config.id, (), False, True, ref.raw_locator, "Slack file", ref
+                content = adapter._file_content(
+                    config,
+                    ref,
+                    file,
+                    channel_id,
+                    exposure,
+                    (),
+                    False,
+                    Coverage(CoverageState.TOO_LARGE),
                 )
                 yield ShardEntry(ShardEntryKind.FETCHED, ref, content)
                 return
@@ -153,13 +216,22 @@ class SlackSweep:
             segments: tuple[Segment, ...] = tuple(
                 Segment(f"L{index}", line) for index, line in enumerate(text.splitlines(), 1)
             )
-            content = ResourceContent(
-                "slack", config.id, segments, True, True, ref.raw_locator, "Slack file", ref
+            content = adapter._file_content(
+                config,
+                ref,
+                file,
+                channel_id,
+                exposure,
+                segments,
+                True,
+                Coverage(CoverageState.SCANNED),
             )
             yield ShardEntry(ShardEntryKind.FETCHED, ref, content)
         except ResourceGoneError:
             yield ShardEntry(ShardEntryKind.REMOVED, ref)
         except RateLimited:
             raise
+        except SlackPermissionDenied:
+            yield ShardEntry(ShardEntryKind.FETCHED, ref, adapter._denied_file_content(config, ref))
         except (TelescreenError, UnicodeDecodeError):
             yield ShardEntry(ShardEntryKind.FAILED, ref, error_code=ErrorCode.FETCH_FAILED)
