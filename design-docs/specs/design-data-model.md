@@ -118,6 +118,67 @@ SLA escalation, notification sent/blocked, evidence accepted/rejected, police re
 police result accepted/rejected, index guard rejection, token creation/revocation, collector
 config changes.
 
+### v1.1 additions (revision `0002_v1_1`)
+
+Behavior is in `design-v1-1-dspm-adoption.md`. One new Alembic revision, `0002_v1_1`
+(`down_revision = "0001_initial"`), adds everything below. `0001_initial` is never edited.
+
+`0001_initial` builds its tables from the current ORM metadata. On a fresh database it
+therefore already creates every v1.1 table and column, while a database migrated under v1
+lacks them. `0002_v1_1` must be idempotent: it inspects the live schema and creates only
+the missing tables, columns and indexes. It then runs the backfills
+(`base_severity = severity` where null, `fingerprint_key_version = 1` where null).
+Downgrade drops the v1.1 additions that exist.
+Enum-like columns stay `String(32)`, so new `IssueStatus`, `IssueResolution`,
+`IssueHistoryKind`, `HumanTaskKind` and `EngineTaskKind` values need no DDL. New tables and
+columns hold only enums, counts, timestamps, ids, keyed references (HMAC hex), operator
+configuration and redacted text. They never hold raw values, file names, paths, titles or
+emails.
+
+New columns on existing tables:
+
+| Table | Columns | Backfill / notes |
+|-------|---------|------------------|
+| `issues` | `base_severity` String(32) not null | `= severity`. From v1.1, `severity` is the effective (exposure-floored) severity |
+| `issues` | `exposure_visibility` String(32) not null default `unknown`, `exposure_json` Text nullable, `exposure_changed_at` nullable | Canonical JSON of `Exposure` (enums and counts only). INDEX(`exposure_visibility`) |
+| `issues` | `placement_keys_json` Text nullable, `resource_modified_at` nullable | JSON array of `"<placement kind>:<hex>"` keyed references |
+| `issues` | `owner_ref` String(80) nullable | `"<identity kind>:<hex>"`; never a raw id or email |
+| `issues` | `policy_name` String(64) nullable, `policy_version` Integer nullable | The policy that made the last decision |
+| `issues` | `risk_score` Integer not null default 0, `asset_tier` String(32) nullable | INDEX(`status`, `risk_score`). Recomputed by the first maintenance tick |
+| `findings` | `fingerprint_key_version` Integer not null server default 1 | INDEX `ix_findings_key_fingerprint` (`fingerprint_key_version`, `fingerprint`) |
+| `teams` | `lead_member_id` String(36) nullable | Exception approver |
+| `police_workers` | `health_alerted_at` nullable | Open `police_silent` alert marker |
+
+New tables:
+
+| Table | Owner | Columns | Notes |
+|-------|-------|---------|-------|
+| `placement_policies` | issues | id, name, version, source_format, source_text, compiled_json, effect, enabled, active, owner_team nullable, created_by, created_at, UNIQUE(name, version) | Like `workflow_definitions`: `source_text` is rejected at upload if the RuleDetector finds anything; `rationale` inside it is redacted. At most one active version per name |
+| `issue_exceptions` | issues | id, issue_id, reason (redacted), duration, status, requested_by, approver_ref nullable, decided_by nullable, decided_at nullable, expires_at nullable, created_at, INDEX(issue_id), INDEX(status, expires_at) | At most one `requested` or `active` row per issue (checked in the service under the issue row lock) |
+| `member_identities` | directory | id, member_id, kind, identity_key (64 hex), origin, created_at, UNIQUE(kind, identity_key) | Keyed only; derived rows follow `members.email` / `slack_user_id` |
+| `resource_coverage` | collectors | id, collector_config_id, resource_key, source, state, reason nullable, truncated_bytes, exposure_visibility, first_seen_at, last_attempt_at, UNIQUE(collector_config_id, resource_key) | Only resources whose latest state is not `scanned`; no locator or title |
+| `scan_coverage` | collectors | scan_job_id, state, reason (empty string when none), count, PK(scan_job_id, state, reason) | Counts per scan job |
+| `collector_health` | collectors | collector_config_id PK, last_success_at, last_failure_at, consecutive_failures, last_event_at, watch_expires_at, open_conditions (comma list), alerted_at, updated_at | One row per config, created on first job or event |
+
+Issue status machine from v1.1: the user transitions, record-path transitions and resolution
+reasons in `design-v1-1-dspm-adoption.md` section 5 replace the v1 table above. Status
+groups `OPEN_STATUSES` and `RECONCILED_STATUSES` are defined in `telescreen.core.vocabulary`.
+
+Keys from v1.1 (`Fingerprinter` with an identity key and an active key; version 1 is the
+identity key):
+
+- `resource_key`, `grouping_key`, `placement_key = HMAC(identity, "placement\0" + kind +
+  "\0" + value)` and `owner identity_key = HMAC(identity, "identity\0" + kind + "\0" +
+  normalized)` always use version 1.
+- `fingerprint` and external re-keying use the active version, recorded in
+  `findings.fingerprint_key_version`.
+
+Audited actions added: `policy.created`, `policy.activated`, `policy.disabled`,
+`issue.remediation_requested`, `issue.verified`, `issue.resolved` (with reason),
+`exception.requested`, `exception.approved`, `exception.rejected`, `exception.revoked`,
+`exception.expired`, `identity.added`, `identity.removed`, `team.lead_changed`,
+`health.alert_opened`.
+
 ## References
 
 See `design-docs/references/README.md`.

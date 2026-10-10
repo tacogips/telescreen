@@ -75,6 +75,55 @@ serve (`unsupported_contract_version`).
   only), `error` (`code`, `detail`, optional `retry_after_seconds` used with code
   `rate_limited`) when failed, `result_token` (callback only).
 
+### Contract 1.1 (v1.1, exposure)
+
+Minor version `1.1` adds one optional member to `result-envelope.schema.json`, through a
+new `$ref`-ed schema file `resource-exposure.schema.json`:
+
+```json
+"resource_exposures": {
+  "type": "array", "maxItems": 1000,
+  "items": {"$ref": "resource-exposure.schema.json"}
+}
+```
+
+`resource-exposure.schema.json` is a closed object (`additionalProperties: false`):
+
+| Member | Type | Required |
+|--------|------|----------|
+| `locator` | string, max 1024 | yes |
+| `visibility` | enum `public`, `anyone_with_link`, `external_shared`, `domain`, `internal`, `private`, `unknown` | yes |
+| `external_principal_count` | integer >= 0 | no |
+| `shared_drive`, `is_fork` | boolean | no |
+| `channel_kind` | enum `public`, `private`, `dm`, `connect` | no |
+| `repo_visibility` | enum `public`, `internal`, `private` | no |
+
+Rules:
+
+- `contract_version` keeps the pattern `^1\.[0-9]+$`. The Bureau accepts 1.0 and 1.1
+  envelopes against the same schema files. A 1.0 worker never sends the member, so existing
+  workers keep working unchanged.
+- The member is accepted on `detect` and `scan_shard` results and ignored on the other task
+  types.
+- Each `locator` must also appear as a finding `locator` or in `complete_locators`.
+  Entries for other locators are dropped, and the drop is counted in the audit details.
+- Every `locator` is scanned by the `Redactor` like the other string fields. Any hit
+  rejects the result with 422 `raw_value_detected`.
+- Accepted entries become `ExternalScan.exposures` and are applied per resource as in
+  `design-v1-1-dspm-adoption.md` section 3. Locators without an entry get visibility
+  `unknown`, which never overwrites a known value.
+- `openapi.json` adds the schema reference, and `examples/` gains
+  `result-envelope-1.1.json` with exposures.
+- SDK: `models.py` gains a frozen `ResourceExposure` dataclass and
+  `ResultEnvelope.resource_exposures: tuple[ResourceExposure, ...] = ()`, serialized only
+  when non-empty. `CONTRACT_VERSION` becomes `"1.1"`. `SweepHandler` and `PullWorker`
+  handlers may return exposures. The SDK still imports only stdlib and httpx.
+- Contract tests validate SDK-serialized 1.0 and 1.1 envelopes and the Bureau's acceptance
+  of both against the same schema files.
+- Heartbeat semantics (v1.1): a claim also updates `last_heartbeat_at`, even when it
+  returns no tasks. A long-poll claim is a liveness signal, and the `police_silent` health
+  condition relies on it (`design-v1-1-dspm-adoption.md` section 8).
+
 ### Endpoints (`/api/police/v1`)
 
 | Endpoint | Auth | Behavior |

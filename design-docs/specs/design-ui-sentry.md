@@ -405,6 +405,109 @@ independent.
 | p28-assembly | As accepted plan, plus the static serving rules of 8.6 and the fixture leak test of 8.3 | 2 (parallel with p12-p14; the serve tests use a temporary dist directory, not a real build) |
 | p29-examples-compose | `examples/compose/**`, `examples/workflows/**`, `tests/examples/**`, `README.md` | 3 |
 
+### 9. v1.1 additions (binding for the v1.1 run)
+
+This section extends section 8 for the v1.1 features (`design-v1-1-dspm-adoption.md`)
+against the "v1.1 endpoints" of `design-api-and-ui.md`. Where a row below differs from
+8.1, this section wins. The rule of section 8 still applies: data the API does not return
+is omitted, not emulated.
+
+#### 9.1 Tokens and components
+
+- New color role `--critical` / `--critical-strong` / `--critical-content` /
+  `--critical-muted-bg`:
+  - light: `#B4232A` / `#8C1A20` / `#8C1A20` / `#B4232A1F`;
+  - dark: `#F0646A` / `#5E1A1D` / `#F7B5B7` / `#F0646A33`.
+
+  Use: critical severity only.
+- `SeverityBar`: critical `--critical`, high `--danger`, medium `--warning`.
+- `PriorityBadge`: 4/3/2 bars for critical/high/medium. It is still derived read-only from
+  the effective `severity`.
+- `Tag` gains variant `critical`.
+- New `ExposureBadge` (a `Tag`):
+  - `public` -> danger "Public";
+  - `anyone_with_link` -> danger "Link sharing";
+  - `external_shared` -> warning "Shared externally (N)", or without a count when N is 0;
+  - `domain` -> muted "Domain";
+  - `internal`, `private` and `unknown` render nothing in list rows and plain text in the
+    detail sidebar.
+- New `RiskPill`: the score in tabular numbers on `--bg-tertiary`, with a tooltip "Ordinal
+  risk 0-100: severity x exposure x asset x age".
+- Status tags:
+  - `allowed` -> muted "Allowed";
+  - `pending_verification` -> info "Verifying";
+  - `resolved` with resolution `manual_unverified` -> warning "Resolved (unverified)" with a
+    warning icon;
+  - `ignored` -> muted "Ignored", plus the expiry text from the active exception or "No
+    expiry (legacy)".
+- `ProgressMarker`: `pending_verification` -> Fix proposed. `allowed` shows no marker.
+
+#### 9.2 Shell and routes
+
+- `AREAS` gains `tasks` (path `/my-tasks`, page `pages/tasks/index.tsx`, rail label "My
+  tasks", placed after Issues) and `policies` (path `/policies`, page
+  `pages/policies/index.tsx`, rail label "Policies", placed after Collectors).
+- Rail order: Issues, My tasks, Search, Workflows, Police, Collectors, Policies,
+  Escalation, Audit, Assistant, Settings.
+- The My tasks rail item shows a count badge from the open human tasks plus the requested
+  approvals.
+
+#### 9.3 API capability mapping (v1.1 rows)
+
+| UI element | v1.1 behavior (API source) |
+|------------|----------------------------|
+| Issue search tokens | Adds `is:allowed`, `is:pending_verification`, `exposure:<visibility>` -> `exposure`, the shorthand `is:public` -> `exposure=public`, and `assigned:me` / `assigned:my_teams` -> `assignee=me|my_teams`. `severity:` accepts `critical`. Other limits of 8.1 are unchanged |
+| Sort | Adds **Risk** ("Highest risk first", `sort=risk`) |
+| Secondary panel (Issues) | "For review" is restored as `assigned:me`. Views gain "Allowed" (`is:allowed`) and "Verifying" (`is:pending_verification`) |
+| List columns | Adds Risk (`RiskPill`, 48px right, from container `md`). The meta row shows `ExposureBadge` from `exposure_visibility` (replacing the omitted "Externally shared" flag) |
+| Bulk actions | Acknowledge, Mark in progress, Reopen, Assign to, Start workflow, and **Mark remediated** (`POST /remediation {action: remove}` per issue). Resolve and Ignore are no longer bulk actions, because both need a reason |
+| Issue detail actions | **Resolve** split: "Mark remediated..." (dialog: removed or restricted; "Include linked occurrences" checkbox for credential classes), "Resolve as false positive..." (note required), "Resolve without verification..." (admin only, warning styling). **Ignore** becomes "Request exception..." (reason required; duration 7, 30 or 90 days or until regressed; "Forever" only for admin tokens; an admin request is approved at once). Reopen calls PATCH `unresolved` |
+| Status banner | `pending_verification`: "Verifying: waiting for a rescan of the resource". `allowed`: "Allowed by policy <name> v<version>". `ignored`: "Ignored until <date>, approved by <ref>" / "Exception requested, waiting for <ref>" / "No expiry (legacy)" |
+| Sidebar | Adds **Exposure** (visibility, external principal count, shared drive, channel kind, repo visibility, fork, changed at), **Risk** (score, severity with base severity when different, asset tier, age), **Owner** ("Mapped to <member>" / "Owner not mapped" / "No owner"), **Policy** (name, version, effect) and the **Exception** card with Approve/Reject when the viewer is the approver |
+| Fold sections | "Linked occurrences (N)" after Location chain (`GET /occurrences`): rows link to the other issues and show source, masked display locator, status and exposure. A note says that links are limited to fingerprints of one key version and that a key rotation starts new groups |
+| Timeline | Renders the new history kinds with icons: exposure changed, policy re-evaluated, verification requested/failed/inconclusive, exception requested/approved/rejected/revoked/expired |
+| My tasks (`/my-tasks`) | Four panels: **Owner reviews** (`GET /api/human-tasks?assignee=me&status=open`, kind `owner_review`: outcome buttons Remove / Restrict / Exception / Not mine, comment field, duration select for Exception); **Other tasks** (other open human tasks, linking to the run); **Approvals** (`GET /api/exceptions?approver=me&status=requested`: Approve / Reject); **Assigned issues** (`GET /api/issues?assignee=me&sort=risk`, open statuses, with a Verifying group). Empty state "Nothing needs your attention" |
+| Policies (`/policies`, `/policies/:name`) | List: name, active version, effect, enabled, owner team. Detail mirrors Workflows: YAML/JSON editor with server-side validate and an error list, versions, Activate, Disable (admin). No graph preview |
+| Collectors | Adds a health column (`StatusIndicator`: ok success, warning warning, failing danger, unknown muted; tooltip lists conditions and last success) and an "Event only" warning tag. Detail `/collectors/:id` gains tabs **Overview** / **Coverage**. Coverage shows counts by state and reason, plus the **Unscannable resources** table (resource id prefix, state, reason, `ExposureBadge`, last attempt, linked issues) with cursor pagination. Public rows sort first |
+| Police | The status dot uses `health.status` from the API, replacing the client-side 5-minute rule; the tooltip shows `police_silent` when open |
+| Escalation | Tier blocks show `min_risk` when set; the JSON editor accepts it |
+| Settings | Members: an identities list per member (kind, origin, key prefix), "Add GitHub login or email" (admin; the value is never shown again) and remove. Teams: a lead selector (`lead`) |
+
+#### 9.4 Mock API and screenshots
+
+- The mock router serves every v1.1 endpoint in 9.3 with in-memory mutations: remediation,
+  resolve, exceptions (request, approve, reject, revoke), policies (validate, create,
+  activate, disable), identities and team lead.
+- Fixture coverage:
+  - at least one issue per v1.1 status and per visibility;
+  - a critical issue;
+  - a `manual_unverified` resolution;
+  - a credential issue with two linked occurrences;
+  - risk scores across the range;
+  - two policies (allow with conditions, violate) with two versions;
+  - exceptions in each status;
+  - an open `owner_review` task assigned to the mock member;
+  - coverage rows of each state including a public unscannable one;
+  - collectors in each health status, including event-only;
+  - a silent pull police worker.
+- The fixture value rules of 8.3 still apply: no raw values. Fixtures also contain no real
+  file names or emails outside reserved example domains, and identity rows show key
+  prefixes only.
+- The screenshot smoke (8.5) adds `/my-tasks`, `/policies`, one policy, and one collector
+  detail with `?tab=coverage`, in light and dark (35 images in total). It must finish with
+  zero page or console errors.
+
+#### 9.5 Plan boundaries (v1.1 run)
+
+| Plan | Owns | Wave |
+|------|------|------|
+| v11-ui-foundation | `src/web/src/api/**` (types, client, mock router and fixtures), `src/web/src/components/**`, `src/web/src/styles/**`, `src/web/src/{routes,App}.tsx`, `src/web/src/shell.test.tsx`, `src/web/scripts/**` | 1 |
+| v11-ui-issues | `src/web/src/pages/issues/**` | 2 |
+| v11-ui-ops | `src/web/src/pages/{tasks,policies,collectors,police,escalation,settings}/**` | 2 |
+
+`src/web/package.json` and `bun.lock` need no change. If a dependency turns out to be
+needed, it is added by v11-ui-foundation only.
+
 ## Sources
 
 | Topic | Source |

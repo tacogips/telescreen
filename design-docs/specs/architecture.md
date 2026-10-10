@@ -147,6 +147,20 @@ Protocols):
 | `RecipientResolver.resolve(ref)` | Recipient ref to contacts | api-common (`telescreen.directory`) | notifications, workflow-engine |
 | `SweepCapable`, `CollectorSweeper`, `SweepLauncher`, `MapResultSink` plus DTOs (`PartitionRequest`, `PartitionPage`, `ShardSpec`, `ShardEntry`, `ShardSummary`, `ShardFailure`, `RateLimited`), in `ports/sweeps.py` | Map-reduce sweeps (`design-map-reduce-sweeps.md`) | `SweepCapable`: collectors-slack/google/github; `CollectorSweeper`: collectors-core; `SweepLauncher`, `MapResultSink`: workflow-mapreduce | collectors-core; workflow-mapreduce; collectors-core (sweep API, `sweep_cron`, CLI); police-bureau |
 
+v1.1 port additions (`design-v1-1-dspm-adoption.md` section 2):
+
+- `ports/policy.py` `PolicyDecider` and `RiskScorer` are implemented in
+  `telescreen.issues.policy` / `telescreen.issues.risk` and consumed by the issue record
+  path.
+- `IssueRemediation` is implemented by issues and consumed by the human-tasks router.
+- `ResourceIssueReader.open_issues_for_resources` is consumed by the coverage router.
+- The new protocol `OwnerDirectory` (`member_ref`, `team_refs_of`, `member_for_owner`,
+  `team_lead`) is implemented by directory and consumed by issues and the routers.
+- The collector DTO fields `Exposure`, `Coverage`, `OwnerIdentity` and `PlacementRef` are
+  added, plus `RescanKind.inconclusive`.
+
+The v1.1 tables are owned as listed in `design-data-model.md` ("v1.1 additions").
+
 Repositories live in the feature package that owns the tables: directory tables
 (`members`, `teams`, `team_memberships`, `api_tokens`) in `telescreen.directory`; collectors
 tables in `telescreen.collectors` (collectors-core); issues, findings, history and `counters` in
@@ -225,7 +239,11 @@ owner and must be called out in review.
 
 1. Raw detected values exist only in memory inside the scan or upload coroutine.
 2. Persisted, logged, indexed, notified and returned data contains only masked values,
-   masked snippets and HMAC-SHA256 fingerprints keyed by `TELESCREEN_FINGERPRINT_KEY`.
+   masked snippets and HMAC-SHA256 fingerprints keyed by `TELESCREEN_FINGERPRINT_KEY`
+   (from v1.1, the versioned keys of `design-v1-1-dspm-adoption.md` section 9).
+   v1.1 exposure, placement, owner, coverage, policy, health, occurrence and exception
+   records add only enums, counts, keyed references and redacted text, never file names or
+   emails.
 3. Monitored content is never stored. Evidence is stored only after a clean scan; stored
    images have their metadata stripped first.
 4. Every log record, exception message and traceback passes the masking formatter.

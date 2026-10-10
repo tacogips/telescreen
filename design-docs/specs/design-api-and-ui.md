@@ -63,6 +63,33 @@ members) must never appear on the wire, so pydantic dataclass bodies never have 
 | Search | `GET /api/search?q&index=issues|findings|runs|audit` | read |
 | Chat | `POST /api/chat {messages: [{role, content}]}` | read |
 
+### v1.1 endpoints
+
+Behavior is in `design-v1-1-dspm-adoption.md`. Bodies are pydantic dataclasses; lists
+return `{items, next_cursor}`. Free-form policy sources are plain strings
+(`source_text`), as for workflows.
+
+| Area | Endpoint | Scope |
+|------|----------|-------|
+| Issues (changed) | `GET /api/issues` adds `exposure=<Visibility>`, `sort=risk`, `assignee=me|my_teams` (resolved through `RecipientResolver.member_ref` / `team_refs_of`), and the new statuses. Items add `base_severity`, `exposure_visibility`, `risk_score`, `policy_name`, `policy_version`, `resolution` | read |
+| | `GET /api/issues/{id}` adds `exposure` (enums and counts), `exposure_changed_at`, `asset_tier`, `assignee_ref`, `owner {present: bool, member_ref: str or null}` (one `RecipientResolver.member_for_owner` call; never the keyed ref), `active_exception` (id, status, duration, expires_at, approver_ref) | read |
+| | `PATCH /api/issues/{id}`: `status` limited to the v1.1 user transitions; `resolved` / `ignored` return 422 `invalid_transition` | write |
+| | `POST /api/issues/{id}/remediation {action: remove|restrict, include_linked: bool, note?}` -> `{issue_ids, rescans_enqueued}` | write |
+| | `POST /api/issues/{id}/resolve {reason: false_positive|manual_unverified, note}` | write (`manual_unverified`: admin) |
+| | `GET /api/issues/{id}/occurrences` -> `{items: [{issue_id, short_id, source, display_locator, status, severity, exposure_visibility}], key_versions}` | read |
+| Exceptions | `POST /api/issues/{id}/exceptions {reason, duration}`; `GET /api/exceptions?status&issue_id&approver=me`; `POST /api/exceptions/{id}/approve {note?}`, `/reject {note?}`, `/revoke` | write / read / approver or admin |
+| Policies | `GET /api/policies` (one item per name: active version, effect, enabled, owner_team); `GET /api/policies/{name}` (versions); `GET /api/policies/{name}/versions/{v}` (source); `POST /api/policies/validate {source_format, source_text}` -> `{valid, errors}`; `POST /api/policies {source_format, source_text}` (new inactive version); `POST /api/policies/{name}/activate {version}`; `POST /api/policies/{name}/disable` | read / admin |
+| Coverage | `GET /api/collectors/{id}/coverage` -> `{since, counts: [{state, reason, count}], unscannable_total}` (scan jobs of the last 7 days plus current `resource_coverage`); `GET /api/collectors/{id}/coverage/resources?state&limit&cursor` -> items `{resource_id (12-hex key prefix), source, state, reason, truncated_bytes, exposure_visibility, first_seen_at, last_attempt_at, issues: [{issue_id, short_id}]}` | read |
+| Collectors (changed) | `GET /api/collectors` items add `health {status, conditions, last_success_at, last_failure_at, consecutive_failures, last_event_at, watch_expires_at, event_only}` | read |
+| Police (changed) | `GET /api/police/workers` items add `health {status, conditions}` | read |
+| Human tasks (changed) | `GET /api/human-tasks?assignee=me` resolves the principal's `member:<handle>` and team refs (fixes the v1 `member:<id>` lookup, and a token without a member gets 403 instead of an unfiltered list); `POST /api/human-tasks/{id}/complete` adds `exception_duration` (required for the `owner_review` outcome `exception`, which also requires `comment`) | read / write |
+| Directory (changed) | `GET/POST /api/teams` add `lead` (member handle, nullable); `GET /api/members/{handle}/identities` -> items `{id, kind, origin, key_prefix, created_at}`; `POST /api/members/{handle}/identities {kind, value}` (value keyed, never stored or echoed); `DELETE /api/members/{handle}/identities/{id}` | read / admin |
+| Escalation (changed) | Tier objects in `tiers_json` accept optional `min_risk` (0-100) | admin |
+
+Search: the `issues` index adds `exposure_visibility` and `risk_score`. Filterable gains
+`exposure_visibility`; sortable gains `risk_score`. `ensure_indexes()` applies the new
+settings, and `telescreen search reindex` refreshes documents after the migration.
+
 ### Evidence
 
 - Upload is a raw request body (`application/octet-stream`), read in memory up to
@@ -140,7 +167,9 @@ Stack: SolidJS, TypeScript (strict), Vite, `@solidjs/router`, vitest, jsdom,
   panel, TopBar slots); the route table in `routes.tsx` still points to
   `pages/<area>/index.tsx`.
 - Page scope against this API: `design-ui-sentry.md` section 8.1 (binding for v1; no new
-  endpoints are added for the UI rework). Mock API mode: section 8.3.
+  endpoints are added for the UI rework). Mock API mode: section 8.3. The v1.1 additions
+  (exposure, risk, new statuses, My tasks, policies, coverage, health, exceptions) are in
+  `design-ui-sentry.md` section 9, against the "v1.1 endpoints" above.
 - API client: `src/api/client.ts` (fetch wrapper with bearer token, error decoding into the
   error model) and `src/api/types.ts` (hand-written types mirroring the API dataclasses).
   The token is entered on the Settings page and kept in `sessionStorage`.

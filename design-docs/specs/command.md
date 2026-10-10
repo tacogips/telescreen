@@ -36,7 +36,14 @@ Bare `telescreen` prints help and exits 2.
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `TELESCREEN_DATABASE_URL` | yes (except `workflow validate`) | - | SQLAlchemy async URL (`postgresql+asyncpg://...`) |
-| `TELESCREEN_FINGERPRINT_KEY` | yes (except `workflow validate`) | - | Secret ref; HMAC key for fingerprints and resource keys (>= 32 bytes) |
+| `TELESCREEN_FINGERPRINT_KEY` | yes, unless `TELESCREEN_FINGERPRINT_KEYS` is set (except `workflow validate`) | - | Secret ref; HMAC key for fingerprints and resource keys (>= 32 bytes). From v1.1 it means key version 1; setting it together with `TELESCREEN_FINGERPRINT_KEYS` is a configuration error |
+| `TELESCREEN_FINGERPRINT_KEYS` | no (v1.1) | unset | Comma list `<version>=<secret ref>`; version 1 is required (identity key for resource, placement and owner keys) |
+| `TELESCREEN_FINGERPRINT_ACTIVE_VERSION` | no (v1.1) | highest configured version | Key version for new value fingerprints and external re-keying |
+| `TELESCREEN_INTERNAL_DOMAINS` | no (v1.1) | unset | Comma list of internal domains for Drive exposure; unset makes user/group shares `unknown` |
+| `TELESCREEN_OWNER_ROUTING` / `TELESCREEN_DEFAULT_TEAM` | no (v1.1) | `false` / unset | Owner routing when no policy matched; fallback team slug |
+| `TELESCREEN_DIGEST_CRON` | no (v1.1) | `0 9 * * 1` | Weekly owner digest (UTC); empty disables |
+| `TELESCREEN_HEALTH_RECIPIENTS` / `TELESCREEN_HEALTH_FAILURE_THRESHOLD` / `TELESCREEN_ALERT_UNSCANNABLE_PUBLIC` | no (v1.1) | unset / 3 / `true` | Health alert recipient refs (unset: state only, no alerts); consecutive failed scan jobs before alerting; alert on public unscannable resources |
+| `TELESCREEN_RISK_WEIGHTS` | no (v1.1) | built-in defaults | Comma list `<group>.<name>=<value>` (0 < value <= 1) overriding risk weights; unknown keys are a configuration error |
 | `TELESCREEN_POLICE_SIGNING_KEY` | for push police | - | Secret ref; master key deriving push signing secrets |
 | `TELESCREEN_POLICE_ENROLLMENT_TOKEN` | for police registration | - | Secret ref |
 | `TELESCREEN_POLICE_ALLOW_HTTP` | no | `false` | Allow http push endpoints (dev only) |

@@ -60,6 +60,17 @@ For emails the secret part is the local part, so the rule keeps its first charac
   rotation is visible (old fingerprints are not re-keyed in v1).
 - External (police/push) fingerprints are re-keyed:
   `HMAC(key, "ext\0" + source + "\0" + external_fingerprint)`.
+- v1.1 key versioning (`design-v1-1-dspm-adoption.md` section 9):
+  - The `Fingerprinter` is built from `TELESCREEN_FINGERPRINT_KEYS`
+    (`<version>=<secret ref>` list; the legacy `TELESCREEN_FINGERPRINT_KEY` means version
+    1) and holds the active key plus a separate identity key.
+  - Version 1 is the identity key. It is always used for `resource_key`, placement keys,
+    owner identity keys and the Drive channel token, so a rotation never changes issue
+    identity.
+  - The active version (`TELESCREEN_FINGERPRINT_ACTIVE_VERSION`, default highest) is used
+    for value fingerprints and external re-keying. It is stored as
+    `findings.fingerprint_key_version` next to `fingerprint_key_id`.
+  - Old fingerprints are still not re-keyed, so linking across versions is not possible.
 
 ### Masked snippets
 
