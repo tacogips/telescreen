@@ -160,65 +160,40 @@ Before each edit, read the file fresh and record its sha256. Record it again aft
 edit (Progress Log `Hashes`). If a pre-hash differs from the last recorded post-hash,
 another writer changed the file: stop and report drift.
 
-### Leak matrix gaps (Deliverables 2-4)
+### Leak matrix gaps (Deliverables 2-4): closed in session 23:15; keep them passing
 
-Imitate `tests/leak/flows_v11.py:exception_flow` (member token through
-`TokenService.create(..., member_id)`) and `tests/leak/harness.py:Recorder.handle` (canned
-provider routes). The leak world already has `owner_routing=True`,
-`default_team="security"`, `digest_cron="* * * * *"`, `health_recipients=("team:security",)`
-and `health_failure_threshold=3`.
+`tests/leak/test_leak_matrix_v11.py` verifies all of these at af943da. Check each one against
+its assertion. Edit a file only if a check regresses.
 
-- L1 `sinks.py:v11_record_text`: read the columns of `placement_policies` (except
-  `source_text`), `issue_exceptions`, `member_identities`, `resource_coverage`,
-  `scan_coverage` and `collector_health` from `Model.__table__.columns`, not from
-  hand-written name lists, so a column added later is still covered. Keep the six
-  `issues` columns. Include a notification row when its subject starts with `Telescreen`,
-  OR it has an `issue_id`, OR its `actor_ref` is one of `system:digest`, `system:issues`,
-  `system:exceptions`, `system:collector-health`, `system:police-health` or
-  `system:verify-rescan`.
-- L2 `owner_mapping`: remove the PATCH. Create alice and the `github_login canary-login`
-  identity, then send a second signed push (same payload shape as `github_public_push`,
-  a different added path under `secrets/`), drain, and assert that the new issue has
-  `assignee_member_id == alice.id`. Routing must come from the push author identity.
-- L3 `policy_flow`: implement Deliverable 3.3 step by step. After each `world.drain()`,
-  assert on `IssueRow.status`, on `IssueRow.resolution` and on the `IssueHistoryRow`
-  rows of kind `policy_reevaluated` for the github issue of `sample/repo`. For the
-  disable step, the `issue_created` evidence is the history row with from_value
-  `allowed` and to_value `unresolved`. `issues/policy_apply.py:reopen_allowed_issue`
-  writes that row and emits the event in the same call. Policies are selected by
-  `match.locations.github_repos`. The violate-wins step must end `unresolved`.
-- L4 `remediation_flow`: case A uses a GitHub issue. Switch the Recorder content for
-  that path to sample-free text, request `remove`, drain, and assert `verified_removed`.
-  Case B: the contents route returns 404 at the verify rescan, so assert `resolved` with
-  resolution `resource_deleted`. Add the switches as Recorder fields in `harness.py`
-  (for example a set of paths served clean and a set served as 404). Keep the v1 routes
-  unchanged.
-- L5 `exception_flow`: after the tick and drain, assert that the exception status is
-  `expired`, that the issue is `unresolved` and that there is a history row
+- L1 `sinks.py:v11_record_text`:
+  - reads the new tables from `Model.__table__.columns` instead of hand-written lists, and
+    excludes `placement_policies.source_text`;
+  - reads the six `issues` columns;
+  - includes notification rows whose subject starts with `Telescreen`, that have an
+    `issue_id`, or whose actor is one of the `system:` actors (digest, issues, exceptions,
+    collector-health, police-health, verify-rescan).
+- L2 `owner_mapping`: a second signed push by `canary-login` is assigned to alice through the
+  member identity. No PATCH is used.
+- L3 `policy_flow`: Deliverable 3.3 runs step by step and asserts status, resolution and the
+  `policy_reevaluated` rows. In the last step violate wins and the issue ends `unresolved`.
+- L4 `remediation_flow`:
+  - case A, clean content -> `verified_removed`;
+  - case B, the contents route returns 404 -> `resolved` with `resource_deleted`.
+
+  The Recorder switches these with `clean_content_paths` and `missing_content_paths`.
+- L5 `exception_flow`: the exception is `expired`, the issue is `unresolved`, and history has
   `exception_expired`.
-- L6 `coverage_flow`: assert that at least one `ResourceCoverageRow` has `reason`
-  `binary` (pushed `secrets/binary.bin`). The two GET calls stay.
-- L7 `health_flow`: make one dedicated GitHub collector fail 3 scans through a Recorder
-  route that returns 500. Then tick the scheduler and drain. Assert a `NotificationRow`
-  whose subject starts with `Telescreen health:` and whose recipients name
-  `team:security`. Do not depend on side effects of other flows.
-- L8 `police_exposures`: register a pull worker with enrollment token
-  `police-enrollment-placeholder`, claim a detect task, and submit a contract 1.1 result
-  with `resource_exposures`. Imitate the result shape in
-  `tests/police/test_v11_police.py:test_result_forwards_only_valid_resource_exposures`
-  and the SDK client usage in `tests/e2e/test_flow_github_remediation.py:_police_result`.
-  Assert HTTP success and that the exposure was recorded on the issue
-  (`exposure_visibility`). If no detect task can be produced in the leak world without
-  `src/**` changes, stop and file a reconciliation request against `v11-p12-police-bureau`.
-- L9 `test_leak_matrix_v11.py`: add the missing canary checks.
-  (a) Neither canary appears in any outbound request body (`world.recorder.requests`).
-  Team `security` has the canary email as an operator-entered contact. If an email
-  delivery body carries it as a recipient address, exclude only that recipient field
-  (state why in a code comment). The subject and body text must still be checked.
-  (b) Neither canary appears in the `exposure` and `owner` fields of
-  `GET /api/issues/{id}` for every issue. Do not apply this check to `display_locator`
-  or `display_title`.
-  (c) Keep every existing assertion. `canary-login` stays absent from all sinks.
+- L6 `coverage_flow`: a `ResourceCoverageRow` exists with reason `binary`.
+- L7 `health_flow`: a dedicated collector fails 3 times (HTTP 500) -> a `Telescreen health:`
+  notification to `team:security`.
+- L8 `police_exposures`: a pull worker's 1.1 result with `resource_exposures` sets
+  `exposure_visibility` on the issue.
+- L9 canaries:
+  - absent from outbound bodies. The only exception is the recipient field that carries the
+    operator-entered team contact, and a code comment says why;
+  - absent from the issue detail fields `exposure` and `owner` (`display_locator` and
+    `display_title` are not checked);
+  - `canary-login` appears in no sink.
 
 ### e2e gaps (Deliverable 5)
 
@@ -266,6 +241,59 @@ e2e key points:
 - Each file stays under 1000 lines. Test-only fixtures are built at runtime like
   `tests/support/samples.py`. No literal secrets or emails.
 
+### Session 5 scope (2026-10-10, HEAD af943da)
+
+L1-L9, P1 and R1 pass (567 passed, 4 skipped). Still to do: P2, R2 and O1-O4. Edit only the three
+e2e files, unless the v1.1 matrix fails again.
+
+- P2 (`test_flow_v11_policy.py`): move the `fresh-allow`/`matching-violate` block (now in the P1
+  test after the max-age assertions) into a new `test_matching_violate_overrides_matching_allow`.
+  Share the collector and ingest setup through a module helper `async def _scan_issue(world: E2EWorld) -> str`.
+  Steps: activate `fresh-allow` (no condition) alone, drain -> `allowed`. Then activate
+  `matching-violate`, drain -> `unresolved`, resolution None, and a `policy_reevaluated` row with
+  from_value `allowed` and to_value `unresolved`.
+- R2 (`test_flow_v11_remediation.py`): add a new test that copies the collector, signed push and
+  `github` handler of `test_flow_github_remediation.py`, without uploading a workflow. After the
+  first drain, set a test-local flag so that `/contents/` serves base64 of `b"\x00\xff"`
+  (`collectors/github/adapter.py` maps undecodable content to `unsupported`/`binary`, like
+  `tests/leak/harness.py`). Call `POST /api/issues/{id}/remediation {"action":"remove","include_linked":false}`,
+  then drain. Expect `pending_verification`, exactly one `verification_inconclusive` row whose
+  to_value is `CoverageState.UNSUPPORTED.value`, and no `verified_removed`.
+- O1-O3 shared setup (one helper in `test_flow_v11_owner_health.py`):
+  - env `TELESCREEN_DEFAULT_TEAM=security` and the webhook secret;
+  - teams `security` (slack_channel `#security`, email None) and `secops-tier2`;
+  - member `alice` added with `PUT /api/teams/security/members {"handles":["alice"]}`;
+  - a READ+WRITE member token from `TokenService.create(..., member_id)` (imitate
+    `tests/leak/flows_v11.py:exception_flow`);
+  - escalation policy `secops-standard` with tier 0 `assign_to: team:secops-tier2`;
+  - `owner-review.yaml` uploaded and activated.
+  Each issue comes from one push that adds a distinct path holding an `aws_access_key_id` sample.
+- O1: the `owner_review` task has assignee `team:security`. Complete it with `remove` using
+  alice's token -> 200. Read the DB BEFORE any drain and expect `pending_verification`, task
+  `completed` and history `verification_requested`. A drain would rescan the unchanged secret and
+  reopen the issue (design section 5).
+- O2: push a second file. PATCH `{"assignee_ref":"member:alice"}`. Complete the task with
+  `not_mine` using alice's token. Expect `assignee_member_id` None, `assignee_team_id` = the id of
+  team `security`, and the newest `assigned` row with to_value `team:security`. Do not assert on
+  the `route_to_security` notify step.
+- O3: `SlaCheckHandler` reads the tiers of the policy row when the SLA check runs, and each task
+  binds the policy by name when it is created.
+  - Stop case: issue C; assert `0 < risk_score < 100`. PUT tier 0 `min_risk: 100`, advance
+    `timedelta(days=2, minutes=1)`, drain. Expect task C `tier_index` 0, assignee `team:security`,
+    and `sla_breached` with to_value `below risk threshold`.
+  - Fire case: issue D with score r. PUT `min_risk: r`, advance and drain the same way. Expect
+    `tier_index` 1 and assignee `team:secops-tier2`.
+  - The age factor only raises the score, so also assert that the stored score is still >= r.
+- O4, in its own world. The shared database also shares the engine queue, so between the
+  container-2 steps run only `container2.worker.run_until_idle()` (with `concurrency = 1`), never
+  `world.drain()`. Build container 2 from `TELESCREEN_FINGERPRINT_KEYS=1=env:E2E_FP,2=env:<v2>`
+  with E2E_FP's value. Do not also set `TELESCREEN_FINGERPRINT_KEY` (that is exit 3).
+  1. In world 1, push file A, drain -> issue A.
+  2. Through app 2, push file B with the same token -> issue B. `GET /api/issues/{B}/occurrences`
+     (world client) does not list A.
+  3. Through app 2, push a modification of A. Expect the newest finding of A to have
+     `fingerprint_key_version == 2` and the `IssueRow` count to stay 2.
+
 ## Pitfalls
 
 - Use `world.drain()` (or the e2e harness equivalent) to run engine tasks and scheduler
@@ -305,7 +333,7 @@ whole-repository gates, which must all exit 0:
   After the screenshot run, `ls tmp/ui-screenshots/*.png | wc -l` must print 35, and
   the screenshots log must not contain `Browser reported`.
 
-Expected pytest evidence: at least 566 passed plus the new tests, 4 skipped (the
+Expected pytest evidence: at least 567 passed plus the new tests, 4 skipped (the
 offline-skipped integration tests), 0 failed. Run the scoped command
 `uv run --frozen pytest -p no:cacheprovider tests/leak tests/e2e` first, then the full
 suite.
@@ -319,7 +347,7 @@ suite.
 - [ ] e2e scenarios P1, P2, R1, R2, O1, O2, O3 and O4 (Remaining Work table) each have a
       passing test.
 - [x] `git diff --name-only 809b02d -- src tests/leak/test_leak_matrix.py tests/leak/flows.py`
-      prints nothing, and `grep -rnE 'xfail|pytest.skip|mark.skip' tests/leak tests/e2e`
+      prints only `src/telescreen/issues/policy/decider.py` (owner v11-p07 fix in af943da), and `grep -rnE 'xfail|pytest.skip|mark.skip' tests/leak tests/e2e`
       prints nothing.
 - [ ] All whole-repository Python and web gates exit 0.
 - [ ] Progress Log complete.
