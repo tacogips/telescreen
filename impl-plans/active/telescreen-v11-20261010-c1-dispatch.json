@@ -745,12 +745,15 @@
         "tests/leak/sinks.py",
         "tests/e2e/test_flow_v11_policy.py",
         "tests/e2e/test_flow_v11_remediation.py",
-        "tests/e2e/test_flow_v11_owner_health.py"
+        "tests/e2e/test_flow_v11_owner_health.py",
+        "src/web/node_modules",
+        "tmp/ui-screenshots"
       ],
       "sharedPaths": [],
-      "artifactRoots": [],
+      "artifactRoots": ["src/web/node_modules", "tmp/ui-screenshots"],
       "acceptanceCriteria": [
         "File-name and owner-email canaries, the new sink, 10 v1.1 leak flows, the v1.1 matrix test and 3 e2e flow files (policy, remediation, owner/health) added; the v1 matrix test unchanged and passing; no raw sample in any sink and no canary in new tables, notifications or API responses.",
+        "Leak gaps L1-L9 and every Deliverable 5 e2e scenario P1, P2, R1, R2, O1, O2, O3, O4 (plan Remaining Work section) have passing assembled-app assertions with no xfail, skip or weakened assertion; no src/** change and tests/leak/test_leak_matrix.py and tests/leak/flows.py unchanged since 809b02d.",
         "All whole-repository Python gates (ruff format, ruff check, typelint, ty, pytest, uv build to /tmp) and web gates (install, typecheck, test, build to /tmp, screenshot smoke with zero browser errors) exit 0 with no tolerances.",
         "Completion Criteria all ticked; Progress Log complete."
       ],

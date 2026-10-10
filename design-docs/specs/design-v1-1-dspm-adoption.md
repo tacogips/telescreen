@@ -697,8 +697,8 @@ process.
 
 | Provider | Package | Interval | Work |
 |----------|---------|----------|------|
-| `IssueMaintenanceProvider` | issues | 60 s | Exception expiry; enqueue `owner_digest` on cron fire |
-| (same, hourly branch) | issues | 1 h | Risk refresh of open issues; re-evaluate `max_age_days` for `allowed` issues |
+| `ExceptionMaintenanceProvider` (`issues/maintenance.py`) | issues | 60 s | Exception expiry; enqueue `owner_digest` on cron fire |
+| `IssuePolicyMaintenance` (`issues/policy_apply.py`) | issues | 1 h | Risk refresh of open issues; re-evaluate `max_age_days` for `allowed` issues |
 | `CollectorHealthProvider` | collectors | 60 s | Collector health conditions and alerts |
 | `PoliceHealthProvider` | police | 60 s | `police_silent` |
 
