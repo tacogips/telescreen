@@ -1,6 +1,6 @@
 # V11-P21 Leak Matrix Extension and v1.1 End-to-End Flows
 
-**Status**: In Progress
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-1-dspm-adoption.md section 13 (data handling and leak matrix), sections 4-11 (flows); design-docs/specs/design-masking.md (leak matrix)
 **Created**: 2026-10-10
 **Last Updated**: 2026-10-10
@@ -344,13 +344,13 @@ suite.
       v1 matrix is unchanged and passing.
 - [x] Leak gaps L1-L9 (Remaining Work) are closed; `tests/leak/test_leak_matrix_v11.py`
       passes with the new assertions.
-- [ ] e2e scenarios P1, P2, R1, R2, O1, O2, O3 and O4 (Remaining Work table) each have a
+- [x] e2e scenarios P1, P2, R1, R2, O1, O2, O3 and O4 (Remaining Work table) each have a
       passing test.
 - [x] `git diff --name-only 809b02d -- src tests/leak/test_leak_matrix.py tests/leak/flows.py`
       prints only `src/telescreen/issues/policy/decider.py` (owner v11-p07 fix in af943da), and `grep -rnE 'xfail|pytest.skip|mark.skip' tests/leak tests/e2e`
       prints nothing.
-- [ ] All whole-repository Python and web gates exit 0.
-- [ ] Progress Log complete.
+- [x] All whole-repository Python and web gates exit 0.
+- [x] Progress Log complete.
 
 ## Progress Log
 
@@ -374,3 +374,14 @@ suite.
 **Notes**: Earlier scoped/full runs also exposed the policy timezone failure; the first scoped run's intermittent `audit_records.seq` collision did not recur after setting the harness worker concurrency to one. Web artifact roots were authorized by this dispatch and used as declared. This plan remains In Progress; the unchecked E2E and aggregate-gate criteria prevent completion.
 
 **Owner resolution (2026-10-10, round 2)**: The P1 max-age failure was a real v11-p07 bug: `issues/policy/decider.py::_conditions_hold` subtracted SQLite's naive `age_reference` from an aware clock time (TypeError). The owner normalized both sides with `ensure_utc` and added `tests/issues/v11_policy/test_decider.py::test_max_age_accepts_naive_age_reference_from_sqlite`. Full suite: 567 passed, 4 skipped, including P1. Continue with P2, R2 and O1-O4 as assigned, then run all required gates. Report per conventions 7a.
+
+### Session: 2026-10-10 Step 6 implementation
+**Tasks Completed**: Split P2 into its own assembled-app test and asserted the allowed-to-unresolved history transition; added R2 binary GitHub rescan coverage; added O1 member owner-review removal, O2 not_mine team release, O3 below/equal min-risk SLA behavior, and O4 active fingerprint key rotation identity/occurrence assertions. Updated this plan's completion criteria after final-source verification.
+**Tasks In Progress**: None for p21 implementation. Formal review and serial release documentation/archive work remain with downstream workflow steps.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `tests/e2e/test_flow_v11_policy.py` before=d5a157954797c5930e3c11866bc3f88add87f310fd36b74ad8a933227f2269eb after=e3960f7a0461a2416510350468a7223e1f2f1d254134e8c39a865da4d4edccb1; `tests/e2e/test_flow_v11_remediation.py` before=48bf89365c3db608ec38c7900793835637923234d3b762fa91f5b21701b6796f after=e8501bfad5a96c317b369286796a6a5add3da5a3c6447464fe6b66396f691a18; `tests/e2e/test_flow_v11_owner_health.py` before=5d983b7638d77a1b2f3d30779211c1c81ff193e493008125280d3f70d511316c after=427abee074166c36b69c61c249538d3be0295ab80b406ae91e471c5fcea0195f; `impl-plans/active/v11-p21-leak-e2e.md` before=ecb2c9474681f484bd37b33772665d921493107c53b09ee6c174e60baef86e5b after=recorded in `tmp/telescreen-v11-20261010-c3/v11-p21-leak-e2e/session-step6/post-edit-sha256.txt` after the final plan edit.
+**Verification**: Scoped `uv run --frozen pytest -p no:cacheprovider tests/leak tests/e2e` -> exit 0, 32 passed (`/tmp/telescreen-v11-p21-step6-pytest-scoped.log`); whole-repository `uv run --frozen ruff format --check --no-cache .` -> exit 0 (`/tmp/telescreen-v11-p21-step6-format-final.log`); `uv run --frozen ruff check --no-cache .` -> exit 0 (`/tmp/telescreen-v11-p21-step6-ruff-final.log`); `uv run --frozen python tools/typelint.py` -> exit 0 (`/tmp/telescreen-v11-p21-step6-typelint-final.log`); `uv run --frozen ty check` -> exit 0 (`/tmp/telescreen-v11-p21-step6-ty-final.log`); whole-repository `uv run --frozen pytest -p no:cacheprovider` -> exit 0, 572 passed / 4 skipped / 0 failed (`/tmp/telescreen-v11-p21-step6-pytest-final.log`); `uv build --out-dir /tmp/telescreen-v11-p21-step6-dist-final` -> exit 0 (`/tmp/telescreen-v11-p21-step6-build-final.log`); `cd src/web && bun install --frozen-lockfile` -> exit 0 (`/tmp/telescreen-v11-p21-step6-web-install.log`); `cd src/web && bun run typecheck` -> exit 0 (`/tmp/telescreen-v11-p21-step6-web-typecheck.log`); `cd src/web && bun run test` -> exit 0, 146 passed (`/tmp/telescreen-v11-p21-step6-web-test.log`); `cd src/web && bun run build --outDir /tmp/telescreen-v11-p21-step6-web --emptyOutDir` -> exit 0 (`/tmp/telescreen-v11-p21-step6-web-build.log`); `cd src/web && bun run screenshots` -> exit 0 (`/tmp/telescreen-v11-p21-step6-web-screenshots.log`); PNG count = 35 and `Browser reported` absent; source drift and skip searches exit 0. `bun --version` = 1.4.2; `src/web/bun.lock` sha256 = a7020b44ae75aaea9890f6de2c6d83fa4fbfd441eda0e4f35c3921a1f13d4608.
+**Notes**: An interim full pytest run found TL003 issues in new tests (571 passed, 1 failed, 4 skipped; `/tmp/telescreen-v11-p21-step6-pytest.log`); explicit tuple/sample annotations were added and the final full run passed. Initial focused attempts also corrected the GitHub selector, history timestamp ordering, and SLA note-field assertion; all final assigned scenarios pass. No p21 `src/**` edits.
+
+**Owner resolution (2026-10-10, round 3)**: The round-2 step result was blocked by the progress gate only because `priorVerification` listed superseded interim failing runs (an interim full pytest before TL003 fixes and two early focused e2e attempts). The p21 test code above is complete and the owner re-ran every gate on the committed tree: whole-repository ruff format/check, typelint, ty, pytest (572 passed, 4 skipped), web typecheck and vitest (146 passed). The next step result must re-run the required gates on the committed source, list only those final passing commands in `verification`, and leave `priorVerification` empty (conventions 7a). Do not rewrite the passing tests unless review finds a defect.
