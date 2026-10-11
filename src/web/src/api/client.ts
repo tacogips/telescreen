@@ -4,7 +4,10 @@ import type {
   IssueStatsBuckets, JsonValue, MapJob, MapJobSummary, Member, MemberIdentity, Page, PoliceClaim, PoliceCredentials,
   PoliceHeartbeat, PoliceHeartbeatResponse, PoliceManifest, PoliceResult, PoliceWorker, SearchResponse,
   OccurrencesResponse, PolicySummary, PolicyValidation, PolicyVersion, RemediationReceipt, Team, ValidateResponse, WorkflowVersion, WorkflowVersionRef, RunDetail, RunSummary, RunHumanTask,
+  AuthConfig, AuthMe, AuthSession, CreatedToken, RoleMatrix, TemplateDetail, TemplatePreview, TemplateSummary, TemplateValidation, TemplateValidationErrorItem, TemplateVersionText, TokenSummary, UserSummary,
 } from "./types";
+import { clearSession, getSession, setSession } from "../auth/session";
+import { refreshIfNeeded } from "../auth/oidc";
 
 const TOKEN_KEY = "telescreen.token";
 const MOCK = import.meta.env.VITE_TELESCREEN_MOCK === "1";
@@ -47,16 +50,22 @@ export class WorkflowValidationError extends ApiError {
   }
 }
 
+export class TemplateValidationError extends ApiError {
+  readonly errors: readonly TemplateValidationErrorItem[];
+  constructor(errors: readonly TemplateValidationErrorItem[]) { super(422, "validation_error", "Template validation failed."); this.name = "TemplateValidationError"; this.errors = errors; }
+}
+
 export function getToken(): string | null {
-  return globalThis.sessionStorage?.getItem(TOKEN_KEY) ?? null;
+  return getSession()?.access_token ?? null;
 }
 
 export function setToken(token: string | null): void {
-  if (token === null || token.trim() === "") globalThis.sessionStorage?.removeItem(TOKEN_KEY);
-  else globalThis.sessionStorage?.setItem(TOKEN_KEY, token);
+  if (token === null || token.trim() === "") clearSession();
+  else setSession({ kind: "token", access_token: token });
 }
 
 export async function rawFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  if (!MOCK && !path.startsWith("/api/auth/")) await refreshIfNeeded();
   const headers = new Headers(init.headers);
   const token = getToken();
   if (token !== null) headers.set("Authorization", `Bearer ${token}`);
@@ -65,7 +74,13 @@ export async function rawFetch(path: string, init: RequestInit = {}): Promise<Re
     const { mockFetch } = await import("./mock");
     return mockFetch(path, request);
   }
-  return fetch(path, request);
+  const response = await fetch(path, request);
+  if (response.status === 401 && !path.startsWith("/api/auth/")) {
+    const returnTo = `${location.pathname}${location.search}`;
+    clearSession();
+    location.assign(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+  }
+  return response;
 }
 
 export async function apiFetch<T>(path: string, init: ApiRequestInit = {}): Promise<T> {
@@ -87,12 +102,15 @@ async function throwApiError(response: Response): Promise<never> {
   try { body = await response.json(); } catch { body = undefined; }
   const error: UnknownRecord | undefined = record(record(body)?.error);
   if (response.status === 422 && Array.isArray(record(body)?.errors)) {
-    const errors = (record(body)?.errors as unknown[]).flatMap((item) => {
+    const fieldErrors = (record(body)?.errors as unknown[]).flatMap((item): TemplateValidationErrorItem[] => {
       const value = record(item);
-      return typeof value?.path === "string" && typeof value.code === "string"
-        ? [{ path: value.path, code: value.code }] : [];
+      return typeof value?.field === "string" && typeof value.code === "string" ? [{ field: value.field, code: value.code }] : [];
     });
-    throw new WorkflowValidationError(errors);
+    if (fieldErrors.length > 0) throw new TemplateValidationError(fieldErrors);
+    const pathErrors = (record(body)?.errors as unknown[]).flatMap((item): Readonly<{ path: string; code: string }>[] => {
+      const value = record(item); return typeof value?.path === "string" && typeof value.code === "string" ? [{ path: value.path, code: value.code }] : [];
+    });
+    throw new WorkflowValidationError(pathErrors);
   }
   const ruleClasses = Array.isArray(error?.rule_classes)
     ? error.rule_classes.filter((item): item is string => typeof item === "string") : undefined;
@@ -124,6 +142,31 @@ function normalizePage<T>(value: Readonly<{ items: T[]; next_cursor?: string | n
 }
 
 export const healthApi = { get: (): Promise<Readonly<{ status: string }>> => apiFetch("/api/health") };
+
+export const authApi = {
+  config: (): Promise<AuthConfig> => apiFetch("/api/auth/config"),
+  session: (): Promise<AuthSession> => apiFetch("/api/auth/session", { method: "POST" }),
+  me: (): Promise<AuthMe> => apiFetch("/api/auth/me"),
+};
+export const templatesApi = {
+  list: (): Promise<Readonly<{ items: TemplateSummary[] }>> => apiFetch("/api/notification-templates"),
+  get: (name: string): Promise<TemplateDetail> => apiFetch(`/api/notification-templates/${encodeURIComponent(name)}`),
+  version: (name: string, version: number): Promise<TemplateVersionText> => apiFetch(`/api/notification-templates/${encodeURIComponent(name)}/versions/${version}`),
+  validate: (value: Readonly<{ event_kind: string; subject: string; body: string; email_subject?: string; email_body?: string; slack_body?: string }>): Promise<TemplateValidation> => apiFetch("/api/notification-templates/validate", json("POST", value)),
+  preview: (value: Readonly<{ event_kind?: string; subject?: string; body?: string; email_subject?: string; email_body?: string; slack_body?: string; name?: string; version?: number }>): Promise<TemplatePreview> => apiFetch("/api/notification-templates/preview", json("POST", value)),
+  create: (value: Readonly<{ name: string; event_kind: string; description?: string; subject: string; body: string; email_subject?: string; email_body?: string; slack_body?: string }>): Promise<Readonly<{ name: string; version: number }>> => apiFetch("/api/notification-templates", json("POST", value)),
+  activate: (name: string, version: number): Promise<TemplateSummary> => apiFetch(`/api/notification-templates/${encodeURIComponent(name)}/activate`, json("POST", { version })),
+};
+export const usersApi = {
+  list: (): Promise<Readonly<{ items: UserSummary[] }>> => apiFetch("/api/users"),
+  roles: (): Promise<RoleMatrix> => apiFetch("/api/roles"),
+  setRole: (handle: string, role: "admin" | "responder" | "viewer" | null): Promise<UserSummary> => apiFetch(`/api/users/${encodeURIComponent(handle)}/role`, json("PUT", { role })),
+};
+export const tokensApi = {
+  list: (): Promise<Readonly<{ items: TokenSummary[] }>> => apiFetch("/api/tokens"),
+  create: (value: Readonly<{ label: string; scopes: readonly string[]; member_handle?: string }>): Promise<CreatedToken> => apiFetch("/api/tokens", json("POST", { ...value, scopes: [...value.scopes] })),
+  revoke: (id: string): Promise<void> => apiFetch(`/api/tokens/${encodeURIComponent(id)}/revoke`, json("POST")),
+};
 
 export const issuesApi = {
   list: (filters: URLSearchParams | IssueListFilters = new URLSearchParams()): Promise<Page<Issue>> => apiFetch(`/api/issues${query(params(filters))}`),

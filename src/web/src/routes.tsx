@@ -1,6 +1,10 @@
 import { lazy, type Component, type JSX } from "solid-js";
 import { Navigate, Route, useLocation } from "@solidjs/router";
+import { Show, type JSX as SolidJSX } from "solid-js";
 import { Unavailable } from "./components/Unavailable";
+import { getSession } from "./auth/session";
+const LoginPage = lazy(() => import("./pages/login"));
+const CallbackPage = lazy(() => import("./pages/login/Callback"));
 export type AreaKey = "issues" | "tasks" | "search" | "workflows" | "runs" | "police" | "collectors" | "policies" | "escalation" | "audit" | "chat" | "settings";
 export type Area = Readonly<{ key: AreaKey; label: string; path: string; group: AreaKey }>;
 export type PageModule = Readonly<{ default: () => JSX.Element }>;
@@ -24,4 +28,5 @@ const pages = new Map<AreaKey, Component>();
 for (const [path, loader] of Object.entries(pageModules)) { const match = /^\.\/pages\/([^/]+)\/index\.tsx$/.exec(path); const key = match?.[1]; if (key !== undefined && areaKeys.has(key)) pages.set(areaKeys.get(key)!, lazy(loader)); }
 export function AreaPage(props: Readonly<{ area: Area; pages?: ReadonlyMap<AreaKey, Component> }>): JSX.Element { const Page = (props.pages ?? pages).get(props.area.key); return Page === undefined ? <Unavailable label={props.area.label}/> : <Page/>; }
 function ChatRedirect(): JSX.Element { const location = useLocation(); return <Navigate href={`/assistant${location.search}`}/>; }
-export function AppRoutes(): JSX.Element { return <><Route path="/" component={() => <Navigate href="/issues"/>}/><Route path="/chat" component={ChatRedirect}/><Route path="/chat/:id" component={ChatRedirect}/>{AREAS.map((area) => <><Route path={area.path} component={() => <AreaPage area={area}/>}/><Route path={`${area.path}/:id`} component={() => <AreaPage area={area}/>}/></>)}</>; }
+function Protected(props: Readonly<{ children: SolidJSX.Element }>): JSX.Element { const location = useLocation(); return import.meta.env.VITE_TELESCREEN_MOCK === "1" || getSession() !== null ? <>{props.children}</> : <Navigate href={`/login?returnTo=${encodeURIComponent(location.pathname + location.search)}`}/>; }
+export function AppRoutes(): JSX.Element { return <><Route path="/login" component={LoginPage}/><Route path="/auth/callback" component={CallbackPage}/><Route path="/" component={() => <Protected><Navigate href="/issues"/></Protected>}/><Route path="/chat" component={() => <Protected><ChatRedirect/></Protected>}/><Route path="/chat/:id" component={() => <Protected><ChatRedirect/></Protected>}/>{AREAS.map((area) => <><Route path={area.path} component={() => <Protected><AreaPage area={area}/></Protected>}/><Route path={`${area.path}/:id`} component={() => <Protected><AreaPage area={area}/></Protected>}/><Route path={`${area.path}/:id/:sub`} component={() => <Protected><AreaPage area={area}/></Protected>}/></>)}</>; }

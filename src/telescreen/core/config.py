@@ -6,6 +6,7 @@ from typing import TypeVar
 from croniter import croniter
 
 from telescreen.core.errors import ConfigError
+from telescreen.core.oidc_settings import OidcSettings, load_oidc_settings
 from telescreen.core.risk_weights import RiskWeights, parse_risk_weights
 from telescreen.core.secrets import EnvSource
 from telescreen.core.vocabulary import (
@@ -86,6 +87,8 @@ class TelescreenSettings:
     health_failure_threshold: int = 3
     alert_unscannable_public: bool = True
     risk_weights: RiskWeights = RiskWeights()
+    oidc: OidcSettings | None = None
+    ui_token_login: bool = True
 
 
 def _read(env: EnvSource, name: str) -> str | None:
@@ -309,4 +312,6 @@ def load_settings(env: EnvSource) -> TelescreenSettings:
         health_failure_threshold=_integer(env, "HEALTH_FAILURE_THRESHOLD", 3),
         alert_unscannable_public=_boolean(env, "ALERT_UNSCANNABLE_PUBLIC", True),
         risk_weights=parse_risk_weights(_read(env, "RISK_WEIGHTS")),
+        oidc=load_oidc_settings(env),
+        ui_token_login=_boolean(env, "UI_TOKEN_LOGIN", True),
     )

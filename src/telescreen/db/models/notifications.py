@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from telescreen.db.base import Base
@@ -26,3 +26,34 @@ class NotificationRow(Base, kw_only=True):
     issue_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+    event_kind: Mapped[str | None] = mapped_column(String(32), default=None)
+    template_name: Mapped[str | None] = mapped_column(String(64), default=None)
+    template_version: Mapped[int | None] = mapped_column(Integer, default=None)
+    set_name: Mapped[str | None] = mapped_column(String(64), default=None)
+    target_index: Mapped[int | None] = mapped_column(Integer, default=None)
+    error_code: Mapped[str | None] = mapped_column(String(32), default=None)
+
+
+class NotificationTemplateRow(Base, kw_only=True):
+    """An immutable version of a named notification template."""
+
+    __tablename__ = "notification_templates"
+    __table_args__ = (
+        UniqueConstraint("name", "version"),
+        Index("ix_notification_templates_name_active", "name", "active"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    name: Mapped[str] = mapped_column(String(64))
+    version: Mapped[int] = mapped_column(Integer)
+    event_kind: Mapped[str] = mapped_column(String(32))
+    description: Mapped[str | None] = mapped_column(String(200), default=None)
+    subject: Mapped[str] = mapped_column(Text)
+    body: Mapped[str] = mapped_column(Text)
+    email_subject: Mapped[str | None] = mapped_column(Text, default=None)
+    email_body: Mapped[str | None] = mapped_column(Text, default=None)
+    slack_body: Mapped[str | None] = mapped_column(Text, default=None)
+    active: Mapped[bool] = mapped_column(Boolean)
+    created_by: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

@@ -90,6 +90,7 @@ class IssueSnapshot:
     assignee_ref: str | None = None
     risk_score: int = 0
     visibility: Visibility = Visibility.UNKNOWN
+    masked_excerpt: str | None = None
 
 
 @dataclass(frozen=True)

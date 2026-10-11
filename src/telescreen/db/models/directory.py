@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from telescreen.db.base import Base
@@ -21,6 +21,10 @@ class MemberRow(Base, kw_only=True):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    role: Mapped[str | None] = mapped_column(String(16), default=None)
+    last_sign_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+    __table_args__ = (Index("ix_members_role_active", "role", "active"),)
 
 
 class TeamRow(Base, kw_only=True):
@@ -59,6 +63,7 @@ class TeamMembershipRow(Base, kw_only=True):
 
     team_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     member_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    origin: Mapped[str] = mapped_column(String(16), default="manual", server_default="manual")
 
 
 class ApiTokenRow(Base, kw_only=True):

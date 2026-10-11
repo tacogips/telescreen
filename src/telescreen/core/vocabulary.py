@@ -182,6 +182,75 @@ class ApiScope(StrEnum):
     INGEST = "ingest"
 
 
+class NotificationEvent(StrEnum):
+    """System events that may produce notifications."""
+
+    WORKFLOW_NOTIFY = "workflow_notify"
+    HUMAN_TASK_ASSIGNED = "human_task_assigned"
+    OWNER_REVIEW_ASSIGNED = "owner_review_assigned"
+    SLA_ESCALATED = "sla_escalated"
+    OWNER_DIGEST = "owner_digest"
+    EXCEPTION_REQUESTED = "exception_requested"
+    EXCEPTION_EXPIRED = "exception_expired"
+    VERIFICATION_INCONCLUSIVE = "verification_inconclusive"
+    COLLECTOR_HEALTH_ALERT = "collector_health_alert"
+    POLICE_HEALTH_ALERT = "police_health_alert"
+
+
+class Role(StrEnum):
+    """Human access role assigned to a member."""
+
+    ADMIN = "admin"
+    RESPONDER = "responder"
+    VIEWER = "viewer"
+
+
+class RoleChangeSource(StrEnum):
+    """Source responsible for a member role change."""
+
+    MANUAL = "manual"
+    IDP = "idp"
+    CLI = "cli"
+
+
+class MembershipOrigin(StrEnum):
+    """Origin of a member's team membership."""
+
+    MANUAL = "manual"
+    IDP = "idp"
+
+
+class OidcProvisioning(StrEnum):
+    """Provisioning policy for an OIDC identity."""
+
+    LINK = "link"
+    CREATE = "create"
+
+
+class SignInProvisioning(StrEnum):
+    """Outcome of resolving a member during OIDC sign-in."""
+
+    EXISTING = "existing"
+    LINKED = "linked"
+    CREATED = "created"
+
+
+class PrincipalKind(StrEnum):
+    """Authentication mechanism for an API principal."""
+
+    TOKEN = "token"
+    OIDC = "oidc"
+
+
+class ExternalAuthKind(StrEnum):
+    """Authentication type for external API requests."""
+
+    PUBLIC = "public"
+    PROVIDER_SIGNATURE = "provider_signature"
+    POLICE_CONTRACT = "police_contract"
+    OIDC_SIGN_IN = "oidc_sign_in"
+
+
 class SourceFormat(StrEnum):
     """Supported workflow definition formats."""
 
@@ -320,6 +389,7 @@ class NotificationStatus(StrEnum):
     SENT = "sent"
     FAILED = "failed"
     BLOCKED = "blocked"
+    SKIPPED = "skipped"
 
 
 class EvidenceVerdict(StrEnum):
@@ -442,6 +512,16 @@ class ErrorCode(StrEnum):
     PROVIDER_ERROR = "provider_error"
     DELIVERY_FAILED = "delivery_failed"
     RECIPIENT_UNKNOWN = "recipient_unknown"
+    RECIPIENT_UNREACHABLE = "recipient_unreachable"
+    UNKNOWN_TEMPLATE = "unknown_template"
+    UNKNOWN_VARIABLE = "unknown_variable"
+    TEMPLATE_EVENT_MISMATCH = "template_event_mismatch"
+    LAST_ADMIN = "last_admin"
+    NO_ROLE = "no_role"
+    NOT_PROVISIONED = "not_provisioned"
+    IDENTITY_CONFLICT = "identity_conflict"
+    IDP_UNAVAILABLE = "idp_unavailable"
+    INVALID_TOKEN = "invalid_token"
     CHAIN_BROKEN = "chain_broken"
     INDEX_GUARD_REJECTED = "index_guard_rejected"
     SCAN_INCOMPLETE = "scan_incomplete"
@@ -531,6 +611,7 @@ class IdentityKind(StrEnum):
     EMAIL = "email"
     SLACK_USER = "slack_user"
     GITHUB_LOGIN = "github_login"
+    OIDC_SUBJECT = "oidc_subject"
 
 
 class IdentityOrigin(StrEnum):
@@ -539,6 +620,7 @@ class IdentityOrigin(StrEnum):
     MEMBER_EMAIL = "member_email"
     MEMBER_SLACK = "member_slack"
     MANUAL = "manual"
+    OIDC = "oidc"
 
 
 class PolicyEffect(StrEnum):

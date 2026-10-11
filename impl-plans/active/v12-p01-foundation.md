@@ -1,6 +1,6 @@
 # V12-P01 Foundation: Vocabulary, Permissions, OIDC Settings, Ports
 
-**Status**: Not Started
+**Status**: In Progress
 **Design Reference**: design-docs/specs/design-v1-2-notifications-and-identity.md sections 1, 2, 5.1; design-docs/specs/command.md (OIDC variables); design-docs/user-qa/qa-oidc-sso.md
 **Created**: 2026-10-11
 **Last Updated**: 2026-10-11
@@ -212,7 +212,8 @@ Imitate:
 - Role sets: viewer == READ, responder == WRITE, admin == ALL - {ingest.push}.
 - Effective permissions:
   - bound `{WRITE}` with role viewer -> READ set;
-  - bound `{ADMIN}` with role responder -> WRITE set;
+  - bound `{ADMIN}` with role responder -> WRITE plus `ingest.push`, following the
+    scope-derived machine grant in the effective-permission formula;
   - bound `{INGEST}` with role None -> {ingest.push};
   - unbound `{READ}` with role None -> READ set.
 - `highest_role([viewer, admin]) == admin`; `highest_role([]) is None`.
@@ -242,10 +243,21 @@ It must pass, because nothing else changes behavior in wave 1.
 
 ## Completion Criteria
 
-- [ ] Deliverables 1-10 implemented with docstrings.
-- [ ] New tests pass; scoped ruff format/check, ty and pytest exit 0; typelint grep empty.
+- [x] Deliverables 1-10 implemented with docstrings.
+- [x] New tests pass; scoped ruff format/check, ty and pytest exit 0; typelint grep empty.
 - [ ] Full offline pytest exits 0 (log path recorded).
-- [ ] `git status --porcelain` shows only paths in writePaths for this plan's edits.
-- [ ] Progress Log entry with hashes and verification lines.
+- [x] `git status --porcelain` shows only paths in writePaths for this plan's edits.
+- [x] Progress Log entry with hashes and verification lines.
 
 ## Progress Log
+
+### Session: 2026-10-11 10:21 JST
+**Tasks Completed**: Added the v1.2 vocabulary, permission sets and functions, validated OIDC settings and TelescreenSettings fields, additive notification and issue DTO fields, template and identity ports, live pytest marker, local RSA/JWKS test provider, and focused tests. Corrected the effective-permission example above to follow design D11 and the plan's formula: admin scope plus responder role includes `ingest.push` from the scope-derived machine grant.
+**Tasks In Progress**: Full offline pytest gate; no plan-owned implementation remains.
+**Blockers**: Full suite currently fails on two changed paths outside this plan's writePaths. `tests/db/test_models.py::test_metadata_has_the_exact_table_contract` omits the concurrent `notification_templates` model (p02 has recorded this as an ownership reconciliation request). `tests/leak/test_ui_fixtures.py::test_every_mock_fixture_is_masked` detects a value in concurrent `src/web/src/api/mock/fixtures/v12.ts` (p03 owns the fixture). Resume after the owning plan or serial join reconciles those paths and rerun the full offline suite.
+**Reconciliation requests**: Update `tests/db/test_models.py` to include `notification_templates` and the expected model count; scrub the flagged value in `src/web/src/api/mock/fixtures/v12.ts`. No out-of-scope edits were made.
+**Hashes**: `pyproject.toml` before=42b939e0c442981f7d556979b87d8014ad98a8da170e287208142eceb8a416cb after=00043e3fc7b51caf2f0d8176ab7e37db5787b9d73b56bf5b75d6ea45ea2d7d38; `src/telescreen/core/config.py` before=e55a848b3cb581885ee19a24b135bffd024bcc0cabb94a87ef1aafb4a5358693 after=bee951998c0e19be14f1f341cb4d9b028216fd3d7e37eff9d96d168527c257b8; `src/telescreen/core/vocabulary.py` before=6e1c56821cb0481ab72c11a55196a2b0498b80d5b24a89505e3615f9f84f68f0 after=5ff3190d7511ac40c0b74c3dfa0a57dd2a7872686b024fb1663f419c7e36a5b6; `src/telescreen/core/permissions.py` before=absent after=08b66e9f4d34c14c00196c7fc0bff13a071a2ad7593d47e338a8f108d98ae01d; `src/telescreen/core/oidc_settings.py` before=absent after=d63962e77c600bb5aa43cf8d633fc54036c3032756651451c1099ad7c83d060b; `src/telescreen/ports/notifications.py` before=c912e14be2f6e6528d28374653c9784fbe8a860e807ca5f277c827922fb97b72 after=f4a13a582f5ee1411fd76be67d5aa4ae588ac4c4319183ac716b1b03372b16c0; `src/telescreen/ports/issues.py` before=a7c091987d8370136ed7e718dd4062cc51ee6882a5d682b3cf4b1dbe2ff6bafa after=06c7f873f05dac48d431b563771f619cb646aa148e3c5c125d8d5a4f0bf67914; `src/telescreen/ports/templates.py` before=absent after=7292b578a0c82a665c4b2dea5cf3150f7646e550f8a3a82d82018cfad4edc919; `src/telescreen/ports/identity.py` before=absent after=d3b79181527379d5a746b2834e3f226aed16f768f44a6e576bd7c489e474ae3b; `tests/support/oidc.py` before=absent after=dfdfe2022f8bd281cb0199bba1f8f1bb51e41fa4d55642142961a3b0cd98150a; `tests/core/v12/test_permissions_and_oidc_settings.py` before=absent after=0a42d7dc78c5c60e19376caffbb20eebcc73eed95f1b1bc89b70dba4cff73a62; `tests/ports/v12/test_foundation_ports.py` before=absent after=e77ec4eb87ade170c5397975dac1373f62aa2ac3308a3cb523b0a629691488ae; `tests/ports/v12/test_oidc_test_helper.py` before=absent after=0154004cbc1e9252c6fffaa0db81b41d864802122b550ba9cc6de88188b59722; plan before=4ca69e9da8d23798c7f8fc16412b9be62b3947e435f19335bbbe469994e61d95 after=recorded in the plan-local evidence manifest after this update.
+**Verification**: Scoped format check -> exit 0 (log: `/tmp/telescreen-v12-p01-foundation-format-final3.log`); scoped Ruff check -> exit 0 (log: `/tmp/telescreen-v12-p01-foundation-ruff-final3.log`); scoped ty check -> exit 0 (log: `/tmp/telescreen-v12-p01-foundation-ty-final3.log`); repository typelint plus scoped grep -> exit 0, no owned-path diagnostics (log: `/tmp/telescreen-v12-p01-foundation-typelint-final3.log`); focused pytest -> exit 0, 15 passed (log: `/tmp/telescreen-v12-p01-foundation-pytest-final3.log`); full offline pytest -> exit 1, 587 passed, 2 failed, 5 skipped (log: `/tmp/telescreen-v12-p01-foundation-pytest-all.log`); live marker check -> exit 0 (log: `/tmp/telescreen-v12-p01-foundation-live-marker.log`); no-dependency/no-typelint-change check -> exit 0 (log: `/tmp/telescreen-v12-p01-foundation-no-dependency-or-typelint-change.log`); git status captured and all p01-owned paths are within writePaths (log: `/tmp/telescreen-v12-p01-foundation-git-status.log`). Initial static/focused failures were corrected and superseded by the passing final scoped checks; evidence is preserved in the earlier `edit-*.md` files and `/tmp/telescreen-v12-p01-foundation-*-final2.log`.
+**Notes**: The full-suite failures are classified concurrent p02/p03 issues, not p01 source regressions. The admin-scope/responder plan example contradicted D11's explicit formula; the formula and existing machine-scope behavior were preserved, and the example now states the resulting machine grant.
+
+**Owner resolution (2026-10-11, session 7)**: The only blockers were cross-plan test inventories outside this plan's writePaths. The owner updated `tests/db/test_models.py` (adds `notification_templates`, 34 tables) and `src/web/src/pages/settings/index.test.tsx` (reads the token through `getSession()` instead of the legacy `telescreen.token` key). The UI fixture leak test passes with the final `v12.ts`. Whole-repository gates on the combined wave-1 tree: ruff format/check, typelint, ty, pytest 589 passed / 5 skipped, web typecheck and vitest 165 passed. On redispatch, re-verify on the committed tree, change nothing unless review finds a defect, and report only final passing commands with an empty `priorVerification` (conventions 7a).

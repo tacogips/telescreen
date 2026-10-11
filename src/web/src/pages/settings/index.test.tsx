@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { afterEach, expect, it, vi } from "vitest";
+import { getSession } from "../../auth/session";
 import SettingsPage from "./index";
 
 afterEach(() => { cleanup(); sessionStorage.clear(); document.documentElement.removeAttribute("data-theme"); vi.restoreAllMocks(); });
@@ -19,7 +20,7 @@ it("stores the token in sessionStorage without showing it again", async () => {
   render(() => <SettingsPage />);
   fireEvent.input(await screen.findByLabelText("Bearer token"), { target: { value: "private-token-value" } });
   fireEvent.click(screen.getByRole("button", { name: "Save token" }));
-  expect(sessionStorage.getItem("telescreen.token")).toBe("private-token-value");
+  expect(getSession()?.access_token).toBe("private-token-value");
   expect(await screen.findByText("Token set")).toBeInTheDocument();
   expect(screen.queryByText("private-token-value")).toBeNull();
   expect(await screen.findByText("env:DRIVE_TOKEN")).toBeInTheDocument();

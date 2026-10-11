@@ -1,11 +1,12 @@
 import { render, screen, fireEvent, within, waitFor } from "@solidjs/testing-library";
 import { createMemoryHistory, MemoryRouter, Route } from "@solidjs/router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Component } from "solid-js";
 import { ApiError, apiFetch, setToken } from "./api/client";
 import { AppShell } from "./components/shell/AppShell";
 import { setTheme } from "./components/shell/theme";
 import { AREAS, AppRoutes, AreaPage, type AreaKey } from "./routes";
+import { SecondaryPanel } from "./components/shell/SecondaryPanel";
 
 const values = new Map<string, string>();
 const storage = {
@@ -16,6 +17,8 @@ const storage = {
 };
 vi.stubGlobal("localStorage", storage);
 
+beforeEach(() => setToken("shell-test-session"));
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.stubGlobal("localStorage", storage);
@@ -25,6 +28,12 @@ afterEach(() => {
 });
 
 describe("web shell", () => {
+  it("hides Users and roles when the account lacks users.read", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ kind: "token", member: { handle: "sam", display_name: "Sam Lee" }, role: "viewer", permissions: ["templates.read"] })));
+    render(() => <MemoryRouter><Route path="/" component={() => <SecondaryPanel area="settings" collapsed={false} onToggle={() => undefined}/>} /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByRole("link", { name: "Notification templates" })).toBeInTheDocument());
+    expect(screen.queryByRole("link", { name: "Users and roles" })).toBeNull();
+  });
   it("renders the rail labels in order and the skip link", () => {
     render(() => <MemoryRouter root={AppShell}><AppRoutes /></MemoryRouter>);
     const rail = within(screen.getByRole("navigation", { name: "Primary navigation" }));

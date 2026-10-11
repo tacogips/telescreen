@@ -27,7 +27,7 @@ else {
         const page = await browser.newPage(); let errors = 0;
         page.on("pageerror", (error) => { errors += 1; console.error(`[pageerror ${page.url()}] ${error.message}`); });
         page.on("response", (response) => { if (response.status() >= 400) console.error(`[http ${response.status()}] ${response.url()}`); }); page.on("console", (message) => { if (message.type() === "error") { errors += 1; console.error(`[console ${page.url()}] ${message.text()}`); } });
-        const pages = ["/issues", "/my-tasks", "/search?q=TELE", "/workflows", "/runs", "/police", "/collectors", "/policies", "/escalation", "/audit", "/assistant", "/settings"];
+        const pages = ["/issues", "/my-tasks", "/search?q=TELE", "/workflows", "/runs", "/police", "/collectors", "/policies", "/escalation", "/audit", "/assistant", "/settings", "/login", "/settings/templates", "/settings/templates/system.workflow_notify", "/settings/users"];
         const discoverFirst = async (list: string, prefix: string): Promise<string | null> => { await page.goto(`http://127.0.0.1:4319${list}`, { waitUntil: "networkidle" }); return page.locator(`a[href^="${prefix}/"]`).first().getAttribute("href"); };
         const firstIssue = await discoverFirst("/issues", "/issues"); if (firstIssue !== null) pages.splice(1, 0, firstIssue);
         const firstWorkflow = await discoverFirst("/workflows", "/workflows"); if (firstWorkflow !== null) pages.push(firstWorkflow);

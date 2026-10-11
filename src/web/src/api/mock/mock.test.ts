@@ -78,4 +78,19 @@ describe("mock API mode", () => {
     expect(detail.transitions.some((item) => item.kind === "send_back")).toBe(true);
     expect(detail.human_tasks[0]?.outcomes).toContain("send_back");
   });
+
+  it("serves v1.2 auth, template, user and token contracts with mutations", async () => {
+    const client = await mockClient();
+    expect((await client.authApi.config()).oidc?.issuer).toBe("https://idp.example.test/realms/telescreen");
+    expect((await client.authApi.me()).role).toBe("admin");
+    expect((await client.templatesApi.list()).items.length).toBe(11);
+    const created = await client.templatesApi.create({ name: "workflow.custom", event_kind: "workflow_notify", subject: "Review", body: "Masked update" });
+    expect(created.version).toBe(1);
+    expect((await client.templatesApi.get("workflow.custom")).active_version).toBeNull();
+    await client.templatesApi.activate("workflow.custom", 1);
+    expect((await client.templatesApi.get("workflow.custom")).active_version).toBe(1);
+    await expect(client.usersApi.setRole("alex", "responder")).rejects.toMatchObject({ status: 409, code: "last_admin" });
+    expect((await client.usersApi.list()).items).toHaveLength(4);
+    expect((await client.tokensApi.list()).items).toHaveLength(1);
+  });
 });

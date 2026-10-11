@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, WorkflowValidationError, apiFetch, auditApi, collectorsApi, directoryApi, evidenceApi, exceptionsApi, getToken, humanTasksApi, issuesApi, policiesApi, rawFetch, setToken, workflowsApi } from "./client";
+import { getSession } from "../auth/session";
 
 afterEach(() => { vi.unstubAllGlobals(); sessionStorage.clear(); });
 
@@ -95,5 +96,10 @@ describe("API wire contract", () => {
   it("retains stable API error decoding", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: { code: "not_found", detail: "Missing" } }), { status: 404 })));
     await expect(apiFetch("/api/missing")).rejects.toMatchObject({ code: "not_found", status: 404 });
+  });
+
+  it("clears a session and redirects to login after a production 401", async () => {
+    setToken("expired-session"); const assign = vi.fn(); vi.stubGlobal("location", { pathname: "/runs", search: "?state=active", assign }); vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 401 })));
+    await expect(apiFetch("/api/runs")).rejects.toMatchObject({ status: 401 }); expect(getSession()).toBeNull(); expect(assign).toHaveBeenCalledWith("/login?returnTo=%2Fruns%3Fstate%3Dactive");
   });
 });
