@@ -168,7 +168,9 @@ cd src/web && bun run screenshots > /tmp/telescreen-v12-p12-verification-docs-sh
 ```
 
 Every command must exit 0. pytest reports the live tests as skipped (not failed) and the
-4 offline `integration` skips as before. Screenshots: 43 images, zero page or console
+5 offline `integration` skips of the fcfb198 baseline (tests/search/test_search.py,
+tests/audit/test_audit.py, tests/workflow/mapreduce/test_postgres.py,
+tests/db/test_migration.py, tests/db/test_v12_migration.py); passed count at or above 784. Screenshots: 43 images, zero page or console
 errors. A missing browser is a recorded verification gap, not a pass.
 
 ## Completion Criteria
