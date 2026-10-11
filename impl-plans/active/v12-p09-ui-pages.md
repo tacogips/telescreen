@@ -116,7 +116,10 @@ Imitate:
   inline text; the matrix renders role columns; the select is disabled without
   `users.write`.
 - Workflows: the v2 fixture shows two set cards; the v1 fixture shows no sets section;
-  invalid YAML shows the fallback text.
+  invalid YAML shows the fallback text. The shared mock fixtures (`src/web/src/api/mock`,
+  p03, committed) contain no v2 workflow, so define the v1 and v2 `source_text` YAML as
+  local constants in the colocated test file (recipients only `slack_channel:C0123ABCDE`
+  and `email:` addresses at `example.invalid`). Do not edit `src/web/src/api/mock`.
 - RunDetail: a targets table is rendered for a v2 output.
 - Settings General: no token input is present.
 

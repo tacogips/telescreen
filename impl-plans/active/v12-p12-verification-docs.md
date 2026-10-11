@@ -144,6 +144,13 @@ Imitate:
   Configure `TELESCREEN_OIDC_ISSUER` from that same URL plus `/realms/telescreen`.
 - The leak matrix must not stub services in a way that bypasses the production
   rendering, DLP or auth paths (design-masking: only the listed seams).
+- E2E OIDC needs no harness edit: `tests/e2e/harness.py:make_world` already takes
+  `extra_env` (set the `TELESCREEN_OIDC_*` variables with an `https://idp.example.invalid`
+  issuer) and `OutboundRecorder.handlers` (register that host to serve discovery and JWKS
+  from `tests/support/oidc.py`). Do not edit `tests/e2e/harness.py` (not in writePaths).
+- The new v2 example `examples/workflows/notification-sets.yaml` is also picked up by the
+  `*.yaml` globs in `tests/workflow/test_v11_workflow.py` (compiled JSON round-trip;
+  p05 makes it hold for v2); it must load and round-trip without editing that test.
 
 ## Verification
 

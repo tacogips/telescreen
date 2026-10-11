@@ -67,7 +67,7 @@ Baseline facts this design builds on (checked against `main` at 7402f51):
 | D11 | Token intersection | Unbound token: scope permissions. Member-bound token: scope permissions intersected with the member's role permissions (human permissions), plus machine permissions from scopes. OIDC session: role permissions only | Requirement: "effective permission is the intersection" |
 | D12 | Migration of members and tokens | `0003_v1_2` sets each member's role from the highest scope among its non-revoked bound tokens (`admin` -> admin, `write` -> responder, `read` -> viewer), else null | No existing bound token loses or gains access |
 | D13 | OIDC role claim | Default `TELESCREEN_OIDC_ROLE_CLAIM=realm_access.roles` with map `telescreen-admin=admin,telescreen-responder=responder,telescreen-viewer=viewer`; the highest mapped role wins. Groups (`groups` claim) map to teams only, and that map is empty by default | Matches the realm: realm roles carry the role, groups carry team membership |
-| D14 | IdP authority over roles | With OIDC role mapping, every sign-in sets the member's role from the claims (or `TELESCREEN_OIDC_DEFAULT_ROLE`, or none). API role changes stay possible but are overwritten at the next sign-in of an OIDC-linked member; the UI marks such users "Managed by IdP". The last-admin rule applies to Telescreen-side changes (API, UI, CLI); an IdP-driven demotion is applied and audited | The IdP is the source of truth for SSO users; recovery uses the CLI (section 7.6) |
+| D14 | IdP authority over roles | With OIDC role mapping, every sign-in sets the member's role from the claims (or `TELESCREEN_OIDC_DEFAULT_ROLE`, or none). API role changes stay possible but are overwritten at the next sign-in of an OIDC-linked member; the UI marks such users "Managed by IdP". The last-admin rule applies to Telescreen-side changes (API, UI, CLI); an IdP-driven demotion is applied and audited | The IdP is the source of truth for SSO users; recovery uses the CLI (section 7.4) |
 | D15 | Provisioning | `TELESCREEN_OIDC_PROVISIONING=link` (default): an unknown `(issuer, sub)` is linked to an existing active member with the same verified email; `create`: link, else create a member. A subject with no mapped role and no default role is denied before any provisioning | Requirement: "optional JIT provisioning by verified email (configurable)" |
 | D16 | Identity storage | `(issuer, sub)` is stored as a `member_identities` row of kind `oidc_subject` with the keyed `identity_key = HMAC(identity key v1, "identity\0oidc_subject\0" + issuer + "\0" + sub)` | Reuses the v1.1 keyed identity table; no raw IdP id stored |
 | D17 | Session model | No server-side session. The SPA holds the access, refresh and ID tokens in `sessionStorage` (as v1 holds the static token) and calls `POST /api/auth/session` once per sign-in. Each API call carries the access token. Logout clears storage and redirects to the IdP `end_session_endpoint` when one is advertised | No cookies, so no CSRF surface; small hand-written PKCE |
@@ -99,7 +99,8 @@ frozenset({INGEST_PUSH})`, and pure functions `role_permissions(role)`,
 `scope_permissions(scopes)`, `effective_token_permissions(scopes, role | None, bound: bool)`,
 `highest_role(roles)`. No mapping types (typelint).
 
-Settings (`core/config.py`, all optional; OIDC is off unless the issuer is set):
+Settings (`core/config.py`, with the OIDC group in `core/oidc_settings.py`; all optional;
+OIDC is off unless the issuer is set):
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
@@ -129,7 +130,8 @@ Port changes (`telescreen.ports`):
 - `ports/templates.py` (new): `TemplateCatalog.lookup(session, name) -> TemplateInfo | None`
   where `TemplateInfo(name, event_kind, active_version)`; used by workflow upload validation.
 - `ports/identity.py` (new): `BearerVerifier.verify(token) -> VerifiedToken` (raises
-  `invalid_token` / `idp_unavailable`); `VerifiedToken(issuer, subject, claims_json: str)`
+  `invalid_token` / `idp_unavailable`) and `BearerVerifier.metadata() -> ProviderMetadata`
+  (the discovered public endpoints served by `GET /api/auth/config`); `VerifiedToken(issuer, subject, claims_json: str)`
   where `claims_json` is canonical JSON of the verified payload; `MemberProvisioner` with
   `member_for_identity(session, issuer, subject) -> MemberAuth | None` and
   `sign_in(session, SignInRequest) -> SignInResult`; `MemberAuth(member_id, handle, role:

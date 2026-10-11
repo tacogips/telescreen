@@ -72,7 +72,8 @@
       "Wave DAG: vocabulary/ports, DB and UI foundation first; services, enforcement, identity and UI pages in parallel; routers (wave 3) separated from wiring (wave 4) because wiring builds every router; leak matrix, E2E, live tests, docs and final gates last (wave 5)."
     ],
     "intentionalTradeoffs": [
-      "v12-p06 owns four bound-token fixture files (tests/evidence/test_evidence.py, tests/api/v11_issues/test_issues_router.py, tests/api/v11_ops/test_api_ops.py, tests/leak/flows_v11.py) and tests/workflow/engine/test_engine_extended.py for role seeding and Principal construction only; git diff must show no assertion or scope change.",
+      "Session-8 inventory audit (continuation, base ebc8db2): D4 moves call-site text into event + context, so v12-p04 owns the request-text assertions of tests/issues/v11_remediation/test_remediation.py and tests/police/test_v11_police.py, and v12-p05 owns those of tests/workflow/test_v11_workflow.py; no file is shared by two plans of one wave.",
+      "v12-p06 owns five bound-token fixture files (tests/evidence/test_evidence.py, tests/api/v11_issues/test_issues_router.py, tests/api/v11_ops/test_api_ops.py, tests/leak/flows_v11.py, tests/e2e/test_flow_v11_owner_health.py, the last found by the session-8 audit because it binds the member positionally) and tests/workflow/engine/test_engine_extended.py for role seeding and Principal construction only; git diff must show no assertion or scope change.",
       "v12-p06 tests/leak regression runs during the wave-2 fanout while v12-p04 and v12-p05 edit exercised code; failures caused by another plan's in-progress files are recorded as such, auth or 403 failures are p06 failures; v12-p11 and v12-p12 rerun the full suite after the joins (low S5-V12-L03).",
       "v12-p04 tests/e2e tests/leak run and v12-p07 tests/api/common run are informational during fanout and are Progress Log evidence, not manifest verification entries.",
       "The screenshot smoke is a gate in v12-p03 and v12-p12; a missing browser is a recorded verification gap, never a pass.",
@@ -244,26 +245,31 @@
         "src/telescreen/issues/service.py",
         "src/telescreen/collectors/health.py",
         "src/telescreen/police/health.py",
-        "tests/notifications"
+        "tests/notifications",
+        "tests/issues/v11_remediation/test_remediation.py",
+        "tests/police/test_v11_police.py"
       ],
       "sharedPaths": [],
       "sharedPathNotes": [
-        {"path": "src/telescreen/issues/service.py", "intendedEdit": "Populate IssueSnapshot.masked_excerpt only; no other behavior change."}
+        {"path": "src/telescreen/issues/service.py", "intendedEdit": "Populate IssueSnapshot.masked_excerpt only; no other behavior change."},
+        {"path": "tests/issues/v11_remediation/test_remediation.py", "intendedEdit": "Request-text assertions only (about :427, :472-475, :594, :708-714): assert request.event and NotificationContext fields (issue_short_id, digest_summary) instead of request.subject/body; keep the negative checks against context string fields."},
+        {"path": "tests/police/test_v11_police.py", "intendedEdit": "Request-text assertion only (about :367): assert event police_health_alert and context.health_condition == police_silent."}
       ],
       "artifactRoots": [],
       "acceptanceCriteria": [
         "Template package (versioned DB templates, built-ins system.<event> as version 0, allow-listed context per event, save-time validation, preview with synthetic context, audit), rendering in NotificationService.send before Redactor and DLP, per-target rows including skipped, no-address rows become failed, Slack result handling, and the seven non-workflow call sites moved to event + NotificationContext with text parity.",
         "Raw values can never reach a template; template text with detected values is rejected.",
         "New and existing notification tests pass; tests/issues tests/collectors tests/police regression exits 0; scoped gates pass; typelint grep empty; each file under 1000 lines.",
+        "git diff on tests/issues/v11_remediation/test_remediation.py and tests/police/test_v11_police.py shows only the request-text assertion rewrites (D4 call sites send event + context, not text).",
         "Completion Criteria all ticked; Progress Log complete."
       ],
       "verification": [
-        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/notifications src/telescreen/issues src/telescreen/collectors/health.py src/telescreen/police/health.py tests/notifications",
-        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/notifications src/telescreen/issues src/telescreen/collectors/health.py src/telescreen/police/health.py tests/notifications",
-        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/notifications src/telescreen/issues src/telescreen/collectors/health.py src/telescreen/police/health.py tests/notifications",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/notifications src/telescreen/issues src/telescreen/collectors/health.py src/telescreen/police/health.py tests/notifications tests/issues/v11_remediation/test_remediation.py tests/police/test_v11_police.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/notifications src/telescreen/issues src/telescreen/collectors/health.py src/telescreen/police/health.py tests/notifications tests/issues/v11_remediation/test_remediation.py tests/police/test_v11_police.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/notifications src/telescreen/issues src/telescreen/collectors/health.py src/telescreen/police/health.py tests/notifications tests/issues/v11_remediation/test_remediation.py tests/police/test_v11_police.py",
         "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/notifications 2>&1 | tee /tmp/telescreen-v12-p04-notification-templates-pytest.log",
         "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/issues tests/collectors tests/police > /tmp/telescreen-v12-p04-notification-templates-regress.log 2>&1",
-        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v12-p04-notification-templates-typelint.log 2>&1; ! grep -E '^(src/telescreen/notifications/|src/telescreen/issues/|src/telescreen/collectors/health\\.py|src/telescreen/police/health\\.py|tests/notifications/)' /tmp/telescreen-v12-p04-notification-templates-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v12-p04-notification-templates-typelint.log 2>&1; ! grep -E '^(src/telescreen/notifications/|src/telescreen/issues/|src/telescreen/collectors/health\\.py|src/telescreen/police/health\\.py|tests/notifications/|tests/issues/v11_remediation/test_remediation\\.py|tests/police/test_v11_police\\.py)' /tmp/telescreen-v12-p04-notification-templates-typelint.log",
         "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v12-p04-notification-templates.md)\" -eq 0"
       ]
     },
@@ -281,23 +287,28 @@
         "src/telescreen/workflow/engine/definitions.py",
         "src/telescreen/workflow/recipients.py",
         "src/telescreen/workflow/notify_targets.py",
-        "tests/workflow/v12"
+        "tests/workflow/v12",
+        "tests/workflow/test_v11_workflow.py"
       ],
       "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "tests/workflow/test_v11_workflow.py", "intendedEdit": "Owner-review request-text assertions only (about :406-412): assert event owner_review_assigned and the NotificationContext fields (TELE-8, credential/high/public, risk 40, task_link) instead of request.subject/body; keep count, channel and private-file negative checks."}
+      ],
       "artifactRoots": [],
       "acceptanceCriteria": [
         "DSL v2 (apiVersion telescreen.workflow/v2) named notification sets and inline targets with slack_channel: and email: recipients and optional templates; validation of unknown sets, empty targets, undeliverable combinations and non-workflow_notify templates; v1 documents load and run unchanged.",
+        "compiled_from_json rebuilds set_targets through the shared resolve_set_targets, so the engine (which executes definition.compiled_json) fans out set targets, and v2 round-trips with equality; git diff on tests/workflow/test_v11_workflow.py shows only the owner-review assertion rewrite.",
         "notify steps, human task assignment (notify_set/notify_targets) and escalation tiers fan out one NotificationRequest per target and channel with set_name/target_index and use event templates for human_task_assigned, owner_review_assigned and sla_escalated.",
         "tests/workflow and tests/examples pass; scoped gates pass; typelint grep empty; every file under 1000 lines.",
         "Completion Criteria all ticked; Progress Log complete."
       ],
       "verification": [
-        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/workflow tests/workflow/v12",
-        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/workflow tests/workflow/v12",
-        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/workflow tests/workflow/v12",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/workflow tests/workflow/v12 tests/workflow/test_v11_workflow.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/workflow tests/workflow/v12 tests/workflow/test_v11_workflow.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/workflow tests/workflow/v12 tests/workflow/test_v11_workflow.py",
         "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/workflow/v12 2>&1 | tee /tmp/telescreen-v12-p05-workflow-notification-sets-pytest.log",
         "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/workflow tests/examples > /tmp/telescreen-v12-p05-workflow-notification-sets-regress.log 2>&1",
-        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v12-p05-workflow-notification-sets-typelint.log 2>&1; ! grep -E '^(src/telescreen/workflow/|tests/workflow/v12/)' /tmp/telescreen-v12-p05-workflow-notification-sets-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v12-p05-workflow-notification-sets-typelint.log 2>&1; ! grep -E '^(src/telescreen/workflow/|tests/workflow/v12/|tests/workflow/test_v11_workflow\\.py)' /tmp/telescreen-v12-p05-workflow-notification-sets-typelint.log",
         "wc -l src/telescreen/workflow/dsl/*.py > /tmp/telescreen-v12-p05-workflow-notification-sets-wc.log; ! awk '$2 != \"total\" && $1 >= 1000' /tmp/telescreen-v12-p05-workflow-notification-sets-wc.log | grep -q .",
         "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v12-p05-workflow-notification-sets.md)\" -eq 0"
       ]
@@ -333,10 +344,12 @@
         "tests/evidence/test_evidence.py",
         "tests/api/v11_issues/test_issues_router.py",
         "tests/api/v11_ops/test_api_ops.py",
-        "tests/leak/flows_v11.py"
+        "tests/leak/flows_v11.py",
+        "tests/e2e/test_flow_v11_owner_health.py"
       ],
       "sharedPaths": [],
       "sharedPathNotes": [
+        {"path": "tests/e2e/test_flow_v11_owner_health.py", "intendedEdit": "Fixture-only: the read+write token v11-owner-member is bound positionally to the API-created member; set that MemberRow role to responder before creating the token; no assertion or token scope change."},
         {"path": "tests/workflow/engine/test_engine_extended.py", "intendedEdit": "Principal construction lines only."},
         {"path": "tests/evidence/test_evidence.py", "intendedEdit": "Fixture-only: seed the bound member role matching its v1 scopes (member-1 responder via a new MemberRow); no assertion or token scope change."},
         {"path": "tests/api/v11_issues/test_issues_router.py", "intendedEdit": "Fixture-only: seed member-api-owner responder and member-lifecycle admin; no assertion or token scope change."},
@@ -346,19 +359,20 @@
       "artifactRoots": [],
       "acceptanceCriteria": [
         "require_scope removed; one dependency (require_permission or declare_external) on every route of the 17 existing routers per the design 5.1 matrix; Principal carries permissions; OIDC access tokens accepted through the BearerVerifier port with role permissions; bound tokens use effective_token_permissions; in-handler admin checks use manage_any permissions.",
-        "Existing tokens keep exact v1 behavior; D11 role-NULL tests pass; the four bound-token fixtures seed roles only (git diff shows no assertion or scope change).",
-        "Scoped gates pass; tests/api tests/contract tests/evidence tests/assistant, tests/api/v11_issues tests/api/v11_ops and tests/leak regressions exit 0 (sibling-caused leak failures recorded per the plan); typelint grep empty.",
+        "Existing tokens keep exact v1 behavior; D11 role-NULL tests pass; the five bound-token fixtures (including tests/e2e/test_flow_v11_owner_health.py) seed roles only (git diff shows no assertion or scope change).",
+        "Scoped gates pass; tests/api tests/contract tests/evidence tests/assistant, tests/api/v11_issues tests/api/v11_ops, tests/leak and the router-module regression (tests/e2e/test_flow_v11_owner_health.py tests/audit tests/collectors/core/test_core.py tests/issues/test_issues_api.py tests/workflow/engine/test_resume_gaps.py) exit 0 (sibling-caused failures recorded per the plan); typelint grep empty.",
         "Completion Criteria all ticked; Progress Log complete."
       ],
       "verification": [
-        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/api tests/api tests/workflow/engine/test_engine_extended.py tests/evidence/test_evidence.py tests/leak/flows_v11.py",
-        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/api tests/api tests/workflow/engine/test_engine_extended.py tests/evidence/test_evidence.py tests/leak/flows_v11.py",
-        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/api tests/api tests/workflow/engine/test_engine_extended.py tests/evidence/test_evidence.py tests/leak/flows_v11.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/api tests/api tests/workflow/engine/test_engine_extended.py tests/evidence/test_evidence.py tests/leak/flows_v11.py tests/e2e/test_flow_v11_owner_health.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/api tests/api tests/workflow/engine/test_engine_extended.py tests/evidence/test_evidence.py tests/leak/flows_v11.py tests/e2e/test_flow_v11_owner_health.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/api tests/api tests/workflow/engine/test_engine_extended.py tests/evidence/test_evidence.py tests/leak/flows_v11.py tests/e2e/test_flow_v11_owner_health.py",
         "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/api tests/workflow/engine/test_engine_extended.py tests/evidence/test_evidence.py 2>&1 | tee /tmp/telescreen-v12-p06-rbac-enforcement-pytest.log",
         "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/api tests/contract tests/evidence tests/assistant > /tmp/telescreen-v12-p06-rbac-enforcement-regress.log 2>&1",
         "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/api/v11_issues tests/api/v11_ops > /tmp/telescreen-v12-p06-rbac-enforcement-v11api.log 2>&1",
         "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/leak > /tmp/telescreen-v12-p06-rbac-enforcement-leak.log 2>&1",
-        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v12-p06-rbac-enforcement-typelint.log 2>&1; ! grep -E '^(src/telescreen/api/|tests/api/|tests/workflow/engine/test_engine_extended\\.py|tests/evidence/test_evidence\\.py|tests/leak/flows_v11\\.py)' /tmp/telescreen-v12-p06-rbac-enforcement-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/e2e/test_flow_v11_owner_health.py tests/audit tests/collectors/core/test_core.py tests/issues/test_issues_api.py tests/workflow/engine/test_resume_gaps.py > /tmp/telescreen-v12-p06-rbac-enforcement-routers.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v12-p06-rbac-enforcement-typelint.log 2>&1; ! grep -E '^(src/telescreen/api/|tests/api/|tests/workflow/engine/test_engine_extended\\.py|tests/evidence/test_evidence\\.py|tests/leak/flows_v11\\.py|tests/e2e/test_flow_v11_owner_health\\.py)' /tmp/telescreen-v12-p06-rbac-enforcement-typelint.log",
         "! grep -rn require_scope src",
         "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v12-p06-rbac-enforcement.md)\" -eq 0"
       ]

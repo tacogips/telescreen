@@ -38,8 +38,10 @@
   - `tests/api/v11_issues/test_issues_router.py` (fixture-only: bound member role seeding)
   - `tests/api/v11_ops/test_api_ops.py` (fixture-only: bound member role seeding)
   - `tests/leak/flows_v11.py` (fixture-only: bound member role seeding)
+  - `tests/e2e/test_flow_v11_owner_health.py` (fixture-only: bound member role seeding;
+    added by the session-8 inventory audit)
 - sharedPaths: none
-- sharedPathNotes (the intent for the four fixture files): fixture-only. Give the
+- sharedPathNotes (the intent for the five fixture files): fixture-only. Give the
   token-bound member the role that matches its v1 scopes (admin scope -> admin, write ->
   responder, read -> viewer). Change no assertion and no token scope.
 - artifactRoots: none
@@ -175,10 +177,17 @@ Imitate: `api/common/auth.py:require_scope` (structure and static error texts) a
      /api/members` returns `member_id`, set `MemberRow.role = "responder"` through
      `world.database.sessions` in the same `begin()` block that creates the read+write
      `member_token`.
-   - Then run `grep -rn "member_id=\|TokenService" tests` and confirm that no other
-     fixture binds a token to a member. The planner checked this on 2026-10-11: every
-     other `TokenService.create` / `ApiTokenRow` fixture passes `None`. Report any new hit
-     as a Reconciliation request.
+   - `tests/e2e/test_flow_v11_owner_health.py` (about :90-95): the read+write token
+     `v11-owner-member` is bound POSITIONALLY to `member_id` (the 4th argument of
+     `TokenService.create`), where the member was created via `POST /api/members` just
+     above. In the same `world.database.sessions.begin()` block, before creating the
+     token, load that `MemberRow` and set `role = "responder"`.
+   - Then confirm that no other fixture binds a token to a member. Check BOTH keyword and
+     positional binding: read the 4th argument of every hit of `grep -rn -A5 "create("
+     tests | grep -B4 "ApiScope"`, plus every hit of `grep -rn "ApiTokenRow(" tests`.
+     The session-8 audit (2026-10-11) found exactly the five files above; every other
+     `TokenService.create` / `ApiTokenRow` fixture passes `None`. Report any new hit as a
+     Reconciliation request.
 
 ## Pitfalls
 
@@ -228,18 +237,21 @@ for the token `a.b.c`, raises `INVALID_TOKEN` otherwise) and a fake `MemberProvi
 
 Conventions section 7 with `<src>` = `src/telescreen/api` and `<tests>` = `tests/api
 tests/workflow/engine/test_engine_extended.py tests/evidence/test_evidence.py
-tests/leak/flows_v11.py`. Then run these regressions with `set -o pipefail`. Each must
-exit 0, and its exit status and log path go in the Progress Log:
+tests/leak/flows_v11.py tests/e2e/test_flow_v11_owner_health.py`. Then run these
+regressions with `set -o pipefail`. Each must exit 0, and its exit status and log path go
+in the Progress Log:
 
 ```bash
 uv run --frozen pytest -p no:cacheprovider tests/api tests/contract tests/evidence tests/assistant > /tmp/telescreen-v12-p06-rbac-enforcement-regress.log 2>&1; echo "exit=$?"
 uv run --frozen pytest -p no:cacheprovider tests/api/v11_issues tests/api/v11_ops > /tmp/telescreen-v12-p06-rbac-enforcement-v11api.log 2>&1; echo "exit=$?"
 uv run --frozen pytest -p no:cacheprovider tests/leak > /tmp/telescreen-v12-p06-rbac-enforcement-leak.log 2>&1; echo "exit=$?"
+uv run --frozen pytest -p no:cacheprovider tests/e2e/test_flow_v11_owner_health.py tests/audit tests/collectors/core/test_core.py tests/issues/test_issues_api.py tests/workflow/engine/test_resume_gaps.py > /tmp/telescreen-v12-p06-rbac-enforcement-routers.log 2>&1; echo "exit=$?"
 ```
 
 These suites build routers or the container with real tokens, so scope compatibility and
-the fixture role seeding are proven there. `tests/leak` also runs code owned by
-concurrent wave-2 plans. A failure caused by another plan's in-progress file is
+the fixture role seeding are proven there (the fourth command covers the remaining
+router-building test modules outside `tests/api`). `tests/leak` and the fourth command
+also run code owned by concurrent wave-2 plans (p04 issues/notifications, p05 workflow). A failure caused by another plan's in-progress file is
 recorded as such; a 403 or auth failure is a p06 failure and must be fixed.
 
 ## Completion Criteria
@@ -247,9 +259,9 @@ recorded as such; a 403 or auth failure is a p06 failure and must be fixed.
 - [ ] `require_scope` is gone (`grep -rn require_scope src` prints nothing).
 - [ ] Every route in the 17 routers uses `require_permission` or `declare_external` per
       the table.
-- [ ] The four bound-token fixtures seed roles; `git diff` on them shows only role
+- [ ] The five bound-token fixtures seed roles; `git diff` on them shows only role
       seeding (no assertion or scope change).
-- [ ] Tests pass; the scoped gates and the three regression commands exit 0; typelint
+- [ ] Tests pass; the scoped gates and the four regression commands exit 0; typelint
       grep empty.
 - [ ] Progress Log complete.
 

@@ -22,7 +22,21 @@
   - `src/telescreen/collectors/health.py`
   - `src/telescreen/police/health.py`
   - `tests/notifications`
+  - `tests/issues/v11_remediation/test_remediation.py` (request-text assertions only)
+  - `tests/police/test_v11_police.py` (request-text assertion only)
 - sharedPaths: none
+- sharedPathNotes (added by the session-8 inventory audit): D4 call sites now send
+  `event` + `context` with empty `subject`/`body`, so the existing assertions on fake
+  sender request text break. Rewrite only these assertions, keep every other line:
+  - `test_remediation.py` about :427 and :594 (`body.startswith("TELE-n")`) -> assert
+    `request.event` is `exception_requested` / `exception_expired` and
+    `request.context.issue_short_id == "TELE-n"`; about :472-475 and :708-714 -> assert
+    the event (`exception_requested` / `owner_digest`), that the context carries the short
+    id (`issue_short_id`, or `"TELE-1" in context.digest_summary`), and keep the
+    `not in` checks against every context string field instead of `request.body`;
+  - `test_v11_police.py` about :367 (`"police_silent" in request.subject`) -> assert
+    `request.event is NotificationEvent.POLICE_HEALTH_ALERT` and
+    `request.context.health_condition == "police_silent"`.
 - artifactRoots: none
 
 Read `impl-plans/conventions.md` first.
@@ -240,15 +254,18 @@ Imitate:
   `recipient_unreachable`, and the fake SMTP transport receives nothing.
 - Slack: a MockTransport `{"ok":true,"channel":"C1","ts":"1.2"}` -> `SlackPostResult`.
 - Call sites: the existing `tests/issues`, `tests/collectors` and `tests/police` suites
-  still pass (run them; do not edit them unless an assertion compared the request
-  subject/body). If one does, write a Reconciliation request instead of editing a file
-  outside `writePaths`.
+  still pass. The only assertions that compare request subject/body are the ones listed
+  in sharedPathNotes (planner grep on 2026-10-11:
+  `grep -rnE "\.(subject|body)\b" tests/issues tests/collectors tests/police`); rewrite
+  them as described there. Any other failing assertion outside `writePaths` becomes a
+  Reconciliation request.
 
 ## Verification
 
 Conventions section 7 with `<src>` = `src/telescreen/notifications src/telescreen/issues
 src/telescreen/collectors/health.py src/telescreen/police/health.py` and `<tests>` =
-`tests/notifications`. Additionally run:
+`tests/notifications tests/issues/v11_remediation/test_remediation.py
+tests/police/test_v11_police.py`. Additionally run:
 
 ```bash
 uv run --frozen pytest -p no:cacheprovider tests/issues tests/collectors tests/police > /tmp/telescreen-v12-p04-notification-templates-regress.log 2>&1; echo "exit=$?"
@@ -264,6 +281,8 @@ must be fixed; a failure elsewhere is noted.
 
 - [ ] Template package, sender, delivery, Slack result and call sites implemented.
 - [ ] New and existing notification tests pass; the regression command exits 0.
+- [ ] `git diff` on the two v1.1 test files shows only the request-text assertion
+      rewrites of sharedPathNotes.
 - [ ] Scoped gates pass; typelint grep empty; each file under 1000 lines.
 - [ ] Progress Log complete.
 

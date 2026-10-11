@@ -21,7 +21,17 @@
   - `src/telescreen/workflow/recipients.py`
   - `src/telescreen/workflow/notify_targets.py` (new)
   - `tests/workflow/v12` (new directory)
+  - `tests/workflow/test_v11_workflow.py` (owner-review request-text assertions only)
 - sharedPaths: none
+- sharedPathNotes (added by the session-8 inventory audit): `HumanTaskExecutor._notify`
+  now sends `event=owner_review_assigned` + `context` with empty `subject`/`body` (D4), so
+  `test_v11_workflow.py` about :406-412 (`request.subject == "Telescreen: review TELE-8"`
+  and the `request.body` checks) breaks. Rewrite only those lines: assert `request.event
+  is NotificationEvent.OWNER_REVIEW_ASSIGNED`, `request.context.issue_short_id ==
+  "TELE-8"`, `issue_rule_class`/`issue_severity`/`issue_exposure` = `credential`/`high`/
+  `public`, `issue_risk_score == 40`, `task_link == "https://telescreen.example/my-tasks"`,
+  and keep both `private-file.txt` negative checks against every context string field.
+  Keep the request count and channel assertions unchanged.
 - artifactRoots: none
 
 Read `impl-plans/conventions.md` first.
@@ -62,7 +72,12 @@ Imitate:
 ## Invariants
 
 - A v1 document's `CompiledWorkflow`, its `compiled_to_json` output and its executor
-  behavior are unchanged. The existing `tests/workflow/**` pass untouched.
+  behavior are unchanged. The existing `tests/workflow/**` pass untouched, except the
+  owner-review request-text lines of `tests/workflow/test_v11_workflow.py` (sharedPathNotes).
+- The engine executes the stored definition (`engine/engine.py` and
+  `triggers/service.py` call `compiled_from_json(parse_json(definition.compiled_json))`),
+  not the loader output. `set_targets` is therefore rebuilt in `compiled_from_json`; a
+  set reference that is lost there would silently send nothing at run time.
 - `CompiledWorkflow` gains defaulted fields `api_version: str =
   "telescreen.workflow/v1"` and `notification_sets: tuple[NotificationSetSpec, ...] =
   ()`. `compiled_to_json` writes `workflow.api_version` (not the hard-coded v1), plus
@@ -104,6 +119,10 @@ Imitate:
        `undeliverable_combination`.
    - Codes: `duplicate_name`, `empty_list`, `invalid_recipient`,
      `undeliverable_combination`, `unknown_notification_set`.
+   - `resolve_set_targets(workflow: CompiledWorkflow) -> CompiledWorkflow`: returns a copy
+     whose notify, human_task and evidence_upload steps carry `set_targets` from
+     `workflow.notification_sets` (unknown names -> empty). This is the ONE resolver,
+     used by the loader (deliverable 3) and by `compiled_from_json` (deliverable 5).
 3. **`dsl/loader.py`**:
    - Accept `telescreen.workflow/v1` and `telescreen.workflow/v2`.
    - Read `notification_sets` and the new step fields through `notification_sets.py`.
@@ -112,14 +131,17 @@ Imitate:
      `requires_api_version_v2` at that path.
    - Notify `to` + `notification_set` (or `targets`) together -> `conflicting_fields`.
      In v2, a notify with none of `to`/`notification_set`/`targets` -> `missing_field`.
-   - After the steps and sets parse, resolve each `notification_set` / `notify_set`
-     name into that step's `set_targets` with `dataclasses.replace`. When the name is
-     unknown, leave `set_targets` empty; `validate.py` reports it.
+   - After the steps and sets parse, call `resolve_set_targets` (each `notification_set`
+     / `notify_set` name -> that step's `set_targets` via `dataclasses.replace`). When the
+     name is unknown, leave `set_targets` empty; `validate.py` reports it.
 4. **`dsl/validate.py`**: unknown `notification_set` / `notify_set` ->
    `unknown_notification_set`. Every inline and set target goes through
    `validate_recipient_for_channels`.
 5. **`dsl/compiled.py`**: serialize `api_version`, `notification_sets` and the new step
-   fields (only when set, so v1 output is byte-identical).
+   fields (only when set, so v1 output is byte-identical). `set_targets` is not
+   serialized; `compiled_from_json` decodes the sets and step references and then
+   returns `resolve_set_targets(workflow)`, so `compiled_from_json(compiled_to_json(w))
+   == w` holds for v2 and the engine sees the set targets.
 6. **`dsl/escalation.py`**:
    - `EscalationTier` gains `notification_set: str | None = None` and `targets:
      tuple[NotificationTargetSpec, ...] = ()`;
@@ -202,7 +224,10 @@ Imitate:
 - Loader:
   - a v1 document with `notification_sets` -> `requires_api_version_v2`;
   - v2 with a set and a notify `notification_set` loads, and `compiled_to_json` ->
-    `compiled_from_json` round-trips;
+    `compiled_from_json` round-trips with equality AND the decoded notify and human-task
+    steps have non-empty `set_targets` (guards the engine path);
+  - a notify executor run on a step taken from `compiled_from_json(compiled_to_json(w))`
+    fans out the set targets (not zero requests);
   - `email:` + slack -> `undeliverable_combination`;
   - `slack_channel:general` -> `invalid_recipient`;
   - an unknown set -> `unknown_notification_set`;
@@ -231,13 +256,15 @@ Imitate:
 ## Verification
 
 Conventions section 7 with `<src>` = `src/telescreen/workflow` and `<tests>` =
-`tests/workflow/v12`. Also run `uv run --frozen pytest -p no:cacheprovider tests/workflow
+`tests/workflow/v12 tests/workflow/test_v11_workflow.py`. Also run `uv run --frozen pytest -p no:cacheprovider tests/workflow
 tests/examples` -> exit 0 (the v1 and v1.1 workflow suites are unchanged).
 
 ## Completion Criteria
 
 - [ ] Deliverables 1-12 implemented; files under 1000 lines.
 - [ ] `tests/workflow` and `tests/examples` pass; scoped gates pass; typelint grep empty.
+- [ ] `git diff tests/workflow/test_v11_workflow.py` shows only the owner-review
+      request-text assertion rewrite.
 - [ ] Progress Log complete.
 
 ## Progress Log
