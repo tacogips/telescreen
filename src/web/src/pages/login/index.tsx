@@ -4,7 +4,7 @@ import { ApiError, authApi, setToken } from "../../api/client";
 import type { AuthConfig } from "../../api/types";
 import { beginLogin } from "../../auth/oidc";
 import { safeReturnTo } from "../../auth/session";
-const messages: Readonly<Record<string, string>> = { no_role: "Your account has no Telescreen role. Ask an administrator.", not_provisioned: "Your account is not provisioned in Telescreen.", identity_conflict: "Your identity conflicts with an existing account. Ask an administrator.", idp_unavailable: "The identity provider is unavailable. Try again later.", invalid_token: "Sign-in could not be verified. Try again." };
+const messages: Readonly<Record<string, string>> = { no_role: "Your account has no Telescreen role. Ask an administrator.", not_provisioned: "Your account is not provisioned in Telescreen.", identity_conflict: "Your identity conflicts with an existing account. Ask an administrator.", idp_unavailable: "The identity provider is unavailable. Try again later.", invalid_token: "Sign-in could not be verified. Try again.", idp_error: "The identity provider did not complete the sign-in. Try again." };
 export default function LoginPage(): JSX.Element {
   const [config, setConfig] = createSignal<AuthConfig>(); const [token, setValue] = createSignal(""); const [error, setError] = createSignal(""); const navigate = useNavigate(); const [params] = useSearchParams();
   onMount(() => { void authApi.config().then(setConfig).catch(() => setError("Sign-in configuration could not be loaded.")); });

@@ -115,7 +115,7 @@ and never echo text.
 
 | Area | Endpoint | Permission |
 |------|----------|-----------|
-| Auth | `GET /api/auth/config` -> `{oidc: {issuer, client_id, authorization_endpoint, token_endpoint, end_session_endpoint, scopes} or null, token_login}` | external `public` |
+| Auth | `GET /api/auth/config` -> `{oidc: {issuer, client_id, authorization_endpoint, token_endpoint, end_session_endpoint, scopes: string[]} or null, token_login}` (the UI joins `scopes` with spaces in the authorization request) | external `public` |
 | | `POST /api/auth/session` (Bearer OIDC access token) -> `{member: {handle, display_name}, role, permissions}`; 403 `no_role` / `not_provisioned` / `forbidden`, 409 `identity_conflict`, 401 `invalid_token`, 503 `idp_unavailable` | external `oidc_sign_in` |
 | | `GET /api/auth/me` -> `{kind: token or oidc, member: {handle, display_name} or null, role, permissions}` | `auth.self` |
 | Templates | `GET /api/notification-templates` -> items `{name, event_kind, builtin, description, active_version, latest_version, updated_at}` (built-ins merged with DB names) | `templates.read` |

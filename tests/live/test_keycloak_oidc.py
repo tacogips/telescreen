@@ -145,7 +145,7 @@ async def test_keycloak_direct_grants_map_roles_and_pkce_authorize(tmp_path: Pat
             for input_tag in re.findall(r"<input[^>]*>", authorize.text):
                 name_match: re.Match[str] | None = re.search(r'name="([^"]+)"', input_tag)
                 value_match: re.Match[str] | None = re.search(r'value="([^"]*)"', input_tag)
-                if name_match is not None:
+                if name_match is not None and name_match.group(1) not in ("username", "password"):
                     form_fields.append(
                         (
                             name_match.group(1),
@@ -159,11 +159,21 @@ async def test_keycloak_direct_grants_map_roles_and_pkce_authorize(tmp_path: Pat
                     ("password", f"{pkce_username}-dev-pass"),
                 )
             )
+            # Keycloak marks its login-session cookies Secure. Browsers send them to
+            # http://127.0.0.1 (a secure context), but httpx does not, so forward them.
+            session_cookies: str = "; ".join(
+                f"{cookie.name}={cookie.value}"
+                for cookie in client.cookies.jar
+                if cookie.value is not None
+            )
             login_request: httpx.Request = client.build_request(
                 "POST",
                 form_action,
                 content=urlencode(form_fields),
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Cookie": session_cookies,
+                },
             )
             login: httpx.Response = await client.send(login_request, follow_redirects=False)
             assert login.status_code in (302, 303)

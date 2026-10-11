@@ -1,5 +1,5 @@
 export type Page<T> = Readonly<{ items: T[]; next_cursor: string | null }>;
-export type OidcConfig = Readonly<{ issuer: string; client_id: string; authorization_endpoint: string; token_endpoint: string; end_session_endpoint?: string | null; scopes: string }>;
+export type OidcConfig = Readonly<{ issuer: string; client_id: string; authorization_endpoint: string; token_endpoint: string; end_session_endpoint?: string | null; scopes: readonly string[] }>;
 export type AuthConfig = Readonly<{ oidc: OidcConfig | null; token_login: boolean }>;
 export type AuthSession = Readonly<{ member: Readonly<{ handle: string; display_name: string }> | null; role: string | null; permissions: readonly string[] }>;
 export type AuthMe = Readonly<{ kind: "token" | "oidc"; member: Readonly<{ handle: string; display_name: string }> | null; role: string | null; permissions: readonly string[] }>;

@@ -144,6 +144,18 @@ def _serve(settings: TelescreenSettings, env: EnvSource, host: str, port: int) -
     return 0
 
 
+async def _run_and_close(container: Container, arguments: argparse.Namespace) -> int:
+    """Run one command and close its resources on the same event loop.
+
+    Pooled database connections belong to the loop that opened them, so closing the
+    container from a second ``asyncio.run`` fails on PostgreSQL (asyncpg).
+    """
+    try:
+        return await _run_async_command(container, arguments)
+    finally:
+        await close_container(container)
+
+
 async def _run_async_command(container: Container, arguments: argparse.Namespace) -> int:
     """Run supported asynchronous utility commands."""
     if arguments.command == "worker":
@@ -253,10 +265,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _serve(settings, env, arguments.host, arguments.port)
         container: Container
         container = _build_cli_container(settings, env)
-        try:
-            return asyncio.run(_run_async_command(container, arguments))
-        finally:
-            asyncio.run(close_container(container))
+        return asyncio.run(_run_and_close(container, arguments))
     except ConfigError as error:
         print(error.detail, file=sys.stderr)
         return 3

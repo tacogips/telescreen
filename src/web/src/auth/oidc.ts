@@ -8,7 +8,7 @@ import { clearPendingLogin, clearSession, getPendingLogin, getSession, safeRetur
 export async function beginLogin(config: OidcConfig, returnTo: string | null): Promise<void> {
   const state = randomUrlSafe(32); const nonce = randomUrlSafe(32); const verifier = createVerifier();
   const destination = safeReturnTo(returnTo); setPendingLogin({ state, nonce, verifier, returnTo: destination });
-  const url = new URL(config.authorization_endpoint); url.searchParams.set("response_type", "code"); url.searchParams.set("client_id", config.client_id); url.searchParams.set("redirect_uri", `${location.origin}/auth/callback`); url.searchParams.set("scope", config.scopes); url.searchParams.set("state", state); url.searchParams.set("nonce", nonce); url.searchParams.set("code_challenge", await challengeS256(verifier)); url.searchParams.set("code_challenge_method", "S256"); location.assign(url.toString());
+  const url = new URL(config.authorization_endpoint); url.searchParams.set("response_type", "code"); url.searchParams.set("client_id", config.client_id); url.searchParams.set("redirect_uri", `${location.origin}/auth/callback`); url.searchParams.set("scope", config.scopes.join(" ")); url.searchParams.set("state", state); url.searchParams.set("nonce", nonce); url.searchParams.set("code_challenge", await challengeS256(verifier)); url.searchParams.set("code_challenge_method", "S256"); location.assign(url.toString());
 }
 
 /** Validate the callback, exchange the code and establish an application session. */
@@ -16,6 +16,7 @@ export async function completeLogin(callback: URL): Promise<string> {
   const pending = getPendingLogin();
   try {
     if (pending === null || callback.searchParams.get("state") !== pending.state) throw new ApiError(400, "invalid_state", "The sign-in response could not be verified.");
+    if (callback.searchParams.has("error") || !callback.searchParams.get("code")) throw new ApiError(400, "idp_error", "The identity provider did not complete the sign-in.");
     const config = await apiFetch<AuthConfig>("/api/auth/config");
     if (config.oidc === null) throw new ApiError(503, "idp_unavailable", "Single sign-on is not configured.");
     const response = await fetch(config.oidc.token_endpoint, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "authorization_code", code: callback.searchParams.get("code") ?? "", redirect_uri: `${location.origin}/auth/callback`, client_id: config.oidc.client_id, code_verifier: pending.verifier }) });

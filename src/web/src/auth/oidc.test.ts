@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { beginLogin, completeLogin, logout, refreshIfNeeded } from "./oidc";
 import { clearSession, getPendingLogin, getSession, setPendingLogin, setSession } from "./session";
-const config = { oidc: { issuer: "https://idp.example.test", client_id: "telescreen-ui", authorization_endpoint: "https://idp.example.test/auth", token_endpoint: "https://idp.example.test/token", scopes: "openid" }, token_login: true };
+const config = { oidc: { issuer: "https://idp.example.test", client_id: "telescreen-ui", authorization_endpoint: "https://idp.example.test/auth", token_endpoint: "https://idp.example.test/token", scopes: ["openid"] }, token_login: true };
 const jwt = (nonce: string): string => `header.${btoa(JSON.stringify({ nonce })).replace(/=/g, "")}.signature`;
 afterEach(() => { vi.unstubAllGlobals(); sessionStorage.clear(); });
 describe("OIDC code flow", () => {
@@ -9,6 +9,15 @@ describe("OIDC code flow", () => {
     const assign = vi.fn(); vi.stubGlobal("location", { origin: "https://app.test", assign });
     await beginLogin(config.oidc, "//outside.test"); const destination = new URL(String(assign.mock.calls[0]?.[0]));
     expect(destination.searchParams.get("response_type")).toBe("code"); expect(destination.searchParams.get("code_challenge_method")).toBe("S256"); expect(getPendingLogin()?.returnTo).toBe("/issues");
+  });
+  it("joins scopes with spaces as OIDC requires", async () => {
+    const assign = vi.fn(); vi.stubGlobal("location", { origin: "https://app.test", assign });
+    await beginLogin({ ...config.oidc, scopes: ["openid", "profile", "email"] }, "/issues"); const destination = new URL(String(assign.mock.calls[0]?.[0]));
+    expect(destination.searchParams.get("scope")).toBe("openid profile email");
+  });
+  it("reports an identity provider error without requesting a token", async () => {
+    setPendingLogin({ state: "expected", nonce: "nonce", verifier: "verifier", returnTo: "/runs" }); const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+    await expect(completeLogin(new URL("https://app.test/auth/callback?state=expected&error=invalid_scope"))).rejects.toMatchObject({ code: "idp_error" }); expect(fetcher).not.toHaveBeenCalled();
   });
   it("rejects a state mismatch before requesting a token", async () => {
     setPendingLogin({ state: "expected", nonce: "nonce", verifier: "verifier", returnTo: "/runs" }); const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);

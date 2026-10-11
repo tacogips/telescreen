@@ -51,10 +51,11 @@ export function UsersRoles(): JSX.Element {
     <TopBar.Slot name="title">Users and roles</TopBar.Slot>
     <Show when={loadError() ?? error()} keyed>{(value) => <ErrorBanner error={value} />}</Show>
     <Panel title="Users">
+      <Show when={!users.error}>
       <Show when={!users.loading} fallback={<Placeholder label="Loading users…" />}>
-        <Show when={(users()?.length ?? 0) > 0} fallback={<Show when={!users.error}><EmptyState title="No users"><p>Add members under General.</p></EmptyState></Show>}>
+        <Show when={(users.latest?.length ?? 0) > 0} fallback={<Show when={!users.error}><EmptyState title="No users"><p>Add members under General.</p></EmptyState></Show>}>
           <Table><thead><tr><th>Handle</th><th>Display name</th><th>Role</th><th>Teams</th><th>Last sign-in</th></tr></thead><tbody>
-            <For each={users()}>{(user) => <tr>
+            <For each={users.latest}>{(user) => <tr>
               <td>@{user.handle}</td>
               <td>{user.display_name}</td>
               <td><div class="role-cell">
@@ -66,6 +67,7 @@ export function UsersRoles(): JSX.Element {
             </tr>}</For>
           </tbody></Table>
         </Show>
+      </Show>
       </Show>
     </Panel>
     <Panel title="Permission matrix">

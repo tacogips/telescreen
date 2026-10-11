@@ -64,3 +64,11 @@ it("disables the role select without users.write", async () => {
   await settle();
   expect(select).toBeDisabled();
 });
+
+it("shows a forbidden banner instead of loading forever when users cannot be read", async () => {
+  const forbidden = (): Response => Response.json({ error: { code: "forbidden", detail: "permission is not granted" } }, { status: 403 });
+  mockApi([], (url) => (url === "/api/users" || url === "/api/roles" ? forbidden() : undefined));
+  renderSettings("/settings/users");
+  await waitFor(() => expect(screen.getAllByText("permission is not granted").length).toBeGreaterThan(0));
+  expect(screen.queryByText("Loading users…")).toBeNull();
+});

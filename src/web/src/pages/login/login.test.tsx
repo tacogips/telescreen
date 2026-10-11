@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import LoginPage from ".";
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); sessionStorage.clear(); });
 it("shows SSO and token choices according to auth configuration", async () => {
-  vi.stubGlobal("fetch", vi.fn(async () => Response.json({ oidc: { issuer: "https://idp.example.test", client_id: "ui", authorization_endpoint: "https://idp.example.test/auth", token_endpoint: "https://idp.example.test/token", scopes: "openid" }, token_login: true })));
+  vi.stubGlobal("fetch", vi.fn(async () => Response.json({ oidc: { issuer: "https://idp.example.test", client_id: "ui", authorization_endpoint: "https://idp.example.test/auth", token_endpoint: "https://idp.example.test/token", scopes: ["openid"] }, token_login: true })));
   render(() => <MemoryRouter><Route path="/" component={() => <LoginPage/>}/></MemoryRouter>);
   expect(await screen.findByRole("button", { name: "Sign in with SSO" })).toBeInTheDocument(); expect(screen.getByLabelText("API token")).toBeInTheDocument();
 });
