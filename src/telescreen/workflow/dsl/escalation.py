@@ -19,6 +19,7 @@ from telescreen.core.json import (
     parse_yaml,
 )
 from telescreen.core.vocabulary import ErrorCode, NotificationChannel, SourceFormat
+from telescreen.ports.directory import SLACK_CHANNEL_ID
 from telescreen.workflow.dsl._iso import format_duration
 from telescreen.workflow.dsl.loader import ValidationIssue, WorkflowValidationError
 from telescreen.workflow.dsl.model import NotificationTargetSpec
@@ -112,7 +113,7 @@ def _tier(value: JsonValue, index: int, issues: list[ValidationIssue]) -> Escala
         else ()
     )
     for notify_index, recipient in enumerate(notify):
-        if _RECIPIENT.fullmatch(recipient) is None:
+        if _RECIPIENT.fullmatch(recipient) is None or not _valid_slack_channel(recipient):
             issues.append(ValidationIssue(f"{path}/notify/{notify_index}", "invalid_value"))
     channels_value: JsonValue | None = value.get("channels")
     if notify and channels_value is None:
@@ -200,3 +201,9 @@ def escalation_from_json(value: JsonValue) -> EscalationPolicySpec:
         return load_escalation_policy(dump_json(value), SourceFormat.JSON)
     except WorkflowValidationError:
         raise TelescreenError(ErrorCode.WORKFLOW_INVALID, "invalid escalation policy") from None
+
+
+def _valid_slack_channel(recipient: str) -> bool:
+    """Return False for a slack_channel recipient whose id is not a channel id."""
+    parts: tuple[str, str, str] = recipient.partition(":")
+    return parts[0] != "slack_channel" or SLACK_CHANNEL_ID.fullmatch(parts[2]) is not None

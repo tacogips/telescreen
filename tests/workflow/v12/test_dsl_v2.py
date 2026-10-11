@@ -150,6 +150,18 @@ steps:
             "/notification_sets/0/targets/0/recipients/1",
         ),
         (
+            "slack_channel:C0123ABCDE",
+            "slack_channel:U0123ABCDE",
+            "invalid_recipient",
+            "/notification_sets/0/targets/0/recipients/1",
+        ),
+        (
+            "slack_channel:C0123ABCDE",
+            "slack_channel:D0123ABCDE",
+            "invalid_recipient",
+            "/notification_sets/0/targets/0/recipients/1",
+        ),
+        (
             "email:secops-leads@example.invalid",
             "email:a,b@example.invalid",
             "invalid_recipient",
@@ -314,6 +326,11 @@ tiers:
             "/tiers/0/targets/0/recipients/0",
         ),
         ("    notification_set: Bad Set\n", "invalid_value", "/tiers/0/notification_set"),
+        (
+            "    notify: [slack_channel:U0123ABCDE]\n    channels: [slack]\n",
+            "invalid_value",
+            "/tiers/0/notify/0",
+        ),
     ],
 )
 def test_invalid_tiers_report_codes(tier: str, code: str, path: str) -> None:

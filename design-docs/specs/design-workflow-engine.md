@@ -180,7 +180,7 @@ tiers:
   `evidence_required` otherwise). Comment is redacted before storage.
 - Recipient resolution: `member:` -> member email/slack user, `team:` -> team mailing list
   email, team Slack channel, and members, `email:` -> address, `slack:` -> channel
-  (v1.2: `slack_channel:` -> channel or DM id, `slack:` kept as an alias).
+  (v1.2: `slack_channel:` -> public or private channel id only, `slack:` kept as an alias).
 
 ### Node executors with external effects
 

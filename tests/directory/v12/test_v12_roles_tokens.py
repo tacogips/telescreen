@@ -194,7 +194,7 @@ async def test_set_team_members_keeps_v1_manual_semantics() -> None:
 
 @pytest.mark.asyncio
 async def test_slack_channel_recipient_resolves_to_one_channel() -> None:
-    """slack_channel: references resolve like slack: to one Slack channel."""
+    """slack_channel: references resolve to one Slack channel and reject user or DM ids."""
     harness: SqliteHarness = await make_sqlite_harness()
     resolver: DirectoryRecipientResolver = DirectoryRecipientResolver()
     async with harness.sessions.begin() as session:
@@ -208,6 +208,10 @@ async def test_slack_channel_recipient_resolves_to_one_channel() -> None:
         with pytest.raises(TelescreenError) as empty:
             await resolver.resolve(session, "slack_channel:")
         assert empty.value.code is ErrorCode.RECIPIENT_UNKNOWN
+        for personal in ("slack_channel:U0123ABCDE", "slack_channel:D0123ABCDE"):
+            with pytest.raises(TelescreenError) as not_channel:
+                await resolver.resolve(session, personal)
+            assert not_channel.value.code is ErrorCode.RECIPIENT_UNKNOWN
     await harness.close()
 
 

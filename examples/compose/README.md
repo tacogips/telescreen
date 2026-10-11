@@ -125,7 +125,9 @@ telescreen notify test --channel email --to email:someone@example.test
 Live tests are opt-in. Set `TELESCREEN_TEST_MAILPIT_URL`,
 `TELESCREEN_TEST_SMTP_HOST`, `TELESCREEN_TEST_SMTP_PORT`,
 `TELESCREEN_TEST_KEYCLOAK_URL`, `TELESCREEN_TEST_SLACK_BOT_TOKEN`, and
-`TELESCREEN_TEST_SLACK_CHANNEL` for the corresponding services, then run:
+`TELESCREEN_TEST_SLACK_CHANNEL` (a channel id starting with `C` or `G`; the bot must be a
+channel member, or the channel must be public and the token must have `chat:write.public`)
+for the corresponding services, then run:
 
 ```sh
 uv run pytest -m live tests/live

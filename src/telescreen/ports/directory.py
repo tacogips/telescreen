@@ -1,9 +1,13 @@
 """Recipient resolution ports and DTOs."""
 
+import re
 from dataclasses import dataclass
 from typing import Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
+
+SLACK_CHANNEL_ID: re.Pattern[str] = re.compile(r"^[CG][A-Z0-9]{8,}$")
+"""Public (C) or private (G) Slack channel id; user (U/W) and DM (D) ids are not channels."""
 
 
 @dataclass(frozen=True)

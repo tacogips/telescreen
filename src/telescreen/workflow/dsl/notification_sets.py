@@ -10,6 +10,7 @@ from dataclasses import replace
 
 from telescreen.core.json import JsonKind, JsonValue, json_array, json_object, json_str
 from telescreen.core.vocabulary import NotificationChannel
+from telescreen.ports.directory import SLACK_CHANNEL_ID
 from telescreen.workflow.dsl.model import (
     API_VERSION_V2,
     CompiledWorkflow,
@@ -33,7 +34,6 @@ V2_ONLY_STEP_FIELDS: tuple[str, ...] = (
 
 _SET_NAME: re.Pattern[str] = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
 _TEMPLATE_NAME: re.Pattern[str] = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,63}$")
-_SLACK_CHANNEL_ID: re.Pattern[str] = re.compile(r"^[CDGUW][A-Z0-9]{8,}$")
 _EMAIL_FORBIDDEN: re.Pattern[str] = re.compile(r"[\s,;<>\x00-\x1f\x7f]")
 _EMAIL_MAX_LENGTH: int = 254
 
@@ -154,7 +154,7 @@ def validate_recipient_for_channels(
         elif NotificationChannel.SLACK in channels:
             issues.append(ValidationIssue(path, "undeliverable_combination"))
         return
-    if kind == "slack_channel" and _SLACK_CHANNEL_ID.fullmatch(value) is None:
+    if kind == "slack_channel" and SLACK_CHANNEL_ID.fullmatch(value) is None:
         issues.append(ValidationIssue(path, "invalid_recipient"))
         return
     if kind in ("slack_channel", "slack"):

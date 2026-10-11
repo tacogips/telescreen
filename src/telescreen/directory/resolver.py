@@ -9,7 +9,7 @@ from telescreen.core.errors import TelescreenError
 from telescreen.core.vocabulary import ErrorCode
 from telescreen.db.models import MemberRow, TeamRow
 from telescreen.directory.repository import DirectoryRepository
-from telescreen.ports.directory import AssigneeIds, ResolvedRecipients
+from telescreen.ports.directory import SLACK_CHANNEL_ID, AssigneeIds, ResolvedRecipients
 
 
 @dataclass
@@ -28,6 +28,8 @@ class DirectoryRecipientResolver:
             raise TelescreenError(ErrorCode.RECIPIENT_UNKNOWN, "recipient is unknown")
         if kind == "email":
             return ResolvedRecipients((value,), (), (), ())
+        if kind == "slack_channel" and SLACK_CHANNEL_ID.fullmatch(value) is None:
+            raise TelescreenError(ErrorCode.RECIPIENT_UNKNOWN, "recipient is unknown")
         if kind in ("slack", "slack_channel"):
             return ResolvedRecipients((), (value,), (), ())
         if kind == "member":
