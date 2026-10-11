@@ -140,6 +140,29 @@ For emails the secret part is the local part, so the rule keeps its first charac
   can cause one duplicate send. That duplicate carries the same masked content and is never
   unrecorded.
 
+### v1.2 additions (templates, fan-out, identity)
+
+Details are in `design-v1-2-notifications-and-identity.md` sections 3 and 8.
+
+- Template rendering happens inside `NotificationService.send`, before the DLP gate. The
+  context is the typed, allow-listed `NotificationContext`, built only from masked columns,
+  refs, enums, counts and configured names. The rendered subject and body pass `Redactor`,
+  then the gate. Slack values are escaped (`&`, `<`, `>`), subjects are folded to one line,
+  and email is plain text.
+- Template text is checked with `Redactor` when saved, validated and previewed. A hit gives
+  422 `raw_value_detected`, nothing is stored, and the audit records field names only.
+  Preview uses fixed synthetic constants that the rule detector finds clean.
+- Fan-out runs the DLP gate once per target and channel. `skipped` rows hold the masked
+  message, the ref and an error code, and no delivery task.
+- OIDC: access, ID and refresh tokens, `sub` and raw claims are never stored, logged,
+  indexed, audited or returned. Identities are keyed (`oidc_subject`), and audit records
+  carry member refs or 12-hex key prefixes. Auth failures log static text.
+- Leak matrix v1.2 (`tests/leak/flows_v12.py`, `test_leak_matrix_v12.py`): template save,
+  validate and preview with samples; v2 set fan-out with inline samples (Slack through
+  MockTransport, fake SMTP); role change, last admin, token create and revoke; OIDC sign-in
+  with locally signed tokens (the token strings, including the issued access token, must
+  appear in no sink); the notify test path. The v1 sink list applies unchanged.
+
 ### Re-scan of inbound masked data
 
 Police results, pushed findings (`/api/ingest/v1/findings`), human task comments, issue

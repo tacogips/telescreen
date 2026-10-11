@@ -1,0 +1,567 @@
+{
+  "taskId": "telescreen-v12-20261011-d1",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "7402f515ea06ece4e4deef861155f22674331e47",
+  "evidenceRoot": "tmp/telescreen-v12-20261011-d1",
+  "evidenceRootNotes": "Untracked (gitignored by **/tmp); never staged or committed. Use per-plan and per-attempt subdirectories: tmp/telescreen-v12-20261011-d1/<planId>/attempt-<n>/. Command logs go to /tmp/telescreen-<planId>-*.log and builds to /tmp/telescreen-<planId>-dist or /tmp/telescreen-<planId>-web (conventions section 7).",
+  "runScope": "Telescreen v1.2 (N1 notification templates, N2 workflow notification sets, N3 live delivery verification, R1 roles and permissions, R2 OIDC SSO) per design-docs/specs/design-v1-2-notifications-and-identity.md: 12 plans in 5 waves. Wave 1 {v12-p01-foundation, v12-p02-db, v12-p03-ui-foundation}; wave 2 {v12-p04-notification-templates, v12-p05-workflow-notification-sets, v12-p06-rbac-enforcement, v12-p07-directory-roles, v12-p08-oidc-identity, v12-p09-ui-pages}; wave 3 {v12-p10-api-routers}; wave 4 {v12-p11-wiring-cli}; wave 5 {v12-p12-verification-docs, final whole-repository and web gates with no tolerances}.",
+  "designDocPaths": [
+    "design-docs/specs/design-v1-2-notifications-and-identity.md",
+    "design-docs/specs/architecture.md",
+    "design-docs/specs/command.md",
+    "design-docs/specs/design-api-and-ui.md",
+    "design-docs/specs/design-data-model.md",
+    "design-docs/specs/design-masking.md",
+    "design-docs/specs/design-ui-sentry.md",
+    "design-docs/specs/design-workflow-engine.md",
+    "design-docs/user-qa/README.md",
+    "design-docs/user-qa/qa-oidc-sso.md",
+    "design-docs/user-qa/qa-ui-authentication.md"
+  ],
+  "planIndexPath": "impl-plans/README.md",
+  "conventionsPath": "impl-plans/conventions.md",
+  "serialFinalization": "After v12-p12-verification-docs is integration-accepted: move impl-plans/active/v12-p*.md to impl-plans/completed/ and this manifest to impl-plans/completed/dispatch/; update impl-plans/README.md (v1.2 rows to completed/, phases 13-17 COMPLETED) and the status lines of the v1.2 design documents. Serial and outside fanout.",
+  "reviewContext": {
+    "issueReference": {
+      "title": "Telescreen v1.2: editable notification templates, workflow notification target/channel sets, user roles and permission management, OIDC SSO (Keycloak), live verification of email and Slack delivery",
+      "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-7",
+      "intakeCommunication": "workflowInput (issue-resolution, no GitHub issue number); intake comm-000292",
+      "designAcceptance": "design comm-000293 accepted by design review comm-000294",
+      "planAcceptance": "plan comm-000295, plan review comm-000296, plan revision comm-000297, accepted by step5-impl-plan-review comm-000298 (S5-V12-H01 and S5-V12-L01 verified resolved; no repair requests)"
+    },
+    "userProblem": "Email (SMTP) and Slack delivery adapters exist behind the DLP-gated NotificationSender but were never verified against real services; notification text is hard-coded; workflow notify steps carry one channel and inline text; API authentication is coarse token scopes; OIDC SSO was deferred in v1. The owner asked to verify email via Mailpit and Slack via the tacogips-test workspace, make templates editable, let workflows declare destination plus method sets, add registered-user permission management, and integrate SSO tested against a Keycloak container with registered users.",
+    "requiredOutcomes": [
+      "N1: versioned DB templates per name with one event kind, built-ins system.<event> as version 0 reproducing current text, path-only syntax, per-event allow-listed masked context, unknown variables rejected at save, list/get/create version/activate/validate/preview API with audit, Settings > Notification templates UI; rendering inside NotificationService.send before Redactor and the DLP gate.",
+      "N2: apiVersion telescreen.workflow/v2 named notification sets (recipients x channels x optional template), slack_channel: and email: recipients, notify steps, human task assignment and escalation tiers fan out one DLP-gated notification per target and channel with per-target rows (including skipped); validation rejects unknown sets, empty targets and undeliverable combinations; v1 documents load unchanged; workflow UI shows the sets.",
+      "N3: tests/live (marker live) for Mailpit, Slack and Keycloak skipped offline, and the telescreen notify test CLI through the real NotificationService and delivery handler.",
+      "R1: roles admin, responder, viewer; Permission enum per route action; one enforcement dependency on every router; route-walk test fails on any undeclared route; role assignment via API, UI and CLI, audited, last-admin protected; bound token permission = scope permissions intersected with role permissions plus machine permissions.",
+      "R2: UI Authorization Code + PKCE (hand-written, WebCrypto); backend JWT validation with discovery, JWKS caching and rotation, signature, iss, aud, exp/nbf leeway, rejecting none and HS*; (issuer, sub) keyed identity; verified-email linking or JIT creation (configurable); role and team claim mapping on each sign-in; 403 without a mapped role unless a default role; audited sign-ins; static-token login kept as configurable fallback; Keycloak setup documented.",
+      "Leak matrix extended (tests/leak/flows_v12.py, test_leak_matrix_v12.py) to templates, notification sets, role changes, token create/revoke, OIDC sign-ins and the notify-test path; E2E flows T1, T2, A1, A2.",
+      "mise run ci passes offline; src/web typecheck, vitest, build and the screenshot smoke (zero browser errors, new pages included) pass; README, examples/compose README (dev services), design docs and impl-plans index updated."
+    ],
+    "nonGoals": [
+      "No auditor role (D9); no token management UI (API only); no server-side session or cookies (D17).",
+      "No backend refresh-token or userinfo handling, no jti replay store, no member deactivation API, no team creation from IdP groups.",
+      "No new human task reminder notification (SLA escalation tiers are the reminder mechanism).",
+      "No dependency change: pyjwt[crypto] already present; uv.lock, src/web/package.json and bun.lock unchanged; the only pyproject.toml edit is the live pytest marker (v12-p01).",
+      "No edits to existing Alembic migrations (0001_initial, 0002_v1_1); no per-file-ignore entries; no change to tools/typelint.py."
+    ],
+    "constraints": [
+      "AGENTS.md: English only, no emojis, python-coding-standards; plan files under 400 lines; Python files under 1000 lines (v2 parsing in workflow/dsl/notification_sets.py, bindings in wiring_v12.py, CLI in cli_v12.py).",
+      "Strict typing via tools/typelint.py, ruff ANN/PGH and ty; no type-ignore or ty-ignore; PyJWT used only through typed entry points (D19).",
+      "Raw detected values, access/ID/refresh tokens, sub, raw claims, IdP passwords and secrets are never persisted, logged, indexed, notified or returned; templates and rendered notifications hold only masked text; audit details limited to names, versions, enums and key prefixes.",
+      "Default uv run pytest passes offline; integration tests skip without TELESCREEN_TEST_DATABASE_URL / TELESCREEN_TEST_MEILI_URL; live tests skip without TELESCREEN_TEST_MAILPIT_URL, TELESCREEN_TEST_SMTP_HOST/PORT, TELESCREEN_TEST_KEYCLOAK_URL, TELESCREEN_TEST_SLACK_BOT_TOKEN/CHANNEL. Offline tests use fake SMTP, httpx MockTransport and locally generated RSA keys (tests/support/oidc.py).",
+      "Secrets only as env:/file: references; live Slack credentials stay in ~/.config/telescreen/slack-test.env outside the repository.",
+      "Database changes only via the new idempotent revision 0003_v1_2.",
+      "Wave 2-3 plans keep wiring.py type-checking with defaulted feature-off fields; v12-p11 binds real implementations.",
+      "Conventions 7a: fixed findings only in addressedFeedback; verification lists only final passing commands; offline-skipped integration and live tests and /tmp outputs are not risks.",
+      "A defect outside a plan's writePaths becomes a Reconciliation request in that plan's Progress Log, not an in-place fix."
+    ],
+    "designDecisionsAndRationale": [
+      "D1-D2: templates are names with immutable versions sharing one event kind, one active version per name; built-ins system.<event_kind> are version 0 in code and cannot be deleted, so referenced names always resolve.",
+      "D3-D4: existing path-only {{ path }} syntax; NotificationService.send renders when a request carries an event, call sites pass a typed NotificationContext, so there is one renderer and one DLP gate.",
+      "D5-D6: workflow-referenced templates must be workflow_notify; DSL v2 is explicit and v1 documents load unchanged.",
+      "D7-D8: add slack_channel:<id>, keep slack: and email:; every (target, channel) writes notification rows with set_name, target_index, template_name/version and event_kind; unreachable recipients on fan-out sites become skipped rows.",
+      "D9-D11: roles admin/responder/viewer mirror v1 scopes read/write/admin; ingest.push is machine-only from scopes; bound token = (scope & role) | (scope & machine); OIDC session = role permissions.",
+      "D12: 0003_v1_2 sets each member's role from the highest scope among its non-revoked bound tokens, so no existing token gains or loses access; v12-p06 seeds roles in the four bound-token test fixtures for the same reason.",
+      "D13-D16: realm_access.roles default role claim with telescreen-* map, groups map to teams only; IdP is authoritative for SSO users' roles on each sign-in; link provisioning by default, create optional; (issuer, sub) stored only as a keyed member_identities row.",
+      "D17-D20: no server-side session (tokens in sessionStorage, no CSRF surface); static tokens always accepted and TELESCREEN_UI_TOKEN_LOGIN controls only the login page; pyjwt[crypto] via typed entry points; notify test CLI exercises the production path.",
+      "Wave DAG: vocabulary/ports, DB and UI foundation first; services, enforcement, identity and UI pages in parallel; routers (wave 3) separated from wiring (wave 4) because wiring builds every router; leak matrix, E2E, live tests, docs and final gates last (wave 5)."
+    ],
+    "intentionalTradeoffs": [
+      "v12-p06 owns four bound-token fixture files (tests/evidence/test_evidence.py, tests/api/v11_issues/test_issues_router.py, tests/api/v11_ops/test_api_ops.py, tests/leak/flows_v11.py) and tests/workflow/engine/test_engine_extended.py for role seeding and Principal construction only; git diff must show no assertion or scope change.",
+      "v12-p06 tests/leak regression runs during the wave-2 fanout while v12-p04 and v12-p05 edit exercised code; failures caused by another plan's in-progress files are recorded as such, auth or 403 failures are p06 failures; v12-p11 and v12-p12 rerun the full suite after the joins (low S5-V12-L03).",
+      "v12-p04 tests/e2e tests/leak run and v12-p07 tests/api/common run are informational during fanout and are Progress Log evidence, not manifest verification entries.",
+      "The screenshot smoke is a gate in v12-p03 and v12-p12; a missing browser is a recorded verification gap, never a pass.",
+      "No jti replay store; short-lived IdP access tokens and exp/nbf leeway at most 300 s are accepted."
+    ],
+    "supportedEdgeCases": [
+      "v1 workflow documents and inline notify text keep working; v2-only fields in a v1 document are a validation error.",
+      "Unknown template name, unknown variable, workflow template with a non-workflow_notify event, unknown set, empty targets and undeliverable channel/recipient combinations are rejected with path-only errors.",
+      "Unreachable or unknown recipients on fan-out sites produce skipped rows; a row with no address on its channel becomes failed.",
+      "Bound token with role None still gets ingest.push when scopes carry ingest or admin; unbound tokens keep exact v1 scope behavior.",
+      "Removing or demoting the last admin through API, UI or CLI is rejected (last_admin); IdP-driven demotion is applied and audited; CLI member set-role recovers.",
+      "OIDC: alg none/HS*, jku/x5u/jwk headers, wrong iss/aud/azp/typ, expired or not-yet-valid tokens, JWKS key rotation, IdP unavailable, no mapped role (403 no_role), unverified email, identity conflict, link vs create provisioning.",
+      "Keycloak realm users alice (admin), bob (responder), carol (viewer), dave (no role, 403) map as designed."
+    ],
+    "outOfScopeEdgeCases": [
+      "Live Mailpit, Slack and Keycloak behavior beyond tests/live, which the owner runs after this run; real docker compose up during fanout.",
+      "Live PostgreSQL/Meilisearch behavior beyond marked integration tests skipped offline.",
+      "Slack read-back requiring scopes beyond chat.postMessage (conversations.history only if the token already has the scope).",
+      "Multiple concurrent OIDC issuers and IdP-side session management beyond RP-initiated logout."
+    ],
+    "lowFindingsCarried": [
+      "impl-plans/active/v12-p03-ui-foundation.md:29 (S5-V12-L02): the src/web/node_modules artifact root (p03, p09, p12) has no tracked toolchain audit manifest; pinned by bun.lock and installed with --frozen-lockfile; never shared within a wave.",
+      "impl-plans/active/v12-p06-rbac-enforcement.md:237 (S5-V12-L03): the p06 tests/leak regression runs during the wave-2 fanout; sibling-caused failures are recorded, auth/403 failures fixed; p11 and p12 rerun the full suite."
+    ],
+    "sourcePaths": [
+      "impl-plans/conventions.md",
+      "impl-plans/README.md",
+      "design-docs/specs/design-v1-2-notifications-and-identity.md",
+      "design-docs/specs/architecture.md",
+      "design-docs/specs/command.md",
+      "design-docs/specs/design-api-and-ui.md",
+      "design-docs/specs/design-data-model.md",
+      "design-docs/specs/design-masking.md",
+      "design-docs/specs/design-ui-sentry.md",
+      "design-docs/specs/design-workflow-engine.md",
+      "design-docs/user-qa/qa-oidc-sso.md",
+      "design-docs/user-qa/qa-ui-authentication.md",
+      "examples/compose/dev-services.yml",
+      "examples/compose/keycloak/telescreen-realm.json"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "v12-p01-foundation",
+      "planPath": "impl-plans/active/v12-p01-foundation.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "impl-plans/active/v12-p01-foundation.md",
+        "pyproject.toml",
+        "src/telescreen/core/vocabulary.py",
+        "src/telescreen/core/config.py",
+        "src/telescreen/core/permissions.py",
+        "src/telescreen/core/oidc_settings.py",
+        "src/telescreen/ports/notifications.py",
+        "src/telescreen/ports/issues.py",
+        "src/telescreen/ports/templates.py",
+        "src/telescreen/ports/identity.py",
+        "tests/support/oidc.py",
+        "tests/core/v12",
+        "tests/ports/v12"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "pyproject.toml", "intendedEdit": "Append the pytest marker 'live: needs TELESCREEN_TEST_* live service variables' only; no dependency change, no uv lock."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Deliverables 1-10: vocabulary enums and ErrorCodes, core/permissions.py (Permission, READ/WRITE/ALL/MACHINE/INGEST sets, SCOPE_PERMISSIONS, ROLE_PERMISSIONS, scope_permissions, role_permissions, effective_token_permissions, highest_role, parse_role), core/oidc_settings.py with load_oidc_settings, TelescreenSettings oidc and ui_token_login, NotificationContext and defaulted NotificationRequest/NotificationReceipt fields, IssueSnapshot.masked_excerpt, ports/templates.py, ports/identity.py, live marker, tests/support/oidc.py.",
+        "Scope permission sets reproduce v1 exactly; every new DTO field defaulted; ConfigError never contains configured values; none/HS* algorithms rejected.",
+        "Scoped gates pass, typelint grep empty, full offline pytest exits 0; no dependency or typelint change.",
+        "Completion Criteria all ticked; Progress Log has hashes and command evidence."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/core src/telescreen/ports tests/core/v12 tests/ports/v12 tests/support/oidc.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/core src/telescreen/ports tests/core/v12 tests/ports/v12 tests/support/oidc.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/core src/telescreen/ports tests/core/v12 tests/ports/v12 tests/support/oidc.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/core/v12 tests/ports/v12 2>&1 | tee /tmp/telescreen-v12-p01-foundation-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v12-p01-foundation-typelint.log 2>&1; ! grep -E '^(src/telescreen/(core|ports)/|tests/(core|ports)/v12/|tests/support/oidc\\.py)' /tmp/telescreen-v12-p01-foundation-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-v12-p01-foundation-pytest-all.log 2>&1",
+        "grep -q 'live: needs TELESCREEN_TEST_' pyproject.toml",
+        "test -z \"$(git diff --name-only HEAD -- uv.lock src/web/package.json src/web/bun.lock tools/typelint.py)\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v12-p01-foundation.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v12-p02-db",
+      "planPath": "impl-plans/active/v12-p02-db.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "impl-plans/active/v12-p02-db.md",
+        "src/telescreen/db/models",
+        "src/telescreen/db/migrations/versions/0003_v1_2.py",
+        "tests/db/test_v12_migration.py"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "v1.2 table and columns exactly as in design-data-model.md 'v1.2 additions', every new ORM field defaulted so existing constructors keep working.",
+        "0003_v1_2 is idempotent (inspects the live schema, adds only what is missing) and applies D12 member role backfill; 0001_initial and 0002_v1_1 untouched.",
+        "tests/db passes; scoped gates pass; typelint grep empty.",
+        "Completion Criteria all ticked; Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/db tests/db/test_v12_migration.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/db tests/db/test_v12_migration.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/db tests/db/test_v12_migration.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/db/test_v12_migration.py 2>&1 | tee /tmp/telescreen-v12-p02-db-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/db > /tmp/telescreen-v12-p02-db-pytest-db.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v12-p02-db-typelint.log 2>&1; ! grep -E '^(src/telescreen/db/|tests/db/test_v12_migration\\.py)' /tmp/telescreen-v12-p02-db-typelint.log",
+        "test -z \"$(git diff --name-only HEAD -- src/telescreen/db/migrations/versions/0001_initial.py src/telescreen/db/migrations/versions/0002_v1_1.py)\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v12-p02-db.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v12-p03-ui-foundation",
+      "planPath": "impl-plans/active/v12-p03-ui-foundation.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "impl-plans/active/v12-p03-ui-foundation.md",
+        "src/web/src/api",
+        "src/web/src/auth",
+        "src/web/src/components",
+        "src/web/src/routes.tsx",
+        "src/web/src/App.tsx",
+        "src/web/src/main.tsx",
+        "src/web/src/shell.test.tsx",
+        "src/web/src/pages/login",
+        "src/web/scripts",
+        "src/web/vite.config.ts",
+        "src/web/node_modules",
+        "tmp/ui-screenshots"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["src/web/node_modules", "tmp/ui-screenshots"],
+      "acceptanceCriteria": [
+        "Hand-written OIDC Authorization Code + PKCE (WebCrypto, no new package), session store covering the static token, /login and /auth/callback pages, permission-aware shell, typed clients and mock endpoints for every v1.2 endpoint, routes for the new settings pages, screenshot script with the added pages, vite dev port 5174.",
+        "package.json and bun.lock unchanged; existing exports kept.",
+        "bun install --frozen-lockfile, typecheck, vitest and build (to /tmp) pass; tests/leak/test_ui_fixtures.py passes; screenshot smoke produces 43 images with zero browser errors (or a recorded browser gap, which is not a pass).",
+        "Completion Criteria all ticked; Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; cd src/web && bun install --frozen-lockfile > /tmp/telescreen-v12-p03-ui-foundation-install.log 2>&1",
+        "set -o pipefail; cd src/web && bun run typecheck > /tmp/telescreen-v12-p03-ui-foundation-typecheck.log 2>&1",
+        "set -o pipefail; cd src/web && bun run test > /tmp/telescreen-v12-p03-ui-foundation-test.log 2>&1",
+        "set -o pipefail; cd src/web && bun run build --outDir /tmp/telescreen-v12-p03-ui-foundation-web --emptyOutDir > /tmp/telescreen-v12-p03-ui-foundation-build.log 2>&1",
+        "set -o pipefail; cd src/web && bun run screenshots > /tmp/telescreen-v12-p03-ui-foundation-shots.log 2>&1",
+        "test \"$(ls tmp/ui-screenshots/*.png | wc -l | tr -d ' ')\" -ge 43",
+        "! grep -q 'Browser reported' /tmp/telescreen-v12-p03-ui-foundation-shots.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/leak/test_ui_fixtures.py > /tmp/telescreen-v12-p03-ui-foundation-fixtures.log 2>&1",
+        "test -z \"$(git diff --name-only HEAD -- src/web/package.json src/web/bun.lock)\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v12-p03-ui-foundation.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v12-p04-notification-templates",
+      "planPath": "impl-plans/active/v12-p04-notification-templates.md",
+      "wave": 2,
+      "dependsOn": ["v12-p01-foundation", "v12-p02-db"],
+      "writePaths": [
+        "impl-plans/active/v12-p04-notification-templates.md",
+        "src/telescreen/notifications",
+        "src/telescreen/issues/verification.py",
+        "src/telescreen/issues/digest.py",
+        "src/telescreen/issues/exceptions.py",
+        "src/telescreen/issues/recipient_channel.py",
+        "src/telescreen/issues/service.py",
+        "src/telescreen/collectors/health.py",
+        "src/telescreen/police/health.py",
+        "tests/notifications"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "src/telescreen/issues/service.py", "intendedEdit": "Populate IssueSnapshot.masked_excerpt only; no other behavior change."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Template package (versioned DB templates, built-ins system.<event> as version 0, allow-listed context per event, save-time validation, preview with synthetic context, audit), rendering in NotificationService.send before Redactor and DLP, per-target rows including skipped, no-address rows become failed, Slack result handling, and the seven non-workflow call sites moved to event + NotificationContext with text parity.",
+        "Raw values can never reach a template; template text with detected values is rejected.",
+        "New and existing notification tests pass; tests/issues tests/collectors tests/police regression exits 0; scoped gates pass; typelint grep empty; each file under 1000 lines.",
+        "Completion Criteria all ticked; Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/notifications src/telescreen/issues src/telescreen/collectors/health.py src/telescreen/police/health.py tests/notifications",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/notifications src/telescreen/issues src/telescreen/collectors/health.py src/telescreen/police/health.py tests/notifications",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/notifications src/telescreen/issues src/telescreen/collectors/health.py src/telescreen/police/health.py tests/notifications",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/notifications 2>&1 | tee /tmp/telescreen-v12-p04-notification-templates-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/issues tests/collectors tests/police > /tmp/telescreen-v12-p04-notification-templates-regress.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v12-p04-notification-templates-typelint.log 2>&1; ! grep -E '^(src/telescreen/notifications/|src/telescreen/issues/|src/telescreen/collectors/health\\.py|src/telescreen/police/health\\.py|tests/notifications/)' /tmp/telescreen-v12-p04-notification-templates-typelint.log",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v12-p04-notification-templates.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v12-p05-workflow-notification-sets",
+      "planPath": "impl-plans/active/v12-p05-workflow-notification-sets.md",
+      "wave": 2,
+      "dependsOn": ["v12-p01-foundation", "v12-p02-db"],
+      "writePaths": [
+        "impl-plans/active/v12-p05-workflow-notification-sets.md",
+        "src/telescreen/workflow/dsl",
+        "src/telescreen/workflow/executors/notify.py",
+        "src/telescreen/workflow/executors/human.py",
+        "src/telescreen/workflow/escalation",
+        "src/telescreen/workflow/engine/definitions.py",
+        "src/telescreen/workflow/recipients.py",
+        "src/telescreen/workflow/notify_targets.py",
+        "tests/workflow/v12"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "DSL v2 (apiVersion telescreen.workflow/v2) named notification sets and inline targets with slack_channel: and email: recipients and optional templates; validation of unknown sets, empty targets, undeliverable combinations and non-workflow_notify templates; v1 documents load and run unchanged.",
+        "notify steps, human task assignment (notify_set/notify_targets) and escalation tiers fan out one NotificationRequest per target and channel with set_name/target_index and use event templates for human_task_assigned, owner_review_assigned and sla_escalated.",
+        "tests/workflow and tests/examples pass; scoped gates pass; typelint grep empty; every file under 1000 lines.",
+        "Completion Criteria all ticked; Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/workflow tests/workflow/v12",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/workflow tests/workflow/v12",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/workflow tests/workflow/v12",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/workflow/v12 2>&1 | tee /tmp/telescreen-v12-p05-workflow-notification-sets-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/workflow tests/examples > /tmp/telescreen-v12-p05-workflow-notification-sets-regress.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v12-p05-workflow-notification-sets-typelint.log 2>&1; ! grep -E '^(src/telescreen/workflow/|tests/workflow/v12/)' /tmp/telescreen-v12-p05-workflow-notification-sets-typelint.log",
+        "wc -l src/telescreen/workflow/dsl/*.py > /tmp/telescreen-v12-p05-workflow-notification-sets-wc.log; ! awk '$2 != \"total\" && $1 >= 1000' /tmp/telescreen-v12-p05-workflow-notification-sets-wc.log | grep -q .",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v12-p05-workflow-notification-sets.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v12-p06-rbac-enforcement",
+      "planPath": "impl-plans/active/v12-p06-rbac-enforcement.md",
+      "wave": 2,
+      "dependsOn": ["v12-p01-foundation", "v12-p02-db"],
+      "writePaths": [
+        "impl-plans/active/v12-p06-rbac-enforcement.md",
+        "src/telescreen/api/common",
+        "src/telescreen/api/routers/audit.py",
+        "src/telescreen/api/routers/chat.py",
+        "src/telescreen/api/routers/collectors.py",
+        "src/telescreen/api/routers/directory.py",
+        "src/telescreen/api/routers/escalation.py",
+        "src/telescreen/api/routers/evidence.py",
+        "src/telescreen/api/routers/exceptions.py",
+        "src/telescreen/api/routers/health.py",
+        "src/telescreen/api/routers/human_tasks.py",
+        "src/telescreen/api/routers/ingest.py",
+        "src/telescreen/api/routers/issues.py",
+        "src/telescreen/api/routers/map_jobs.py",
+        "src/telescreen/api/routers/police.py",
+        "src/telescreen/api/routers/policies.py",
+        "src/telescreen/api/routers/runs.py",
+        "src/telescreen/api/routers/search.py",
+        "src/telescreen/api/routers/workflows.py",
+        "tests/api/common",
+        "tests/api/v12_rbac",
+        "tests/workflow/engine/test_engine_extended.py",
+        "tests/evidence/test_evidence.py",
+        "tests/api/v11_issues/test_issues_router.py",
+        "tests/api/v11_ops/test_api_ops.py",
+        "tests/leak/flows_v11.py"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "tests/workflow/engine/test_engine_extended.py", "intendedEdit": "Principal construction lines only."},
+        {"path": "tests/evidence/test_evidence.py", "intendedEdit": "Fixture-only: seed the bound member role matching its v1 scopes (member-1 responder via a new MemberRow); no assertion or token scope change."},
+        {"path": "tests/api/v11_issues/test_issues_router.py", "intendedEdit": "Fixture-only: seed member-api-owner responder and member-lifecycle admin; no assertion or token scope change."},
+        {"path": "tests/api/v11_ops/test_api_ops.py", "intendedEdit": "Fixture-only: seed the bound fixture member viewer; no assertion or token scope change."},
+        {"path": "tests/leak/flows_v11.py", "intendedEdit": "Fixture-only: seed the exception-owner member responder; no assertion or token scope change."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "require_scope removed; one dependency (require_permission or declare_external) on every route of the 17 existing routers per the design 5.1 matrix; Principal carries permissions; OIDC access tokens accepted through the BearerVerifier port with role permissions; bound tokens use effective_token_permissions; in-handler admin checks use manage_any permissions.",
+        "Existing tokens keep exact v1 behavior; D11 role-NULL tests pass; the four bound-token fixtures seed roles only (git diff shows no assertion or scope change).",
+        "Scoped gates pass; tests/api tests/contract tests/evidence tests/assistant, tests/api/v11_issues tests/api/v11_ops and tests/leak regressions exit 0 (sibling-caused leak failures recorded per the plan); typelint grep empty.",
+        "Completion Criteria all ticked; Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/api tests/api tests/workflow/engine/test_engine_extended.py tests/evidence/test_evidence.py tests/leak/flows_v11.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/api tests/api tests/workflow/engine/test_engine_extended.py tests/evidence/test_evidence.py tests/leak/flows_v11.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/api tests/api tests/workflow/engine/test_engine_extended.py tests/evidence/test_evidence.py tests/leak/flows_v11.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/api tests/workflow/engine/test_engine_extended.py tests/evidence/test_evidence.py 2>&1 | tee /tmp/telescreen-v12-p06-rbac-enforcement-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/api tests/contract tests/evidence tests/assistant > /tmp/telescreen-v12-p06-rbac-enforcement-regress.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/api/v11_issues tests/api/v11_ops > /tmp/telescreen-v12-p06-rbac-enforcement-v11api.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/leak > /tmp/telescreen-v12-p06-rbac-enforcement-leak.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v12-p06-rbac-enforcement-typelint.log 2>&1; ! grep -E '^(src/telescreen/api/|tests/api/|tests/workflow/engine/test_engine_extended\\.py|tests/evidence/test_evidence\\.py|tests/leak/flows_v11\\.py)' /tmp/telescreen-v12-p06-rbac-enforcement-typelint.log",
+        "! grep -rn require_scope src",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v12-p06-rbac-enforcement.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v12-p07-directory-roles",
+      "planPath": "impl-plans/active/v12-p07-directory-roles.md",
+      "wave": 2,
+      "dependsOn": ["v12-p01-foundation", "v12-p02-db"],
+      "writePaths": [
+        "impl-plans/active/v12-p07-directory-roles.md",
+        "src/telescreen/directory",
+        "tests/directory/v12"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "RoleService with audited role changes and last-admin protection (row locks on active admins), MemberProvisioner implementation (keyed (issuer, sub) identity via fingerprinter.owner_ref(OwnerIdentity(IdentityKind.OIDC_SUBJECT, issuer + NUL + subject)), verified-email linking or JIT creation, identity_conflict, role and idp-origin team sync), slack_channel: recipient resolution, token listing and member binding.",
+        "The raw issuer/sub pair is never stored, logged or audited.",
+        "tests/directory passes; scoped gates pass; typelint grep empty.",
+        "Completion Criteria all ticked; Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/directory tests/directory",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/directory tests/directory",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/directory tests/directory",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/directory 2>&1 | tee /tmp/telescreen-v12-p07-directory-roles-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v12-p07-directory-roles-typelint.log 2>&1; ! grep -E '^(src/telescreen/directory/|tests/directory/)' /tmp/telescreen-v12-p07-directory-roles-typelint.log",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v12-p07-directory-roles.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v12-p08-oidc-identity",
+      "planPath": "impl-plans/active/v12-p08-oidc-identity.md",
+      "wave": 2,
+      "dependsOn": ["v12-p01-foundation"],
+      "writePaths": [
+        "impl-plans/active/v12-p08-oidc-identity.md",
+        "src/telescreen/identity",
+        "tests/identity"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "New L3 package telescreen.identity: discovery with exact issuer match and same-origin jwks_uri, JWKS cache with rotation and rate-limited refetch, BearerVerifier (configured algorithm allow-list, kty match, jku/x5u/jwk rejected, iss, aud, azp, typ, exp/nbf leeway), claim-to-role and group-to-team mapping, SignInService denying NO_ROLE before provisioning and auditing sign-ins with key_prefix derived as in p07.",
+        "Tokens, headers, payloads, sub and claims never appear in logs, exception details, audit records or repr; PyJWT used only through typed entry points; no per-file-ignore.",
+        "Every negative test passes; scoped gates pass; typelint grep empty.",
+        "Completion Criteria all ticked; Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/identity tests/identity",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/identity tests/identity",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/identity tests/identity",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/identity 2>&1 | tee /tmp/telescreen-v12-p08-oidc-identity-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v12-p08-oidc-identity-typelint.log 2>&1; ! grep -E '^(src/telescreen/identity/|tests/identity/)' /tmp/telescreen-v12-p08-oidc-identity-typelint.log",
+        "! grep -rnE '# *(type|ty): *ignore' src/telescreen/identity tests/identity",
+        "test -z \"$(git diff --name-only HEAD -- tools/typelint.py)\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v12-p08-oidc-identity.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v12-p09-ui-pages",
+      "planPath": "impl-plans/active/v12-p09-ui-pages.md",
+      "wave": 2,
+      "dependsOn": ["v12-p03-ui-foundation"],
+      "writePaths": [
+        "impl-plans/active/v12-p09-ui-pages.md",
+        "src/web/src/pages/settings",
+        "src/web/src/pages/workflows",
+        "src/web/src/pages/runs",
+        "src/web/node_modules"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["src/web/node_modules"],
+      "acceptanceCriteria": [
+        "Settings > General, Settings > Notification templates (list, editor, validate, preview, activate), Settings > Users and roles (role select, last-admin error, Managed by IdP marker, permission matrix), workflow definition Notification sets panel and step set/target references, per-target counts of v2 notify outputs in run detail; editors shown only with *.write permissions from /api/auth/me.",
+        "Titles only through TopBar.Slot; no edits outside the three page directories; no new package.",
+        "bun install --frozen-lockfile, typecheck, vitest and build (to /tmp) exit 0.",
+        "Completion Criteria all ticked; Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; cd src/web && bun install --frozen-lockfile > /tmp/telescreen-v12-p09-ui-pages-install.log 2>&1",
+        "set -o pipefail; cd src/web && bun run typecheck > /tmp/telescreen-v12-p09-ui-pages-typecheck.log 2>&1",
+        "set -o pipefail; cd src/web && bun run test > /tmp/telescreen-v12-p09-ui-pages-test.log 2>&1",
+        "set -o pipefail; cd src/web && bun run build --outDir /tmp/telescreen-v12-p09-ui-pages-web --emptyOutDir > /tmp/telescreen-v12-p09-ui-pages-build.log 2>&1",
+        "test -z \"$(git diff --name-only HEAD -- src/web/package.json src/web/bun.lock)\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v12-p09-ui-pages.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v12-p10-api-routers",
+      "planPath": "impl-plans/active/v12-p10-api-routers.md",
+      "wave": 3,
+      "dependsOn": ["v12-p04-notification-templates", "v12-p06-rbac-enforcement", "v12-p07-directory-roles", "v12-p08-oidc-identity"],
+      "writePaths": [
+        "impl-plans/active/v12-p10-api-routers.md",
+        "src/telescreen/api/routers/notification_templates.py",
+        "src/telescreen/api/routers/users.py",
+        "src/telescreen/api/routers/auth.py",
+        "tests/api/v12_routers"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Three routers with the permissions of design 5.1: notification templates (list/get/create version/activate/validate/preview), users (members and roles, /api/roles, /api/tokens with member binding and one-time token value), auth (/api/auth/config public metadata, /api/auth/session sign-in, /api/auth/me); every route uses exactly one require_permission or declare_external.",
+        "Responses never contain tokens (except the one-time POST /api/tokens value), template text in error bodies, sub or claims; service error codes passed through unchanged.",
+        "Tests pass; scoped gates pass; typelint grep empty.",
+        "Completion Criteria all ticked; Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/api/routers/notification_templates.py src/telescreen/api/routers/users.py src/telescreen/api/routers/auth.py tests/api/v12_routers",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/api/routers/notification_templates.py src/telescreen/api/routers/users.py src/telescreen/api/routers/auth.py tests/api/v12_routers",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/api/routers/notification_templates.py src/telescreen/api/routers/users.py src/telescreen/api/routers/auth.py tests/api/v12_routers",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/api/v12_routers 2>&1 | tee /tmp/telescreen-v12-p10-api-routers-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v12-p10-api-routers-typelint.log 2>&1; ! grep -E '^(src/telescreen/api/routers/(notification_templates|users|auth)\\.py|tests/api/v12_routers/)' /tmp/telescreen-v12-p10-api-routers-typelint.log",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v12-p10-api-routers.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v12-p11-wiring-cli",
+      "planPath": "impl-plans/active/v12-p11-wiring-cli.md",
+      "wave": 4,
+      "dependsOn": ["v12-p04-notification-templates", "v12-p05-workflow-notification-sets", "v12-p06-rbac-enforcement", "v12-p07-directory-roles", "v12-p08-oidc-identity", "v12-p10-api-routers"],
+      "writePaths": [
+        "impl-plans/active/v12-p11-wiring-cli.md",
+        "src/telescreen/wiring.py",
+        "src/telescreen/wiring_v12.py",
+        "src/telescreen/cli.py",
+        "src/telescreen/cli_v12.py",
+        "tests/e2e/test_api_routes.py",
+        "tests/e2e/test_wiring_v12.py",
+        "tests/e2e/test_route_permissions.py",
+        "tests/e2e/test_cli_v12.py"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Container binds the DB template resolver and catalog, OIDC verifier, sign-in service and provisioner, role service, the three new routers and ApiContext.verifier/identities; CLI telescreen notify test (through the real NotificationService and delivery handler) and member set-role.",
+        "Full-app route-walk test fails if any route lacks a permission declaration; scope-compatibility test proves v1 token behavior.",
+        "wiring.py under 1000 lines; full offline pytest, typelint and ty exit 0.",
+        "Completion Criteria all ticked; Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/wiring.py src/telescreen/wiring_v12.py src/telescreen/cli.py src/telescreen/cli_v12.py tests/e2e",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/wiring.py src/telescreen/wiring_v12.py src/telescreen/cli.py src/telescreen/cli_v12.py tests/e2e",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/wiring.py src/telescreen/wiring_v12.py src/telescreen/cli.py src/telescreen/cli_v12.py tests/e2e",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/e2e 2>&1 | tee /tmp/telescreen-v12-p11-wiring-cli-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-v12-p11-wiring-cli-pytest-all.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v12-p11-wiring-cli-typelint-all.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check > /tmp/telescreen-v12-p11-wiring-cli-ty-all.log 2>&1",
+        "test \"$(wc -l < src/telescreen/wiring.py)\" -lt 1000",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v12-p11-wiring-cli.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v12-p12-verification-docs",
+      "planPath": "impl-plans/active/v12-p12-verification-docs.md",
+      "wave": 5,
+      "dependsOn": ["v12-p11-wiring-cli", "v12-p09-ui-pages", "v12-p03-ui-foundation"],
+      "writePaths": [
+        "impl-plans/active/v12-p12-verification-docs.md",
+        "tests/leak/flows_v12.py",
+        "tests/leak/test_leak_matrix_v12.py",
+        "tests/leak/harness.py",
+        "tests/e2e/test_flow_v12_notifications.py",
+        "tests/e2e/test_flow_v12_identity.py",
+        "tests/live",
+        "examples/workflows",
+        "tests/examples",
+        "examples/compose/README.md",
+        "README.md",
+        "src/web/node_modules",
+        "tmp/ui-screenshots"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "tests/leak/harness.py", "intendedEdit": "Only if an OIDC or SMTP seam is needed; keep v1/v1.1 behavior."},
+        {"path": "README.md", "intendedEdit": "Serial final owner: v1.2 features, notify test CLI and SSO usage."}
+      ],
+      "artifactRoots": ["src/web/node_modules", "tmp/ui-screenshots"],
+      "acceptanceCriteria": [
+        "Leak matrix flows 1-5 of design section 8 (templates, notification sets, role changes and tokens, OIDC sign-ins including no_role and invalid_token, notify-test path) over the real build_container; E2E flows T1, T2, A1, A2.",
+        "tests/live (marker live) for Mailpit SMTP + HTTP API, Slack chat.postMessage (ok=true; history read-back only if scoped) and Keycloak sign-in with role mapping for alice/bob/carol/dave, skipped offline; a v2 example workflow with tests/examples coverage; examples/compose/README.md dev-services and Keycloak setup; README v1.2 features.",
+        "Full ruff format/check, typelint, ty, offline pytest (live tests skipped, 4 integration skips), uv build, web install/typecheck/test/build and screenshot smoke (43 images, zero browser errors) all exit 0; no src/ file changed by this plan.",
+        "Completion Criteria all ticked; Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache . > /tmp/telescreen-v12-p12-verification-docs-format.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache . > /tmp/telescreen-v12-p12-verification-docs-ruff.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v12-p12-verification-docs-typelint.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check > /tmp/telescreen-v12-p12-verification-docs-ty.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-v12-p12-verification-docs-pytest.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv build --out-dir /tmp/telescreen-v12-p12-verification-docs-dist > /tmp/telescreen-v12-p12-verification-docs-build.log 2>&1",
+        "set -o pipefail; cd src/web && bun install --frozen-lockfile > /tmp/telescreen-v12-p12-verification-docs-web-install.log 2>&1",
+        "set -o pipefail; cd src/web && bun run typecheck > /tmp/telescreen-v12-p12-verification-docs-web-typecheck.log 2>&1",
+        "set -o pipefail; cd src/web && bun run test > /tmp/telescreen-v12-p12-verification-docs-web-test.log 2>&1",
+        "set -o pipefail; cd src/web && bun run build --outDir /tmp/telescreen-v12-p12-verification-docs-web --emptyOutDir > /tmp/telescreen-v12-p12-verification-docs-web-build.log 2>&1",
+        "set -o pipefail; cd src/web && bun run screenshots > /tmp/telescreen-v12-p12-verification-docs-shots.log 2>&1",
+        "test \"$(ls tmp/ui-screenshots/*.png | wc -l | tr -d ' ')\" -ge 43",
+        "! grep -q 'Browser reported' /tmp/telescreen-v12-p12-verification-docs-shots.log",
+        "test -z \"$(git diff --name-only HEAD -- uv.lock src/web/package.json src/web/bun.lock)\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v12-p12-verification-docs.md)\" -eq 0"
+      ]
+    }
+  ]
+}

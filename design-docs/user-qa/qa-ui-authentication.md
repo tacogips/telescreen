@@ -36,3 +36,8 @@ page. Option B can be added later without changing the scope model.
 ## Decision
 
 Option A accepted: bearer API tokens for v1; OIDC SSO is deferred to a later version.
+
+v1.2 (2026-10-11): the owner requested Option B. It is specified in
+`design-docs/specs/design-v1-2-notifications-and-identity.md` and decided in
+`qa-oidc-sso.md`. Option A stays: API tokens still work, and token login remains a
+configurable fallback in the UI.

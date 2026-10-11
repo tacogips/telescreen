@@ -25,7 +25,9 @@ are secret references (`env:NAME` or `file:/path`).
 | `telescreen collector run NAME [--watch]` | Enqueue an immediate scan of a collector config; `--watch` (gdrive kinds) registers the Drive push channel |
 | `telescreen collector sweep NAME` | Start a concurrent map-reduce sweep of a collector config's whole estate and print the map job id (exit 1 with `conflict` if a sweep of that config is still active) |
 | `telescreen police list` | List registered police with mode, labels and heartbeat age |
-| `telescreen token create --label TEXT --scopes read,write` | Create an API token and print it once |
+| `telescreen token create --label TEXT --scopes read,write [--member HANDLE]` | Create an API token and print it once. v1.2 adds `--member`, which binds the token to a member, so its permissions are the scopes intersected with the member's role |
+| `telescreen member set-role HANDLE admin\|responder\|viewer\|none` | v1.2. Set a member's role (audited with source `cli`). Demoting the last active admin fails with `last_admin` (exit 1). This is the break-glass path |
+| `telescreen notify test --channel email\|slack --to REF [--template NAME]` | v1.2. Queue one notification through the real DLP-gated sender with the synthetic preview context and deliver it inline. Prints one JSON line per row (`notification_id`, `channel`, `status`, `dlp_verdict`, `error_code`). Exit 0 when all rows are `sent`, 1 otherwise, 2 for an unknown template, 3 for a configuration error |
 | `telescreen search reindex` | Rebuild all search indexes through the IndexGuard |
 | `telescreen mcp` | Run the Assistant MCP server over stdio |
 
@@ -76,6 +78,14 @@ Bare `telescreen` prints help and exits 2.
 | `TELESCREEN_WEB_DIST` | no | unset (API only) | Built UI directory (`vite build` output, must contain `index.html`, else exit 3) served at `/` with SPA fallback for non-`/api/` paths; see `design-ui-sentry.md` section 8.6 |
 | `TELESCREEN_LOG_LEVEL` | no | `INFO` | Log level |
 | `TELESCREEN_TEST_DATABASE_URL` / `TELESCREEN_TEST_MEILI_URL` | tests only | unset | Enable `integration` tests |
+| `TELESCREEN_OIDC_ISSUER` | no (v1.2) | unset (OIDC off) | Issuer URL. Enables OIDC access-token validation and SSO in the UI |
+| `TELESCREEN_OIDC_CLIENT_ID` / `TELESCREEN_OIDC_AUDIENCE` / `TELESCREEN_OIDC_SCOPES` | no (v1.2) | `telescreen-ui` / client id / `openid profile email` | Public PKCE client, required `aud` member, scopes the UI requests |
+| `TELESCREEN_OIDC_ALGORITHMS` / `TELESCREEN_OIDC_LEEWAY_SECONDS` / `TELESCREEN_OIDC_JWKS_CACHE_SECONDS` | no (v1.2) | `RS256` / 60 / 300 | Allowed asymmetric algorithms (`none` and `HS*` are a configuration error); clock leeway (0-300); JWKS cache lifetime |
+| `TELESCREEN_OIDC_ROLE_CLAIM` / `TELESCREEN_OIDC_ROLE_MAP` / `TELESCREEN_OIDC_DEFAULT_ROLE` | no (v1.2) | `realm_access.roles` / `telescreen-admin=admin,telescreen-responder=responder,telescreen-viewer=viewer` / unset | Role claim path, claim-value-to-role map (highest wins), role for subjects with no mapped role (unset: 403) |
+| `TELESCREEN_OIDC_GROUP_CLAIM` / `TELESCREEN_OIDC_TEAM_MAP` | no (v1.2) | `groups` / empty | Group claim path and `<group>=<team slug>` map; empty disables team sync |
+| `TELESCREEN_OIDC_PROVISIONING` | no (v1.2) | `link` | `link` (link by verified email to an existing member) or `create` (JIT member creation) |
+| `TELESCREEN_UI_TOKEN_LOGIN` | no (v1.2) | `true` | Offer static API-token login on the UI login page |
+| `TELESCREEN_TEST_MAILPIT_URL` + `TELESCREEN_TEST_SMTP_HOST` / `_PORT`; `TELESCREEN_TEST_KEYCLOAK_URL`; `TELESCREEN_TEST_SLACK_BOT_TOKEN` + `TELESCREEN_TEST_SLACK_CHANNEL` | tests only (v1.2) | unset | Enable the matching `live` tests in `tests/live` |
 
 ### Exit Codes
 

@@ -26,6 +26,23 @@ contain only masked data. The UI consumes the same API.
 - Validation errors list only `loc` and `type` (see Masking design).
 - Pagination: `?limit=<1-200>&cursor=<opaque>`; responses `{items, next_cursor}`.
 
+v1.2 replaces `require_scope` with `require_permission(ctx, Permission)`
+(`design-v1-2-notifications-and-identity.md` section 5):
+
+- Every route declares exactly one permission, or one `declare_external(kind)` for health,
+  auth config, webhooks, the police contract and OIDC sign-in. A route-walk test enforces
+  this.
+- The `Bearer` value is a static API token (hash lookup, as in v1) or, when
+  `TELESCREEN_OIDC_ISSUER` is set, an OIDC access token (a JWT validated per section 6.2).
+- `Principal(kind, token_id, member_id, role, permissions)`.
+- Token permissions: an unbound token gets its scope permissions. A member-bound token gets
+  its scope permissions intersected with the member's role permissions, plus the machine
+  permission `ingest.push` from scopes. An OIDC principal gets the role permissions of its
+  linked member.
+- New error codes: `invalid_token`, `idp_unavailable`, `no_role`, `not_provisioned`,
+  `identity_conflict`, `last_admin`, `unknown_template`, `unknown_variable`,
+  `template_event_mismatch`, `recipient_unreachable`.
+
 ### Free-form JSON on the wire
 
 `JsonValue` (`telescreen.core.json`) is an internal model. Its dataclass shape (kind, items,
@@ -89,6 +106,28 @@ return `{items, next_cursor}`. Free-form policy sources are plain strings
 Search: the `issues` index adds `exposure_visibility` and `risk_score`. Filterable gains
 `exposure_visibility`; sortable gains `risk_score`. `ensure_indexes()` applies the new
 settings, and `telescreen search reindex` refreshes documents after the migration.
+
+### v1.2 endpoints
+
+Behavior is in `design-v1-2-notifications-and-identity.md`. Permissions are those of its
+section 5.1. Template text fields are plain strings. Validation errors list `{field, code}`
+and never echo text.
+
+| Area | Endpoint | Permission |
+|------|----------|-----------|
+| Auth | `GET /api/auth/config` -> `{oidc: {issuer, client_id, authorization_endpoint, token_endpoint, end_session_endpoint, scopes} or null, token_login}` | external `public` |
+| | `POST /api/auth/session` (Bearer OIDC access token) -> `{member: {handle, display_name}, role, permissions}`; 403 `no_role` / `not_provisioned` / `forbidden`, 409 `identity_conflict`, 401 `invalid_token`, 503 `idp_unavailable` | external `oidc_sign_in` |
+| | `GET /api/auth/me` -> `{kind: token or oidc, member: {handle, display_name} or null, role, permissions}` | `auth.self` |
+| Templates | `GET /api/notification-templates` -> items `{name, event_kind, builtin, description, active_version, latest_version, updated_at}` (built-ins merged with DB names) | `templates.read` |
+| | `GET /api/notification-templates/{name}` -> `{name, event_kind, builtin, active_version, versions: [{version, active, created_by, created_at}], variables: [paths allowed for the event]}`; `GET /api/notification-templates/{name}/versions/{v}` -> text fields (v 0 is the built-in) | `templates.read` |
+| | `POST /api/notification-templates/validate {event_kind, subject, body, email_subject?, email_body?, slack_body?}` -> `{valid, errors}`; `POST /api/notification-templates/preview` (same body, or `{name, version}`) -> `{email: {subject, body, dlp_verdict}, slack: {subject, body, dlp_verdict}}` using the synthetic context | `templates.read` |
+| | `POST /api/notification-templates {name, event_kind, description?, subject, body, email_subject?, email_body?, slack_body?}` -> `{name, version}` (new inactive version); `POST /api/notification-templates/{name}/activate {version}` (0 restores a built-in) | `templates.write` |
+| Users and roles | `GET /api/users` -> items `{handle, display_name, email, role, idp_managed, active, last_sign_in_at, teams}`; `GET /api/roles` -> `{roles: [{role, permissions}], scopes: [{scope, permissions}]}` | `users.read` |
+| | `PUT /api/users/{handle}/role {role: admin or responder or viewer or null}` -> user; 409 `last_admin` | `users.write` |
+| Tokens | `GET /api/tokens` -> items `{id, label, scopes, member_handle, created_at, revoked_at}` | `tokens.read` |
+| | `POST /api/tokens {label, scopes, member_handle?}` -> `{id, token}` (shown once); `POST /api/tokens/{id}/revoke` | `tokens.write` |
+| Workflows (changed) | Upload accepts `telescreen.workflow/v2` and applies the template and set checks of section 4.2; `GET /api/workflows/schema` serves a schema that accepts v1 and v2 | unchanged |
+| Runs (changed) | v2 `notify` step outputs carry per-target counts (section 4.3) | unchanged |
 
 ### Evidence
 
@@ -172,7 +211,10 @@ Stack: SolidJS, TypeScript (strict), Vite, `@solidjs/router`, vitest, jsdom,
   `design-ui-sentry.md` section 9, against the "v1.1 endpoints" above.
 - API client: `src/api/client.ts` (fetch wrapper with bearer token, error decoding into the
   error model) and `src/api/types.ts` (hand-written types mirroring the API dataclasses).
-  The token is entered on the Settings page and kept in `sessionStorage`.
+  The token is entered on the Settings page and kept in `sessionStorage`. From v1.2 it is
+  entered on `/login`, next to "Sign in with SSO" (OIDC Authorization Code + PKCE,
+  `src/web/src/auth/`). The OIDC tokens are kept in `sessionStorage`, refreshed before
+  expiry, and cleared on logout (`design-ui-sentry.md` section 10).
 - Pages:
   - Issues list: filters (status, source, rule class, severity, assignee, free text via
     search), columns short id, title, status badge, first seen, last seen, events, 14-day

@@ -179,7 +179,8 @@ tiers:
   and the run's issue (`EvidenceQuery.accepted_count(issue_id, step_run_id)`; 409
   `evidence_required` otherwise). Comment is redacted before storage.
 - Recipient resolution: `member:` -> member email/slack user, `team:` -> team mailing list
-  email, team Slack channel, and members, `email:` -> address, `slack:` -> channel.
+  email, team Slack channel, and members, `email:` -> address, `slack:` -> channel
+  (v1.2: `slack_channel:` -> channel or DM id, `slack:` kept as an alias).
 
 ### Node executors with external effects
 
@@ -191,6 +192,40 @@ tiers:
 | `evidence_upload` | Waiting human task of kind `evidence`; resumes on `human_completed` |
 | `map` | Creates a `map_jobs` row and its initial partitions, then waits; the map-reduce machinery (`design-map-reduce-sweeps.md`) dispatches shards concurrently and resumes the step with `map_finished` carrying the count-only sweep result |
 | `police_verify` | Dispatches `PoliceTaskRequest` through `PoliceGateway` with deadline `now + timeout` and enqueues `police_timeout`; resumes on `police_result` (outcome `passed` or `failed`) or timeout (`error`) |
+
+### Workflow DSL v2 (v1.2)
+
+Full rules are in `design-v1-2-notifications-and-identity.md` section 4. Summary:
+
+- `apiVersion: telescreen.workflow/v2`. v1 documents load and run unchanged; v2-only fields
+  in a v1 document fail with `requires_api_version_v2`. `compiled_json` records the source
+  `apiVersion`, so stored v1 compiled documents reload unchanged. The published schema
+  accepts both versions.
+- Top-level `notification_sets: [{name, targets: [{recipients, channels, template?}]}]`.
+- `notify`: exactly one of `to` (v1 form with `channel`), `notification_set` or `targets`;
+  text from `template`, inline `subject`/`body`, or the built-in `system.workflow_notify`. A
+  target `template` overrides the step's text.
+- `human_task` / `evidence_upload`: optional `notify_set` or `notify_targets`, notified in
+  addition to the assignee when the task opens (default template
+  `system.human_task_assigned`).
+- Escalation tiers: optional `notification_set` (resolved against the run's workflow) and
+  `targets`. A tier needs at least one of `notify`, `targets`, `notification_set` (default
+  template `system.sla_escalated`).
+- Recipient kinds: `member:`, `team:`, `email:`, `slack_channel:` (new) and `slack:`
+  (alias). `email:` works only with the `email` channel, and `slack_channel:`/`slack:` only
+  with `slack`.
+- The executors pass a typed `NotificationContext` and template name to
+  `NotificationSender`; rendering and DLP happen there once per target and channel. Unknown
+  or unreachable recipients become `skipped` rows and never fail a v2 step. The v2 notify
+  output is `{queued, notification_ids, targets: [{index, channel, queued, blocked,
+  skipped}]}`.
+- Upload (API) checks: referenced templates exist, are active and have event kind
+  `workflow_notify`, and the sets named by the escalation policies of human-task steps are
+  declared.
+
+The v1 `human_task`, `sla_escalated` and `notify` texts become the built-in templates
+`system.human_task_assigned`, `system.sla_escalated` and (for v2 steps without text)
+`system.workflow_notify`. The built-ins reproduce the v1.1 text exactly.
 
 ### Triggers
 

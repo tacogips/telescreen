@@ -508,6 +508,86 @@ is omitted, not emulated.
 `src/web/package.json` and `bun.lock` need no change. If a dependency turns out to be
 needed, it is added by v11-ui-foundation only.
 
+### 10. v1.2 additions (binding for the v1.2 run)
+
+This section extends sections 8 and 9 for `design-v1-2-notifications-and-identity.md`
+against the "v1.2 endpoints" of `design-api-and-ui.md`. The rule of section 8 still
+applies: data the API does not return is omitted, not emulated.
+
+#### 10.1 Authentication (`src/web/src/auth/`, `pages/login/`)
+
+- `pkce.ts`: `code_verifier` of 64 characters from `crypto.getRandomValues`, an S256
+  challenge via `crypto.subtle.digest`, and 32-byte base64url `state` and `nonce`.
+- `session.ts`: `sessionStorage` key `telescreen.session`, holding `{kind: "token" |
+  "oidc", access_token, refresh_token?, id_token?, expires_at?}`. The v1 token key is
+  migrated once on load. The pending login (`state`, `nonce`, verifier, `returnTo`) is
+  stored under `telescreen.oidc.pending` and removed by the callback.
+- `oidc.ts`: begin (redirect to `authorization_endpoint` from `/api/auth/config`), callback
+  (state check, code exchange at `token_endpoint`, nonce check on the decoded ID token
+  payload, then `POST /api/auth/session`), refresh (refresh-token grant when within 30 s of
+  `expires_at`; one retry on 401; on failure, clear and go to `/login`), and logout (clear,
+  then `end_session_endpoint` with `id_token_hint`, `client_id` and
+  `post_logout_redirect_uri=<origin>/login` when advertised).
+- `/login`: a centered card with "Sign in with SSO" (a primary `Button`, shown when `oidc`
+  is non-null) and "Use an API token" (a token field, shown when `token_login`). It shows
+  error banners for `no_role` ("Your account has no Telescreen role. Ask an administrator."),
+  `not_provisioned`, `identity_conflict` and `idp_unavailable`. `/auth/callback` shows a
+  spinner, then navigates to the stored `returnTo` (relative paths only).
+- The API client sends the session's bearer value. A 401 clears the session and redirects
+  to `/login?returnTo=<path>`. `GET /api/auth/me` fills a `useAuth()` store (role,
+  permissions, member). The TopBar user menu shows the member handle and role, and "Sign
+  out".
+- `vite.config.ts` sets `server.port` to 5174 with `strictPort`, matching the dev realm
+  redirect URIs.
+
+#### 10.2 Shell and routes
+
+- `AREAS` is unchanged. The `settings` area gains child routes: `/settings` (General: API
+  base info and sign-out), `/settings/templates`, `/settings/templates/:name`, and
+  `/settings/users`. The Settings secondary panel lists General, Notification templates,
+  and Users and roles.
+- `/login` and `/auth/callback` render outside the shell.
+- Navigation and actions are permission-aware. Users and roles is hidden without
+  `users.read`. Editor actions are hidden without the matching `*.write` permission.
+
+#### 10.3 Pages
+
+| Page | Behavior (API source) |
+|------|-----------------------|
+| Notification templates list | Table: name, event kind, `Tag` "Built-in" or "Custom", active version, latest version, updated. "New template" (`templates.write`) |
+| Template detail | Version list with Activate (version 0 is labeled "Built-in default"). The editor has subject, body and optional email subject/body and Slack body fields in `JsonTextArea`-style monospace text areas, plus an "Allowed variables" side list from `variables`. "Validate" shows the `{field, code}` errors. "Preview" shows the Email and Slack tabs with DLP verdict tags. "Save as new version" leaves the version inactive until activated |
+| Users and roles | Users table: handle, display name, role select (admin, responder, viewer, none; disabled without `users.write`), "Managed by IdP" `Tag` with a tooltip that the next sign-in resets the role, teams, last sign-in. A 409 `last_admin` shows an inline error. Below it, a read-only permission matrix from `GET /api/roles` (rows: permissions grouped by route group; columns: roles and scopes) |
+| Workflow detail | A "Notification sets" fold section: one card per set, with target rows (recipient chips, channel tags, template name). Notify and human-task nodes in the graph preview show their set name or "inline targets" |
+| Run detail | A v2 notify step output renders the per-target counts as a small table (target index, channel, queued, blocked, skipped) |
+
+#### 10.4 Mock API and screenshots
+
+- The mock router serves every v1.2 endpoint: auth config (an OIDC config with a fixture
+  issuer `https://idp.example.test/realms/telescreen`, and `token_login: true`), session and
+  me (a mock admin member), templates (built-ins for every event kind plus one custom
+  `workflow_notify` template with two versions), validate, preview (canned masked output),
+  create and activate, users (four members, one per role and one without a role, one marked
+  IdP-managed), roles, and tokens.
+- The first workflow fixture is a v2 workflow with two notification sets, so the
+  screenshot of "one workflow" shows the sets panel.
+- The fixture value rules of 8.3 and 9.4 still apply. No fixture contains a JWT, token or
+  secret-shaped value. The mock never performs the OIDC redirect.
+- Vitest covers the PKCE helpers (known verifier and challenge vector), state and nonce
+  mismatch rejection, the refresh path with a fake `fetch`, the `returnTo` sanitizer, and
+  the login page in each config combination.
+- The screenshot smoke adds `/login`, `/settings/templates`, one template detail and
+  `/settings/users`, in light and dark (43 images). It must finish with zero page or
+  console errors.
+
+#### 10.5 Plan boundaries (v1.2 run)
+
+| Plan | Owns | Wave |
+|------|------|------|
+| v12-p03-ui-foundation | `src/web/src/api/**`, `src/web/src/auth/**`, `src/web/src/components/**`, `src/web/src/{routes,App,main}.tsx`, `src/web/src/shell.test.tsx`, `src/web/src/pages/login/**`, `src/web/scripts/**`, `src/web/vite.config.ts` | 1 |
+| v12-p09-ui-pages | `src/web/src/pages/{settings,workflows,runs}/**` | 2 |
+
+`src/web/package.json` and `bun.lock` do not change; WebCrypto replaces any OIDC library.
+
 ## Sources
 
 | Topic | Source |

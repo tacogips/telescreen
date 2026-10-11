@@ -179,6 +179,42 @@ Audited actions added: `policy.created`, `policy.activated`, `policy.disabled`,
 `exception.expired`, `identity.added`, `identity.removed`, `team.lead_changed`,
 `health.alert_opened`.
 
+### v1.2 additions (revision `0003_v1_2`)
+
+Behavior is in `design-v1-2-notifications-and-identity.md`. One new revision, `0003_v1_2`
+(`down_revision = "0002_v1_1"`), adds everything below. `0001_initial` and `0002_v1_1`
+are never edited. Because `0001_initial` builds tables from the current ORM metadata,
+`0003_v1_2` is idempotent like `0002_v1_1`: it inspects the live schema, creates only the
+missing tables, columns and indexes, and then runs the role backfill. Downgrade drops the
+v1.2 additions that exist. Enum-like columns stay `String(32)` or shorter.
+
+New table (owner: notifications):
+
+| Table | Columns | Notes |
+|-------|---------|-------|
+| `notification_templates` | id, name String(64), version Integer, event_kind String(32), description String(200) nullable, subject Text, body Text, email_subject Text nullable, email_body Text nullable, slack_body Text nullable, active Boolean, created_by String(80), created_at, UNIQUE(name, version), INDEX(name, active) | Built-ins (`system.<event>`, version 0) live in code, not rows. All rows of a name share `event_kind`. At most one active row per name (checked in the service under a row lock on the name's rows). Text is admin-entered and rejected when `Redactor` finds a hit |
+
+New columns:
+
+| Table | Columns | Backfill / notes |
+|-------|---------|------------------|
+| `notifications` | `event_kind` String(32) nullable, `template_name` String(64) nullable, `template_version` Integer nullable, `set_name` String(64) nullable, `target_index` Integer nullable, `error_code` String(32) nullable | Null for v1/v1.1 rows. `status` gains `skipped` (error code `recipient_unknown` or `recipient_unreachable`); `failed` rows now also record `error_code` |
+| `members` | `role` String(16) nullable, `last_sign_in_at` nullable | Backfill: the highest scope among the member's non-revoked bound `api_tokens` (`admin` -> `admin`, `write` -> `responder`, `read` -> `viewer`), else null. INDEX(`role`, `active`) |
+| `team_memberships` | `origin` String(16) not null server default `manual` | `idp` rows are added and removed only by OIDC team sync |
+
+`member_identities` needs no DDL. New kind `oidc_subject` with origin `oidc`, where
+`identity_key = HMAC(identity key v1, "identity\0oidc_subject\0" + issuer + "\0" + sub)`.
+The UNIQUE(kind, identity_key) constraint makes one `(issuer, sub)` map to one member, and
+the service allows at most one `oidc_subject` per member per issuer.
+
+Recipient references gain `slack_channel:<channel id>`; `slack:` stays as an alias.
+
+Audited actions added: `template.created`, `template.activated`, `template.rejected`,
+`notification.skipped`, `notification.set_missing`, `role.changed`, `member.provisioned`,
+`identity.linked`, `team_membership.synced`, `auth.sign_in`, `auth.sign_in_denied`.
+`token.created` and `token.revoked` now carry the calling principal's actor ref. No audit
+detail holds a token, `sub`, claim value or template text.
+
 ## References
 
 See `design-docs/references/README.md`.

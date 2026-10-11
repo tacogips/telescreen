@@ -13,7 +13,11 @@ workflows through its workflow engine, dispatches verification work to extensibl
 workers, and exposes everything through a REST API, an MCP server and a SolidJS UI. Raw sensitive values never leave the scan coroutine that observed them.
 
 Status: v1 design, implemented. It is the baseline for the v1 and v1.1 plans, which are
-archived under `impl-plans/completed/`.
+archived under `impl-plans/completed/`. v1.2 (notification templates, workflow
+notification sets, roles and permissions, OIDC SSO, live delivery verification) is
+designed in `design-v1-2-notifications-and-identity.md`. That document's v1.2 notes below
+and in the supporting specs are additions; they replace only decision 6 (Authentication)
+of section 5.
 
 ---
 
@@ -41,6 +45,9 @@ to read. Names are used consistently in Python packages, API paths, UI labels an
 | Evidence upload | Evidence | `telescreen.evidence` | `/api/evidence` | Evidence |
 | Issue tracking | Issues | `telescreen.issues` | `/api/issues` | Issues |
 | Push ingestion | Ingest | `telescreen.issues.ingest` | `/api/ingest/v1` | - |
+| Notification templates (v1.2) | Notification templates | `telescreen.notifications.templates` | `/api/notification-templates` | Settings > Notification templates |
+| Users, roles, tokens (v1.2) | Users and roles | `telescreen.directory`, `telescreen.core.permissions` | `/api/users`, `/api/roles`, `/api/tokens` | Settings > Users and roles |
+| OIDC sign-in (v1.2) | Identity | `telescreen.identity` | `/api/auth` | Login |
 
 ### 2. Requirement Traceability
 
@@ -64,6 +71,16 @@ to read. Names are used consistently in Python packages, API paths, UI labels an
 | 16 | Owner decisions: text and image evidence, Claude (default) or Codex managed LLM, bearer tokens for v1 | Evidence scan-and-reject with a fail-closed image scanner; `TELESCREEN_MANAGED_LLM_PROVIDER`; `api_tokens` | `design-api-and-ui.md`, `design-detectors.md`, `design-docs/user-qa/qa-*.md` (all resolved) |
 | 17 | Reviewed draft is the baseline | Commit 2036af9 re-reviewed on 2026-10-08. Fixes were limited to stale names, JSON wire encoding, cross-package endpoint ownership, ports for issue history and the evidence gate, the SDK ASGI boundary, and the polling-only queue rationale. Second re-review of cfa6529 (2026-10-08) fixed only map-reduce integration gaps: sweep ports between collectors-core, workflow-mapreduce and police-bureau; a serialized dispatcher for the concurrency cap; crash-safe shard re-execution; watermark-based removal reconciliation (`issues.last_checked_at`); missing CLI, env, API and task-kind entries; and v1 `map` step scope | all files |
 | 18 | Whole-estate inspection (for example all of Google Drive, also by Police) runs concurrently as map-reduce, not sequentially; Airflow considered | Durable map-reduce sweeps in the self-built engine: streaming partition, `map_items` dispatched concurrently with a global `max_concurrency`, quota backpressure, reduce with removal reconciliation; `map` DSL step; Police `partition`/`scan_shard` task types; built-in sweeps for Drive/Docs/Sheets, GitHub, Slack. Airflow rejected as core engine (`notes.md`) | `design-map-reduce-sweeps.md` |
+
+v1.2 rows (`design-v1-2-notifications-and-identity.md`):
+
+| # | Requirement | Design element | Section |
+|---|-------------|----------------|---------|
+| 19 | Editable notification templates | Versioned `notification_templates`, `system.<event>` built-ins, allow-listed `NotificationContext`, rendering inside `NotificationService` before the DLP gate | 3 |
+| 20 | Workflow notification target/channel sets | DSL `telescreen.workflow/v2` `notification_sets`, `targets`, `slack_channel:`, per-target `notifications` rows | 4 |
+| 21 | Live email and Slack verification | `tests/live` (Mailpit, Slack, Keycloak), `telescreen notify test` | 7 |
+| 22 | Users, roles, permission management | `Permission` matrix, `require_permission`, route-walk test, last-admin lock, token intersection | 5 |
+| 23 | OIDC SSO with Keycloak | `telescreen.identity` verifier, `/api/auth/session`, keyed `oidc_subject` identities, claim mapping, UI PKCE | 6 |
 
 ### 3. Runtime Processes
 
@@ -162,6 +179,20 @@ v1.1 port additions (`design-v1-1-dspm-adoption.md` section 2):
 
 The v1.1 tables are owned as listed in `design-data-model.md` ("v1.1 additions").
 
+v1.2 additions (`design-v1-2-notifications-and-identity.md` section 2):
+
+- `telescreen.core.permissions` (L0) holds `Permission`, the role and scope permission sets
+  and the intersection function.
+- `ports/notifications.py`: `NotificationRequest` gains `event`, `template_name`,
+  `context: NotificationContext`, `set_name`, `target_index` and `record_unreachable`.
+- `ports/templates.py` `TemplateCatalog` is implemented by notifications and consumed by
+  workflow upload validation.
+- `ports/identity.py`: `BearerVerifier` is implemented by the new L3 package
+  `telescreen.identity` and consumed by `telescreen.api.common`. `MemberProvisioner` is
+  implemented by directory and consumed by identity.
+- `IssueSnapshot` gains `masked_excerpt`.
+- New tables and columns are listed in `design-data-model.md` ("v1.2 additions").
+
 Repositories live in the feature package that owns the tables: directory tables
 (`members`, `teams`, `team_memberships`, `api_tokens`) in `telescreen.directory`; collectors
 tables in `telescreen.collectors` (collectors-core); issues, findings, history and `counters` in
@@ -207,7 +238,16 @@ The UI lives in `src/web` (SolidJS + TypeScript + Vite + vitest) and talks to `/
 6. **Authentication.** Bearer API tokens (random 32 bytes, base64url) stored as SHA-256
    hashes in `api_tokens` with scopes `read`, `write`, `admin`, `ingest`. Police use a
    separate enrollment token (secret ref) and per-worker tokens. SSO is out of scope for v1
-   (see `design-docs/user-qa/qa-ui-authentication.md`).
+   (see `design-docs/user-qa/qa-ui-authentication.md`). v1.2 replaces scope checks with
+   per-route permissions:
+   - members get the roles `admin`, `responder` and `viewer`;
+   - a member-bound token's permissions are the token's scopes intersected with the
+     member's role;
+   - OIDC access tokens are validated against the configured issuer;
+   - static API tokens stay valid.
+
+   See `design-v1-2-notifications-and-identity.md` sections 5 and 6 and
+   `design-docs/user-qa/qa-oidc-sso.md`.
 7. **Secrets by reference.** Configuration and DB rows hold secret references
    (`env:NAME` or `file:/path`), never secret values. `telescreen.core.secrets` resolves
    them at use time and the resolved value is never logged or stored.
@@ -355,6 +395,7 @@ runtime, so the rule that the Bureau never imports the SDK still holds.
 |-------|---------|---------|
 | Python unit/contract/leak | `uv run pytest` with pytest-asyncio, SQLite repositories, httpx MockTransport, fake LLM clients | none |
 | Integration | `@pytest.mark.integration`, skipped unless `TELESCREEN_TEST_DATABASE_URL` / `TELESCREEN_TEST_MEILI_URL` | local services only |
+| Live (v1.2) | `tests/live`, `@pytest.mark.live`, skipped unless the Mailpit/SMTP, Keycloak or Slack variables are set (`design-v1-2-notifications-and-identity.md` 7.2) | Mailpit and Keycloak locally, Slack API |
 | Static | `uv run ruff format --check .`, `uv run ruff check .`, `uv run python tools/typelint.py`, `uv run ty check` | none |
 | Build | `uv build` (wheel contains `telescreen` and `telescreen_police_sdk`) | none |
 | UI | `cd src/web && bun install && bun run typecheck && bun run test && bun run build` | `bun install` only |
@@ -376,6 +417,7 @@ gitleaks pre-commit hook does not flag committed sources.
 | `design-docs/specs/design-synthetic-test-dataset.md` | Approved synthetic test dataset sources, fictitious-value rules, labeled corpus generator (follow-up) |
 | `design-docs/specs/design-ui-sentry.md` | Sentry-based UI: tokens, components, shell, issue list/detail and page patterns, licensing constraints |
 | `design-docs/specs/design-v1-1-dspm-adoption.md` | v1.1 gap analysis against comparable DSPM/DLP systems and adopted features F1-F10 (exposure, placement policies, verified resolution, coverage, owner routing, health, linked occurrences, risk score, exceptions) |
+| `design-docs/specs/design-v1-2-notifications-and-identity.md` | v1.2: editable notification templates, workflow notification sets, live delivery verification, roles and permission matrix, OIDC SSO, threat model, v1.2 plan shape |
 | `design-docs/specs/design-api-and-ui.md` | REST API, auth, Assistant MCP/chat, evidence API, UI |
 | `design-docs/specs/command.md` | CLI, environment variables, exit codes, dependencies |
 | `design-docs/specs/notes.md` | Engine rationale vs Airflow/n8n/Kestra, riela mapping, tooling notes |
