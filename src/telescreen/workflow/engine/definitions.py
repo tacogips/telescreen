@@ -33,6 +33,7 @@ from telescreen.workflow.dsl.model import (
     NotifyStep,
     SubWorkflowStep,
 )
+from telescreen.workflow.dsl.raw_scan import source_has_raw_values
 from telescreen.workflow.dsl.validate import ValidationIssue
 from telescreen.workflow.engine.repository import WorkflowRepository
 
@@ -50,7 +51,7 @@ class WorkflowService:
 
     async def validate(self, source_format: SourceFormat, text: str) -> Sequence[ValidationIssue]:
         """Return safe DSL diagnostics, rejecting any source containing sensitive data."""
-        if self.redactor.has_hits(text):
+        if source_has_raw_values(self.redactor, text):
             return [ValidationIssue("", "raw_value_detected")]
         try:
             load_workflow(text, source_format)
@@ -66,7 +67,7 @@ class WorkflowService:
         actor_ref: str,
     ) -> WorkflowDefinitionRow:
         """Validate and store a new inactive workflow version."""
-        if self.redactor.has_hits(text):
+        if source_has_raw_values(self.redactor, text):
             raise WorkflowValidationError((ValidationIssue("", "raw_value_detected"),))
         workflow: CompiledWorkflow = load_workflow(text, source_format)
         for step in workflow.steps:

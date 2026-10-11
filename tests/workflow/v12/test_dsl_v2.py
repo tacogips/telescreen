@@ -232,7 +232,14 @@ def test_slack_channel_recipient_is_accepted_in_v2_to_form() -> None:
     assert compiled_from_json(compiled_to_json(workflow)) == workflow
 
 
-@pytest.mark.parametrize("workflow_path", sorted(Path("examples/workflows").glob("*.yaml")))
+_V1_EXAMPLES: list[Path] = [
+    path
+    for path in sorted(Path("examples/workflows").glob("*.yaml"))
+    if path.read_text(encoding="utf-8").startswith("apiVersion: telescreen.workflow/v1\n")
+]
+
+
+@pytest.mark.parametrize("workflow_path", _V1_EXAMPLES)
 def test_existing_examples_still_load_as_v1(workflow_path: Path) -> None:
     """Existing v1 examples load unchanged and keep the v1 compiled apiVersion."""
     workflow: CompiledWorkflow = load_workflow(

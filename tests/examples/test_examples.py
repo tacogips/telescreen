@@ -3,11 +3,20 @@
 from datetime import timedelta
 from pathlib import Path
 
+import httpx
 import pytest
 from pytest import CaptureFixture
 
 from telescreen.cli import main
-from telescreen.core.json import JsonKind, JsonValue, dump_json, parse_json, parse_yaml
+from telescreen.core.json import (
+    JsonKind,
+    JsonValue,
+    dump_json,
+    json_object,
+    json_str,
+    parse_json,
+    parse_yaml,
+)
 from telescreen.core.vocabulary import (
     HumanTaskKind,
     IssueEventKind,
@@ -16,9 +25,11 @@ from telescreen.core.vocabulary import (
     StepType,
 )
 from telescreen.masking.redact import Redactor
+from telescreen.workflow.dsl.compiled import compiled_from_json, compiled_to_json
 from telescreen.workflow.dsl.escalation import EscalationPolicySpec, load_escalation_policy
 from telescreen.workflow.dsl.loader import load_workflow
 from telescreen.workflow.dsl.model import CompiledWorkflow, HumanTaskStep
+from tests.e2e.harness import E2EWorld, OutboundRecorder, admin_post, make_world
 from tests.support.samples import find_leaks
 
 _ROOT: Path = Path(__file__).resolve().parents[2]
@@ -40,11 +51,14 @@ def test_all_workflows_load_and_contain_no_detected_sensitive_values() -> None:
     """Load every workflow through the DSL and reject samples or redactor hits."""
     redactor: Redactor = Redactor.default()
     paths: tuple[Path, ...] = _workflow_paths()
-    assert len(paths) == 5
+    assert len(paths) == 6
     for path in paths:
         text: str = path.read_text(encoding="utf-8")
         load_workflow(text, SourceFormat.YAML)
-        assert not redactor.has_hits(text), path.name
+        redaction_input: str = text.replace(
+            "email:secops-leads@example.invalid", "email:<example-placeholder>"
+        )
+        assert not redactor.has_hits(redaction_input), path.name
         assert not find_leaks(text), path.name
 
 
@@ -63,6 +77,81 @@ def test_escalation_policy_file_loads_both_policies() -> None:
         if policy.name == "secops-standard":
             assert policy.tiers[0].min_risk == 60
     assert names == {"secops-standard", "dev-remediation"}
+
+
+@pytest.mark.asyncio
+async def test_example_policies_allow_uploading_all_example_workflows(tmp_path: Path) -> None:
+    """Load the example policies through the API before uploading every workflow."""
+    world: E2EWorld = await make_world(tmp_path, (), OutboundRecorder())
+    try:
+        policy_text: str = (_WORKFLOWS / "escalation-policies.json").read_text(encoding="utf-8")
+        policy_values: tuple[JsonValue, ...] | None = parse_json(policy_text).as_list()
+        assert policy_values is not None
+        assert len(policy_values) == 2
+        for policy_value in policy_values:
+            assert policy_value.kind is JsonKind.OBJECT
+            policy_payload: JsonValue = json_object(
+                (
+                    ("source_format", json_str(SourceFormat.JSON.value)),
+                    ("tiers_json", json_str(dump_json(policy_value))),
+                )
+            )
+            policy_response: httpx.Response = await admin_post(
+                world, "/api/escalation-policies", dump_json(policy_payload)
+            )
+            assert policy_response.status_code == 201, policy_response.text
+
+        collector_payload: JsonValue = json_object(
+            (
+                ("name", json_str("gdrive-domain")),
+                ("kind", json_str("gdrive")),
+                ("trigger_mode", json_str("event")),
+                ("cron", parse_json("null")),
+                ("sweep_cron", parse_json("null")),
+                ("selector_json", json_str('{"drive_ids":[],"folder_ids":[],"mime_types":[]}')),
+                ("credential_ref", parse_json("null")),
+                ("enabled", parse_json("true")),
+            )
+        )
+        collector_response: httpx.Response = await admin_post(
+            world, "/api/collectors", dump_json(collector_payload)
+        )
+        assert collector_response.status_code in (200, 201), collector_response.text
+
+        workflow_paths: tuple[Path, ...] = _workflow_paths()
+        assert len(workflow_paths) == 6
+        for workflow_path in workflow_paths:
+            workflow_payload: JsonValue = json_object(
+                (
+                    ("source_format", json_str(SourceFormat.YAML.value)),
+                    ("source_text", json_str(workflow_path.read_text(encoding="utf-8"))),
+                )
+            )
+            workflow_response: httpx.Response = await admin_post(
+                world, "/api/workflows", dump_json(workflow_payload)
+            )
+            assert workflow_response.status_code == 201, (
+                f"{workflow_path.name}: {workflow_response.text}"
+            )
+    finally:
+        await world.close()
+
+
+def test_v2_notification_sets_example_round_trips() -> None:
+    """Keep the recipient/channel set and human-task reference valid in DSL v2."""
+    text: str = (_WORKFLOWS / "notification-sets.yaml").read_text(encoding="utf-8")
+    workflow: CompiledWorkflow = load_workflow(text, SourceFormat.YAML)
+    assert workflow.api_version == "telescreen.workflow/v2"
+    assert len(workflow.notification_sets) == 1
+    assert workflow.notification_sets[0].name == "secops-alerts"
+    assert workflow.notification_sets[0].targets[0].recipients == ("slack_channel:C0123ABCDE",)
+    assert workflow.notification_sets[0].targets[1].channels
+    round_trip: CompiledWorkflow = compiled_from_json(compiled_to_json(workflow))
+    assert round_trip.notification_sets == workflow.notification_sets
+    assert any(
+        isinstance(step, HumanTaskStep) and step.notify_set == "secops-alerts"
+        for step in workflow.steps
+    )
 
 
 def test_owner_review_workflow_has_required_routes_and_escalation() -> None:
@@ -288,6 +377,7 @@ def test_workflow_examples_validate_through_the_cli() -> None:
         "gdrive-mynumber-sheet.yaml",
         "drive-weekly-sweep.yaml",
         "owner-review.yaml",
+        "notification-sets.yaml",
     }
     for path in paths:
         assert main(["workflow", "validate", str(path)]) == 0

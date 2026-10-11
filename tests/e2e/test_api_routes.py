@@ -82,6 +82,8 @@ async def test_assembled_feature_list_routes_return_200() -> None:
                 "/api/exceptions",
                 "/api/escalation-policies",
                 "/api/map-jobs",
+                "/api/notification-templates",
+                "/api/users",
             ):
                 response: httpx.Response = await client.get(
                     path, headers={"Authorization": f"Bearer {token.token}"}

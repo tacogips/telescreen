@@ -64,3 +64,72 @@ health recipients, and the weekly owner digest. Fingerprint key rotation is show
 `file:` secret references; keep version 1 configured because it remains the identity key.
 See [`design-docs/specs/command.md`](../../design-docs/specs/command.md) for all
 `TELESCREEN_*` settings and defaults.
+
+## Local test services (dev-services.yml)
+
+The separate test-service stack supplies Mailpit, Keycloak, and PostgreSQL without starting
+the Bureau or Meilisearch. Run it from the repository root:
+
+```sh
+docker compose -f examples/compose/dev-services.yml up -d
+docker compose -f examples/compose/dev-services.yml down
+```
+
+Mailpit accepts SMTP on `127.0.0.1:1025` and shows messages at
+<http://127.0.0.1:8025>. Keycloak is at `http://127.0.0.1:8080`; use that same
+`127.0.0.1` host in the browser, Telescreen settings, and issuer URL because the token
+issuer must exactly match the configured issuer. The imported `telescreen` realm has
+`alice` (admin), `bob` (responder), `carol` (viewer), and `dave` (no mapped role); the
+development-only passwords follow `<user>-dev-pass`.
+
+For a local API/worker run, configure the database and OIDC settings in the same shell:
+
+```sh
+export TELESCREEN_DATABASE_URL=postgresql+asyncpg://telescreen:telescreen-dev@127.0.0.1:55432/telescreen
+export TELESCREEN_OIDC_ISSUER=http://127.0.0.1:8080/realms/telescreen
+export TELESCREEN_OIDC_CLIENT_ID=telescreen-ui
+export TELESCREEN_OIDC_AUDIENCE=telescreen-ui
+export TELESCREEN_OIDC_PROVISIONING=create
+export TELESCREEN_OIDC_TEAM_MAP=security=secops,dev=dev,ghe-admin=ghe-admin
+telescreen migrate
+```
+
+Start `telescreen serve` in one terminal and create the teams with an administrator token:
+
+```sh
+export TELESCREEN_ADMIN_TOKEN='<administrator token>'
+for team in secops dev ghe-admin; do
+  curl --fail http://127.0.0.1:8000/api/teams \
+    -H "Authorization: Bearer $TELESCREEN_ADMIN_TOKEN" \
+    -H 'Content-Type: application/json' \
+    -d "{\"slug\":\"$team\",\"name\":\"$team\"}"
+done
+```
+
+Then run `telescreen worker` in another terminal. SMTP is configured with host
+`127.0.0.1`, port `1025`, and STARTTLS disabled. No SMTP password is required.
+
+Slack test credentials remain outside the repository. Source the owner's local test file
+and pass references to Telescreen; the application reads the referenced environment values
+only when sending:
+
+```sh
+set -a
+. ~/.config/telescreen/slack-test.env
+set +a
+export TELESCREEN_SLACK_BOT_TOKEN=env:TELESCREEN_TEST_SLACK_BOT_TOKEN
+telescreen notify test --channel slack --to "slack_channel:${TELESCREEN_TEST_SLACK_CHANNEL}"
+telescreen notify test --channel email --to email:someone@example.test
+```
+
+Live tests are opt-in. Set `TELESCREEN_TEST_MAILPIT_URL`,
+`TELESCREEN_TEST_SMTP_HOST`, `TELESCREEN_TEST_SMTP_PORT`,
+`TELESCREEN_TEST_KEYCLOAK_URL`, `TELESCREEN_TEST_SLACK_BOT_TOKEN`, and
+`TELESCREEN_TEST_SLACK_CHANNEL` for the corresponding services, then run:
+
+```sh
+uv run pytest -m live tests/live
+```
+
+Without these variables the live tests skip. The test suite does not read the local Slack
+credential file itself.

@@ -1,6 +1,6 @@
 # V12-P01 Foundation: Vocabulary, Permissions, OIDC Settings, Ports
 
-**Status**: In Progress
+**Status**: Completed (re-verified in session 9; integration-accepted at fcfb198; archived 2026-10-12)
 **Design Reference**: design-docs/specs/design-v1-2-notifications-and-identity.md sections 1, 2, 5.1; design-docs/specs/command.md (OIDC variables); design-docs/user-qa/qa-oidc-sso.md
 **Created**: 2026-10-11
 **Last Updated**: 2026-10-11

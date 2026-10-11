@@ -40,34 +40,43 @@ Large features are split into multiple related plans with cross-references.
 All plans share `impl-plans/conventions.md` (ownership, typing, verification and
 progress-log rules).
 
-### v1.2 (notification templates, notification sets, roles, OIDC SSO, live verification)
-
-Created 2026-10-11 at base 7402f51 from
-`design-docs/specs/design-v1-2-notifications-and-identity.md` (section 10). Waves run in
-order; plans within a wave have disjoint write paths.
-
-| Plan | Wave | Depends On | Design Reference |
-|------|------|------------|------------------|
-| `active/v12-p01-foundation.md` | W1 | - | v1.2 s1, s2, s5.1; command.md |
-| `active/v12-p02-db.md` | W1 | - | design-data-model.md v1.2 additions |
-| `active/v12-p03-ui-foundation.md` | W1 | - | design-ui-sentry.md s10.1, s10.2, s10.4 |
-| `active/v12-p04-notification-templates.md` | W2 | p01, p02 | v1.2 s3, s4.3, s8 |
-| `active/v12-p05-workflow-notification-sets.md` | W2 | p01, p02 | v1.2 s4; design-workflow-engine.md DSL v2 |
-| `active/v12-p06-rbac-enforcement.md` | W2 | p01, p02 | v1.2 s5.1, s5.2, s6.4 |
-| `active/v12-p07-directory-roles.md` | W2 | p01, p02 | v1.2 s5.3, s5.4, s6.3 |
-| `active/v12-p08-oidc-identity.md` | W2 | p01 | v1.2 s6.2, s6.3, s8 |
-| `active/v12-p09-ui-pages.md` | W2 | p03 | design-ui-sentry.md s10.3 |
-| `active/v12-p10-api-routers.md` | W3 | p04, p06, p07, p08 | design-api-and-ui.md v1.2 endpoints |
-| `active/v12-p11-wiring-cli.md` | W4 | p04-p08, p10 | v1.2 s5.2, s7.1, s7.4 |
-| `active/v12-p12-verification-docs.md` | W5 | p11, p09, p03 | v1.2 s6.5, s7, s8, s10 |
+There are no active plans.
 
 Telescreen v1 is complete (all 32 plans integration-accepted, final commit 7a8c600).
 Telescreen v1.1 (F1-F10 of `design-docs/specs/design-v1-1-dspm-adoption.md`) is complete:
 all 21 v11 plans are integration-accepted and archived under `completed/` (2026-10-11).
-Run dispatch manifests, including the v1.1 manifests `telescreen-v11-20261010-c1` to `-c4`,
-are archived under `completed/dispatch/`.
+Telescreen v1.2 (N1-N3, R1, R2 of
+`design-docs/specs/design-v1-2-notifications-and-identity.md`) is complete: all 12 v12
+plans are integration-accepted and archived under `completed/` (2026-10-12).
+Run dispatch manifests, including the v1.1 manifests `telescreen-v11-20261010-c1` to `-c4`
+and the v1.2 manifests `telescreen-v12-20261011-d1` to `-d4`, are archived under
+`completed/dispatch/`.
 
 ## Completed Plans
+
+### v1.2 (notification templates, notification sets, roles, OIDC SSO, live verification)
+
+Created 2026-10-11 at base 7402f51 from
+`design-docs/specs/design-v1-2-notifications-and-identity.md` (section 10). Waves ran in
+order, and plans within a wave had disjoint write paths. v12-p01 to v12-p04 and v12-p07 to
+v12-p09 were integration-accepted at fcfb198 (session 9). In session 10 (manifest d4),
+v12-p05 and v12-p06 were re-verified on the committed tree, v12-p10 to v12-p12 were
+implemented, and the combined tree was integration-accepted (comm-000471).
+
+| Plan | Wave | Depends On | Design Reference |
+|------|------|------------|------------------|
+| `completed/v12-p01-foundation.md` | W1 | - | v1.2 s1, s2, s5.1; command.md |
+| `completed/v12-p02-db.md` | W1 | - | design-data-model.md v1.2 additions |
+| `completed/v12-p03-ui-foundation.md` | W1 | - | design-ui-sentry.md s10.1, s10.2, s10.4 |
+| `completed/v12-p04-notification-templates.md` | W2 | p01, p02 | v1.2 s3, s4.3, s8 |
+| `completed/v12-p05-workflow-notification-sets.md` | W2 | p01, p02 | v1.2 s4; design-workflow-engine.md DSL v2 |
+| `completed/v12-p06-rbac-enforcement.md` | W2 | p01, p02 | v1.2 s5.1, s5.2, s6.4 |
+| `completed/v12-p07-directory-roles.md` | W2 | p01, p02 | v1.2 s5.3, s5.4, s6.3 |
+| `completed/v12-p08-oidc-identity.md` | W2 | p01 | v1.2 s6.2, s6.3, s8 |
+| `completed/v12-p09-ui-pages.md` | W2 | p03 | design-ui-sentry.md s10.3 |
+| `completed/v12-p10-api-routers.md` | W3 | p04, p06, p07, p08 | design-api-and-ui.md v1.2 endpoints |
+| `completed/v12-p11-wiring-cli.md` | W4 | p04-p08, p10 | v1.2 s5.2, s7.1, s7.4 |
+| `completed/v12-p12-verification-docs.md` | W5 | p11, p09, p03 | v1.2 s6.5, s7, s8, s10 |
 
 ### v1.1 (F1-F10)
 
@@ -160,11 +169,11 @@ Only plans from eligible phases should be read to minimize context loading.
 | 10 (v1.1 wave V3) | COMPLETED | Phase 9 |
 | 11 (v1.1 wave V4) | COMPLETED | Phase 10 |
 | 12 (v1.1 wave V5) | COMPLETED | Phase 11 |
-| 13 (v1.2 wave W1) | NOT_STARTED | Phase 12 |
-| 14 (v1.2 wave W2) | NOT_STARTED | Phase 13 (per-plan dependencies) |
-| 15 (v1.2 wave W3) | NOT_STARTED | Phase 14 |
-| 16 (v1.2 wave W4) | NOT_STARTED | Phase 15 |
-| 17 (v1.2 wave W5) | NOT_STARTED | Phase 16 |
+| 13 (v1.2 wave W1) | COMPLETED | Phase 12 |
+| 14 (v1.2 wave W2) | COMPLETED | Phase 13 (per-plan dependencies) |
+| 15 (v1.2 wave W3) | COMPLETED | Phase 14 |
+| 16 (v1.2 wave W4) | COMPLETED | Phase 15 |
+| 17 (v1.2 wave W5) | COMPLETED | Phase 16 |
 
 Run B added `p30-ui-design-system.md` and `p31-ui-mock-api.md` (wave B1, before the
 reworked p12, p13 and p14), split the end-to-end and leak tests into p28b and p28c after

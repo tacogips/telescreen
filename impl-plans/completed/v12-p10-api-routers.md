@@ -1,6 +1,6 @@
 # V12-P10 API Routers: Notification Templates, Users/Roles/Tokens, Auth
 
-**Status**: Not Started
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-api-and-ui.md "v1.2 endpoints"; design-docs/specs/design-v1-2-notifications-and-identity.md sections 3.4, 5.1, 5.3, 5.4, 6.1, 6.3
 **Created**: 2026-10-11
 **Last Updated**: 2026-10-11
@@ -134,8 +134,17 @@ src/telescreen/api/routers/users.py src/telescreen/api/routers/auth.py` and `<te
 
 ## Completion Criteria
 
-- [ ] Three routers implemented with the permissions of design 5.1.
-- [ ] Tests pass; scoped gates pass; typelint grep empty.
-- [ ] Progress Log complete.
+- [x] Three routers implemented with the permissions of design 5.1.
+- [x] Tests pass; scoped gates pass; typelint grep empty.
+- [x] Progress Log complete.
 
 ## Progress Log
+
+### Session: 2026-10-11 Step 6 implementation (manifest d4)
+**Tasks Completed**: Added the notification-template, users/roles/tokens and auth routers; added ASGI coverage for route authorization, validation secrecy, role audit and last-admin protection, token creation/list/revoke and role intersection, OIDC metadata/sign-in/no-role behavior, and safe auth/me projections. Each route has exactly one permission or external-auth declaration.
+**Tasks In Progress**: None in this plan. Wiring and composition-root integration belong to v12-p11; combined-tree review and shared final gates remain downstream.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `src/telescreen/api/routers/notification_templates.py` before=absent after=ca91653b2f139e006c9917d2d815d3f1e2b9ee1fcb37607c74a1662897a5fd25; `src/telescreen/api/routers/users.py` before=absent after=3eb25bcc153358468d10366feb457439c492974f358f53ddda489f04fbdf5b51; `src/telescreen/api/routers/auth.py` before=absent after=1e10047856add26c05812d4df0f3f6f939c14e0e9a98bcb8d3af1105db14f188; `tests/api/v12_routers/__init__.py` before=absent after=cd725cfdc19ca50f55ead0b2f1e9e1faac0a30462f265841df7f84b3a6493a93; `tests/api/v12_routers/test_routers.py` before=absent after=93a05de161cf8e85b0bce91d09282f735966dbe585ae748f0331971121f0b1da; plan before=ac3396a5c4e911f38bee448ecb3b05d995b68d660e30d2f5f00509f4cebb4161.
+**Verification**: `uv run --frozen ruff format --check --no-cache src/telescreen/api/routers/notification_templates.py src/telescreen/api/routers/users.py src/telescreen/api/routers/auth.py tests/api/v12_routers` -> exit 0 (log: `tmp/telescreen-v12-20261011-d4/v12-p10-api-routers/attempt-1/28-format-final.log`); `uv run --frozen ruff check --no-cache src/telescreen/api/routers/notification_templates.py src/telescreen/api/routers/users.py src/telescreen/api/routers/auth.py tests/api/v12_routers` -> exit 0 (log: `tmp/telescreen-v12-20261011-d4/v12-p10-api-routers/attempt-1/29-ruff-final.log`); `uv run --frozen ty check src/telescreen/api/routers/notification_templates.py src/telescreen/api/routers/users.py src/telescreen/api/routers/auth.py tests/api/v12_routers` -> exit 0 (log: `tmp/telescreen-v12-20261011-d4/v12-p10-api-routers/attempt-1/30-ty-final.log`); `uv run --frozen pytest -p no:cacheprovider tests/api/v12_routers` -> exit 0, 4 passed (log: `tmp/telescreen-v12-20261011-d4/v12-p10-api-routers/attempt-1/31-pytest-final.log`); `uv run --frozen python tools/typelint.py` -> exit 0 and scoped grep empty (logs: `tmp/telescreen-v12-20261011-d4/v12-p10-api-routers/attempt-1/32-typelint-final.log`, `tmp/telescreen-v12-20261011-d4/v12-p10-api-routers/attempt-1/32-typelint-scoped-final.log`); `git diff --check -- src/telescreen/api/routers/notification_templates.py src/telescreen/api/routers/users.py src/telescreen/api/routers/auth.py tests/api/v12_routers` -> exit 0.
+**Notes**: Intermediate gate attempts exposed and then resolved a service-view import mismatch, missing strict local annotations, test assumptions about revocation ordering and FastAPI's lazy included-router representation, and Ruff import ordering. The final gates above were rerun after those changes and pass on the final source. The first shell wrapper used zsh's read-only `status` name and returned a wrapper error; final verification used bash and recorded the actual command exits.

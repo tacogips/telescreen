@@ -1,6 +1,6 @@
 # V12-P06 RBAC Enforcement: Permission Dependency on Every Route
 
-**Status**: Completed (implementation; formal review pending)
+**Status**: Completed (re-verified in session 10, manifest d4; integration-accepted in comm-000471; archived 2026-10-12)
 **Design Reference**: design-docs/specs/design-v1-2-notifications-and-identity.md sections 1 (D10, D11, D18), 5.1, 5.2, 6.2 step 1, 6.4; design-docs/specs/design-api-and-ui.md "Authentication and errors" (v1.2 paragraph)
 **Created**: 2026-10-11
 **Last Updated**: 2026-10-11
@@ -330,3 +330,14 @@ Verification (bash, pipefail, PYTHONDONTWRITEBYTECODE=1), final source:
 
 
 **Owner resolution (2026-10-11, session 9)**: The only gap was the manifest gate `! grep -rn require_scope src`, which also matches vendored JavaScript under the `src/web/node_modules` artifact root. The owner-approved gate is `! grep -rn require_scope src/telescreen src/telescreen_police_sdk` (integration review INT-W2-M01); the next dispatch manifest must use it. Whole-repository gates on the combined tree pass (pytest 784 passed / 5 skipped). On redispatch, re-verify on the committed tree with that gate, change no source unless review finds a defect, and report only final passing commands with an empty `priorVerification` (conventions 7a).
+
+### Session 10 (2026-10-11), Step 6 re-verification (manifest d4)
+
+- Re-verified the already committed implementation at HEAD `5474072f90c2fce01b9f1d272f69a533122e51b1`; no source changes were needed. Assigned plan and design remain aligned: one permission/external declaration per route in the 17 existing routers, Principal permissions, OIDC BearerVerifier authentication, D11 token intersection, and manage-any checks.
+- `git diff` was empty for the five bound-token fixture files and `test_engine_extended.py` before this plan-only update; their committed role seeding/Principal changes remain fixture-only.
+- Every final required command exited 0. Behavioral counts: scoped pytest 39 passed; API/contract/evidence/assistant regressions 53 passed; v11 API 7 passed; leak 6 passed; router regression 33 passed, 1 integration test skipped offline. Logs are complete under `tmp/telescreen-v12-20261011-d4/v12-p06-rbac-enforcement/attempt-1/` (`01`–`09`). The `require_scope` scan was empty. The four regression gates and scoped checks all passed.
+- No blockers or reconciliation requests. Formal review remains downstream.
+- Verification: `uv run --frozen ruff format --check --no-cache src/telescreen/api tests/api tests/workflow/engine/test_engine_extended.py tests/evidence/test_evidence.py tests/leak/flows_v11.py tests/e2e/test_flow_v11_owner_health.py` -> exit 0 (`01-format.log`); `uv run --frozen ruff check --no-cache src/telescreen/api tests/api tests/workflow/engine/test_engine_extended.py tests/evidence/test_evidence.py tests/leak/flows_v11.py tests/e2e/test_flow_v11_owner_health.py` -> exit 0 (`02-ruff.log`); `uv run --frozen ty check src/telescreen/api tests/api tests/workflow/engine/test_engine_extended.py tests/evidence/test_evidence.py tests/leak/flows_v11.py tests/e2e/test_flow_v11_owner_health.py` -> exit 0 (`03-ty.log`).
+- Verification: `uv run --frozen pytest -p no:cacheprovider tests/api tests/workflow/engine/test_engine_extended.py tests/evidence/test_evidence.py` -> exit 0, 39 passed (`04-scoped-pytest.log`); `uv run --frozen pytest -p no:cacheprovider tests/api tests/contract tests/evidence tests/assistant` -> exit 0, 53 passed (`05-regress.log`); `uv run --frozen pytest -p no:cacheprovider tests/api/v11_issues tests/api/v11_ops` -> exit 0, 7 passed (`06-v11api.log`); `uv run --frozen pytest -p no:cacheprovider tests/leak` -> exit 0, 6 passed (`07-leak.log`); `uv run --frozen pytest -p no:cacheprovider tests/e2e/test_flow_v11_owner_health.py tests/audit tests/collectors/core/test_core.py tests/issues/test_issues_api.py tests/workflow/engine/test_resume_gaps.py` -> exit 0, 33 passed and 1 integration skip (`08-routers.log`).
+- Verification: `uv run --frozen python tools/typelint.py` plus the scoped grep -> exit 0, no findings (`09-typelint.log`); `! grep -rn require_scope src/telescreen src/telescreen_police_sdk` -> exit 0, no matches; `test "$(grep -c '^- \[ \]' impl-plans/active/v12-p06-rbac-enforcement.md)" -eq 0` -> exit 0.
+- Hashes: plan before=`e859d7405003eb938a5f8073c2a752bc9c6ba1c9e4db294e3006ad749d30d44e`; after content update, before this hash audit line=`55b7f610fba5072671b977e0b2beb51f406474c613520b5f9e414de4170941df`.

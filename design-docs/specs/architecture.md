@@ -15,7 +15,8 @@ workers, and exposes everything through a REST API, an MCP server and a SolidJS 
 Status: v1 design, implemented. It is the baseline for the v1 and v1.1 plans, which are
 archived under `impl-plans/completed/`. v1.2 (notification templates, workflow
 notification sets, roles and permissions, OIDC SSO, live delivery verification) is
-designed in `design-v1-2-notifications-and-identity.md`. That document's v1.2 notes below
+designed in `design-v1-2-notifications-and-identity.md` and implemented; its plans are
+archived under `impl-plans/completed/` as well. That document's v1.2 notes below
 and in the supporting specs are additions; they replace only decision 6 (Authentication)
 of section 5.
 

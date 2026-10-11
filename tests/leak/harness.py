@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import httpx
 from fastapi import FastAPI
@@ -15,12 +16,14 @@ from httpx import ASGITransport, AsyncClient, Request, Response
 from telescreen.api.app import create_app
 from telescreen.core.clock import FakeClock
 from telescreen.core.config import TelescreenSettings
+from telescreen.core.oidc_settings import OidcSettings
 from telescreen.core.secrets import EnvSource
 from telescreen.core.vocabulary import ApiScope
 from telescreen.directory.tokens import CreatedToken, TokenService
 from telescreen.masking.log_masking import MaskingFormatter
 from telescreen.wiring import Container, build_container, close_container
 from tests.support.db import SqliteHarness, make_sqlite_harness
+from tests.support.oidc import TestIdp
 from tests.support.samples import Sample, all_samples
 
 CANARY_FILENAME: str = "leakcanary-" + "fname-7f3a" + ".txt"
@@ -49,11 +52,14 @@ class Recorder:
     clean_content_paths: set[str] = field(default_factory=set)
     missing_content_paths: set[str] = field(default_factory=set)
     failing_hosts: set[str] = field(default_factory=set)
+    idp: TestIdp | None = None
 
     async def handle(self, request: Request) -> Response:
         """Record a request and return a deterministic provider response."""
         body: bytes = await request.aread()
         self.requests.append((str(request.url), body))
+        if self.idp is not None and request.url.host == urlsplit(self.idp.issuer).hostname:
+            return self.idp.mock_handler(request)
         if request.url.host in self.failing_hosts:
             return Response(500, request=request)
         if "api.anthropic.com" in request.url.host:
@@ -158,11 +164,13 @@ class LeakWorld:
         logging.getLogger().removeHandler(self.log_handler)
 
 
-async def make_leak_world(tmp: Path, with_llm: bool) -> LeakWorld:
+async def make_leak_world(
+    tmp: Path, with_llm: bool, oidc: OidcSettings | None = None, idp: TestIdp | None = None
+) -> LeakWorld:
     """Build a real Telescreen container with only declared test seams."""
     database: SqliteHarness = await make_sqlite_harness()
     clock: FakeClock = FakeClock(datetime(2026, 10, 10, tzinfo=UTC))
-    recorder: Recorder = Recorder()
+    recorder: Recorder = Recorder(idp=idp)
     log_buffer: io.StringIO = io.StringIO()
     buffer_handler: logging.StreamHandler[io.StringIO] = logging.StreamHandler(log_buffer)
     root: logging.Logger = logging.getLogger()
@@ -190,6 +198,7 @@ async def make_leak_world(tmp: Path, with_llm: bool) -> LeakWorld:
         digest_cron="* * * * *",
         health_recipients=("team:security",),
         health_failure_threshold=3,
+        oidc=oidc,
     )
     transport: httpx.AsyncClient = httpx.AsyncClient(
         transport=httpx.MockTransport(recorder.handle),

@@ -103,6 +103,7 @@ from telescreen.wiring_v11 import (
     build_issue_ops,
     build_policy_and_risk,
 )
+from telescreen.wiring_v12 import WiringV12, WiringV12Parts, build_v12
 from telescreen.workflow.engine.child import ChildRunFinishedHandler
 from telescreen.workflow.engine.definitions import WorkflowService
 from telescreen.workflow.engine.engine import AdvanceStepHandler, RunEngine, TimerFiredHandler
@@ -186,6 +187,7 @@ class Container:
     routers: tuple[APIRouter, ...]
     owns_http: bool
     owns_engine: bool
+    v12: WiringV12
 
     async def ensure_indexes(self) -> None:
         """Initialize configured search indexes before serving requests."""
@@ -209,7 +211,6 @@ def build_container(
 ) -> Container:
     """Build feature services, worker handlers, and API routers."""
     primitives: RuntimePrimitives = build_primitives(settings, env, http, sessions, clock)
-    ctx: ApiContext = ApiContext(primitives.sessions, primitives.clock, primitives.audit)
     resolver: DirectoryRecipientResolver = DirectoryRecipientResolver()
     directory: DirectoryService = DirectoryService(
         primitives.audit, primitives.clock, fingerprinter=primitives.fingerprinter
@@ -230,13 +231,26 @@ def build_container(
     )
     detector: Detector = build_detector(settings, env, http, settings.detectors)
     dlp_detector: Detector = build_detector(settings, env, http, settings.dlp_detectors)
+    notification_gate: DlpGate = DlpGate(dlp_detector, primitives.redactor, settings.dlp_policy)
+    token_service: TokenService = TokenService(primitives.audit, primitives.clock)
+    v12_parts: WiringV12Parts = build_v12(
+        settings, primitives, notification_gate, http, token_service
+    )
+    ctx: ApiContext = ApiContext(
+        primitives.sessions,
+        primitives.clock,
+        primitives.audit,
+        v12_parts.verifier,
+        v12_parts.provisioner if settings.oidc is not None else None,
+    )
     notification_service: NotificationService = NotificationService(
-        DlpGate(dlp_detector, primitives.redactor, settings.dlp_policy),
+        notification_gate,
         resolver,
         queue,
         primitives.audit,
         primitives.clock,
         NotificationRepository(),
+        v12_parts.template_resolver,
     )
     health: Health = build_health(
         settings,
@@ -403,6 +417,7 @@ def build_container(
         primitives.audit,
         primitives.clock,
         workflow_repository,
+        v12_parts.templates,
     )
     executors: ExecutorRegistry = ExecutorRegistry()
     for flow_executor in (
@@ -698,6 +713,7 @@ def build_container(
         build_audit_router(AuditRouterDeps(ctx, primitives.search)),
         build_search_router(SearchRouterDeps(ctx, primitives.search)),
         build_chat_router(ChatRouterDeps(ctx, chat)),
+        *v12_parts.routers,
     )
     return Container(
         settings,
@@ -726,8 +742,15 @@ def build_container(
         workflow,
         run_engine,
         police_repository,
-        TokenService(primitives.audit, primitives.clock),
+        token_service,
         routers,
         False,
         primitives.owns_engine,
+        WiringV12(
+            v12_parts.templates,
+            notification_service,
+            notification_handler,
+            v12_parts.roles,
+            v12_parts.sign_in,
+        ),
     )

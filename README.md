@@ -33,6 +33,16 @@ as `telescreen.collectors`, `telescreen.detection`, `/api/issues`, and Issues.
 - Exceptions record a reason and approver, expire on schedule, and can reopen issues.
 - Stale-data policies evaluate whether sensitive content exceeds a configured age.
 
+## Features (v1.2)
+
+- Versioned, editable notification templates are validated, previewed, and activated from Settings.
+- Workflow v2 notification sets pair recipients with Slack or email channels; delivery outcomes are recorded per target.
+- Admin, responder, and viewer roles control API and UI permissions, with member-bound token permissions intersected with the assigned role.
+- OpenID Connect sign-in supports Authorization Code + PKCE, Keycloak role mapping, and an optional static-token login fallback.
+- `telescreen notify test` exercises the production notification service and delivery handler; opt-in Mailpit, Slack, and Keycloak tests are under `tests/live/`.
+
+See the [v1.2 design](design-docs/specs/design-v1-2-notifications-and-identity.md) for the permission matrix, configuration, and operator walkthrough.
+
 Telescreen does not check provider credential validity or reveal raw values (it links to
 the source location only), and it remains read-only on every monitored source.
 
@@ -72,7 +82,9 @@ run without database configuration; other services validate requirements when us
 | `telescreen collector run NAME [--watch]` | Enqueue a collector scan or register a supported watch |
 | `telescreen collector sweep NAME` | Start a concurrent whole-estate sweep |
 | `telescreen police list` | List registered Police workers |
-| `telescreen token create --label TEXT --scopes read,write` | Create an API token |
+| `telescreen token create --label TEXT --scopes read,write [--member HANDLE]` | Create an API token, optionally bound to a member |
+| `telescreen notify test --channel email\|slack --to RECIPIENT [--template NAME]` | Send a DLP-gated test notification |
+| `telescreen member set-role HANDLE admin\|responder\|viewer\|none` | Assign or recover a member role |
 | `telescreen search reindex` | Rebuild guarded search indexes |
 | `telescreen mcp` | Run the Assistant MCP server over stdio |
 
@@ -88,6 +100,13 @@ completion fields. The Police contract is published at `/api/police/v1/openapi.j
 versioned JSON schemas. See the v1.1 endpoint table in `design-docs/specs/design-api-and-ui.md` and
 `design-docs/specs/design-police-contract.md` for the contract details.
 
+v1.2 adds `/api/notification-templates` (list, get, validate, preview, create version,
+activate), `/api/users`, `/api/roles` and `PUT /api/users/{handle}/role`, `/api/tokens`
+(list, create, revoke), and `/api/auth/config`, `/api/auth/session` and `/api/auth/me` for
+OIDC sign-in. Every route declares one permission, and a route-walk test fails on any
+undeclared route. A bearer credential is either a static API token or an IdP access token;
+see the "v1.2 endpoints" section of `design-docs/specs/design-api-and-ui.md`.
+
 ## Web application
 
 The SolidJS application is in `src/web`. Install dependencies and run the frontend
@@ -102,7 +121,7 @@ Vite proxies API requests to `http://localhost:8000`; start the Bureau there whe
 against live data. To render every page with masked local fixtures and no backend, run
 `cd src/web && VITE_TELESCREEN_MOCK=1 bun run dev`. The mock data contains masked values.
 Run `cd src/web && bun run screenshots` for the screenshot smoke against the mock API
-(every page in light and dark themes plus the mobile Issues page, 35 images); it needs Chrome/Chromium or `TELESCREEN_SCREENSHOT_BROWSER` and writes images under
+(every page in light and dark themes plus the mobile Issues page, 43 images); it needs Chrome/Chromium or `TELESCREEN_SCREENSHOT_BROWSER` and writes images under
 `tmp/ui-screenshots/`. The visual reference is
 [`design-docs/specs/design-ui-sentry.md`](design-docs/specs/design-ui-sentry.md). The
 self-hosted Rubik and Roboto Mono fonts use the OFL licenses in `src/web/public/fonts/`;
@@ -111,6 +130,13 @@ Lucide icons use ISC licensing.
 The v1.1 My tasks page brings together owner-review tasks, exception approvals, and issues
 assigned to the current member. The Policies page validates, versions, and activates
 placement policies.
+
+In v1.2 the login page offers SSO through the configured OIDC issuer (Authorization Code
++ PKCE, returning to `/auth/callback`) and, when `TELESCREEN_UI_TOKEN_LOGIN` allows it,
+the static-token login. Settings has Notification templates (editor, validation, preview,
+and version activation) and Users and roles. The workflow definition view shows the
+notification sets of v2 workflows. Navigation and actions follow the signed-in member's
+role.
 
 To serve a production build locally, run `cd src/web && bun run build`, then set
 `TELESCREEN_WEB_DIST=src/web/dist` when running `telescreen serve`. The directory must
@@ -125,6 +151,12 @@ weights, and fingerprint key rotation are listed in
 add `2=<secret-ref>` to `TELESCREEN_FINGERPRINT_KEYS`, set
 `TELESCREEN_FINGERPRINT_ACTIVE_VERSION=2`, and keep version 1 configured because it
 remains the identity key for resources, placements, and owners.
+
+The v1.2 OIDC settings (`TELESCREEN_OIDC_ISSUER`, `TELESCREEN_OIDC_CLIENT_ID`,
+`TELESCREEN_OIDC_AUDIENCE`, `TELESCREEN_OIDC_ROLE_MAP`, `TELESCREEN_OIDC_DEFAULT_ROLE`,
+`TELESCREEN_OIDC_TEAM_MAP`, `TELESCREEN_OIDC_PROVISIONING` and the others) and
+`TELESCREEN_UI_TOKEN_LOGIN` are also in `command.md`. Without a mapped role and without a
+default role, an SSO user gets HTTP 403 (`no_role`).
 
 ## Police workers
 
@@ -168,7 +200,13 @@ supplied through `POLICE_FINGERPRINT_KEY`. Slack and GitHub webhooks return HTTP
 `TELESCREEN_GITHUB_WEBHOOK_SECRET` are configured as secret references and the matching
 secret files are declared and mounted in Compose. Drive channel tokens are derived from
 the fingerprint key; there is no separate Drive channel variable. Example
-incident-response workflows are in `examples/workflows/`.
+incident-response workflows are in `examples/workflows/`; `notification-sets.yaml` is a
+`telescreen.workflow/v2` example with named notification sets.
+
+`examples/compose/dev-services.yml` starts the local test services (Mailpit, Keycloak with
+the `telescreen` realm and users alice, bob, carol and dave, and PostgreSQL). The setup for
+running Telescreen against them, signing in through Keycloak, and sending test
+notifications is in the "Local test services" section of `examples/compose/README.md`.
 
 ## Testing and checks
 
@@ -182,7 +220,14 @@ The end-to-end flows live in `tests/e2e`; the raw-value leak matrix over every s
 in `tests/leak`. The v1.1 flows (`tests/e2e/test_flow_v11_*.py`) cover placement policies,
 verified resolution, owner routing, health, exceptions and fingerprint key rotation, and
 `tests/leak/test_leak_matrix_v11.py` extends the leak matrix to the v1.1 records, so that
-raw samples, file names and owner emails never reach a sink. The default test suite is
+raw samples, file names and owner emails never reach a sink. The v1.2 flows
+(`tests/e2e/test_flow_v12_notifications.py` for templates and notification sets, and
+`tests/e2e/test_flow_v12_identity.py` for roles and OIDC sign-in) and
+`tests/leak/test_leak_matrix_v12.py` cover templates, notification sets, role changes, API
+tokens, OIDC sign-ins and the notify-test path, so that raw samples, tokens and secrets
+never reach a sink. Live delivery and sign-in tests for Mailpit, Slack and Keycloak are in
+`tests/live`, marked `live`, and run only when their `TELESCREEN_TEST_*` variables are set
+(see `examples/compose/README.md`). The default test suite is
 offline and uses fakes or in-memory SQLite. Tests requiring
 PostgreSQL or Meilisearch are marked `integration` and run only when
 `TELESCREEN_TEST_DATABASE_URL` or `TELESCREEN_TEST_MEILI_URL` is set. Frontend checks are

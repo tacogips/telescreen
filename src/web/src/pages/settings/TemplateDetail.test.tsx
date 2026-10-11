@@ -4,7 +4,18 @@ import { afterEach, expect, it, vi } from "vitest";
 import SettingsPage from "./index";
 import { mockApi, renderSettings, requestBody, settle } from "./testUtils";
 
-afterEach(() => { cleanup(); sessionStorage.clear(); vi.restoreAllMocks(); });
+const values = new Map<string, string>();
+const storage = {
+  get length(): number { return values.size; },
+  key: (index: number): string | null => Array.from(values.keys())[index] ?? null,
+  getItem: (key: string): string | null => values.get(key) ?? null,
+  setItem: (key: string, value: string): void => { values.set(key, value); },
+  removeItem: (key: string): void => { values.delete(key); },
+  clear: (): void => values.clear(),
+};
+vi.stubGlobal("localStorage", storage);
+
+afterEach(() => { cleanup(); sessionStorage.clear(); storage.clear(); vi.restoreAllMocks(); });
 
 const base = "/api/notification-templates/system.workflow_notify";
 const detail = { name: "system.workflow_notify", event_kind: "workflow_notify", builtin: true, active_version: 1, versions: [{ version: 0, active: false, created_by: null, created_at: null }, { version: 1, active: true, created_by: "member:alex", created_at: "2026-10-10T12:00:00Z" }], variables: ["issue.short_id", "workflow.name"] };

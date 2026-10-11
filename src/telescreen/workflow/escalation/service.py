@@ -21,6 +21,7 @@ from telescreen.workflow.dsl.escalation import (
     escalation_to_json,
     load_escalation_policy,
 )
+from telescreen.workflow.dsl.raw_scan import source_has_raw_values
 
 
 @dataclass
@@ -85,7 +86,7 @@ class EscalationPolicyService:
 
     def _reject_sensitive_text(self, text: str) -> None:
         """Reject sensitive source before it can be stored or audited."""
-        if self.redactor.has_hits(text):
+        if source_has_raw_values(self.redactor, text):
             raise TelescreenError(
                 ErrorCode.RAW_VALUE_DETECTED, "Escalation policy contains sensitive data"
             )

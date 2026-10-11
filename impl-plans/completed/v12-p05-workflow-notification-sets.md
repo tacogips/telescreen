@@ -1,6 +1,6 @@
 # V12-P05 Workflow DSL v2 Notification Sets, Executors and Escalation
 
-**Status**: In Progress (blocked on one out-of-writePaths inventory line; see Reconciliation request)
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-2-notifications-and-identity.md sections 1 (D5-D8), 4; design-docs/specs/design-workflow-engine.md "Workflow DSL v2 (v1.2)"
 **Created**: 2026-10-11
 **Last Updated**: 2026-10-11
@@ -262,12 +262,15 @@ tests/examples` -> exit 0 (the v1 and v1.1 workflow suites are unchanged).
 ## Completion Criteria
 
 - [x] Deliverables 1-12 implemented; files under 1000 lines.
-- [ ] `tests/workflow` and `tests/examples` pass; scoped gates pass; typelint grep empty.
-      (Scoped gates and typelint pass. Blocked only by
-      `tests/workflow/dsl/test_workflow_dsl.py:314`, outside writePaths; see the
-      session-9 Reconciliation request.)
+- [x] `tests/workflow` and `tests/examples` pass; scoped gates pass; typelint grep empty.
+      (Reconciliation R1 updated the unsupported-version fixture to v3; session-10
+      verification passes on the committed tree.)
 - [x] `git diff tests/workflow/test_v11_workflow.py` shows only the owner-review
       request-text assertion rewrite.
+- [x] INT-D4-M01A: `email:` recipient addresses are exempt from the workflow raw-value
+      scan; all other detected hits remain rejected.
+- [x] ADV-D4-P05-M01: escalation policy saves use `source_has_raw_values`; `email:` tier
+      recipients are accepted and all other detected hits remain rejected.
 - [x] Progress Log complete.
 
 ## Progress Log
@@ -337,3 +340,53 @@ offline pytest on the moving shared tree -> exit 1, 777 passed, 1 failed (same t
 
 
 **Owner resolution (2026-10-11, session 9)**: The only blocker (the v1 DSL test that expected `telescreen.workflow/v2` to be unsupported) was fixed by session-9 reconciliation repair R1: `tests/workflow/dsl/test_workflow_dsl.py` now uses `telescreen.workflow/v3` as the unsupported version. Whole-repository gates on the combined tree pass (pytest 784 passed / 5 skipped). On redispatch, re-verify on the committed tree, tick the remaining completion criterion, change nothing else unless review finds a defect, and report only final passing commands with an empty `priorVerification` (conventions 7a).
+
+### Session: 2026-10-11 12:03 UTC (session 10, manifest telescreen-v12-20261011-d4, attempt 1)
+**Tasks Completed**: Re-verified the accepted p05 implementation on committed tree `5474072f90c2fce01b9f1d272f69a533122e51b1`; the prior reconciliation is present and the remaining completion criterion passes. No implementation source changes.
+**Tasks In Progress**: None.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: plan before=f6bb8b5a9223d1d1f44cd3fc392876201da4f5644a135af9697baeffd8169f93 after=<see `tmp/telescreen-v12-20261011-d4/v12-p05-workflow-notification-sets/attempt-1/plan-after.sha256`>.
+**Verification**:
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/workflow tests/workflow/v12 tests/workflow/test_v11_workflow.py` -> exit 0, 49 files formatted (log: `tmp/telescreen-v12-20261011-d4/v12-p05-workflow-notification-sets/attempt-1/ruff-format.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/workflow tests/workflow/v12 tests/workflow/test_v11_workflow.py` -> exit 0 (log: `tmp/telescreen-v12-20261011-d4/v12-p05-workflow-notification-sets/attempt-1/ruff-check.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/workflow tests/workflow/v12 tests/workflow/test_v11_workflow.py` -> exit 0 (log: `tmp/telescreen-v12-20261011-d4/v12-p05-workflow-notification-sets/attempt-1/ty-check.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/workflow/v12 2>&1 | tee /tmp/telescreen-v12-p05-workflow-notification-sets-pytest.log` -> exit 0, 36 passed, 0 failed (log: `/tmp/telescreen-v12-p05-workflow-notification-sets-pytest.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/workflow tests/examples > /tmp/telescreen-v12-p05-workflow-notification-sets-regress.log 2>&1` -> exit 0, 156 passed, 0 failed, 1 skipped (log: `/tmp/telescreen-v12-p05-workflow-notification-sets-regress.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v12-p05-workflow-notification-sets-typelint.log 2>&1; ! grep -E '^(src/telescreen/workflow/|tests/workflow/v12/|tests/workflow/test_v11_workflow\.py)' /tmp/telescreen-v12-p05-workflow-notification-sets-typelint.log` -> exit 0, no diagnostics under scoped paths (log: `/tmp/telescreen-v12-p05-workflow-notification-sets-typelint.log`).
+- `wc -l src/telescreen/workflow/dsl/*.py > /tmp/telescreen-v12-p05-workflow-notification-sets-wc.log; ! awk '$2 != "total" && $1 >= 1000' /tmp/telescreen-v12-p05-workflow-notification-sets-wc.log | grep -q .` -> exit 0 (log: `/tmp/telescreen-v12-p05-workflow-notification-sets-wc.log`).
+- `find src/telescreen/workflow/dsl src/telescreen/workflow/executors src/telescreen/workflow/escalation tests/workflow/v12 -type f \( -name '*.py' -o -name '*.json' \) -print0 | xargs -0 wc -l > /tmp/telescreen-v12-p05-workflow-notification-sets-all-size.log; ! awk '$2 != "total" && $1 >= 1000' /tmp/telescreen-v12-p05-workflow-notification-sets-all-size.log | grep -q .` -> exit 0, no listed source/schema file reaches 1000 lines (log: `/tmp/telescreen-v12-p05-workflow-notification-sets-all-size.log`).
+- `git diff fcfb198 -- tests/workflow/test_v11_workflow.py` -> exit 0, no unplanned working-tree diff; log: `tmp/telescreen-v12-20261011-d4/v12-p05-workflow-notification-sets/attempt-1/v11-diff.log`; the owner-review assertion rewrite is recorded in the session-9 change inventory.
+- `test "$(grep -c '^- \[ \]' impl-plans/active/v12-p05-workflow-notification-sets.md)" -eq 0` -> exit 0 after this update (log: `tmp/telescreen-v12-20261011-d4/v12-p05-workflow-notification-sets/attempt-1/completion-criteria.log`).
+**Notes**: Working tree was clean before this plan-local update; dependency plans p01/p02 are accepted in the dispatched `acceptedPlanIds`. Verification logs are complete.
+
+### Session: 2026-10-11 (session 10, manifest telescreen-v12-20261011-d4, attempt 2)
+**Tasks Completed**: Fixed INT-D4-M01A in the assigned p05 paths. Added
+`dsl/raw_scan.py:source_has_raw_values`; only EMAIL findings immediately following
+`email:` and ending at EOF or an allowed syntax terminator are exempt. Both
+`WorkflowService.validate` and `WorkflowService.upload` use the helper. Added real-service
+validation and helper tests for the documented v2 example, a v1 email target, free-text
+email, runtime-built secret, secret embedded in an email reference, and all allowed
+terminators. Preserved the p05-owned v1-only example inventory correction already present
+in `tests/workflow/v12/test_dsl_v2.py`; the full suite now includes and passes that test.
+**Tasks In Progress**: None for p05.
+**Blockers**: None for p05.
+**Reconciliation requests**: p11 (`src/telescreen/cli.py`, outside p05 writePaths):
+`uv run --frozen telescreen workflow validate examples/workflows/notification-sets.yaml`
+still exits 2 with `raw_value_detected`. The review explicitly assigns the CLI call site to
+p11 under INT-D4-M01B and forbids editing `cli.py` in p05. p11 should import and call
+`source_has_raw_values` and rerun its CLI validation regression.
+**Hashes**: plan before=`tmp/telescreen-v12-20261011-d4/v12-p05-workflow-notification-sets/attempt-2/plan-before.sha256`; after=`tmp/telescreen-v12-20261011-d4/v12-p05-workflow-notification-sets/attempt-2/plan-after.sha256`. Edit intent: `tmp/telescreen-v12-20261011-d4/v12-p05-workflow-notification-sets/attempt-2/edit-intent-raw-scan.md`.
+**Verification** (final source; logs in `tmp/telescreen-v12-20261011-d4/v12-p05-workflow-notification-sets/attempt-2/`): format/check/ty scoped commands -> exit 0 (`format2.log`, `ruff2.log`, `ty2.log`); `uv run --frozen pytest -p no:cacheprovider tests/workflow/v12` -> 54 passed (`pytest-v12-2.log`); `uv run --frozen pytest -p no:cacheprovider tests/workflow tests/examples` -> 176 passed, 1 skipped (`regression.log`); full pytest -> 817 passed, 8 skipped (`all.log`).
+`uv run --frozen python tools/typelint.py` -> 424 files clean (`typelint-full.log`), filtered p05 typelint -> no diagnostics (`typelint-filter.log`); no `has_hits` in `definitions.py` (`raw-helper-check.log`); size and zero-unticked-criteria gates pass (`line-limits.log`, `completion-criteria.log`, `line-limit-final.log`).
+Initial attempt logs record formatting and TL003 failures; both were corrected and final gates rerun. The CLI example validation is recorded above as p11-owned reconciliation, not a p05 gate.
+
+### Session: 2026-10-11 (session 10, manifest telescreen-v12-20261011-d4, attempt 3)
+**Tasks Completed**: Fixed ADV-D4-P05-M01 in `escalation/service.py`: create/update now scan with the shared `source_has_raw_values`. Added real SQLite service tests for both shipped policies and an inline email target, plus rejection tests for free-text email, an AWS key in body text, and an AWS key inside an `email:` reference. Error code/message and scanner semantics are unchanged.
+**Tasks In Progress**: None for p05.
+**Blockers**: None for p05.
+**Reconciliation requests**: p11 owns the remaining `src/telescreen/cli.py` workflow-validate call under INT-D4-M01B; no p05 CLI change.
+**Evidence/Hashes**: edit intent `attempt-3/edit-intent-escalation-raw-scan.md`; reproduction before repair `attempt-3/reproduction.log`; source and plan hashes in `attempt-3/hashes-before.txt` and `attempt-3/plan-after.sha256`.
+**Verification**: `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/workflow tests/workflow/v12 tests/workflow/test_v11_workflow.py` -> exit 0 (`attempt-3/ruff-format-final.log`); same prefix with `ruff check --no-cache src/telescreen/workflow tests/workflow/v12 tests/workflow/test_v11_workflow.py` -> exit 0 (`ruff-final.log`); same prefix with `ty check src/telescreen/workflow tests/workflow/v12 tests/workflow/test_v11_workflow.py` -> exit 0 (`ty-final.log`).
+`uv run --frozen pytest -p no:cacheprovider tests/workflow/v12` -> 60 passed (`attempt-3/pytest-v12-final.log`); `uv run --frozen pytest -p no:cacheprovider tests/workflow tests/examples` -> 182 passed, 1 skipped (`pytest-regression-final.log`); `uv run --frozen pytest -p no:cacheprovider` -> 823 passed, 8 skipped (`pytest-all-final.log`).
+`set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > tmp/telescreen-v12-20261011-d4/v12-p05-workflow-notification-sets/attempt-3/typelint-final.log 2>&1; ! grep -E '^(src/telescreen/workflow/|tests/workflow/v12/|tests/workflow/test_v11_workflow\.py)' tmp/telescreen-v12-20261011-d4/v12-p05-workflow-notification-sets/attempt-3/typelint-final.log` -> exit 0, 425 files clean and no scoped diagnostics; `! grep -n 'has_hits' src/telescreen/workflow/escalation/service.py src/telescreen/workflow/engine/definitions.py` -> exit 0 (`raw-gate.log`); `find src/telescreen/workflow tests/workflow/v12 -type f -name '*.py' -print0 | xargs -0 wc -l > tmp/telescreen-v12-20261011-d4/v12-p05-workflow-notification-sets/attempt-3/line-counts-final.log; ! awk '$2 != "total" && $1 >= 1000' tmp/telescreen-v12-20261011-d4/v12-p05-workflow-notification-sets/attempt-3/line-counts-final.log | grep -q .` -> exit 0; `test "$(grep -c '^- \[ \]' impl-plans/active/v12-p05-workflow-notification-sets.md)" -eq 0` and plan under 400 lines -> exit 0 (`completion-criteria.log`, `plan-line-count.log`).

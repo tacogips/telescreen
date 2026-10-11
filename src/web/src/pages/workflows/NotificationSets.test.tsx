@@ -30,7 +30,7 @@ steps:
   - {id: done, type: end}
 `;
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); localStorage.clear(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); globalThis.localStorage?.clear(); });
 
 describe("NotificationSets", () => {
   it("shows one card per set of a v2 workflow", () => {

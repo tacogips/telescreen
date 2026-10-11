@@ -7,7 +7,14 @@ changeable. Make notification destinations configurable inside workflows, specif
 of destination plus notification method. Also verify registered-user permission management
 and SSO integration, using a Keycloak container where test users are registered."
 
-Status: design (2026-10-11), baseline for the `v12-pNN` plans. It extends the implemented
+Status: implemented (2026-10-12). N1-N3, R1 and R2 shipped on `main` through the 12 v1.2
+plans `v12-p01` to `v12-p12`. All of them are integration-accepted and archived under
+`impl-plans/completed/`, and their run manifests (`telescreen-v12-20261011-d1` to `-d4`)
+are under `impl-plans/completed/dispatch/`. The v1.2 leak matrix and the end-to-end flows
+T1, T2, A1 and A2 pass offline; the `tests/live` Mailpit, Slack and Keycloak tests are
+env-gated and run by the owner against the real services.
+
+The design was written on 2026-10-11 as the baseline for the `v12-pNN` plans. It extends the implemented
 v1 and v1.1 designs and replaces none of their decisions except those listed in section 1.
 Tables are in `design-data-model.md` ("v1.2 additions"), endpoints in `design-api-and-ui.md`
 ("v1.2 endpoints"), DSL changes in `design-workflow-engine.md` ("Workflow DSL v2"), leak

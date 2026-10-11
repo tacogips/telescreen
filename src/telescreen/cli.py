@@ -13,18 +13,19 @@ from fastapi import FastAPI
 
 from telescreen.assistant.mcp_server import run_stdio
 from telescreen.assistant.tools import AssistantTools
+from telescreen.cli_v12 import create_token, member_set_role, notify_test
 from telescreen.core.config import TelescreenSettings, load_settings
 from telescreen.core.errors import ConfigError, TelescreenError
 from telescreen.core.secrets import EnvSource
 from telescreen.core.vocabulary import ApiScope, ScanTrigger, SourceFormat
 from telescreen.db.models import PoliceWorkerRow
-from telescreen.directory.tokens import CreatedToken
 from telescreen.masking.log_masking import configure_logging, install_excepthook
 from telescreen.masking.redact import Redactor
 from telescreen.ports.collectors import CollectorConfig
 from telescreen.search.reindex import ReindexCounts, reindex_all
 from telescreen.wiring import Container, build_container, close_container
 from telescreen.workflow.dsl.loader import WorkflowValidationError, load_workflow
+from telescreen.workflow.dsl.raw_scan import source_has_raw_values
 
 
 class _Environment(EnvSource):
@@ -70,6 +71,22 @@ def _parser() -> argparse.ArgumentParser:
     create_token: argparse.ArgumentParser = token_commands.add_parser("create")
     create_token.add_argument("--label", required=True)
     create_token.add_argument("--scopes", default="read,write")
+    create_token.add_argument("--member")
+    member: argparse.ArgumentParser = commands.add_parser("member")
+    member_commands: argparse._SubParsersAction[argparse.ArgumentParser] = member.add_subparsers(
+        dest="member_command"
+    )
+    set_role: argparse.ArgumentParser = member_commands.add_parser("set-role")
+    set_role.add_argument("handle")
+    set_role.add_argument("role", choices=("admin", "responder", "viewer", "none"))
+    notify: argparse.ArgumentParser = commands.add_parser("notify")
+    notify_commands: argparse._SubParsersAction[argparse.ArgumentParser] = notify.add_subparsers(
+        dest="notify_command"
+    )
+    notify_test_parser: argparse.ArgumentParser = notify_commands.add_parser("test")
+    notify_test_parser.add_argument("--channel", choices=("email", "slack"), required=True)
+    notify_test_parser.add_argument("--to", dest="recipient", required=True)
+    notify_test_parser.add_argument("--template")
     search: argparse.ArgumentParser = commands.add_parser("search")
     search.add_subparsers(dest="search_command").add_parser("reindex")
     commands.add_parser("mcp")
@@ -87,7 +104,7 @@ def _validate_files(paths: Sequence[str], redactor: Redactor) -> int:
             print(f"{name} file_unavailable")
             failed = True
             continue
-        if redactor.has_hits(source):
+        if source_has_raw_values(redactor, source):
             print(f"{name} raw_value_detected")
             failed = True
             continue
@@ -173,6 +190,12 @@ async def _run_async_command(container: Container, arguments: argparse.Namespace
     if arguments.command == "mcp":
         run_stdio(AssistantTools(container.sessions, container.redactor, container.clock))
         return 0
+    if arguments.command == "notify" and arguments.notify_command == "test":
+        return await notify_test(
+            container, arguments.channel, arguments.recipient, arguments.template
+        )
+    if arguments.command == "member" and arguments.member_command == "set-role":
+        return await member_set_role(container, arguments.handle, arguments.role)
     if arguments.command == "token":
         scope_names: tuple[str, ...] = tuple(
             part.strip() for part in arguments.scopes.split(",") if part.strip()
@@ -185,12 +208,7 @@ async def _run_async_command(container: Container, arguments: argparse.Namespace
         if not scopes:
             print("at least one token scope is required", file=sys.stderr)
             return 2
-        async with container.sessions.begin() as session:
-            created: CreatedToken = await container.token_service.create(
-                session, arguments.label, scopes, None
-            )
-        print(created.token)
-        return 0
+        return await create_token(container, arguments.label, scopes, arguments.member)
     if arguments.command == "police":
         async with container.sessions() as session:
             workers: tuple[PoliceWorkerRow, ...] = await container.police_repository.workers(
