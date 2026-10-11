@@ -21,6 +21,8 @@ from telescreen.core.json import (
 from telescreen.core.vocabulary import ErrorCode, NotificationChannel, SourceFormat
 from telescreen.workflow.dsl._iso import format_duration
 from telescreen.workflow.dsl.loader import ValidationIssue, WorkflowValidationError
+from telescreen.workflow.dsl.model import NotificationTargetSpec
+from telescreen.workflow.dsl.notification_sets import read_targets, targets_json, validate_targets
 
 
 @dataclass(frozen=True)
@@ -32,6 +34,8 @@ class EscalationTier:
     notify: tuple[str, ...]
     channels: tuple[NotificationChannel, ...]
     min_risk: int | None = None
+    notification_set: str | None = None
+    targets: tuple[NotificationTargetSpec, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -42,7 +46,8 @@ class EscalationPolicySpec:
     tiers: tuple[EscalationTier, ...]
 
 
-_RECIPIENT: re.Pattern[str] = re.compile(r"^(member|team|email|slack):.+$")
+_RECIPIENT: re.Pattern[str] = re.compile(r"^(member|team|email|slack|slack_channel):.+$")
+_SET_NAME: re.Pattern[str] = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
 
 
 def load_escalation_policy(text: str, source_format: SourceFormat) -> EscalationPolicySpec:
@@ -100,12 +105,22 @@ def _tier(value: JsonValue, index: int, issues: list[ValidationIssue]) -> Escala
         assign_to = ""
     if _RECIPIENT.fullmatch(assign_to) is None:
         issues.append(ValidationIssue(f"{path}/assign_to", "invalid_value"))
-    notify: tuple[str, ...] = _read_string_array(value.get("notify"), f"{path}/notify", issues)
+    notify_value: JsonValue | None = value.get("notify")
+    notify: tuple[str, ...] = (
+        _read_string_array(notify_value, f"{path}/notify", issues)
+        if notify_value is not None
+        else ()
+    )
     for notify_index, recipient in enumerate(notify):
         if _RECIPIENT.fullmatch(recipient) is None:
             issues.append(ValidationIssue(f"{path}/notify/{notify_index}", "invalid_value"))
-    raw_channels: tuple[str, ...] = _read_string_array(
-        value.get("channels"), f"{path}/channels", issues
+    channels_value: JsonValue | None = value.get("channels")
+    if notify and channels_value is None:
+        issues.append(ValidationIssue(f"{path}/channels", "missing_field"))
+    raw_channels: tuple[str, ...] = (
+        _read_string_array(channels_value, f"{path}/channels", issues)
+        if channels_value is not None
+        else ()
     )
     channels: list[NotificationChannel] = []
     for channel_index, raw in enumerate(raw_channels):
@@ -113,7 +128,22 @@ def _tier(value: JsonValue, index: int, issues: list[ValidationIssue]) -> Escala
             channels.append(NotificationChannel(raw))
         except ValueError:
             issues.append(ValidationIssue(f"{path}/channels/{channel_index}", "invalid_value"))
-    return EscalationTier(after, assign_to, notify, tuple(channels), min_risk)
+    set_value: JsonValue | None = value.get("notification_set")
+    notification_set: str | None = set_value.as_str() if set_value is not None else None
+    if set_value is not None and (
+        notification_set is None or _SET_NAME.fullmatch(notification_set) is None
+    ):
+        issues.append(ValidationIssue(f"{path}/notification_set", "invalid_value"))
+        notification_set = None
+    targets: tuple[NotificationTargetSpec, ...] = read_targets(
+        issues, value.get("targets"), f"{path}/targets"
+    )
+    validate_targets(targets, f"{path}/targets", issues)
+    if notify_value is None and value.get("targets") is None and set_value is None:
+        issues.append(ValidationIssue(path, "missing_field"))
+    return EscalationTier(
+        after, assign_to, notify, tuple(channels), min_risk, notification_set, targets
+    )
 
 
 def _read_string_array(
@@ -155,6 +185,10 @@ def _tier_json(tier: EscalationTier) -> JsonValue:
     ]
     if tier.min_risk is not None:
         members.append(("min_risk", json_int(tier.min_risk)))
+    if tier.notification_set is not None:
+        members.append(("notification_set", json_str(tier.notification_set)))
+    if tier.targets:
+        members.append(("targets", targets_json(tier.targets)))
     return json_object(members)
 
 

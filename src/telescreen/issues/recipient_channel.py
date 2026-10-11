@@ -4,6 +4,8 @@ The notification sender stores recipient references (``member:x``, ``team:y``) a
 them at delivery time, so issue notifications pass the reference itself, never resolved
 addresses. Resolution here only picks the channel; an unknown recipient is skipped so it
 never rolls back the caller's transaction (exception expiry, verification, digests).
+Issue notifications send an event and a ``NotificationContext`` built from masked issue
+columns; the notification service renders the text from a template.
 """
 
 from __future__ import annotations
@@ -15,7 +17,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.core.errors import TelescreenError
 from telescreen.core.vocabulary import ErrorCode, NotificationChannel
+from telescreen.db.models import IssueRow
+from telescreen.issues.keys import short_id
 from telescreen.ports.directory import ResolvedRecipients
+from telescreen.ports.notifications import NotificationContext
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -42,3 +47,15 @@ async def preferred_channel(
     if recipients.emails:
         return NotificationChannel.EMAIL
     return None
+
+
+def issue_context(issue: IssueRow) -> NotificationContext:
+    """Build a template context from an issue's identifier and enum columns only."""
+    return NotificationContext(
+        issue_short_id=short_id(issue.number),
+        issue_rule_class=issue.rule_class,
+        issue_severity=issue.severity,
+        issue_status=issue.status,
+        issue_exposure=issue.exposure_visibility,
+        issue_risk_score=issue.risk_score,
+    )

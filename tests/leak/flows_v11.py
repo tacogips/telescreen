@@ -7,13 +7,14 @@ from datetime import timedelta
 from pathlib import Path
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from telescreen.core.vocabulary import ApiScope
 from telescreen.db.models import (
     IssueExceptionRow,
     IssueHistoryRow,
     IssueRow,
+    MemberRow,
     NotificationRow,
     ResourceCoverageRow,
 )
@@ -313,6 +314,9 @@ async def exception_flow(world: LeakWorld) -> None:
     assert member.status_code == 201, member.text
     member_id: str = member.json()["id"]
     async with world.database.sessions.begin() as session:
+        await session.execute(
+            update(MemberRow).where(MemberRow.id == member_id).values(role="responder")
+        )
         member_token: CreatedToken = await TokenService(world.container.audit, world.clock).create(
             session,
             "v11-exception-member",

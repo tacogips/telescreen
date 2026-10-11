@@ -25,7 +25,7 @@ from telescreen.core.vocabulary import (
     ErrorCode,
     RuleClass,
 )
-from telescreen.db.models import ApiTokenRow, EvidenceRow, IssueHistoryRow
+from telescreen.db.models import ApiTokenRow, EvidenceRow, IssueHistoryRow, MemberRow
 from telescreen.detection import RuleDetector
 from telescreen.detection.harness import LlmJsonRequest
 from telescreen.evidence import (
@@ -405,6 +405,19 @@ async def test_api_rejection_and_over_size_are_safe(tmp_path: Path) -> None:
     ctx: ApiContext = ApiContext(harness.sessions, clock, audit)
     async with harness.sessions.begin() as session:
         session.add(
+            MemberRow(
+                id="member-1",
+                handle="member-1",
+                display_name="Member One",
+                email=None,
+                slack_user_id=None,
+                active=True,
+                created_at=NOW,
+                updated_at=NOW,
+                role="responder",
+            )
+        )
+        session.add(
             ApiTokenRow(
                 id="token-1",
                 label="test",
@@ -509,6 +522,19 @@ async def test_api_missing_image_scanner_returns_503_without_storage(tmp_path: P
     )
     ctx: ApiContext = ApiContext(harness.sessions, FakeClock(NOW), audit)
     async with harness.sessions.begin() as session:
+        session.add(
+            MemberRow(
+                id="member-1",
+                handle="member-1",
+                display_name="Member One",
+                email=None,
+                slack_user_id=None,
+                active=True,
+                created_at=NOW,
+                updated_at=NOW,
+                role="responder",
+            )
+        )
         session.add(
             ApiTokenRow(
                 id="token-1",

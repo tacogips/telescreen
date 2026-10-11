@@ -1,6 +1,6 @@
 # V12-P08 OIDC Identity: Discovery, JWKS, JWT Verification, Sign-in Orchestration
 
-**Status**: Not Started
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-2-notifications-and-identity.md sections 1 (D13-D19), 6.2, 6.3, 8; design-docs/user-qa/qa-oidc-sso.md
 **Created**: 2026-10-11
 **Last Updated**: 2026-10-11
@@ -184,8 +184,37 @@ Conventions section 7 with `<src>` = `src/telescreen/identity` and `<tests>` =
 
 ## Completion Criteria
 
-- [ ] Deliverables 1-6 implemented; every negative test passes.
-- [ ] Scoped gates pass; typelint grep empty; no per-file-ignore added.
-- [ ] Progress Log complete.
+- [x] Deliverables 1-6 implemented; every negative test passes.
+- [x] Scoped gates pass; typelint grep empty; no per-file-ignore added.
+- [x] Progress Log complete.
 
 ## Progress Log
+
+### Session 9 (2026-10-11), manifest telescreen-v12-20261011-d3, attempt 1 (Claude in place of Codex Luna)
+
+- Base HEAD 8ff064f; dependency v12-p01-foundation is in acceptedPlanIds. Evidence:
+  `tmp/telescreen-v12-20261011-d3/v12-p08-oidc-identity/attempt-1/` (edit-intent.md, logs).
+- Added `src/telescreen/identity/`: `jose.py` (split_token, parse_header, verify_signature
+  via `PyJWK.from_json` + `PyJWS().decode`), `discovery.py` (OidcProviderClient: exact issuer,
+  same-origin jwks_uri, JWKS cache, unknown-kid refetch at most once per 30 s, stale use up to
+  3600 s past expiry then `idp_unavailable`, asyncio.Lock), `verifier.py`
+  (OidcBearerVerifier), `claims.py`, `signin.py` (SignInService, identity_key_prefix),
+  `__init__.py`.
+- Added `tests/identity/` (conftest leak guard over caplog, oidc_fixtures, verifier,
+  discovery and sign-in tests): 52 tests covering every listed negative case, leeway,
+  rotation with request counts, discovery mismatch/cross-origin/outage, claims, and sign-in
+  success/no_role/provisioner denials with real AuditLogService rows over SQLite.
+- Notes: `profile()` returns a frozen `ClaimProfile` dataclass (email hidden from repr)
+  instead of a bare tuple. The stale window is measured from cache expiry. While the cache is
+  stale, an outage is retried at most once per 30 s. PyJWT typed cleanly, so no
+  Reconciliation request is needed.
+- Verification (pipefail, PYTHONDONTWRITEBYTECODE=1), all exit 0:
+  `ruff format --check` (11 files) `01-format.log`; `ruff check` `02-ruff.log`; `ty check`
+  `03-ty.log`; `pytest tests/identity` 52 passed `04-pytest.log` and
+  `/tmp/telescreen-v12-p08-oidc-identity-pytest.log`; typelint grep empty (`05-typelint-grep.log`;
+  typelint prints absolute paths, and an any-prefix grep for identity paths is also empty,
+  `05b-typelint-anyprefix-grep.log`; the whole-repo typelint exit 1 comes only from v12-p04
+  notification files); no type/ty ignore (`06-noignore.log`); `tools/typelint.py` unchanged.
+- Informational full suite: `07-pytest-all.log`, exit=1, 45 failed / 617 passed / 5 skipped.
+  All failures are in suites exercised by in-progress wave-2 plans (p04-p07 api, notifications,
+  workflow, leak, typelint repository test). None are in tests/identity.

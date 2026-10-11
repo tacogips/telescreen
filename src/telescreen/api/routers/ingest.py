@@ -8,12 +8,13 @@ import pydantic
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import TypeAdapter, ValidationError
 
-from telescreen.api.common.auth import Principal, require_scope
+from telescreen.api.common.auth import Principal, require_permission
 from telescreen.api.common.body import read_limited_body
 from telescreen.api.common.context import ApiContext
 from telescreen.core.errors import TelescreenError
 from telescreen.core.json import dump_json
-from telescreen.core.vocabulary import ApiScope, CollectorKind, ErrorCode, RuleClass
+from telescreen.core.permissions import Permission
+from telescreen.core.vocabulary import CollectorKind, ErrorCode, RuleClass
 from telescreen.issues.ingest import IngestScanResult, IngestService
 from telescreen.ports.collectors import (
     CollectorConfig,
@@ -91,7 +92,9 @@ def build_ingest_router(deps: IngestRouterDeps) -> APIRouter:
     @router.post("/api/ingest/v1/scan")
     async def scan_push(
         request: Request,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.INGEST))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.INGEST_PUSH))
+        ],
     ) -> Response:
         """Read a bounded payload and scan its content transiently."""
         del principal
@@ -129,7 +132,9 @@ def build_ingest_router(deps: IngestRouterDeps) -> APIRouter:
     @router.post("/api/ingest/v1/findings")
     async def findings_push(
         request: Request,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.INGEST))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.INGEST_PUSH))
+        ],
     ) -> Response:
         """Re-scan external masked findings and store only re-keyed fingerprints."""
         del principal
@@ -163,7 +168,9 @@ def build_ingest_router(deps: IngestRouterDeps) -> APIRouter:
     @router.get("/api/ingest/v1/sources/{name}/config")
     async def source_config(
         name: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.INGEST))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.INGEST_PUSH))
+        ],
     ) -> Response:
         """Return an enabled custom collector's selector as native JSON."""
         del principal

@@ -18,6 +18,16 @@ class SlackResponse:
 
     ok: bool
     error: str | None = None
+    channel: str | None = None
+    ts: str | None = None
+
+
+@dataclass(frozen=True)
+class SlackPostResult:
+    """Channel id and message timestamp reported by a successful post."""
+
+    channel: str
+    ts: str
 
 
 @dataclass(frozen=True)
@@ -28,7 +38,7 @@ class SlackNotifier:
     bot_token: SecretValue | None
     api_base: str = "https://slack.com/api"
 
-    async def send(self, target: str, message: CensoredMessage) -> None:
+    async def send(self, target: str, message: CensoredMessage) -> SlackPostResult:
         """Post masked content and convert provider failures to safe task outcomes."""
         if self.bot_token is None:
             raise TelescreenError(ErrorCode.CONFIG_ERROR, "Slack bot token is not configured")
@@ -48,6 +58,7 @@ class SlackNotifier:
             raise TelescreenError(ErrorCode.DELIVERY_FAILED, "Slack delivery failed") from None
         if not result.ok:
             raise TelescreenError(ErrorCode.DELIVERY_FAILED, "Slack delivery failed")
+        return SlackPostResult(result.channel or target, result.ts or "")
 
 
 def _retry_after(response: httpx.Response) -> float | None:

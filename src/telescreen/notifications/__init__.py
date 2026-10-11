@@ -5,7 +5,7 @@ from telescreen.notifications.dlp import CensoredMessage, DlpGate, OutboundMessa
 from telescreen.notifications.email import EmailNotifier, SmtplibTransport, SmtpTransport
 from telescreen.notifications.repository import NotificationRepository
 from telescreen.notifications.sender import NotificationService
-from telescreen.notifications.slack import SlackNotifier
+from telescreen.notifications.slack import SlackNotifier, SlackPostResult
 
 __all__: list[str] = [
     "CensoredMessage",
@@ -16,6 +16,7 @@ __all__: list[str] = [
     "NotificationService",
     "OutboundMessage",
     "SlackNotifier",
+    "SlackPostResult",
     "SmtpTransport",
     "SmtplibTransport",
     "rehydrate",

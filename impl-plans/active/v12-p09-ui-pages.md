@@ -1,6 +1,6 @@
 # V12-P09 UI Pages: Settings (General, Templates, Users and Roles), Workflow Sets, Run Targets
 
-**Status**: Not Started
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-ui-sentry.md sections 10.2, 10.3, 10.5; design-docs/specs/design-api-and-ui.md "v1.2 endpoints"
 **Created**: 2026-10-11
 **Last Updated**: 2026-10-11
@@ -138,9 +138,59 @@ All four commands must exit 0. The screenshot smoke for these pages is run by v1
 
 ## Completion Criteria
 
-- [ ] Deliverables 1-6 implemented.
-- [ ] typecheck, vitest and build exit 0.
-- [ ] No files changed outside the three page directories (`git status --porcelain`).
-- [ ] Progress Log complete.
+- [x] Deliverables 1-6 implemented.
+- [x] typecheck, vitest and build exit 0.
+- [x] No files changed outside the three page directories (`git status --porcelain`).
+- [x] Progress Log complete.
 
 ## Progress Log
+
+### Session 9 (2026-10-11, d3, base 8ff064f, implementer Claude in place of Codex Luna)
+
+- Dependency: v12-p03-ui-foundation is in acceptedPlanIds. Clients (`templatesApi`,
+  `usersApi`), types, mock routes and `useAuth()` from p03 were used as is; no
+  Reconciliation request was needed.
+- Settings (`pages/settings/`): `index.tsx` is a section switch on `{id, sub}`; the template
+  name is the whole decoded `:sub` segment (dots kept). `GeneralSettings.tsx` holds the v1.1
+  sections without the token entry. `TemplatesList.tsx`, `TemplateDetail.tsx`,
+  `TemplateEditor.tsx` (create and version modes, allowed-variable insert at the cursor,
+  per-field `{field, code}` errors, drafts in memory only), `TemplatePreview.tsx` (Email and
+  Slack tabs, DLP verdict tags), `templateText.ts`, `UsersRoles.tsx` (role select, Managed by
+  IdP tooltip, inline `last_admin` text, select restored on failure), `PermissionMatrix.tsx`
+  (grouped by prefix, roles then scopes, lucide `Check`), `settings.css`, `testUtils.tsx`.
+  Save, Activate and New template need `templates.write`; Validate and Preview stay visible
+  because the API grants them with `templates.read`.
+- Workflows: `sets.ts` (never-throwing parser and `notifyLabel`), `NotificationSets.tsx`
+  (fold section, one card per set, fallback "Unable to read notification sets"); `graph.ts`
+  nodes carry an optional `notify` label (`set: <name>` or "inline targets" for notify,
+  human_task and evidence_upload) drawn by `WorkflowGraph.tsx`; `WorkflowEditor.tsx` mounts
+  the panel. v1 sources render nothing new.
+- Runs: `NotifyTargets.tsx` renders target index, channel, queued, blocked, skipped from a
+  v2 step output `targets`; v1 outputs render nothing.
+- Tests: TemplatesList (3), TemplateDetail (5), UsersRoles (4), Settings General (no token
+  input), NotificationSets (5, local v1/v2 YAML constants), RunDetail (v2 targets table).
+- Verification (final source): install exit 0 (no changes), typecheck exit 0, vitest exit 0
+  (36 files, 183 passed), build to /tmp exit 0, package.json/bun.lock diff empty. Logs:
+  `/tmp/telescreen-v12-p09-ui-pages-{install,typecheck,test,build}.log`, copies under
+  `tmp/telescreen-v12-20261011-d3/v12-p09-ui-pages/attempt-1/`. An earlier typecheck run
+  failed on a test literal (`finished_at` type in RunDetail.test.tsx) and was fixed before
+  the final run.
+- Screenshot smoke for these pages is owned by v12-p12.
+
+
+### Session 9 repair P09-ADV-M01 (step7 comm-000368, attempt-2)
+
+- Defect: the template text resource used a fresh `[name, version]` tuple as its source, so
+  every detail refetch (after Save or Activate) reloaded the text and the editor reset,
+  clearing "Saved as version N (inactive)" and reverting the draft. Reproduced first with
+  new assertions (2 failures, `attempt-2/repro-before-fix.log`).
+- Fix (`TemplateDetail.tsx`): the text key is a memo compared by value (name and version),
+  so an unchanged selection does not refetch. `activate()` pins the displayed version
+  before the refetch, so unsaved edits survive. The open version resets when the route name
+  changes, and a detail that belongs to another name is ignored. `onSaved` stays `refetch()`.
+- Tests (`TemplateDetail.test.tsx`, assertions added only): the save test checks the notice,
+  Body text and a single `versions/1` GET after the refetch settles; the activate test
+  checks that typed Body text survives; new tests cover opening version 0 and navigating
+  between two template names.
+- Verification: install, typecheck, vitest and build exit 0; logs copied under
+  `tmp/telescreen-v12-20261011-d3/v12-p09-ui-pages/attempt-2/`.

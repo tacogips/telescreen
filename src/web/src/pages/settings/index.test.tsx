@@ -1,9 +1,15 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { createMemoryHistory, MemoryRouter, Route } from "@solidjs/router";
 import { afterEach, expect, it, vi } from "vitest";
-import { getSession } from "../../auth/session";
 import SettingsPage from "./index";
 
 afterEach(() => { cleanup(); sessionStorage.clear(); document.documentElement.removeAttribute("data-theme"); vi.restoreAllMocks(); });
+
+function renderGeneral(): void {
+  const history = createMemoryHistory();
+  history.set({ value: "/settings" });
+  render(() => <MemoryRouter history={history}><Route path="/settings" component={SettingsPage} /></MemoryRouter>);
+}
 
 function initialSettingsResponses(): Response[] {
   return [
@@ -14,22 +20,21 @@ function initialSettingsResponses(): Response[] {
   ];
 }
 
-it("stores the token in sessionStorage without showing it again", async () => {
+it("shows the General sections without a token entry", async () => {
   const responses = initialSettingsResponses();
   vi.spyOn(globalThis, "fetch").mockImplementation(async () => responses.shift() ?? new Response());
-  render(() => <SettingsPage />);
-  fireEvent.input(await screen.findByLabelText("Bearer token"), { target: { value: "private-token-value" } });
-  fireEvent.click(screen.getByRole("button", { name: "Save token" }));
-  expect(getSession()?.access_token).toBe("private-token-value");
-  expect(await screen.findByText("Token set")).toBeInTheDocument();
-  expect(screen.queryByText("private-token-value")).toBeNull();
+  renderGeneral();
   expect(await screen.findByText("env:DRIVE_TOKEN")).toBeInTheDocument();
+  expect(screen.getByText("On call")).toBeInTheDocument();
+  expect(screen.queryByLabelText("Bearer token")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Save token" })).toBeNull();
+  expect(document.querySelector("input[type=password]")).toBeNull();
 });
 
 it("applies the selected theme and sends team member handles", async () => {
   const responses = initialSettingsResponses();
   const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () => responses.shift() ?? new Response(null, { status: 204 }));
-  render(() => <SettingsPage />);
+  renderGeneral();
   await screen.findByText("On call");
   fireEvent.change(screen.getByLabelText("Theme"), { target: { value: "dark" } });
   expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
@@ -42,7 +47,7 @@ it("shows the API error when setting team members fails", async () => {
   const responses = initialSettingsResponses();
   responses.push(new Response(JSON.stringify({ error: { code: "internal_error", detail: "failed" } }), { status: 500 }));
   const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () => responses.shift() ?? new Response());
-  render(() => <SettingsPage />);
+  renderGeneral();
   await screen.findByText("On call");
   fireEvent.input(screen.getByLabelText("Member handles"), { target: { value: "alice" } });
   fireEvent.click(screen.getByRole("button", { name: "Save team changes" }));
@@ -62,7 +67,7 @@ it("adds an identity without displaying the submitted value and saves the team l
     if (url === "/api/members/alex/identities") return new Response(JSON.stringify({ items: [{ id: "alex:identity-1", kind: "email", origin: "manual", key_prefix: "hmac:v1:abc", created_at: "2026-10-10T00:00:00Z" }], next_cursor: null }));
     return new Response(null, { status: 204 });
   });
-  render(() => <SettingsPage />);
+  renderGeneral();
   fireEvent.click(await screen.findByRole("button", { name: "Identities" }));
   fireEvent.input(await screen.findByLabelText("Value"), { target: { value: "identity@example.invalid" } });
   fireEvent.click(screen.getByRole("button", { name: "Add identity" }));

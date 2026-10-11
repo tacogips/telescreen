@@ -6,6 +6,7 @@ import { ErrorBanner } from "../../components/ErrorBanner";
 import { Button, Panel } from "../../components/ui";
 import { TopBar } from "../../components/shell/TopBar";
 import { WorkflowGraph } from "./WorkflowGraph";
+import { NotificationSets } from "./NotificationSets";
 import { parseWorkflowGraph } from "./graph";
 import "./workflow-editor.css";
 
@@ -109,6 +110,7 @@ export function WorkflowEditor(props: Readonly<{ name?: string; onChanged?: () =
         </div>
         <WorkflowGraph graph={graph()} />
       </div>
+      <NotificationSets source={source()} format={format()} />
     </Panel>
     <Show when={props.name !== undefined && props.name !== "new"}>
       <Panel><h2>Versions</h2><Show when={versionsError()} keyed>{(value) => <ErrorBanner error={value} />}</Show><Show when={!versions.error}><Show when={!versions.loading} fallback={<p>Loading versions...</p>}><Show when={versionIndex()?.versions.length} fallback={<p>No versions saved yet.</p>}>

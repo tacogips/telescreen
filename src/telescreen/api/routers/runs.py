@@ -7,10 +7,11 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from sqlalchemy import Select, select
 
-from telescreen.api.common.auth import Principal, require_scope
+from telescreen.api.common.auth import Principal, require_permission
 from telescreen.api.common.context import ApiContext
 from telescreen.core.json import parse_json
-from telescreen.core.vocabulary import ApiScope, RunStatus
+from telescreen.core.permissions import Permission
+from telescreen.core.vocabulary import RunStatus
 from telescreen.db.models import (
     HumanTaskRow,
     StepRunRow,
@@ -84,7 +85,9 @@ def build_runs_router(deps: RunsRouterDeps) -> APIRouter:
 
     @router.get("/api/runs")
     async def list_runs(
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.RUNS_READ))
+        ],
         status: RunStatus | None = None,
         workflow: str | None = None,
         issue_id: str | None = None,
@@ -109,7 +112,9 @@ def build_runs_router(deps: RunsRouterDeps) -> APIRouter:
     @router.get("/api/runs/{run_id}")
     async def get_run(
         run_id: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.RUNS_READ))
+        ],
     ) -> JSONResponse:
         del principal
         async with deps.ctx.sessions() as session:
@@ -147,7 +152,9 @@ def build_runs_router(deps: RunsRouterDeps) -> APIRouter:
     @router.post("/api/runs/{run_id}/cancel")
     async def cancel_run(
         run_id: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.WRITE))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.RUNS_WRITE))
+        ],
     ) -> JSONResponse:
         async with deps.ctx.sessions.begin() as session:
             await deps.engine.cancel_run(session, run_id, principal.actor_ref())

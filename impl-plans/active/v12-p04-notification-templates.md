@@ -1,6 +1,6 @@
 # V12-P04 Notification Templates, Rendering, Per-Target Rows, System Call Sites
 
-**Status**: Not Started
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-2-notifications-and-identity.md sections 1 (D1-D5, D8), 3, 4.3, 8; design-docs/specs/design-masking.md "v1.2 additions"; design-docs/specs/design-data-model.md "v1.2 additions"
 **Created**: 2026-10-11
 **Last Updated**: 2026-10-11
@@ -279,11 +279,92 @@ must be fixed; a failure elsewhere is noted.
 
 ## Completion Criteria
 
-- [ ] Template package, sender, delivery, Slack result and call sites implemented.
-- [ ] New and existing notification tests pass; the regression command exits 0.
-- [ ] `git diff` on the two v1.1 test files shows only the request-text assertion
+- [x] Template package, sender, delivery, Slack result and call sites implemented.
+- [x] New and existing notification tests pass; the regression command exits 0.
+- [x] `git diff` on the two v1.1 test files shows only the request-text assertion
       rewrites of sharedPathNotes.
-- [ ] Scoped gates pass; typelint grep empty; each file under 1000 lines.
-- [ ] Progress Log complete.
+- [x] Scoped gates pass; typelint grep empty; each file under 1000 lines.
+- [x] Progress Log complete.
 
 ## Progress Log
+
+### Session: 2026-10-11 (session 9, manifest d3, attempt-1; Claude in place of Codex Luna)
+**Tasks Completed**: deliverables 1-5.
+- `notifications/templates/`: `model`, `variables` (21 variables, `EVENT_GROUPS`,
+  `allowed_paths`, `lookup`), `builtins` (10 x `system.<event>` v0), `render`, `validate`,
+  `synthetic`, `repository`, `resolver` (`BuiltinTemplateResolver`, `DbTemplateResolver`),
+  `service` (`TemplateService`: `list_templates`, `get`, `version_text`, `validate`,
+  `preview`, `create_version`, `activate`, `lookup`). The method is named
+  `list_templates`, not `list`, so the builtin `list` stays usable in the class.
+- `dlp.py`: new `DlpGate.inspect_redacted` (Redactor, then the unchanged `inspect`).
+  Redactor hits count as DLP hits, so pre-masking never turns a detected value into
+  `pass` and never bypasses the block policy. Sealed construction stays in `dlp.py`.
+- `sender.py`: event, inline-event and v1 paths; new row columns; `record_unreachable`
+  writes `skipped` rows (`recipient_unknown` / `recipient_unreachable`), audited as
+  `notification.skipped`, with ids in `receipt.skipped` (not in `notification_ids`).
+  `templates` defaults to `BuiltinTemplateResolver`.
+- `delivery.py`: a row with no address on its channel becomes `failed` /
+  `recipient_unreachable`; `error_code` is also set on the `recipient_unknown` and
+  `delivery_failed` failures. `repository.set_delivery(error_code=None)`.
+- `slack.py`: `send` returns `SlackPostResult(channel, ts)`. New `addresses.py` holds
+  `channel_addresses`, shared by the sender and delivery.
+- Call sites: `verification`, `exceptions` (requested and expired), `digest`, collector
+  health and Police health send an event and a context. `issue_context(IssueRow)` is in
+  `issues/recipient_channel.py`. `IssueService.get` fills `masked_excerpt`.
+- Tests: `tests/notifications/v12/` (parity, validation, render, preview, lifecycle,
+  sender, delivery, Slack, excerpt). Only the sharedPathNotes assertions were rewritten
+  in the two v1.1 test files; the `not in` checks now run against `repr(request.context)`,
+  which covers every context field.
+**Tasks In Progress**: None
+**Blockers**: None
+**Reconciliation requests**: None. Note for the owner: the manifest's typelint grep is
+anchored to `^src/...`, but `tools/typelint.py` prints absolute paths, so that grep is
+empty even when there are findings. The run also used an absolute-path grep
+(`06b-typelint-abs-grep`), which caught and led to fixing 4 TL003 findings; it is now empty.
+**Hashes** (sha256 prefix; evidence `tmp/telescreen-v12-20261011-d3/v12-p04-notification-templates/attempt-1/hashes-*.txt`):
+- src/telescreen/notifications/__init__.py before=1f25d6c00bfb after=2fd18f24b1ec
+- src/telescreen/notifications/addresses.py before=absent after=2bde784a3dcf
+- src/telescreen/notifications/delivery.py before=cf3f8b6ea87b after=415ef40e473f
+- src/telescreen/notifications/dlp.py before=8dec399a7f31 after=1879d1e24430
+- src/telescreen/notifications/repository.py before=fea524018a56 after=2c1544995c0d
+- src/telescreen/notifications/sender.py before=6cf362a79385 after=cdcdcb77c822
+- src/telescreen/notifications/slack.py before=93ec1baeee31 after=69c1a8fae3cd
+- src/telescreen/notifications/templates/__init__.py before=absent after=affea6fa0a66
+- src/telescreen/notifications/templates/builtins.py before=absent after=85b3e73928ae
+- src/telescreen/notifications/templates/model.py before=absent after=d89c2f1277b4
+- src/telescreen/notifications/templates/render.py before=absent after=68638999238e
+- src/telescreen/notifications/templates/repository.py before=absent after=a3ffb59554ee
+- src/telescreen/notifications/templates/resolver.py before=absent after=3d7fddc8f927
+- src/telescreen/notifications/templates/service.py before=absent after=4ef9cb5f1866
+- src/telescreen/notifications/templates/synthetic.py before=absent after=b4c03ed89f04
+- src/telescreen/notifications/templates/validate.py before=absent after=e8ab6359969e
+- src/telescreen/notifications/templates/variables.py before=absent after=9f1662f749f0
+- src/telescreen/issues/verification.py before=480b8c1b409f after=2d2af0dcad11
+- src/telescreen/issues/digest.py before=39760a4008b1 after=314e758673c7
+- src/telescreen/issues/exceptions.py before=2f88d75999cd after=81bdb282f15a
+- src/telescreen/issues/recipient_channel.py before=30d62063f4f4 after=87dad2c0e49e
+- src/telescreen/issues/service.py before=f6134e3d3a53 after=4dac3b34d953
+- src/telescreen/collectors/health.py before=985e111ec544 after=a9efdb0d2084
+- src/telescreen/police/health.py before=d7ca41a2d85f after=09e56dee2b8a
+- tests/notifications/v12/fakes.py before=absent after=67a6453e12a2
+- tests/notifications/v12/test_builtin_parity.py before=absent after=0795499ec088
+- tests/notifications/v12/test_issue_excerpt.py before=absent after=51d39ebbe4cf
+- tests/notifications/v12/test_sender_delivery.py before=absent after=6ea0aa9229fb
+- tests/notifications/v12/test_template_lifecycle.py before=absent after=87f038822897
+- tests/notifications/v12/test_template_validation.py before=absent after=5dd0abc66bb6
+- tests/issues/v11_remediation/test_remediation.py before=a9f0b8205204 after=8a71538449b8
+- tests/police/test_v11_police.py before=b2f42231b362 after=1e671ba88bf3
+**Verification** (bash, pipefail, PYTHONDONTWRITEBYTECODE=1; logs under the attempt-1 directory):
+- ruff format --check (scoped) -> exit 0 (01-format.log)
+- ruff check (scoped) -> exit 0 (02-ruff.log)
+- ty check (scoped) -> exit 0 (03-ty.log)
+- pytest tests/notifications -> exit 0, 97 passed (/tmp/telescreen-v12-p04-notification-templates-pytest.log, 04-pytest.log)
+- pytest tests/issues tests/collectors tests/police -> exit 0, 204 passed (/tmp/telescreen-v12-p04-notification-templates-regress.log, 05-regress.log)
+- typelint + manifest grep -> empty, exit 0; absolute-path grep -> empty, exit 0 (06-typelint.log)
+- informational: pytest tests/e2e tests/leak -> exit 0, 32 passed (/tmp/telescreen-v12-p04-notification-templates-e2e.log, 08-e2e-leak-informational.log)
+- Largest touched file: src/telescreen/issues/service.py, 978 lines; all others under 400.
+**Notes**: The pre-edit baseline (00-baseline-pytest.log) had 4 API-router failures
+(`unhashable type: 'FakeClock'`) from in-progress concurrent p06 edits under `api/common`.
+They passed in later runs and are not p04 paths. The bare AWS secret-key sample is not
+caught by the rule detector on its own (an existing detector property), so the preview
+sample test covers only rule-detectable samples and asserts there are at least 5.

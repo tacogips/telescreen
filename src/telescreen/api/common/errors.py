@@ -19,15 +19,29 @@ def http_status_for(code: ErrorCode) -> int:
         ErrorCode.VALIDATION_ERROR,
         ErrorCode.RAW_VALUE_DETECTED,
         ErrorCode.EVIDENCE_REJECTED,
+        ErrorCode.UNKNOWN_TEMPLATE,
+        ErrorCode.UNKNOWN_VARIABLE,
+        ErrorCode.TEMPLATE_EVENT_MISMATCH,
     ):
         return 422
-    if code in (ErrorCode.UNAUTHORIZED, ErrorCode.TOKEN_INVALID, ErrorCode.SIGNATURE_INVALID):
+    if code in (
+        ErrorCode.UNAUTHORIZED,
+        ErrorCode.TOKEN_INVALID,
+        ErrorCode.SIGNATURE_INVALID,
+        ErrorCode.INVALID_TOKEN,
+    ):
         return 401
-    if code is ErrorCode.FORBIDDEN:
+    if code in (ErrorCode.FORBIDDEN, ErrorCode.NO_ROLE, ErrorCode.NOT_PROVISIONED):
         return 403
     if code in (ErrorCode.NOT_FOUND, ErrorCode.UNKNOWN_SOURCE):
         return 404
-    if code in (ErrorCode.CONFLICT, ErrorCode.INVALID_TRANSITION, ErrorCode.EVIDENCE_REQUIRED):
+    if code in (
+        ErrorCode.CONFLICT,
+        ErrorCode.INVALID_TRANSITION,
+        ErrorCode.EVIDENCE_REQUIRED,
+        ErrorCode.IDENTITY_CONFLICT,
+        ErrorCode.LAST_ADMIN,
+    ):
         return 409
     if code is ErrorCode.PAYLOAD_TOO_LARGE:
         return 413
@@ -35,7 +49,7 @@ def http_status_for(code: ErrorCode) -> int:
         return 415
     if code is ErrorCode.RATE_LIMITED:
         return 429
-    if code is ErrorCode.EVIDENCE_SCANNER_UNAVAILABLE:
+    if code in (ErrorCode.EVIDENCE_SCANNER_UNAVAILABLE, ErrorCode.IDP_UNAVAILABLE):
         return 503
     return 500
 

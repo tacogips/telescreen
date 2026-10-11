@@ -16,6 +16,7 @@ from telescreen.core.vocabulary import (
     HealthCondition,
     HealthStatus,
     NotificationChannel,
+    NotificationEvent,
     PoliceTaskStatus,
     PoliceWorkerStatus,
 )
@@ -364,7 +365,12 @@ async def test_health_provider_alerts_once_and_clears_silently() -> None:
         NotificationChannel.EMAIL,
         NotificationChannel.SLACK,
     )
-    assert all("police_silent" in request.subject for request in notifications.requests)
+    assert all(
+        request.event is NotificationEvent.POLICE_HEALTH_ALERT
+        and request.context is not None
+        and request.context.health_condition == "police_silent"
+        for request in notifications.requests
+    )
     assert len(audit.entries) == 1
     assert audit.entries[0].action == "health.alert_opened"
     async with harness.sessions.begin() as session:

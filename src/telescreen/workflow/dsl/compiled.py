@@ -30,6 +30,7 @@ from telescreen.workflow.dsl.model import (
     HumanTaskStep,
     JoinStep,
     MapStep,
+    NotificationTargetSpec,
     NotifyStep,
     Outcomes3,
     ParallelStep,
@@ -42,12 +43,17 @@ from telescreen.workflow.dsl.model import (
     TriggerSpec,
     WaitStep,
 )
+from telescreen.workflow.dsl.notification_sets import (
+    notification_sets_json,
+    resolve_set_targets,
+    targets_json,
+)
 
 
 def compiled_to_json(workflow: CompiledWorkflow) -> JsonValue:
     """Serialize a compiled workflow into canonical-storage-safe JSON values."""
     members: list[tuple[str, JsonValue]] = [
-        ("apiVersion", json_str("telescreen.workflow/v1")),
+        ("apiVersion", json_str(workflow.api_version)),
         ("kind", json_str("Workflow")),
         ("name", json_str(workflow.name)),
         ("start", json_str(workflow.start)),
@@ -58,11 +64,17 @@ def compiled_to_json(workflow: CompiledWorkflow) -> JsonValue:
     members.append(("defaults", _defaults_json(workflow.defaults)))
     if workflow.trigger is not None:
         members.append(("trigger", _trigger_json(workflow.trigger)))
+    if workflow.notification_sets:
+        members.append(("notification_sets", notification_sets_json(workflow.notification_sets)))
     return json_object(members)
 
 
 def compiled_from_json(value: JsonValue) -> CompiledWorkflow:
-    """Restore a compiled workflow from its stored JSON representation."""
+    """Restore a compiled workflow from its stored JSON representation.
+
+    Step ``set_targets`` are rebuilt from the stored notification sets, because the engine
+    executes this decoded form rather than the loader output.
+    """
     from telescreen.workflow.dsl.loader import (
         ValidationIssue,
         WorkflowValidationError,
@@ -71,7 +83,7 @@ def compiled_from_json(value: JsonValue) -> CompiledWorkflow:
 
     if value.kind is not JsonKind.OBJECT:
         raise WorkflowValidationError((ValidationIssue("", "invalid_document"),))
-    return load_workflow(dump_json(value), SourceFormat.JSON)
+    return resolve_set_targets(load_workflow(dump_json(value), SourceFormat.JSON))
 
 
 def _retry_json(retry: RetrySpec | None) -> JsonValue:
@@ -221,6 +233,7 @@ def _step_json(step: StepSpec) -> JsonValue:
             members.append(("kind", json_str(step.kind.value)))
         _append_optional_duration(members, "sla", step.sla)
         _append_optional_string(members, "escalation_policy", step.escalation_policy)
+        _append_notify_targets(members, step.notify_set, step.notify_targets)
     elif isinstance(step, NotifyStep):
         members.extend(
             (
@@ -230,6 +243,10 @@ def _step_json(step: StepSpec) -> JsonValue:
                 ("body", json_str(_template_text(step.body))),
             )
         )
+        _append_optional_string(members, "notification_set", step.notification_set)
+        if step.targets:
+            members.append(("targets", targets_json(step.targets)))
+        _append_optional_string(members, "template", step.template)
     elif isinstance(step, EvidenceUploadStep):
         members.extend(
             (
@@ -240,6 +257,7 @@ def _step_json(step: StepSpec) -> JsonValue:
         )
         _append_optional_duration(members, "sla", step.sla)
         _append_optional_string(members, "escalation_policy", step.escalation_policy)
+        _append_notify_targets(members, step.notify_set, step.notify_targets)
     elif isinstance(step, PoliceVerifyStep):
         members.extend(
             (
@@ -329,6 +347,16 @@ def _append_optional_string(
 ) -> None:
     if value is not None:
         members.append((key, json_str(value)))
+
+
+def _append_notify_targets(
+    members: list[tuple[str, JsonValue]],
+    notify_set: str | None,
+    notify_targets: tuple[NotificationTargetSpec, ...],
+) -> None:
+    _append_optional_string(members, "notify_set", notify_set)
+    if notify_targets:
+        members.append(("notify_targets", targets_json(notify_targets)))
 
 
 def _append_optional_duration(

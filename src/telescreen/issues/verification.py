@@ -15,10 +15,10 @@ from telescreen.core.vocabulary import (
     IssueHistoryKind,
     IssueStatus,
     NotificationChannel,
+    NotificationEvent,
 )
 from telescreen.db.models import IssueHistoryRow, IssueRow
-from telescreen.issues.keys import short_id
-from telescreen.issues.recipient_channel import preferred_channel
+from telescreen.issues.recipient_channel import issue_context, preferred_channel
 from telescreen.ports.audit import AuditEntry, AuditLog
 from telescreen.ports.collectors import RescanKind, RescanResult, ResourceRescanner
 from telescreen.ports.directory import OwnerDirectory, RecipientResolver
@@ -103,16 +103,16 @@ class VerifyRescanHandler(TaskHandler):
         if channel is None:
             return
         addresses: tuple[str, ...] = (ref,)
-        short: str = short_id(issue.number)
-        body: str = f"{short} {issue.rule_class} {issue.severity} {issue.exposure_visibility}"
         await self.notifications.send(
             session,
             NotificationRequest(
                 channel,
                 addresses,
-                f"Verification inconclusive for {short}",
-                body,
+                "",
+                "",
                 "system:verify-rescan",
                 issue_id=issue.id,
+                event=NotificationEvent.VERIFICATION_INCONCLUSIVE,
+                context=issue_context(issue),
             ),
         )

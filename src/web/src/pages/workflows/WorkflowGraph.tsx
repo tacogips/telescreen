@@ -15,7 +15,7 @@ const icons: Readonly<Record<string, Component<{ size?: number }>>> = {
   end: Check,
 };
 
-type PositionedNode = Readonly<{ id: string; type: string; x: number; y: number; rank: number }>;
+type PositionedNode = Readonly<{ id: string; type: string; notify?: string; x: number; y: number; rank: number }>;
 
 function layout(graph: WorkflowGraphData): PositionedNode[] {
   const ranks = new Map<string, number>();
@@ -65,10 +65,11 @@ export function WorkflowGraph(props: Readonly<{ graph: WorkflowGraphData | null 
         <For each={positions()}>{(node) => {
           const Icon = icons[node.type] ?? Workflow;
           return <g class="workflow-node" transform={"translate(" + node.x + ", " + node.y + ")"}>
-            <rect width="144" height="42" rx="8" />
+            <rect width="144" height={node.notify === undefined ? 42 : 58} rx="8" />
             <foreignObject x="10" y="9" width="22" height="24"><Icon size={18} /></foreignObject>
             <text x="40" y="18" class="workflow-node-type">{node.type}</text>
             <text x="40" y="33" class="workflow-node-id">{node.id}</text>
+            <Show when={node.notify}>{(label) => <text x="40" y="50" class="workflow-node-notify">{label()}</text>}</Show>
           </g>;
         }}</For>
       </svg>

@@ -7,10 +7,10 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from sqlalchemy import Select, select
 
-from telescreen.api.common.auth import Principal, require_scope
+from telescreen.api.common.auth import Principal, require_permission
 from telescreen.api.common.context import ApiContext
 from telescreen.core.json import JsonValue, parse_json
-from telescreen.core.vocabulary import ApiScope
+from telescreen.core.permissions import Permission
 from telescreen.db.models import MapItemRow, MapJobRow, MapPartitionRow
 from telescreen.workflow.mapreduce.reduce import MapReduceHandler
 from telescreen.workflow.mapreduce.repository import status_counts
@@ -32,7 +32,9 @@ def build_map_jobs_router(deps: MapJobsRouterDeps) -> APIRouter:
 
     @router.get("/api/map-jobs")
     async def list_jobs(
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.MAP_JOBS_READ))
+        ],
         origin: str | None = None,
         status: str | None = None,
         collector_config_id: str | None = None,
@@ -69,7 +71,9 @@ def build_map_jobs_router(deps: MapJobsRouterDeps) -> APIRouter:
     @router.get("/api/map-jobs/{job_id}")
     async def get_job(
         job_id: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.MAP_JOBS_READ))
+        ],
     ) -> JSONResponse:
         """Return one job's state and bounded failed shard metadata."""
         del principal
@@ -117,7 +121,9 @@ def build_map_jobs_router(deps: MapJobsRouterDeps) -> APIRouter:
     @router.post("/api/map-jobs/{job_id}/cancel")
     async def cancel_job(
         job_id: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.ADMIN))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.MAP_JOBS_WRITE))
+        ],
     ) -> JSONResponse:
         """Cancel active work for a job."""
         del principal
@@ -128,7 +134,9 @@ def build_map_jobs_router(deps: MapJobsRouterDeps) -> APIRouter:
     @router.post("/api/map-jobs/{job_id}/retry-failed")
     async def retry_failed(
         job_id: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.ADMIN))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.MAP_JOBS_WRITE))
+        ],
     ) -> JSONResponse:
         """Reset failed shards for an administrator-triggered retry."""
         del principal

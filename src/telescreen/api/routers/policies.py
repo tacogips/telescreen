@@ -7,7 +7,7 @@ import pydantic
 from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 
-from telescreen.api.common.auth import Principal, require_scope
+from telescreen.api.common.auth import Principal, require_permission
 from telescreen.api.common.context import ApiContext
 from telescreen.core.clock import ensure_utc
 from telescreen.core.errors import TelescreenError
@@ -21,7 +21,8 @@ from telescreen.core.json import (
     json_object,
     json_str,
 )
-from telescreen.core.vocabulary import ApiScope, ErrorCode, SourceFormat
+from telescreen.core.permissions import Permission
+from telescreen.core.vocabulary import ErrorCode, SourceFormat
 from telescreen.issues.policy.loader import PolicyValidationError
 from telescreen.issues.policy.model import PolicyVersionView
 from telescreen.issues.policy.store import PolicyStore
@@ -57,7 +58,9 @@ def build_policies_router(deps: PoliciesRouterDeps) -> APIRouter:
 
     @router.get("/api/policies")
     async def list_policies(
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.POLICIES_READ))
+        ],
     ) -> Response:
         """List one active or latest version for each policy name."""
         del principal
@@ -74,7 +77,9 @@ def build_policies_router(deps: PoliciesRouterDeps) -> APIRouter:
     async def get_policy_version(
         name: str,
         version: int,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.POLICIES_READ))
+        ],
     ) -> Response:
         """Return a stored policy version including its redacted source."""
         del principal
@@ -88,7 +93,9 @@ def build_policies_router(deps: PoliciesRouterDeps) -> APIRouter:
     @router.get("/api/policies/{name}")
     async def get_policy(
         name: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.POLICIES_READ))
+        ],
     ) -> Response:
         """Return every stored version for a policy name."""
         del principal
@@ -106,7 +113,9 @@ def build_policies_router(deps: PoliciesRouterDeps) -> APIRouter:
     @router.post("/api/policies/validate")
     async def validate_policy(
         body: PolicySourceBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.POLICIES_READ))
+        ],
     ) -> Response:
         """Validate source and return only path/code diagnostics."""
         del principal
@@ -119,7 +128,9 @@ def build_policies_router(deps: PoliciesRouterDeps) -> APIRouter:
     @router.post("/api/policies", status_code=201)
     async def create_policy(
         body: PolicySourceBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.ADMIN))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.POLICIES_WRITE))
+        ],
     ) -> Response:
         """Create an inactive version without echoing invalid source."""
         if deps.store is None:
@@ -141,7 +152,9 @@ def build_policies_router(deps: PoliciesRouterDeps) -> APIRouter:
     async def activate_policy(
         name: str,
         body: PolicyActivateBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.ADMIN))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.POLICIES_WRITE))
+        ],
     ) -> Response:
         """Activate a version and enqueue issue re-evaluation."""
         if deps.store is None:
@@ -156,7 +169,9 @@ def build_policies_router(deps: PoliciesRouterDeps) -> APIRouter:
     @router.post("/api/policies/{name}/disable")
     async def disable_policy(
         name: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.ADMIN))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.POLICIES_WRITE))
+        ],
     ) -> Response:
         """Disable a policy and enqueue issue re-evaluation."""
         if deps.store is None:

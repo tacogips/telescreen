@@ -6,9 +6,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
-from telescreen.api.common.auth import Principal, require_scope
+from telescreen.api.common.auth import Principal, require_permission
 from telescreen.api.common.context import ApiContext
-from telescreen.core.vocabulary import ApiScope
+from telescreen.core.permissions import Permission
 from telescreen.search.backend import (
     FieldValue,
     IndexName,
@@ -78,7 +78,9 @@ def build_search_router(deps: SearchRouterDeps) -> APIRouter:
 
     @router.get("/api/search")
     async def search(
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.SEARCH_READ))
+        ],
         q: str = "",
         index: IndexName = IndexName.ISSUES,
         limit: int = 20,

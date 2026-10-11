@@ -9,3 +9,4 @@
 .workflow-node foreignObject{color:var(--accent)}
 .workflow-node-type{fill:var(--text-secondary);font-size:10px}
 .workflow-node-id{fill:var(--text-primary);font-size:12px;font-weight:600}
+.workflow-node-notify{fill:var(--accent);font-size:10px}

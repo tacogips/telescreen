@@ -8,7 +8,7 @@ import httpx
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from telescreen.api.app import create_app
 from telescreen.core.config import load_settings
@@ -18,6 +18,7 @@ from telescreen.db.models import (
     HumanTaskRow,
     IssueHistoryRow,
     IssueRow,
+    MemberRow,
     WorkflowRunRow,
 )
 from telescreen.directory.tokens import CreatedToken, TokenService
@@ -87,6 +88,9 @@ async def _configure_owner_workflow(world: E2EWorld) -> tuple[str, str]:
     )
     assert membership.status_code == 204, membership.text
     async with world.database.sessions.begin() as session:
+        await session.execute(
+            update(MemberRow).where(MemberRow.id == member_id).values(role="responder")
+        )
         token: CreatedToken = await TokenService(world.container.audit, world.clock).create(
             session,
             "v11-owner-member",

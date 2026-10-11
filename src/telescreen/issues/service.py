@@ -783,6 +783,12 @@ class IssueService:
             assignee_ref = await self.owners.member_ref(session, issue.assignee_member_id)
         elif self.owners is not None and issue.assignee_team_id is not None:
             assignee_ref = await self.owners.team_ref(session, issue.assignee_team_id)
+        masked_excerpt: str | None = await session.scalar(
+            select(FindingRow.masked_snippet)
+            .where(FindingRow.issue_id == issue.id)
+            .order_by(FindingRow.observed_at.desc(), FindingRow.id.desc())
+            .limit(1)
+        )
         return IssueSnapshot(
             issue.id,
             issue.number,
@@ -801,6 +807,7 @@ class IssueService:
             assignee_ref,
             issue.risk_score,
             Visibility(issue.exposure_visibility),
+            masked_excerpt,
         )
 
     async def open_resource_refs(

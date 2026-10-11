@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from telescreen.api.common.auth import Principal, require_scope
+from telescreen.api.common.auth import Principal, declare_external, require_permission
 from telescreen.api.common.body import read_limited_body
 from telescreen.api.common.context import ApiContext
 from telescreen.collectors.codec import selector_from_json, selector_to_json
@@ -19,11 +19,12 @@ from telescreen.collectors.service import CollectorService, WebhookOutcome
 from telescreen.core.clock import ensure_utc
 from telescreen.core.errors import TelescreenError
 from telescreen.core.json import dump_json, parse_json
+from telescreen.core.permissions import Permission
 from telescreen.core.vocabulary import (
-    ApiScope,
     CollectorKind,
     CoverageState,
     ErrorCode,
+    ExternalAuthKind,
     ScanTrigger,
     TriggerMode,
 )
@@ -198,7 +199,9 @@ def build_collectors_router(deps: CollectorsRouterDeps) -> APIRouter:
 
     @router.get("", response_model=CollectorListResponse)
     async def list_configs(
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.COLLECTORS_READ))
+        ],
     ) -> CollectorListResponse:
         """List safe collector configuration fields."""
         async with deps.ctx.sessions() as session:
@@ -250,7 +253,9 @@ def build_collectors_router(deps: CollectorsRouterDeps) -> APIRouter:
     @router.get("/{config_id}/coverage", response_model=CoverageSummaryResponse)
     async def coverage_summary(
         config_id: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.COLLECTORS_READ))
+        ],
     ) -> CoverageSummaryResponse:
         """Return seven-day scan coverage totals for a collector."""
         del principal
@@ -270,7 +275,9 @@ def build_collectors_router(deps: CollectorsRouterDeps) -> APIRouter:
     @router.get("/{config_id}/coverage/resources", response_model=CoverageResourcesResponse)
     async def coverage_resources(
         config_id: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.COLLECTORS_READ))
+        ],
         state: CoverageState | None = None,
         limit: int = 50,
         cursor: str | None = None,
@@ -313,7 +320,9 @@ def build_collectors_router(deps: CollectorsRouterDeps) -> APIRouter:
     @router.post("", response_model=ConfigIdBody)
     async def create_config(
         body: CollectorBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.ADMIN))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.COLLECTORS_WRITE))
+        ],
     ) -> ConfigIdBody:
         """Create a collector config from a JSON selector."""
         selector: CollectorSelector = selector_from_json(body.kind, parse_json(body.selector_json))
@@ -335,7 +344,9 @@ def build_collectors_router(deps: CollectorsRouterDeps) -> APIRouter:
     async def update_config(
         config_id: str,
         body: CollectorBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.ADMIN))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.COLLECTORS_WRITE))
+        ],
     ) -> ConfigIdBody:
         """Update an existing collector config."""
         selector: CollectorSelector = selector_from_json(body.kind, parse_json(body.selector_json))
@@ -356,7 +367,9 @@ def build_collectors_router(deps: CollectorsRouterDeps) -> APIRouter:
     @router.post("/{config_id}/run", response_model=ConfigIdBody)
     async def run_config(
         config_id: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.ADMIN))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.COLLECTORS_WRITE))
+        ],
     ) -> ConfigIdBody:
         """Queue a manual incremental scan."""
         async with deps.ctx.sessions.begin() as session:
@@ -366,7 +379,9 @@ def build_collectors_router(deps: CollectorsRouterDeps) -> APIRouter:
     @router.post("/{config_id}/sweep", response_model=MapJobIdBody)
     async def sweep_config(
         config_id: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.ADMIN))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.COLLECTORS_WRITE))
+        ],
     ) -> MapJobIdBody:
         """Launch a map-reduce collector sweep."""
         async with deps.ctx.sessions() as session:
@@ -379,7 +394,10 @@ def build_collectors_router(deps: CollectorsRouterDeps) -> APIRouter:
         job_id: str = await deps.launcher.start_collector_sweep(config_id, ScanTrigger.MANUAL)
         return MapJobIdBody(job_id)
 
-    @router.post("/{kind}/webhook")
+    @router.post(
+        "/{kind}/webhook",
+        dependencies=[Depends(declare_external(ExternalAuthKind.PROVIDER_SIGNATURE))],
+    )
     async def webhook(kind: CollectorKind, request: Request) -> Response:
         """Verify and enqueue a source webhook without scanning inline."""
         body: bytes = await read_limited_body(request, 1024 * 1024)

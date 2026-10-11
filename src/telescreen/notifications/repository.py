@@ -32,9 +32,11 @@ class NotificationRepository:
         status: NotificationStatus,
         attempts: int,
         sent_at: datetime | None,
+        error_code: str | None = None,
     ) -> None:
         """Update delivery state and normalize a successful timestamp to UTC."""
         row.status = status.value
         row.delivery_attempts = attempts
         row.sent_at = ensure_utc(sent_at) if sent_at is not None else None
+        row.error_code = error_code
         await session.flush()

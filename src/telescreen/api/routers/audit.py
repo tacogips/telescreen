@@ -7,11 +7,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
-from telescreen.api.common.auth import Principal, require_scope
+from telescreen.api.common.auth import Principal, require_permission
 from telescreen.api.common.context import ApiContext
 from telescreen.audit.query import AuditQuery, search_audit
 from telescreen.audit.verify import ChainVerification, verify_chain
-from telescreen.core.vocabulary import ApiScope
+from telescreen.core.permissions import Permission
 from telescreen.search.backend import SearchBackend, SearchDocument, SearchPage
 
 
@@ -35,7 +35,9 @@ def build_audit_router(deps: AuditRouterDeps) -> APIRouter:
 
     @router.get("/api/audit/search")
     async def audit_search(
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.AUDIT_READ))
+        ],
         q: str = "",
         action: str | None = None,
         actor: str | None = None,
@@ -75,7 +77,9 @@ def build_audit_router(deps: AuditRouterDeps) -> APIRouter:
 
     @router.get("/api/audit/verify")
     async def audit_verify(
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.AUDIT_READ))
+        ],
     ) -> JSONResponse:
         """Verify the append-only chain and return its first broken sequence."""
         del principal

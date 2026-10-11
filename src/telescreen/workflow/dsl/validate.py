@@ -38,8 +38,10 @@ _RECIPIENT: re.Pattern[str] = re.compile(r"^(member|team|email|slack):.+$")
 
 
 def validate_workflow(workflow: CompiledWorkflow) -> list[ValidationIssue]:
-    """Return all graph and typed-model validation issues."""
-    issues: list[ValidationIssue] = []
+    """Return all graph, typed-model and notification-set validation issues."""
+    from telescreen.workflow.dsl.notification_sets import notification_set_issues
+
+    issues: list[ValidationIssue] = notification_set_issues(workflow)
     by_id: list[tuple[str, StepSpec]] = []
     positions: list[tuple[str, int]] = []
     for index, step in enumerate(workflow.steps):

@@ -1,0 +1,16 @@
+.template-editor-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(200px,260px);gap:16px;align-items:start}
+.template-fields{display:flex;flex-direction:column;gap:12px;min-width:0}
+.template-textarea{width:100%;resize:vertical;font:13px/1.55 var(--font-mono);white-space:pre-wrap}
+.template-variables{border:1px solid var(--border-primary);border-radius:8px;background:var(--bg-secondary);padding:12px}
+.template-variables h3{margin:0 0 8px;font-size:13px}
+.template-variables ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.field-error{margin:4px 0 0;color:var(--danger-content);font-size:12px}
+.template-preview{margin-top:16px;border:1px solid var(--border-primary);border-radius:8px;padding:12px}
+.template-preview-tabs{display:flex;gap:8px;margin-bottom:12px}
+.template-preview-tabs button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border-primary);border-radius:6px;background:transparent;color:var(--text-primary);padding:4px 10px;cursor:pointer}
+.template-preview-tabs button.active{border-color:var(--accent);background:var(--selected-bg)}
+.template-preview-body{white-space:pre-wrap;font:13px/1.55 var(--font-mono)}
+.role-cell{display:flex;align-items:center;gap:8px}
+.permission-group th{text-align:left;color:var(--text-secondary);font-size:12px;text-transform:uppercase}
+.permission-cell{text-align:center;color:var(--accent)}
+@media(max-width:992px){.template-editor-columns{grid-template-columns:1fr}}

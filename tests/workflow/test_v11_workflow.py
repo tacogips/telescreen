@@ -21,6 +21,7 @@ from telescreen.core.vocabulary import (
     IssueHistoryKind,
     IssueStatus,
     NotificationChannel,
+    NotificationEvent,
     RuleClass,
     Severity,
     SourceFormat,
@@ -403,13 +404,19 @@ async def test_owner_review_resolves_issue_assignee_and_sends_one_safe_channel()
             assert len(notifications.requests) == 1
             request: NotificationRequest = notifications.requests[0]
             assert request.channel is NotificationChannel.SLACK
-            assert request.subject == "Telescreen: review TELE-8"
-            assert "TELE-8" in request.body
-            assert "credential high public" in request.body
-            assert "risk 40" in request.body
-            assert "https://telescreen.example/my-tasks" in request.body
-            assert "private-file.txt" not in request.body
-            assert "org/repo/private-file.txt" not in request.body
+            assert request.event is NotificationEvent.OWNER_REVIEW_ASSIGNED
+            assert request.context is not None
+            assert request.context.issue_short_id == "TELE-8"
+            assert request.context.issue_rule_class == "credential"
+            assert request.context.issue_severity == "high"
+            assert request.context.issue_exposure == "public"
+            assert request.context.issue_risk_score == 40
+            assert request.context.task_link == "https://telescreen.example/my-tasks"
+            context_text: str = " ".join(
+                value for value in vars(request.context).values() if isinstance(value, str)
+            )
+            assert "private-file.txt" not in context_text
+            assert "org/repo/private-file.txt" not in context_text
     finally:
         await harness.close()
 

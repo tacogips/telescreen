@@ -454,6 +454,7 @@ async def test_assignee_me_includes_handle_and_team_refs_and_memberless_is_forbi
     async with harness.sessions.begin() as session:
         member: MemberRow = await directory.create_member(session, "alice", "Alice", None, None)
         member_id: str = member.id
+        member.role = "viewer"
         session.add_all(
             [
                 HumanTaskRow(

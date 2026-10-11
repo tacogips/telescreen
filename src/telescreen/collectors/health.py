@@ -15,12 +15,17 @@ from telescreen.core.vocabulary import (
     HealthCondition,
     HealthStatus,
     NotificationChannel,
+    NotificationEvent,
     ScanJobStatus,
     TriggerMode,
 )
 from telescreen.db.models import CollectorConfigRow, CollectorHealthRow
 from telescreen.ports.audit import AuditEntry, AuditLog
-from telescreen.ports.notifications import NotificationRequest, NotificationSender
+from telescreen.ports.notifications import (
+    NotificationContext,
+    NotificationRequest,
+    NotificationSender,
+)
 from telescreen.ports.workflow import ScheduleProvider
 
 _WATCH_WINDOW: timedelta = timedelta(hours=12)
@@ -250,9 +255,15 @@ class CollectorHealthProvider(ScheduleProvider):
                 NotificationRequest(
                     channel,
                     self.recipients,
-                    f"Telescreen health: {config.name} {condition.value}",
-                    body,
+                    "",
+                    "",
                     "system:collector-health",
+                    event=NotificationEvent.COLLECTOR_HEALTH_ALERT,
+                    context=NotificationContext(
+                        health_target=config.name,
+                        health_condition=condition.value,
+                        health_details=body,
+                    ),
                 ),
             )
 

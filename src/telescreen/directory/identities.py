@@ -115,6 +115,10 @@ class IdentityService:
             raise TelescreenError(ErrorCode.NOT_FOUND, "member not found")
         if not value.strip():
             raise TelescreenError(ErrorCode.VALIDATION_ERROR, "identity value is required")
+        if kind is IdentityKind.OIDC_SUBJECT:
+            raise TelescreenError(
+                ErrorCode.VALIDATION_ERROR, "oidc identities are linked only by sign-in"
+            )
         kind_value: str
         key: str
         kind_value, key = self._key_parts(self.fingerprinter, kind, value)

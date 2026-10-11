@@ -23,6 +23,7 @@ from telescreen.core.clock import FakeClock
 from telescreen.core.errors import TelescreenError
 from telescreen.core.ids import new_id
 from telescreen.core.json import json_object
+from telescreen.core.permissions import scope_permissions
 from telescreen.core.vocabulary import (
     ApiScope,
     DlpVerdict,
@@ -32,6 +33,7 @@ from telescreen.core.vocabulary import (
     IssueEventKind,
     IssueHistoryKind,
     NotificationChannel,
+    PrincipalKind,
     RuleClass,
     RunStatus,
     RunTrigger,
@@ -677,11 +679,23 @@ steps:
         )
         sample: str = github_token().value
         body: CompleteHumanTaskBody = CompleteHumanTaskBody("accepted", sample)
-        unauthorized: Principal = Principal("token-1", None, frozenset((ApiScope.WRITE,)))
+        unauthorized: Principal = Principal(
+            PrincipalKind.TOKEN,
+            "token-1",
+            None,
+            None,
+            scope_permissions(frozenset((ApiScope.WRITE,))),
+        )
         with pytest.raises(TelescreenError) as forbidden:
             await complete(task_id, body, unauthorized)
         assert forbidden.value.code is ErrorCode.FORBIDDEN
-        assignee: Principal = Principal("token-2", "member-1", frozenset((ApiScope.WRITE,)))
+        assignee: Principal = Principal(
+            PrincipalKind.TOKEN,
+            "token-2",
+            "member-1",
+            None,
+            scope_permissions(frozenset((ApiScope.WRITE,))),
+        )
         with pytest.raises(TelescreenError) as missing_evidence:
             await complete(task_id, body, assignee)
         assert missing_evidence.value.code is ErrorCode.EVIDENCE_REQUIRED

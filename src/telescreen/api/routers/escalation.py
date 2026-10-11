@@ -7,9 +7,10 @@ import pydantic
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
-from telescreen.api.common.auth import Principal, require_scope
+from telescreen.api.common.auth import Principal, require_permission
 from telescreen.api.common.context import ApiContext
-from telescreen.core.vocabulary import ApiScope, SourceFormat
+from telescreen.core.permissions import Permission
+from telescreen.core.vocabulary import SourceFormat
 from telescreen.db.models import EscalationPolicyRow
 from telescreen.workflow.escalation.service import EscalationPolicyService
 
@@ -43,7 +44,9 @@ def build_escalation_router(deps: EscalationRouterDeps) -> APIRouter:
 
     @router.get("")
     async def list_policies(
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.ESCALATION_READ))
+        ],
     ) -> JSONResponse:
         del principal
         async with deps.ctx.sessions() as session:
@@ -53,7 +56,9 @@ def build_escalation_router(deps: EscalationRouterDeps) -> APIRouter:
     @router.post("", status_code=201)
     async def create_policy(
         body: EscalationPolicyBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.ADMIN))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.ESCALATION_WRITE))
+        ],
     ) -> JSONResponse:
         async with deps.ctx.sessions.begin() as session:
             row: EscalationPolicyRow = await deps.service.create(
@@ -65,7 +70,9 @@ def build_escalation_router(deps: EscalationRouterDeps) -> APIRouter:
     async def update_policy(
         name: str,
         body: EscalationPolicyBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.ADMIN))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.ESCALATION_WRITE))
+        ],
     ) -> JSONResponse:
         async with deps.ctx.sessions.begin() as session:
             row: EscalationPolicyRow = await deps.service.update(

@@ -245,7 +245,7 @@ It must pass, because nothing else changes behavior in wave 1.
 
 - [x] Deliverables 1-10 implemented with docstrings.
 - [x] New tests pass; scoped ruff format/check, ty and pytest exit 0; typelint grep empty.
-- [ ] Full offline pytest exits 0 (log path recorded).
+- [x] Full offline pytest exits 0 (log path recorded).
 - [x] `git status --porcelain` shows only paths in writePaths for this plan's edits.
 - [x] Progress Log entry with hashes and verification lines.
 
@@ -261,3 +261,10 @@ It must pass, because nothing else changes behavior in wave 1.
 **Notes**: The full-suite failures are classified concurrent p02/p03 issues, not p01 source regressions. The admin-scope/responder plan example contradicted D11's explicit formula; the formula and existing machine-scope behavior were preserved, and the example now states the resulting machine grant.
 
 **Owner resolution (2026-10-11, session 7)**: The only blockers were cross-plan test inventories outside this plan's writePaths. The owner updated `tests/db/test_models.py` (adds `notification_templates`, 34 tables) and `src/web/src/pages/settings/index.test.tsx` (reads the token through `getSession()` instead of the legacy `telescreen.token` key). The UI fixture leak test passes with the final `v12.ts`. Whole-repository gates on the combined wave-1 tree: ruff format/check, typelint, ty, pytest 589 passed / 5 skipped, web typecheck and vitest 165 passed. On redispatch, re-verify on the committed tree, change nothing unless review finds a defect, and report only final passing commands with an empty `priorVerification` (conventions 7a).
+
+### Session: 2026-10-11 (session 9, re-verify, manifest telescreen-v12-20261011-d3)
+**Tasks Completed**: Re-verified the committed tree at 8ff064f without source changes. Ticked the full offline pytest criterion, which the owner resolution unblocked.
+**Tasks In Progress**: None.
+**Blockers**: None.
+**Hashes**: No source, test or pyproject.toml change in this session; only this plan file changed (before=f22853de77e2079c8fd9b3a07f959ae950d04f686f62e0ecb399c0d7ee8dd92d).
+**Verification** (logs under `tmp/telescreen-v12-20261011-d3/v12-p01-foundation/attempt-1/`): scoped ruff format check -> exit 0 (31 files); scoped ruff check -> exit 0; scoped ty check -> exit 0; focused pytest `tests/core/v12 tests/ports/v12` -> exit 0, 15 passed (`/tmp/telescreen-v12-p01-foundation-pytest.log`); typelint plus scoped grep -> exit 0, 363 files clean (`/tmp/telescreen-v12-p01-foundation-typelint.log`); full offline pytest -> exit 0, 589 passed, 5 skipped (`/tmp/telescreen-v12-p01-foundation-pytest-all.log`); live marker grep -> exit 0; no change to uv.lock, src/web/package.json, src/web/bun.lock or tools/typelint.py -> exit 0.

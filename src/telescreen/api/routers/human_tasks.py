@@ -9,13 +9,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy import Select, select
 
-from telescreen.api.common.auth import Principal, require_scope
+from telescreen.api.common.auth import Principal, require_permission
 from telescreen.api.common.context import ApiContext
 from telescreen.core.errors import TelescreenError
 from telescreen.core.json import json_str, parse_json
+from telescreen.core.permissions import Permission
 from telescreen.core.vocabulary import (
     ActorKind,
-    ApiScope,
     ErrorCode,
     ExceptionDuration,
     HumanTaskKind,
@@ -79,7 +79,9 @@ def build_human_tasks_router(deps: HumanTasksRouterDeps) -> APIRouter:
 
     @router.get("")
     async def list_tasks(
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.HUMAN_TASKS_READ))
+        ],
         assignee: str | None = None,
         status: str | None = None,
     ) -> JSONResponse:
@@ -88,7 +90,7 @@ def build_human_tasks_router(deps: HumanTasksRouterDeps) -> APIRouter:
             raise TelescreenError(ErrorCode.FORBIDDEN, "task assignment scope is required")
         if principal.member_id is not None and wants_me and deps.owners is None:
             raise HTTPException(status_code=503, detail="owner directory unavailable")
-        if assignee == "all" and not principal.has(ApiScope.ADMIN):
+        if assignee == "all" and not principal.allows(Permission.HUMAN_TASKS_MANAGE_ANY):
             raise TelescreenError(ErrorCode.FORBIDDEN, "administrator permission is required")
         async with deps.ctx.sessions() as session:
             query: Select[tuple[HumanTaskRow]] = select(HumanTaskRow)
@@ -115,7 +117,9 @@ def build_human_tasks_router(deps: HumanTasksRouterDeps) -> APIRouter:
     async def complete(
         task_id: str,
         body: CompleteHumanTaskBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.WRITE))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.HUMAN_TASKS_COMPLETE))
+        ],
     ) -> JSONResponse:
         async with deps.ctx.sessions.begin() as session:
             task: HumanTaskRow | None = await session.get(HumanTaskRow, task_id)
@@ -123,7 +127,7 @@ def build_human_tasks_router(deps: HumanTasksRouterDeps) -> APIRouter:
                 raise TelescreenError(ErrorCode.NOT_FOUND, "human task not found")
             if task.status != "open":
                 raise TelescreenError(ErrorCode.CONFLICT, "human task is not open")
-            if not principal.has(ApiScope.ADMIN) and (
+            if not principal.allows(Permission.HUMAN_TASKS_MANAGE_ANY) and (
                 principal.member_id is None
                 or not await deps.resolver.is_member_of(
                     session, principal.member_id, task.assignee_ref
@@ -184,7 +188,7 @@ def build_human_tasks_router(deps: HumanTasksRouterDeps) -> APIRouter:
                         safe_comment,
                         body.exception_duration,
                         principal.actor_ref(),
-                        principal.has(ApiScope.ADMIN),
+                        principal.allows(Permission.HUMAN_TASKS_MANAGE_ANY),
                     )
                 elif body.outcome in ("remove", "restrict"):
                     await deps.remediation.request_verification(

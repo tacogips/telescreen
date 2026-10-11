@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.api.common import ApiContext, read_limited_body
-from telescreen.api.common.auth import Principal, require_scope
+from telescreen.api.common.auth import Principal, declare_external, require_permission
 from telescreen.contracts.validator import openapi_document, validate
 from telescreen.core.clock import ensure_utc
 from telescreen.core.errors import TelescreenError
@@ -26,8 +26,14 @@ from telescreen.core.json import (
     json_str,
     parse_json,
 )
+from telescreen.core.permissions import Permission
 from telescreen.core.secrets import SecretValue
-from telescreen.core.vocabulary import ApiScope, ErrorCode, PoliceTaskStatus, PoliceWorkerStatus
+from telescreen.core.vocabulary import (
+    ErrorCode,
+    ExternalAuthKind,
+    PoliceTaskStatus,
+    PoliceWorkerStatus,
+)
 from telescreen.db.models import PoliceTaskRow, PoliceWorkerRow
 from telescreen.db.replay import ReplayNonceStore
 from telescreen.police.claims import ClaimRequest, ClaimService
@@ -106,12 +112,18 @@ def build_police_router(deps: PoliceRouterDeps) -> APIRouter:
     """Build the versioned Police endpoints and worker administration routes."""
     router: APIRouter = APIRouter(tags=["police"])
 
-    @router.get("/api/police/v1/openapi.json")
+    @router.get(
+        "/api/police/v1/openapi.json",
+        dependencies=[Depends(declare_external(ExternalAuthKind.POLICE_CONTRACT))],
+    )
     async def contract_openapi() -> JSONResponse:
         """Return the versioned Police OpenAPI document."""
         return JSONResponse(content=json.loads(openapi_document()))
 
-    @router.post("/api/police/v1/workers/register")
+    @router.post(
+        "/api/police/v1/workers/register",
+        dependencies=[Depends(declare_external(ExternalAuthKind.POLICE_CONTRACT))],
+    )
     async def register(request: Request) -> JSONResponse:
         """Enroll a worker and return its credential exactly once."""
         token: str = _bearer(request)
@@ -134,7 +146,10 @@ def build_police_router(deps: PoliceRouterDeps) -> APIRouter:
             response: bytes = await deps.registration.register(session, body)
         return JSONResponse(status_code=201, content=json.loads(response))
 
-    @router.post("/api/police/v1/workers/{worker_id}/claim")
+    @router.post(
+        "/api/police/v1/workers/{worker_id}/claim",
+        dependencies=[Depends(declare_external(ExternalAuthKind.POLICE_CONTRACT))],
+    )
     async def claim(worker_id: str, request: Request) -> JSONResponse:
         """Long-poll and lease compatible work for a pull worker."""
         body: bytes = await read_limited_body(request, 1_048_576)
@@ -179,7 +194,10 @@ def build_police_router(deps: PoliceRouterDeps) -> APIRouter:
         _schema_check("claim-response.schema.json", response_bytes)
         return JSONResponse(content=json.loads(response_bytes))
 
-    @router.post("/api/police/v1/workers/{worker_id}/heartbeat")
+    @router.post(
+        "/api/police/v1/workers/{worker_id}/heartbeat",
+        dependencies=[Depends(declare_external(ExternalAuthKind.POLICE_CONTRACT))],
+    )
     async def heartbeat(worker_id: str, request: Request) -> JSONResponse:
         """Extend task leases held by an authenticated worker."""
         body: bytes = await read_limited_body(request, 1_048_576)
@@ -199,7 +217,10 @@ def build_police_router(deps: PoliceRouterDeps) -> APIRouter:
         _schema_check("heartbeat-response.schema.json", response_bytes)
         return JSONResponse(content=json.loads(response_bytes))
 
-    @router.post("/api/police/v1/tasks/{task_id}/result")
+    @router.post(
+        "/api/police/v1/tasks/{task_id}/result",
+        dependencies=[Depends(declare_external(ExternalAuthKind.POLICE_CONTRACT))],
+    )
     async def submit_result(task_id: str, request: Request) -> JSONResponse:
         """Accept a result from a currently leased pull task."""
         body: bytes = await read_limited_body(request, 1_048_576)
@@ -228,7 +249,10 @@ def build_police_router(deps: PoliceRouterDeps) -> APIRouter:
             )
         return JSONResponse(status_code=204, content=None)
 
-    @router.post("/api/police/v1/callbacks/{task_id}")
+    @router.post(
+        "/api/police/v1/callbacks/{task_id}",
+        dependencies=[Depends(declare_external(ExternalAuthKind.POLICE_CONTRACT))],
+    )
     async def callback(task_id: str, request: Request) -> JSONResponse:
         """Verify a signed asynchronous push result and consume its token once."""
         body: bytes = await read_limited_body(request, 1_048_576)
@@ -290,7 +314,9 @@ def build_police_router(deps: PoliceRouterDeps) -> APIRouter:
 
     @router.get("/api/police/workers")
     async def list_workers(
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.POLICE_READ))
+        ],
     ) -> JSONResponse:
         """List safe worker capability and liveness metadata."""
         del principal
@@ -332,7 +358,9 @@ def build_police_router(deps: PoliceRouterDeps) -> APIRouter:
     @router.post("/api/police/workers/{worker_id}/disable")
     async def disable_worker(
         worker_id: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.ADMIN))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.POLICE_WRITE))
+        ],
     ) -> JSONResponse:
         """Disable a worker and cancel its ready push delivery when possible."""
         del principal

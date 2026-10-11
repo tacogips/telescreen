@@ -9,20 +9,30 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.core.clock import Clock
+from telescreen.core.errors import TelescreenError
 from telescreen.core.ids import new_id
-from telescreen.core.json import dump_json, json_int, json_object, json_str
-from telescreen.core.vocabulary import ActorKind, CollectorKind, SourceFormat
-from telescreen.db.models import WorkflowDefinitionRow
+from telescreen.core.json import dump_json, json_int, json_object, json_str, parse_json
+from telescreen.core.vocabulary import ActorKind, CollectorKind, NotificationEvent, SourceFormat
+from telescreen.db.models import EscalationPolicyRow, WorkflowDefinitionRow
 from telescreen.masking.redact import Redactor
 from telescreen.ports.audit import AuditEntry, AuditLog
 from telescreen.ports.collectors import CollectorConfig, CollectorConfigReader
+from telescreen.ports.templates import TemplateCatalog, TemplateInfo
+from telescreen.workflow.dsl.escalation import EscalationPolicySpec, escalation_from_json
 from telescreen.workflow.dsl.loader import (
     CompiledWorkflow,
     WorkflowValidationError,
     compiled_to_json,
     load_workflow,
 )
-from telescreen.workflow.dsl.model import MapStep, SubWorkflowStep
+from telescreen.workflow.dsl.model import (
+    EvidenceUploadStep,
+    HumanTaskStep,
+    MapStep,
+    NotificationTargetSpec,
+    NotifyStep,
+    SubWorkflowStep,
+)
 from telescreen.workflow.dsl.validate import ValidationIssue
 from telescreen.workflow.engine.repository import WorkflowRepository
 
@@ -36,6 +46,7 @@ class WorkflowService:
     audit: AuditLog
     clock: Clock
     repository: WorkflowRepository
+    templates: TemplateCatalog | None = None
 
     async def validate(self, source_format: SourceFormat, text: str) -> Sequence[ValidationIssue]:
         """Return safe DSL diagnostics, rejecting any source containing sensitive data."""
@@ -85,6 +96,11 @@ class WorkflowService:
                     raise WorkflowValidationError(
                         (ValidationIssue(f"/steps/{step.id}/collector", "sweep_unsupported"),)
                     )
+        reference_issues: tuple[ValidationIssue, ...] = await self._notification_reference_issues(
+            session, workflow
+        )
+        if reference_issues:
+            raise WorkflowValidationError(reference_issues)
         version_value: int | None = await session.scalar(
             select(func.max(WorkflowDefinitionRow.version)).where(
                 WorkflowDefinitionRow.name == workflow.name
@@ -123,6 +139,59 @@ class WorkflowService:
             ),
         )
         return row
+
+    async def _notification_reference_issues(
+        self, session: AsyncSession, workflow: CompiledWorkflow
+    ) -> tuple[ValidationIssue, ...]:
+        """Check template references and escalation-policy set names (DSL v2, API level)."""
+        issues: list[ValidationIssue] = []
+        references: list[tuple[str, str]] = []
+        for index, notification_set in enumerate(workflow.notification_sets):
+            _target_templates(
+                references, notification_set.targets, f"/notification_sets/{index}/targets"
+            )
+        set_names: frozenset[str] = frozenset(item.name for item in workflow.notification_sets)
+        for step in workflow.steps:
+            path: str = f"/steps/{step.id}"
+            if isinstance(step, NotifyStep):
+                if step.template is not None:
+                    references.append((step.template, f"{path}/template"))
+                _target_templates(references, step.targets, f"{path}/targets")
+            if isinstance(step, (HumanTaskStep, EvidenceUploadStep)):
+                _target_templates(references, step.notify_targets, f"{path}/notify_targets")
+                if step.escalation_policy is not None and await self._policy_names_unknown_set(
+                    session, step.escalation_policy, set_names
+                ):
+                    issues.append(
+                        ValidationIssue(f"{path}/escalation_policy", "unknown_notification_set")
+                    )
+        if self.templates is None:
+            return tuple(issues)
+        for name, template_path in references:
+            info: TemplateInfo | None = await self.templates.lookup(session, name)
+            if info is None or info.active_version is None:
+                issues.append(ValidationIssue(template_path, "unknown_template"))
+            elif info.event_kind is not NotificationEvent.WORKFLOW_NOTIFY:
+                issues.append(ValidationIssue(template_path, "template_event_mismatch"))
+        return tuple(issues)
+
+    async def _policy_names_unknown_set(
+        self, session: AsyncSession, policy_name: str, set_names: frozenset[str]
+    ) -> bool:
+        """Return whether a stored escalation policy names a set the workflow lacks."""
+        row: EscalationPolicyRow | None = await session.scalar(
+            select(EscalationPolicyRow).where(EscalationPolicyRow.name == policy_name)
+        )
+        if row is None:
+            return False
+        try:
+            policy: EscalationPolicySpec = escalation_from_json(parse_json(row.tiers_json))
+        except TelescreenError:
+            return False
+        return any(
+            tier.notification_set is not None and tier.notification_set not in set_names
+            for tier in policy.tiers
+        )
 
     async def activate(
         self, session: AsyncSession, name: str, version: int
@@ -186,3 +255,14 @@ class WorkflowService:
                 )
             ).all()
         )
+
+
+def _target_templates(
+    references: list[tuple[str, str]],
+    targets: tuple[NotificationTargetSpec, ...],
+    path: str,
+) -> None:
+    """Collect (template name, JSON path) pairs referenced by targets."""
+    for index, target in enumerate(targets):
+        if target.template is not None:
+            references.append((target.template, f"{path}/{index}/template"))

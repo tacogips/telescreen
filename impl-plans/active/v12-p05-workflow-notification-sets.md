@@ -1,6 +1,6 @@
 # V12-P05 Workflow DSL v2 Notification Sets, Executors and Escalation
 
-**Status**: Not Started
+**Status**: In Progress (blocked on one out-of-writePaths inventory line; see Reconciliation request)
 **Design Reference**: design-docs/specs/design-v1-2-notifications-and-identity.md sections 1 (D5-D8), 4; design-docs/specs/design-workflow-engine.md "Workflow DSL v2 (v1.2)"
 **Created**: 2026-10-11
 **Last Updated**: 2026-10-11
@@ -261,10 +261,79 @@ tests/examples` -> exit 0 (the v1 and v1.1 workflow suites are unchanged).
 
 ## Completion Criteria
 
-- [ ] Deliverables 1-12 implemented; files under 1000 lines.
+- [x] Deliverables 1-12 implemented; files under 1000 lines.
 - [ ] `tests/workflow` and `tests/examples` pass; scoped gates pass; typelint grep empty.
-- [ ] `git diff tests/workflow/test_v11_workflow.py` shows only the owner-review
+      (Scoped gates and typelint pass. Blocked only by
+      `tests/workflow/dsl/test_workflow_dsl.py:314`, outside writePaths; see the
+      session-9 Reconciliation request.)
+- [x] `git diff tests/workflow/test_v11_workflow.py` shows only the owner-review
       request-text assertion rewrite.
-- [ ] Progress Log complete.
+- [x] Progress Log complete.
 
 ## Progress Log
+
+### Session: 2026-10-11 (session 9, manifest telescreen-v12-20261011-d3, attempt 1)
+**Tasks Completed**: Deliverables 1-12 by Claude (in place of Codex Luna).
+- `dsl/model.py`: `NotificationTargetSpec`, `NotificationSetSpec`; v2 fields on
+  `NotifyStep`, `HumanTaskStep`, `EvidenceUploadStep` (incl. unserialized `set_targets`);
+  `CompiledWorkflow.api_version`/`notification_sets` defaulted.
+- `dsl/notification_sets.py` (new): `read_notification_sets`, `read_targets`,
+  `read_template_name`, `validate_recipient_for_channels`, `validate_targets`,
+  `notification_set_issues`, the single `resolve_set_targets`, JSON helpers. The readers
+  take the issue list instead of `loader._Reader` (avoids an import cycle; same behavior).
+- `dsl/loader.py` (759 lines): v1 and v2 accepted; v2-only fields in v1 ->
+  `requires_api_version_v2`; notify `conflicting_fields`/`missing_field`; sets read and
+  resolved. `dsl/validate.py` lazy-imports `notification_set_issues`
+  (`unknown_notification_set`, `duplicate_name`, `invalid_recipient`,
+  `undeliverable_combination`). `dsl/compiled.py` writes `api_version`, sets and step
+  fields only when set (v1 output byte-identical) and `compiled_from_json` returns
+  `resolve_set_targets(...)`.
+- `dsl/escalation.py`: tier `notification_set`/`targets`; `notify`/`channels` optional;
+  `missing_field` at `/tiers/<i>` when no source; `slack_channel:` accepted.
+- `dsl/workflow-v2.schema.json` served by `workflow_schema_text()`; v1 file kept.
+- `workflow/notify_targets.py` (new): `build_workflow_context`, `with_run_issue`,
+  `fan_out`, `TargetOutcome`, `outcomes_json`. Event, step template, default template and
+  inline text are grouped in a typed `FanOutText` dataclass instead of separate
+  parameters (precedence unchanged: target, step, inline, default).
+- `executors/notify.py`: v1 `to` form unchanged; v2 `to` + template -> `workflow_notify`;
+  set/targets fan out with v2 output; defaulted `issues`/`public_base_url`.
+- `executors/human.py`: assignee requests use `human_task_assigned` /
+  `owner_review_assigned` + context with empty text (owner review context omits title,
+  locator and excerpt); `notify_set`/`notify_targets` fan out with
+  `system.human_task_assigned` independently of `notify_on_assign`.
+- `escalation/sla.py`: tier refs with `sla_escalated` + context; tier set resolved from the
+  run's definition (never raises), missing -> audit `notification.set_missing`
+  (details: set name only); set and inline targets fan out with `system.sla_escalated`;
+  defaulted `public_base_url`.
+- `engine/definitions.py`: `templates: TemplateCatalog | None = None`; upload reports
+  `unknown_template`, `template_event_mismatch`, `unknown_notification_set`.
+- `recipients.py`: unchanged (not needed).
+- `tests/workflow/test_v11_workflow.py`: only the owner-review request-text lines rewritten
+  per sharedPathNotes (plus the `NotificationEvent` import).
+- `tests/workflow/v12/test_dsl_v2.py`, `test_fan_out.py`: 36 tests.
+**Tasks In Progress**: Completion criterion 2 waits on the reconciliation below.
+**Blockers**: `tests/workflow/dsl/test_workflow_dsl.py::test_validation_reports_codes_and_json_pointer_paths`
+(outside writePaths) still asserts that `telescreen.workflow/v2` is
+`unsupported_api_version` (lines 312-318), which D6 and deliverable 3 reverse.
+**Reconciliation requests**: In `tests/workflow/dsl/test_workflow_dsl.py:314` change
+`"apiVersion: telescreen.workflow/v2"` to `"apiVersion: telescreen.workflow/v3"` (one
+token; the case still proves an unsupported apiVersion is rejected). Evidence: a copy with
+only that token changed passes 22/22 against the p05 tree
+(`/tmp/telescreen-v12-p05-workflow-notification-sets-dsl-v3-probe.log`). After the change,
+rerun the manifest regress command and tick criterion 2.
+**Hashes**: before `tmp/telescreen-v12-20261011-d3/v12-p05-workflow-notification-sets/attempt-1/hashes-before.txt`,
+after `.../attempt-1/hashes-after.txt`; diff `.../attempt-1/p05.diff`.
+**Verification** (logs copied to `.../attempt-1/`): ruff format --check -> exit 0
+(`/tmp/telescreen-v12-p05-workflow-notification-sets-format.log`, 49 files); ruff check ->
+exit 0 (`-ruff.log`); ty check -> exit 0 (`-ty.log`); pytest tests/workflow/v12 -> exit 0,
+36 passed (`-pytest.log`); pytest tests/workflow tests/examples -> exit 1, 155 passed,
+1 failed (the blocker above), 1 skipped (`-regress.log`); same with that test deselected ->
+exit 0, 155 passed, 1 skipped (`-regress-deselect.log`); typelint + grep -> exit 0, no
+p05-path diagnostics (`-typelint.log`; remaining diagnostics are in p04 in-progress
+`notifications/` files); dsl wc -> exit 0, max 759 lines (`-wc.log`). Informational full
+offline pytest on the moving shared tree -> exit 1, 777 passed, 1 failed (same test),
+5 skipped (`-pytest-all.log`).
+**Notes**: The final-criteria grep stays nonzero until the reconciliation lands.
+
+
+**Owner resolution (2026-10-11, session 9)**: The only blocker (the v1 DSL test that expected `telescreen.workflow/v2` to be unsupported) was fixed by session-9 reconciliation repair R1: `tests/workflow/dsl/test_workflow_dsl.py` now uses `telescreen.workflow/v3` as the unsupported version. Whole-repository gates on the combined tree pass (pytest 784 passed / 5 skipped). On redispatch, re-verify on the committed tree, tick the remaining completion criterion, change nothing else unless review finds a defect, and report only final passing commands with an empty `priorVerification` (conventions 7a).

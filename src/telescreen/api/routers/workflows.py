@@ -8,9 +8,10 @@ import pydantic
 from fastapi import APIRouter, Depends, Response
 from fastapi.responses import JSONResponse
 
-from telescreen.api.common.auth import Principal, require_scope
+from telescreen.api.common.auth import Principal, require_permission
 from telescreen.api.common.context import ApiContext
-from telescreen.core.vocabulary import ApiScope, RunTrigger, SourceFormat
+from telescreen.core.permissions import Permission
+from telescreen.core.vocabulary import RunTrigger, SourceFormat
 from telescreen.db.models import WorkflowDefinitionRow
 from telescreen.workflow.dsl.loader import WorkflowValidationError
 from telescreen.workflow.dsl.schema import workflow_schema_text
@@ -75,7 +76,9 @@ def build_workflows_router(deps: WorkflowsRouterDeps) -> APIRouter:
 
     @router.get("/api/workflows")
     async def list_workflows(
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.WORKFLOWS_READ))
+        ],
     ) -> JSONResponse:
         del principal
         async with deps.ctx.sessions() as session:
@@ -84,7 +87,9 @@ def build_workflows_router(deps: WorkflowsRouterDeps) -> APIRouter:
 
     @router.get("/api/workflows/schema")
     async def schema(
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.WORKFLOWS_READ))
+        ],
     ) -> Response:
         del principal
         return Response(content=workflow_schema_text(), media_type="application/schema+json")
@@ -93,7 +98,9 @@ def build_workflows_router(deps: WorkflowsRouterDeps) -> APIRouter:
     async def get_version(
         name: str,
         version: int,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.WORKFLOWS_READ))
+        ],
     ) -> JSONResponse:
         del principal
         async with deps.ctx.sessions() as session:
@@ -108,7 +115,9 @@ def build_workflows_router(deps: WorkflowsRouterDeps) -> APIRouter:
     @router.get("/api/workflows/{name}")
     async def get_workflow(
         name: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.WORKFLOWS_READ))
+        ],
     ) -> JSONResponse:
         del principal
         async with deps.ctx.sessions() as session:
@@ -125,7 +134,9 @@ def build_workflows_router(deps: WorkflowsRouterDeps) -> APIRouter:
     @router.post("/api/workflows/validate")
     async def validate(
         body: WorkflowSourceBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.WRITE))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.WORKFLOWS_WRITE))
+        ],
     ) -> JSONResponse:
         del principal
         errors: Sequence[ValidationIssue] = await deps.service.validate(
@@ -141,7 +152,9 @@ def build_workflows_router(deps: WorkflowsRouterDeps) -> APIRouter:
     @router.post("/api/workflows", status_code=201)
     async def upload(
         body: WorkflowSourceBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.WRITE))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.WORKFLOWS_WRITE))
+        ],
     ) -> JSONResponse:
         row: WorkflowDefinitionRow
         try:
@@ -163,7 +176,9 @@ def build_workflows_router(deps: WorkflowsRouterDeps) -> APIRouter:
     async def activate(
         name: str,
         body: ActivateBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.ADMIN))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.WORKFLOWS_ACTIVATE))
+        ],
     ) -> JSONResponse:
         async with deps.ctx.sessions.begin() as session:
             row: WorkflowDefinitionRow = await deps.service.activate(session, name, body.version)
@@ -173,7 +188,9 @@ def build_workflows_router(deps: WorkflowsRouterDeps) -> APIRouter:
     async def start_run(
         name: str,
         body: StartRunBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.WRITE))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.RUNS_WRITE))
+        ],
     ) -> JSONResponse:
         async with deps.ctx.sessions.begin() as session:
             row: WorkflowDefinitionRow | None = await deps.service.get(session, name)

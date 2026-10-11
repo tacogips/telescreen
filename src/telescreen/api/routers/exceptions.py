@@ -8,13 +8,14 @@ import pydantic
 from fastapi import APIRouter, Depends
 from fastapi.responses import Response
 
-from telescreen.api.common.auth import Principal, require_scope
+from telescreen.api.common.auth import Principal, require_permission
 from telescreen.api.common.context import ApiContext
 from telescreen.api.common.pagination import PageParams, decode_cursor, encode_cursor, page_params
 from telescreen.core.clock import ensure_utc
 from telescreen.core.errors import TelescreenError
 from telescreen.core.json import JsonValue, dump_json, json_array, json_null, json_object, json_str
-from telescreen.core.vocabulary import ApiScope, ErrorCode, ExceptionStatus
+from telescreen.core.permissions import Permission
+from telescreen.core.vocabulary import ErrorCode, ExceptionStatus
 from telescreen.db.models import IssueExceptionRow
 from telescreen.issues.exceptions import ExceptionService
 from telescreen.ports.directory import OwnerDirectory
@@ -44,7 +45,9 @@ def build_exceptions_router(deps: ExceptionsRouterDeps) -> APIRouter:
 
     @router.get("/api/exceptions")
     async def list_exceptions(
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.EXCEPTIONS_READ))
+        ],
         page: Annotated[PageParams, Depends(page_params)],
         status: ExceptionStatus | None = None,
         issue_id: str | None = None,
@@ -82,7 +85,9 @@ def build_exceptions_router(deps: ExceptionsRouterDeps) -> APIRouter:
     async def approve_exception(
         exception_id: str,
         body: ExceptionDecisionBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.WRITE))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.EXCEPTIONS_WRITE))
+        ],
     ) -> Response:
         """Approve a pending exception and reindex its issue after commit."""
         return await _decide(deps, exception_id, principal, "approve", body.note)
@@ -91,7 +96,9 @@ def build_exceptions_router(deps: ExceptionsRouterDeps) -> APIRouter:
     async def reject_exception(
         exception_id: str,
         body: ExceptionDecisionBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.WRITE))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.EXCEPTIONS_WRITE))
+        ],
     ) -> Response:
         """Reject a pending exception and reindex its issue after commit."""
         return await _decide(deps, exception_id, principal, "reject", body.note)
@@ -99,7 +106,9 @@ def build_exceptions_router(deps: ExceptionsRouterDeps) -> APIRouter:
     @router.post("/api/exceptions/{exception_id}/revoke")
     async def revoke_exception(
         exception_id: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.WRITE))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.EXCEPTIONS_WRITE))
+        ],
     ) -> Response:
         """Revoke an active exception and reindex its issue after commit."""
         return await _decide(deps, exception_id, principal, "revoke", None)
@@ -125,7 +134,7 @@ async def _decide(
         issue_id = row.issue_id
         actor_ref: str = principal.actor_ref()
         member_id: str | None = principal.member_id
-        admin: bool = principal.has(ApiScope.ADMIN)
+        admin: bool = principal.allows(Permission.EXCEPTIONS_MANAGE_ANY)
         if action == "approve":
             await deps.service.approve(session, exception_id, actor_ref, member_id, admin, note)
         elif action == "reject":

@@ -7,7 +7,7 @@ from telescreen.core.vocabulary import DlpPolicy, DlpVerdict, ErrorCode
 from telescreen.db.models.notifications import NotificationRow
 from telescreen.detection.types import DetectionResult, Detector, ScanItem, check_results
 from telescreen.masking.mask import mask_value
-from telescreen.masking.redact import Redactor
+from telescreen.masking.redact import RedactionResult, Redactor
 
 
 @dataclass(frozen=True)
@@ -83,6 +83,33 @@ class DlpGate:
                 "[BLOCKED BY DLP]", "[BLOCKED BY DLP]", DlpVerdict.BLOCKED, hit_count, _SEAL
             )
         return CensoredMessage(subject, body, DlpVerdict.MASKED, hit_count, _SEAL)
+
+    async def inspect_redacted(self, message: OutboundMessage) -> CensoredMessage:
+        """Apply the rule redactor, then inspect; redactor hits count as DLP hits.
+
+        A redactor hit blocks under the block policy and otherwise turns a passing
+        verdict into a masked one, so pre-masking never hides a detected value.
+        """
+        subject: RedactionResult = self.redactor.redact(message.subject)
+        body: RedactionResult = self.redactor.redact(message.body)
+        redacted_hits: int = subject.hit_count + body.hit_count
+        if redacted_hits and self.policy is DlpPolicy.BLOCK:
+            return CensoredMessage(
+                "[BLOCKED BY DLP]", "[BLOCKED BY DLP]", DlpVerdict.BLOCKED, redacted_hits, _SEAL
+            )
+        inspected: CensoredMessage = await self.inspect(OutboundMessage(subject.text, body.text))
+        if redacted_hits == 0:
+            return inspected
+        verdict: DlpVerdict = (
+            DlpVerdict.BLOCKED if inspected.verdict is DlpVerdict.BLOCKED else DlpVerdict.MASKED
+        )
+        return CensoredMessage(
+            inspected.subject,
+            inspected.body,
+            verdict,
+            inspected.hit_count + redacted_hits,
+            _SEAL,
+        )
 
 
 def _mask_spans(text: str, result: DetectionResult) -> str:

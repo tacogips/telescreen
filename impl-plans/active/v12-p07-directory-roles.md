@@ -1,6 +1,6 @@
 # V12-P07 Directory: Roles, Last Admin, OIDC Member Provisioning, Tokens
 
-**Status**: Not Started
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-2-notifications-and-identity.md sections 1 (D7, D12-D16), 5.3, 5.4, 6.3 steps 3-4; design-docs/specs/design-data-model.md "v1.2 additions"
 **Created**: 2026-10-11
 **Last Updated**: 2026-10-11
@@ -164,8 +164,42 @@ tests/api/common` -> exit 0 (informational if p06 is mid-edit; record it).
 
 ## Completion Criteria
 
-- [ ] Deliverables 1-6 implemented.
-- [ ] `tests/directory` passes; scoped gates pass; typelint grep empty.
-- [ ] Progress Log complete.
+- [x] Deliverables 1-6 implemented.
+- [x] `tests/directory` passes; scoped gates pass; typelint grep empty.
+- [x] Progress Log complete.
 
 ## Progress Log
+
+### Session 9 (2026-10-11), manifest d3, HEAD 8ff064f, implemented by Claude in place of Codex Luna
+
+- Evidence: `tmp/telescreen-v12-20261011-d3/v12-p07-directory-roles/attempt-1/`
+  (`edit-intents.md`, `directory-before.sha256`, numbered gate logs).
+- Deliverable 1: `directory/roles.py` `RoleService.set_role` (NOT_FOUND, no-op without
+  audit, last-admin check over `active_admins_for_update` unless source `idp`, audit
+  `role.changed` from/to/source) and `list_users` -> `UserView`.
+- Deliverable 2: `directory/provisioning.py` `DirectoryProvisioner` (keyed identity via
+  `IdentityService._key_parts(OIDC_SUBJECT, issuer + NUL + subject)`; verified-email link;
+  `IDENTITY_CONFLICT`; JIT create with slug handle and `-2` suffix loop, email only when
+  verified, `derive_for_member` reused; `NOT_PROVISIONED`; inactive `FORBIDDEN`; role sync
+  `source=idp`, actor `system:auth`; idp team sync; `last_sign_in_at`). Audits carry only
+  kind, method or counts. Following design 6.3 / D15, `create` mode links a single verified
+  match and otherwise creates (two active matches stay `NOT_PROVISIONED`).
+- Deliverables 3-6: `slack_channel:` in `resolver.py`; `tokens.py` `actor_ref` on
+  create/revoke (`directory/actors.py` `actor_kind_for`), `TokenView`, `list_tokens`,
+  `member_id_for_handle`; repository queries and explicit `manual` origin in
+  `set_team_members`; `IdentityService.add` rejects `oidc_subject`; `__init__` exports.
+- Tests: `tests/directory/v12/test_v12_roles_tokens.py`, `test_v12_provisioning.py`.
+- Verification (pipefail, `PYTHONDONTWRITEBYTECODE=1`):
+  - `ruff format --check` exit 0 (`01-format.log`); `ruff check` exit 0 (`02-ruff.log`);
+    `ty check` exit 0 (`03-ty.log`);
+  - `pytest tests/directory` exit 0, 14 passed (`04-pytest.log`,
+    `/tmp/telescreen-v12-p07-directory-roles-pytest.log`);
+  - typelint grep for directory paths empty, exit 0 (`05-typelint.log`; the 2 TL003
+    entries are in v12-p04's in-progress `notifications/templates/service.py`).
+- Informational (fanout, moving tree): `pytest tests/directory tests/api/common` exit 1,
+  14 passed, 1 failed (`info-pytest-directory-api-common.log`); the consumer run
+  (`tests/audit tests/collectors/core tests/db tests/leak tests/e2e`) exit 1, 21 failed
+  (`info-pytest-consumers.log`). Every failure is `TypeError: unhashable type: 'FakeClock'`
+  in FastAPI `solve_dependencies`, raised from v12-p06's in-progress
+  `src/telescreen/api/common` edits, not from directory code. v12-p11 and v12-p12 rerun the
+  full suite after the joins.

@@ -150,4 +150,15 @@ describe("RunDetail", () => {
     await Promise.resolve(); await Promise.resolve();
     expect(fetchMock.mock.calls.filter(([input]) => String(input) === "/api/runs/run-01")).toHaveLength(1);
   });
+  it("renders per-target counts for a v2 notify output", async () => {
+    const notifyRun = { ...run, run: { ...summary, status: "succeeded" }, steps: [{ id: "step-09", step_id: "alert", visit: 1, branch_token: "main", status: "succeeded", attempt: 1, input_json: "{}", output_json: JSON.stringify({ queued: true, notification_ids: ["ntf-01", "ntf-02"], targets: [{ index: 0, channel: "slack", queued: 2, blocked: 0, skipped: 1 }, { index: 1, channel: "email", queued: 0, blocked: 1, skipped: 0 }] }), error_code: null }, { id: "step-10", step_id: "legacy", visit: 1, branch_token: "main", status: "succeeded", attempt: 1, input_json: "{}", output_json: JSON.stringify({ queued: true, notification_ids: ["ntf-03"] }), error_code: null }], transitions: [], human_tasks: [] };
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => responseFor(input, notifyRun)));
+    renderRun();
+    const heading = await screen.findByText("Notification targets");
+    expect(screen.getAllByText("Notification targets")).toHaveLength(1);
+    const table = heading.parentElement?.querySelector("table");
+    expect(table).not.toBeNull();
+    const rows = Array.from(table?.querySelectorAll("tbody tr") ?? []).map((row) => Array.from(row.querySelectorAll("td")).map((cell) => cell.textContent));
+    expect(rows).toEqual([["0", "slack", "2", "0", "1"], ["1", "email", "0", "1", "0"]]);
+  });
 });

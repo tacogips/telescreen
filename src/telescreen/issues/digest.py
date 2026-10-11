@@ -12,12 +12,17 @@ from telescreen.core.vocabulary import (
     EngineTaskKind,
     ExceptionStatus,
     NotificationChannel,
+    NotificationEvent,
 )
 from telescreen.db.models import IssueExceptionRow, IssueRow, MemberRow
 from telescreen.issues.keys import short_id
 from telescreen.issues.recipient_channel import preferred_channel
 from telescreen.ports.directory import OwnerDirectory, RecipientResolver
-from telescreen.ports.notifications import NotificationRequest, NotificationSender
+from telescreen.ports.notifications import (
+    NotificationContext,
+    NotificationRequest,
+    NotificationSender,
+)
 from telescreen.ports.workflow import ClaimedTask, TaskHandler, TaskResult
 
 
@@ -123,9 +128,11 @@ class OwnerDigestHandler(TaskHandler):
             NotificationRequest(
                 channel,
                 addresses,
-                "Telescreen owner digest",
-                body,
+                "",
+                "",
                 "system:digest",
+                event=NotificationEvent.OWNER_DIGEST,
+                context=NotificationContext(digest_summary=body),
             ),
         )
 

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from telescreen.api.common.auth import Principal, require_scope
+from telescreen.api.common.auth import Principal, require_permission
 from telescreen.api.common.context import ApiContext
 from telescreen.api.common.pagination import (
     PageParams,
@@ -18,7 +18,8 @@ from telescreen.api.common.pagination import (
     page_params,
 )
 from telescreen.core.errors import TelescreenError
-from telescreen.core.vocabulary import ApiScope, ErrorCode, IdentityKind
+from telescreen.core.permissions import Permission
+from telescreen.core.vocabulary import ErrorCode, IdentityKind
 from telescreen.db.models import MemberIdentityRow, MemberRow, TeamRow
 from telescreen.directory.identities import IdentityService, IdentityView
 from telescreen.directory.service import DirectoryService
@@ -82,7 +83,9 @@ def build_directory_router(deps: DirectoryRouterDeps) -> APIRouter:
 
     @router.get("/api/members")
     async def list_members(
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.DIRECTORY_READ))
+        ],
         page: Annotated[PageParams, Depends(page_params)],
     ) -> JSONResponse:
         """Return directory members without credentials or token material."""
@@ -114,7 +117,9 @@ def build_directory_router(deps: DirectoryRouterDeps) -> APIRouter:
 
     @router.get("/api/teams")
     async def list_teams(
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.DIRECTORY_READ))
+        ],
         page: Annotated[PageParams, Depends(page_params)],
     ) -> JSONResponse:
         """Return directory teams."""
@@ -151,7 +156,9 @@ def build_directory_router(deps: DirectoryRouterDeps) -> APIRouter:
     @router.post("/api/members", status_code=201)
     async def create_member(
         body: MemberBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.ADMIN))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.DIRECTORY_WRITE))
+        ],
     ) -> JSONResponse:
         """Create a directory member."""
         del principal
@@ -174,7 +181,9 @@ def build_directory_router(deps: DirectoryRouterDeps) -> APIRouter:
     @router.post("/api/teams", status_code=201)
     async def create_team(
         body: TeamBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.ADMIN))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.DIRECTORY_WRITE))
+        ],
     ) -> JSONResponse:
         """Create a directory team."""
         del principal
@@ -203,7 +212,9 @@ def build_directory_router(deps: DirectoryRouterDeps) -> APIRouter:
     async def set_team_members(
         slug: str,
         body: TeamMembersBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.ADMIN))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.DIRECTORY_WRITE))
+        ],
     ) -> Response:
         """Replace a team's member set."""
         del principal
@@ -215,7 +226,9 @@ def build_directory_router(deps: DirectoryRouterDeps) -> APIRouter:
     async def set_team_lead(
         slug: str,
         body: TeamLeadBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.ADMIN))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.DIRECTORY_WRITE))
+        ],
     ) -> Response:
         """Set or clear a team's active lead."""
         async with deps.ctx.sessions.begin() as session:
@@ -225,7 +238,9 @@ def build_directory_router(deps: DirectoryRouterDeps) -> APIRouter:
     @router.get("/api/members/{handle}/identities")
     async def list_identities(
         handle: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.DIRECTORY_READ))
+        ],
     ) -> JSONResponse:
         """List safe identity metadata without values or full keyed references."""
         del principal
@@ -253,7 +268,9 @@ def build_directory_router(deps: DirectoryRouterDeps) -> APIRouter:
     async def add_identity(
         handle: str,
         body: IdentityBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.ADMIN))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.DIRECTORY_WRITE))
+        ],
     ) -> JSONResponse:
         """Add a manually keyed email or GitHub login identity."""
         if deps.identities is None:
@@ -279,7 +296,9 @@ def build_directory_router(deps: DirectoryRouterDeps) -> APIRouter:
     async def remove_identity(
         handle: str,
         identity_id: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.ADMIN))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.DIRECTORY_WRITE))
+        ],
     ) -> Response:
         """Remove a manually configured identity."""
         if deps.identities is None:

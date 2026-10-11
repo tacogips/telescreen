@@ -7,9 +7,10 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import JSONResponse
 
 from telescreen.api.common import ApiContext, read_limited_body
-from telescreen.api.common.auth import Principal, require_scope
+from telescreen.api.common.auth import Principal, require_permission
 from telescreen.core.errors import TelescreenError
-from telescreen.core.vocabulary import ApiScope, ErrorCode
+from telescreen.core.permissions import Permission
+from telescreen.core.vocabulary import ErrorCode
 from telescreen.db.models import EvidenceRow
 from telescreen.evidence.service import EvidenceService
 
@@ -49,7 +50,9 @@ def build_evidence_router(deps: EvidenceRouterDeps) -> APIRouter:
         request: Request,
         issue_id: str,
         filename: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.WRITE))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.EVIDENCE_UPLOAD))
+        ],
         step_run_id: str | None = None,
     ) -> JSONResponse:
         """Scan the raw body before any evidence storage operation."""
@@ -77,7 +80,9 @@ def build_evidence_router(deps: EvidenceRouterDeps) -> APIRouter:
     @router.get("")
     async def list_evidence(
         issue_id: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.EVIDENCE_READ))
+        ],
         step_run_id: Annotated[str | None, Query()] = None,
     ) -> JSONResponse:
         """List accepted evidence metadata for an issue."""
@@ -88,7 +93,9 @@ def build_evidence_router(deps: EvidenceRouterDeps) -> APIRouter:
     @router.get("/{evidence_id}/content")
     async def get_content(
         evidence_id: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.EVIDENCE_READ))
+        ],
     ) -> Response:
         """Return accepted evidence bytes as an opaque download."""
         del principal
@@ -98,7 +105,9 @@ def build_evidence_router(deps: EvidenceRouterDeps) -> APIRouter:
     @router.get("/{evidence_id}")
     async def get_metadata(
         evidence_id: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.EVIDENCE_READ))
+        ],
     ) -> JSONResponse:
         """Return accepted evidence metadata only."""
         del principal

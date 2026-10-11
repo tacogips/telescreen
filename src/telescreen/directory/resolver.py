@@ -28,7 +28,7 @@ class DirectoryRecipientResolver:
             raise TelescreenError(ErrorCode.RECIPIENT_UNKNOWN, "recipient is unknown")
         if kind == "email":
             return ResolvedRecipients((value,), (), (), ())
-        if kind == "slack":
+        if kind in ("slack", "slack_channel"):
             return ResolvedRecipients((), (value,), (), ())
         if kind == "member":
             member: MemberRow | None = await self.repository.member_by_handle(session, value)

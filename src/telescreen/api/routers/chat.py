@@ -8,11 +8,12 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from pydantic import Field
 
-from telescreen.api.common.auth import Principal, require_scope
+from telescreen.api.common.auth import Principal, require_permission
 from telescreen.api.common.context import ApiContext
 from telescreen.assistant.chat import ChatMessage, ChatRole, ChatService
 from telescreen.core.errors import TelescreenError
-from telescreen.core.vocabulary import ApiScope, ErrorCode
+from telescreen.core.permissions import Permission
+from telescreen.core.vocabulary import ErrorCode
 
 
 @pydantic.dataclasses.dataclass
@@ -45,7 +46,7 @@ def build_chat_router(deps: ChatRouterDeps) -> APIRouter:
     @router.post("/api/chat")
     async def chat(
         body: ChatBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[Principal, Depends(require_permission(deps.ctx, Permission.CHAT_USE))],
     ) -> JSONResponse:
         """Answer a user transcript without persisting conversation history."""
         del principal

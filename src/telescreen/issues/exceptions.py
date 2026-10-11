@@ -20,19 +20,23 @@ from telescreen.core.vocabulary import (
     IssueResolution,
     IssueStatus,
     NotificationChannel,
+    NotificationEvent,
     RuleClass,
     Visibility,
 )
 from telescreen.db.models import IssueExceptionRow, IssueHistoryRow, IssueRow
-from telescreen.issues.keys import short_id
-from telescreen.issues.recipient_channel import preferred_channel
+from telescreen.issues.recipient_channel import issue_context, preferred_channel
 from telescreen.masking.redact import Redactor
 from telescreen.ports.audit import AuditEntry, AuditLog
 from telescreen.ports.directory import (
     OwnerDirectory,
     RecipientResolver,
 )
-from telescreen.ports.notifications import NotificationRequest, NotificationSender
+from telescreen.ports.notifications import (
+    NotificationContext,
+    NotificationRequest,
+    NotificationSender,
+)
 from telescreen.ports.policy import PolicyDecider, PolicyDecision, PolicySubject
 
 
@@ -108,9 +112,8 @@ class ExceptionService:
             await self._notify(
                 session,
                 approver,
-                f"Exception requested for {short_id(issue.number)}",
-                f"{short_id(issue.number)} {issue.rule_class} {issue.severity} "
-                f"{issue.exposure_visibility}",
+                NotificationEvent.EXCEPTION_REQUESTED,
+                issue_context(issue),
                 actor_ref,
                 issue.id,
             )
@@ -315,9 +318,8 @@ class ExceptionService:
             await self._notify(
                 session,
                 ref,
-                f"Exception expired for {short_id(issue.number)}",
-                f"{short_id(issue.number)} {issue.rule_class} {issue.severity} "
-                f"{issue.exposure_visibility}",
+                NotificationEvent.EXCEPTION_EXPIRED,
+                issue_context(issue),
                 "system:exceptions",
                 issue.id,
             )
@@ -326,8 +328,8 @@ class ExceptionService:
         self,
         session: AsyncSession,
         ref: str,
-        subject: str,
-        body: str,
+        event: NotificationEvent,
+        context: NotificationContext,
         actor_ref: str,
         issue_id: str,
     ) -> None:
@@ -340,7 +342,16 @@ class ExceptionService:
         addresses: tuple[str, ...] = (ref,)
         await self.notifications.send(
             session,
-            NotificationRequest(channel, addresses, subject, body, actor_ref, issue_id=issue_id),
+            NotificationRequest(
+                channel,
+                addresses,
+                "",
+                "",
+                actor_ref,
+                issue_id=issue_id,
+                event=event,
+                context=context,
+            ),
         )
 
     async def _required(self, session: AsyncSession, issue_id: str) -> IssueRow:

@@ -311,7 +311,7 @@ steps:
         ),
         (
             VALID_YAML.replace(
-                "apiVersion: telescreen.workflow/v1", "apiVersion: telescreen.workflow/v2"
+                "apiVersion: telescreen.workflow/v1", "apiVersion: telescreen.workflow/v3"
             ),
             "unsupported_api_version",
             "/apiVersion",

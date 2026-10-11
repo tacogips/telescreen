@@ -12,7 +12,7 @@ from sqlalchemy.engine import Result
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 from sqlalchemy.sql import Select
 
-from telescreen.api.common.auth import Principal, require_scope
+from telescreen.api.common.auth import Principal, require_permission
 from telescreen.api.common.context import ApiContext
 from telescreen.api.common.pagination import PageParams, decode_cursor, encode_cursor, page_params
 from telescreen.core.clock import ensure_utc
@@ -29,8 +29,8 @@ from telescreen.core.json import (
     json_str,
     parse_json,
 )
+from telescreen.core.permissions import Permission
 from telescreen.core.vocabulary import (
-    ApiScope,
     ErrorCode,
     ExceptionDuration,
     ExceptionStatus,
@@ -110,7 +110,9 @@ def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
 
     @router.get("/api/issues")
     async def list_issues(
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.ISSUES_READ))
+        ],
         page: Annotated[PageParams, Depends(page_params)],
         status: IssueStatus | None = None,
         source: str | None = None,
@@ -256,7 +258,9 @@ def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
     @router.get("/api/issues/{issue_id}/events")
     async def issue_events(
         issue_id: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.ISSUES_READ))
+        ],
         page: Annotated[PageParams, Depends(page_params)],
     ) -> Response:
         """Return masked finding observations for an issue."""
@@ -306,7 +310,9 @@ def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
     @router.get("/api/issues/{issue_id}/history")
     async def issue_history(
         issue_id: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.ISSUES_READ))
+        ],
         page: Annotated[PageParams, Depends(page_params)],
     ) -> Response:
         """Return chronological masked issue history."""
@@ -353,7 +359,9 @@ def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
 
     @router.get("/api/issues/stats")
     async def issue_stats(
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.ISSUES_READ))
+        ],
         bucket: Annotated[str, Query(pattern="^(day|hour)$")] = "day",
         days: Annotated[int, Query(ge=1, le=90)] = 14,
     ) -> Response:
@@ -390,7 +398,9 @@ def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
     @router.get("/api/issues/{issue_id}")
     async def get_issue(
         issue_id: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.ISSUES_READ))
+        ],
     ) -> Response:
         """Return a masked issue record."""
         async with deps.ctx.sessions() as session:
@@ -434,7 +444,9 @@ def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
     @router.get("/api/issues/{issue_id}/occurrences")
     async def issue_occurrences(
         issue_id: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.READ))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.ISSUES_READ))
+        ],
     ) -> Response:
         """Return linked credential occurrences without raw identity keys."""
         del principal
@@ -473,7 +485,9 @@ def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
     async def remediate_issue(
         issue_id: str,
         body: RemediationBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.WRITE))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.ISSUES_WRITE))
+        ],
     ) -> Response:
         """Request read-only remediation and verification rescans."""
         if deps.remediation is None:
@@ -510,7 +524,9 @@ def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
     async def resolve_issue(
         issue_id: str,
         body: ResolveBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.WRITE))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.ISSUES_WRITE))
+        ],
     ) -> Response:
         """Resolve an issue with a reason and required note."""
         if deps.remediation is None:
@@ -522,7 +538,7 @@ def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
                 body.reason,
                 body.note,
                 principal.actor_ref(),
-                principal.has(ApiScope.ADMIN),
+                principal.allows(Permission.ISSUES_RESOLVE_UNVERIFIED),
             )
             issue: IssueRow | None = await deps.service.repository.by_id(session, issue_id)
             if issue is None:
@@ -533,7 +549,9 @@ def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
     @router.post("/api/issues/{issue_id}/release")
     async def release_issue(
         issue_id: str,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.WRITE))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.ISSUES_WRITE))
+        ],
     ) -> Response:
         """Release a member assignment to the policy or default team."""
         if deps.remediation is None:
@@ -550,7 +568,9 @@ def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
     async def request_issue_exception(
         issue_id: str,
         body: ExceptionRequestBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.WRITE))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.EXCEPTIONS_WRITE))
+        ],
     ) -> Response:
         """Request an exception through the issue lifecycle service."""
         if deps.remediation is None:
@@ -562,7 +582,7 @@ def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
                 body.reason,
                 body.duration,
                 principal.actor_ref(),
-                principal.has(ApiScope.ADMIN),
+                principal.allows(Permission.EXCEPTIONS_MANAGE_ANY),
             )
             row: IssueExceptionRow | None = await session.get(IssueExceptionRow, exception_id)
             if row is None:
@@ -581,7 +601,9 @@ def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
     async def patch_issue(
         issue_id: str,
         body: IssuePatchBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.WRITE))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.ISSUES_WRITE))
+        ],
     ) -> Response:
         """Change status and/or assignee in one transaction."""
         async with deps.ctx.sessions.begin() as session:
@@ -605,7 +627,9 @@ def build_issues_router(deps: IssuesRouterDeps) -> APIRouter:
     async def add_comment(
         issue_id: str,
         body: CommentBody,
-        principal: Annotated[Principal, Depends(require_scope(deps.ctx, ApiScope.WRITE))],
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.ISSUES_WRITE))
+        ],
     ) -> Response:
         """Add a comment that the service redacts before persistence."""
         async with deps.ctx.sessions.begin() as session:

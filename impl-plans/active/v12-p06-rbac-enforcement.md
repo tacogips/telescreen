@@ -1,6 +1,6 @@
 # V12-P06 RBAC Enforcement: Permission Dependency on Every Route
 
-**Status**: Not Started
+**Status**: Completed (implementation; formal review pending)
 **Design Reference**: design-docs/specs/design-v1-2-notifications-and-identity.md sections 1 (D10, D11, D18), 5.1, 5.2, 6.2 step 1, 6.4; design-docs/specs/design-api-and-ui.md "Authentication and errors" (v1.2 paragraph)
 **Created**: 2026-10-11
 **Last Updated**: 2026-10-11
@@ -256,13 +256,77 @@ recorded as such; a 403 or auth failure is a p06 failure and must be fixed.
 
 ## Completion Criteria
 
-- [ ] `require_scope` is gone (`grep -rn require_scope src` prints nothing).
-- [ ] Every route in the 17 routers uses `require_permission` or `declare_external` per
+- [x] `require_scope` is gone (`grep -rn require_scope src` prints nothing for Python
+      source; see the Reconciliation request below for vendored JS in `src/web/node_modules`).
+- [x] Every route in the 17 routers uses `require_permission` or `declare_external` per
       the table.
-- [ ] The five bound-token fixtures seed roles; `git diff` on them shows only role
+- [x] The five bound-token fixtures seed roles; `git diff` on them shows only role
       seeding (no assertion or scope change).
-- [ ] Tests pass; the scoped gates and the four regression commands exit 0; typelint
+- [x] Tests pass; the scoped gates and the four regression commands exit 0; typelint
       grep empty.
-- [ ] Progress Log complete.
+- [x] Progress Log complete.
 
 ## Progress Log
+
+### Session 9 (2026-10-11), attempt 1 (Claude in place of Codex Luna; manifest d3)
+
+Base HEAD 8ff064f. Evidence: `tmp/telescreen-v12-20261011-d3/v12-p06-rbac-enforcement/attempt-1/`
+(per-edit intents `edit-01..06`, before hashes, logs `01..12`).
+
+- `api/common/auth.py`: `Principal(kind, token_id, member_id, role, permissions)` with
+  `allows`/`actor_ref`; `authenticate` (JWT path via `ctx.verifier` + `ctx.identities`,
+  token path via hash + bound `MemberRow` role and `effective_token_permissions`);
+  `PermissionDependency`/`require_permission`; `ExternalAuthDeclaration`/`declare_external`;
+  `require_scope` and `Principal.has` removed. `PermissionDependency` is
+  `@dataclass(frozen=True, eq=False)`: FastAPI's dependency cache hashes the callable, and
+  field hashing failed on unhashable context services (`FakeClock`, 500s in the first run,
+  `prior-04-pytest-before-eq-false.log`).
+- `context.py` appends `verifier` and `identities`; `errors.py` maps the nine v1.2 codes;
+  `__init__.py` exports updated.
+- 17 routers: permissions per the table (80 routes); externals on health (`public`),
+  collector webhook (`provider_signature`) and six police contract routes
+  (`police_contract`); six in-handler admin checks use manage_any / resolve_unverified.
+- Fixtures (role seeding only): evidence (`member-1` responder, x2), v11_issues
+  (`member-api-owner` responder, `member-lifecycle` admin), v11_ops (`alice` viewer),
+  leak `exception_flow` and e2e owner health (responder via `update(MemberRow)` in the
+  token block). `test_engine_extended.py`: two `Principal(...)` constructions only.
+- Bound-token audit (AST walk of every `.create(` call in tests with a 4th/`member_id`
+  argument, plus `ApiTokenRow(`): exactly the five files above; no new hit.
+- Tests `tests/api/v12_rbac/` (9 tests): 401 cases, unbound v1 scopes, bound role
+  intersection and inactive member, D11 role NULL / missing member / ingest, OIDC path
+  (viewer, unknown identity, role None, inactive, invalid token, verifier None, 503),
+  in-handler manage_any checks, `http_status_for`, and the per-router table test
+  (mutation check: changing PATCH issue to `issues.read` fails it, `11-mutation-router-table.log`).
+
+Verification (bash, pipefail, PYTHONDONTWRITEBYTECODE=1), final source:
+
+| Command | Exit | Log |
+|---------|------|-----|
+| ruff format --check (scoped) | 0 | `01-format.log` |
+| ruff check (scoped) | 0 | `02-ruff.log` |
+| ty check (scoped) | 0 | `03-ty.log` |
+| pytest tests/api engine_extended evidence | 0 (39 passed) | `/tmp/telescreen-v12-p06-rbac-enforcement-pytest.log`, `04-pytest.log` |
+| regress tests/api contract evidence assistant | 0 (53 passed) | `/tmp/telescreen-v12-p06-rbac-enforcement-regress.log`, `05-regress.log` |
+| v11api | 0 (7 passed) | `/tmp/telescreen-v12-p06-rbac-enforcement-v11api.log`, `06-v11api.log` |
+| tests/leak | 0 (6 passed) | `/tmp/telescreen-v12-p06-rbac-enforcement-leak.log`, `07-leak.log` |
+| router-module regression | 0 (33 passed, 1 skipped) | `/tmp/telescreen-v12-p06-rbac-enforcement-routers.log`, `08-routers.log` |
+| typelint + path grep | 0 (grep empty) | `/tmp/telescreen-v12-p06-rbac-enforcement-typelint.log`, `09-typelint.log` |
+| `! grep -rn require_scope src --exclude-dir=node_modules` | 0 | `10-require-scope.log` |
+
+- The first router-module run failed 2 tests in `test_flow_v11_owner_health.py` with 500
+  `workflow_invalid` on `POST /api/escalation-policies` with the unbound admin token (auth
+  passed). The cause was p05's in-progress edits to `workflow/dsl` (sibling-caused, per
+  S5-V12-L03). The rerun passed (`prior-08-routers-sibling-inflight.log`).
+- Informational full `pytest`: 717 passed, 3 failed, all in sibling-owned in-progress
+  areas (p04 `tests/notifications/v12/test_template_validation.py` and a typelint TL003 in
+  `notifications/templates/service.py`; p05 `tests/workflow/dsl/test_workflow_dsl.py`);
+  none is auth-related (`12-pytest-all-informational.log`).
+- Reconciliation request (manifest verification command): the literal
+  `! grep -rn require_scope src` exits 1 only because the vendored
+  `src/web/node_modules/playwright-core/lib/utilsBundle.js` (p03 artifactRoot) defines a JS
+  `require_scope` helper (6 lines, `10b-require-scope-literal.log`). No Python source matches
+  (`grep -rn require_scope src/telescreen` is empty). Requested fix for serial
+  finalization: scope the gate to `src/telescreen` or add `--exclude-dir=node_modules`.
+
+
+**Owner resolution (2026-10-11, session 9)**: The only gap was the manifest gate `! grep -rn require_scope src`, which also matches vendored JavaScript under the `src/web/node_modules` artifact root. The owner-approved gate is `! grep -rn require_scope src/telescreen src/telescreen_police_sdk` (integration review INT-W2-M01); the next dispatch manifest must use it. Whole-repository gates on the combined tree pass (pytest 784 passed / 5 skipped). On redispatch, re-verify on the committed tree with that gate, change no source unless review finds a defect, and report only final passing commands with an empty `priorVerification` (conventions 7a).

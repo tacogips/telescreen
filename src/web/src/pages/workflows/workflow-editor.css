@@ -9,3 +9,10 @@
 .current-step{border-left:3px solid var(--accent);padding-left:12px;background:var(--selected-bg)}
 @keyframes run-step-spin{to{transform:rotate(360deg)}}
 @media(max-width:992px){.workflow-editor-columns{grid-template-columns:1fr}.workflow-source-editor{min-height:300px}}
+.notification-set-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:8px}
+.notification-set-card{border:1px solid var(--border-primary);border-radius:8px;background:var(--bg-primary);padding:12px}
+.notification-set-card h3{margin:0 0 8px;font-size:14px}
+.notification-targets{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.notification-targets li{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.recipient-chips,.channel-tags{display:inline-flex;flex-wrap:wrap;gap:4px}
+.recipient-chip{border:1px solid var(--border-secondary);border-radius:999px;padding:1px 8px;font:12px var(--font-mono)}

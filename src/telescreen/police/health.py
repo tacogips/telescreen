@@ -14,13 +14,18 @@ from telescreen.core.vocabulary import (
     HealthCondition,
     HealthStatus,
     NotificationChannel,
+    NotificationEvent,
     PoliceTaskStatus,
     PoliceWorkerStatus,
 )
 from telescreen.db.models import PoliceTaskRow, PoliceWorkerRow
 from telescreen.police.gateway import Capability, capability
 from telescreen.ports.audit import AuditEntry, AuditLog
-from telescreen.ports.notifications import NotificationRequest, NotificationSender
+from telescreen.ports.notifications import (
+    NotificationContext,
+    NotificationRequest,
+    NotificationSender,
+)
 from telescreen.ports.workflow import ScheduleProvider
 
 
@@ -145,9 +150,14 @@ class PoliceHealthProvider(ScheduleProvider):
                     NotificationRequest(
                         channel,
                         self.recipients,
-                        subject,
-                        f"Police worker {worker.name} is silent.",
+                        "",
+                        "",
                         "system:police-health",
+                        event=NotificationEvent.POLICE_HEALTH_ALERT,
+                        context=NotificationContext(
+                            health_target=worker.name,
+                            health_condition=HealthCondition.POLICE_SILENT.value,
+                        ),
                     ),
                 )
         await self.audit.append(

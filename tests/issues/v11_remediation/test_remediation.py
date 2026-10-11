@@ -21,6 +21,7 @@ from telescreen.core.vocabulary import (
     IssueResolution,
     IssueStatus,
     NotificationChannel,
+    NotificationEvent,
     PolicyEffect,
     RemediationAction,
     RuleClass,
@@ -424,7 +425,9 @@ async def test_resolve_reason_and_exception_approval_revoke_and_expiry() -> None
                 "member:alice",
                 False,
             )
-        assert harness.notifications.requests[0].body.startswith("TELE-2")
+        requested: NotificationRequest = harness.notifications.requests[0]
+        assert requested.event is NotificationEvent.EXCEPTION_REQUESTED
+        assert requested.context is not None and requested.context.issue_short_id == "TELE-2"
         with pytest.raises(TelescreenError) as captured:
             async with harness.db.sessions.begin() as session:
                 await harness.exceptions.approve(
@@ -470,9 +473,11 @@ async def test_exception_conflicts_forever_gate_and_resolved_request_rejection()
                 False,
             )
         notification: NotificationRequest = harness.notifications.requests[0]
-        assert notification.body.startswith("TELE-1")
-        assert "business exception" not in notification.body
-        assert "member@example.test" not in notification.body
+        assert notification.event is NotificationEvent.EXCEPTION_REQUESTED
+        assert notification.context is not None
+        assert notification.context.issue_short_id == "TELE-1"
+        assert "business exception" not in repr(notification.context)
+        assert "member@example.test" not in repr(notification.context)
         async with harness.db.sessions() as session:
             row: IssueExceptionRow | None = await session.get(IssueExceptionRow, exception_id)
         assert row is not None and row.status == ExceptionStatus.REQUESTED.value
@@ -591,7 +596,9 @@ async def test_expire_due_reopens_only_ignored_issue_and_audits() -> None:
         assert count == 1
         assert issue is not None and issue.status == IssueStatus.UNRESOLVED.value
         assert history is not None
-        assert harness.notifications.requests[0].body.startswith("TELE-1")
+        expired: NotificationRequest = harness.notifications.requests[0]
+        assert expired.event is NotificationEvent.EXCEPTION_EXPIRED
+        assert expired.context is not None and expired.context.issue_short_id == "TELE-1"
     finally:
         await harness.close()
 
@@ -708,10 +715,12 @@ async def test_digest_uses_slack_and_omits_title_locator_and_email() -> None:
         request: NotificationRequest = harness.notifications.requests[0]
         assert result.kind is TaskResultKind.DONE
         assert request.channel is NotificationChannel.SLACK
-        assert "TELE-1" in request.body
-        assert "safe title fixture" not in request.body
-        assert "masked-resource" not in request.body
-        assert "member@example.test" not in request.body
+        assert request.event is NotificationEvent.OWNER_DIGEST
+        assert request.context is not None and request.context.digest_summary is not None
+        assert "TELE-1" in request.context.digest_summary
+        assert "safe title fixture" not in repr(request.context)
+        assert "masked-resource" not in repr(request.context)
+        assert "member@example.test" not in repr(request.context)
     finally:
         await harness.close()
 

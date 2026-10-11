@@ -93,6 +93,7 @@ async def test_issue_v11_risk_exposure_assignee_and_safe_detail() -> None:
                     active=True,
                     created_at=harness.clock.now(),
                     updated_at=harness.clock.now(),
+                    role="responder",
                 )
             )
             session.add(
@@ -323,6 +324,7 @@ async def test_issue_exception_policy_and_lifecycle_routes() -> None:
                     active=True,
                     created_at=harness.clock.now(),
                     updated_at=harness.clock.now(),
+                    role="admin",
                 )
             )
         async with harness.db.sessions.begin() as session:

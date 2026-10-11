@@ -37,6 +37,8 @@ from telescreen.workflow.dsl.compiled import (
 )
 from telescreen.workflow.dsl.expressions import parse_expression
 from telescreen.workflow.dsl.model import (
+    API_VERSION_V1,
+    API_VERSION_V2,
     AgentProvider,
     AiAgentStep,
     CompiledWorkflow,
@@ -53,6 +55,8 @@ from telescreen.workflow.dsl.model import (
     MapVia,
     NamedRoute,
     NamedTemplate,
+    NotificationSetSpec,
+    NotificationTargetSpec,
     NotifyStep,
     Outcomes3,
     OutputField,
@@ -67,6 +71,14 @@ from telescreen.workflow.dsl.model import (
     TriggerMatch,
     TriggerSpec,
     WaitStep,
+)
+from telescreen.workflow.dsl.notification_sets import (
+    V2_ONLY_STEP_FIELDS,
+    V2_ONLY_TOP_LEVEL,
+    read_notification_sets,
+    read_targets,
+    read_template_name,
+    resolve_set_targets,
 )
 from telescreen.workflow.dsl.templates import parse_template
 from telescreen.workflow.dsl.validate import ValidationIssue, validate_workflow
@@ -137,8 +149,11 @@ def load_workflow(text: str, source_format: SourceFormat) -> CompiledWorkflow:
         raise WorkflowValidationError((ValidationIssue("", "invalid_document"),))
     api_version: str = reader.string(document.get("apiVersion"), "/apiVersion")
     kind: str = reader.string(document.get("kind"), "/kind")
-    if api_version and api_version != "telescreen.workflow/v1":
+    if api_version and api_version not in (API_VERSION_V1, API_VERSION_V2):
         reader.issues.append(ValidationIssue("/apiVersion", "unsupported_api_version"))
+    v2: bool = api_version == API_VERSION_V2
+    if not v2:
+        _reject_v2_fields(reader, document)
     if kind and kind != "Workflow":
         reader.issues.append(ValidationIssue("/kind", "invalid_value"))
     name: str = reader.string(document.get("name"), "/name")
@@ -147,16 +162,48 @@ def load_workflow(text: str, source_format: SourceFormat) -> CompiledWorkflow:
     trigger: TriggerSpec | None = _read_trigger(reader, document.get("trigger"))
     defaults: Defaults = _read_defaults(reader, document.get("defaults"))
     steps_value: JsonValue | None = document.get("steps")
-    steps: tuple[StepSpec, ...] = _read_steps(reader, steps_value)
+    steps: tuple[StepSpec, ...] = _read_steps(reader, steps_value, v2)
+    notification_sets: tuple[NotificationSetSpec, ...] = (
+        read_notification_sets(
+            reader.issues, document.get("notification_sets"), "/notification_sets"
+        )
+        if v2
+        else ()
+    )
     if reader.issues:
         raise WorkflowValidationError(tuple(reader.issues))
-    workflow: CompiledWorkflow = CompiledWorkflow(
-        name, description, trigger, defaults, start, steps
+    workflow: CompiledWorkflow = resolve_set_targets(
+        CompiledWorkflow(
+            name,
+            description,
+            trigger,
+            defaults,
+            start,
+            steps,
+            API_VERSION_V2 if v2 else API_VERSION_V1,
+            notification_sets,
+        )
     )
     found: list[ValidationIssue] = validate_workflow(workflow)
     if found:
         raise WorkflowValidationError(tuple(found))
     return workflow
+
+
+def _reject_v2_fields(reader: _Reader, document: JsonValue) -> None:
+    """Report DSL v2 fields that appear in a v1 document."""
+    for key in V2_ONLY_TOP_LEVEL:
+        if document.get(key) is not None:
+            reader.issues.append(ValidationIssue(f"/{key}", "requires_api_version_v2"))
+    steps_value: JsonValue | None = document.get("steps")
+    if steps_value is None or steps_value.kind is not JsonKind.ARRAY:
+        return
+    for index, item in enumerate(steps_value.items):
+        for key in V2_ONLY_STEP_FIELDS:
+            if item.kind is JsonKind.OBJECT and item.get(key) is not None:
+                reader.issues.append(
+                    ValidationIssue(f"/steps/{index}/{key}", "requires_api_version_v2")
+                )
 
 
 def _read_trigger(reader: _Reader, value: JsonValue | None) -> TriggerSpec | None:
@@ -236,7 +283,7 @@ def _read_retry(reader: _Reader, value: JsonValue | None, path: str) -> RetrySpe
     return RetrySpec(attempts, backoff)
 
 
-def _read_steps(reader: _Reader, value: JsonValue | None) -> tuple[StepSpec, ...]:
+def _read_steps(reader: _Reader, value: JsonValue | None, v2: bool) -> tuple[StepSpec, ...]:
     if value is None or value.kind is not JsonKind.ARRAY:
         reader.issues.append(
             ValidationIssue("/steps", "missing_field" if value is None else "invalid_type")
@@ -248,11 +295,11 @@ def _read_steps(reader: _Reader, value: JsonValue | None) -> tuple[StepSpec, ...
         if item.kind is not JsonKind.OBJECT:
             reader.issues.append(ValidationIssue(path, "invalid_type"))
             continue
-        steps.append(_read_step(reader, item, path))
+        steps.append(_read_step(reader, item, path, v2))
     return tuple(steps)
 
 
-def _read_step(reader: _Reader, value: JsonValue, path: str) -> StepSpec:
+def _read_step(reader: _Reader, value: JsonValue, path: str, v2: bool = False) -> StepSpec:
     step_id: str = reader.string(value.get("id"), f"{path}/id")
     kind_text: str = reader.string(value.get("type"), f"{path}/type")
     common: tuple[str, str | None, str | None, RetrySpec | None, str | None] = (
@@ -347,22 +394,11 @@ def _read_step(reader: _Reader, value: JsonValue, path: str) -> StepSpec:
                 reader, value.get("notify_on_assign"), True, f"{path}/notify_on_assign"
             ),
             kind=task_kind,
+            notify_set=_notify_set(reader, value, path),
+            notify_targets=_notify_targets(reader, value, path),
         )
     if step_type is StepType.NOTIFY:
-        channel: NotificationChannel = _enum(
-            reader,
-            value.get("channel"),
-            NotificationChannel,
-            f"{path}/channel",
-            NotificationChannel.EMAIL,
-        )
-        return NotifyStep(
-            *common,
-            channel=channel,
-            to=reader.strings(value.get("to"), f"{path}/to"),
-            subject=_template(reader, value.get("subject"), f"{path}/subject"),
-            body=_template(reader, value.get("body"), f"{path}/body"),
-        )
+        return _read_notify(reader, value, path, common, v2)
     if step_type is StepType.EVIDENCE_UPLOAD:
         return EvidenceUploadStep(
             *common,
@@ -374,6 +410,8 @@ def _read_step(reader: _Reader, value: JsonValue, path: str) -> StepSpec:
                 value.get("escalation_policy"), f"{path}/escalation_policy", False
             )
             or None,
+            notify_set=_notify_set(reader, value, path),
+            notify_targets=_notify_targets(reader, value, path),
         )
     if step_type is StepType.POLICE_VERIFY:
         return PoliceVerifyStep(
@@ -423,6 +461,67 @@ def _read_step(reader: _Reader, value: JsonValue, path: str) -> StepSpec:
         *common,
         result=_enum(reader, value.get("result"), RunStatus, f"{path}/result", RunStatus.SUCCEEDED),
     )
+
+
+def _read_notify(
+    reader: _Reader,
+    value: JsonValue,
+    path: str,
+    common: tuple[str, str | None, str | None, RetrySpec | None, str | None],
+    v2: bool,
+) -> NotifyStep:
+    """Read a notify step: the v1 ``to`` form, or (v2) a set reference or inline targets."""
+    channel: NotificationChannel = _enum(
+        reader,
+        value.get("channel"),
+        NotificationChannel,
+        f"{path}/channel",
+        NotificationChannel.EMAIL,
+    )
+    to: tuple[str, ...] = reader.strings(value.get("to"), f"{path}/to")
+    set_name: str | None = (
+        reader.string(value.get("notification_set"), f"{path}/notification_set", False) or None
+    )
+    targets_value: JsonValue | None = value.get("targets")
+    targets: tuple[NotificationTargetSpec, ...] = read_targets(
+        reader.issues, targets_value, f"{path}/targets"
+    )
+    template: str | None = read_template_name(
+        reader.issues, value.get("template"), f"{path}/template"
+    )
+    text_required: bool = True
+    if v2:
+        forms: int = sum((bool(to), set_name is not None, targets_value is not None))
+        if forms > 1:
+            reader.issues.append(ValidationIssue(path, "conflicting_fields"))
+        elif forms == 0:
+            reader.issues.append(ValidationIssue(path, "missing_field"))
+        text_required = bool(to) and template is None
+    return NotifyStep(
+        *common,
+        channel=channel,
+        to=to,
+        subject=_optional_template(reader, value.get("subject"), f"{path}/subject", text_required),
+        body=_optional_template(reader, value.get("body"), f"{path}/body", text_required),
+        notification_set=set_name,
+        targets=targets,
+        template=template,
+    )
+
+
+def _notify_set(reader: _Reader, value: JsonValue, path: str) -> str | None:
+    set_name: str | None = (
+        reader.string(value.get("notify_set"), f"{path}/notify_set", False) or None
+    )
+    if set_name is not None and value.get("notify_targets") is not None:
+        reader.issues.append(ValidationIssue(path, "conflicting_fields"))
+    return set_name
+
+
+def _notify_targets(
+    reader: _Reader, value: JsonValue, path: str
+) -> tuple[NotificationTargetSpec, ...]:
+    return read_targets(reader.issues, value.get("notify_targets"), f"{path}/notify_targets")
 
 
 def _read_map(
@@ -587,6 +686,14 @@ def _read_output(reader: _Reader, value: JsonValue | None, path: str) -> tuple[O
 def _template(reader: _Reader, value: JsonValue | None, path: str) -> Template:
     text: str = reader.string(value, path)
     return _parse_template(reader, text, path)
+
+
+def _optional_template(
+    reader: _Reader, value: JsonValue | None, path: str, required: bool
+) -> Template:
+    if value is None and not required:
+        return ()
+    return _template(reader, value, path)
 
 
 def _parse_template(reader: _Reader, text: str, path: str) -> Template:

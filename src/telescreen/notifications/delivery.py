@@ -17,6 +17,7 @@ from telescreen.core.vocabulary import (
     NotificationStatus,
 )
 from telescreen.db.models.notifications import NotificationRow
+from telescreen.notifications.addresses import channel_addresses
 from telescreen.notifications.dlp import CensoredMessage, rehydrate
 from telescreen.notifications.email import EmailNotifier
 from telescreen.notifications.repository import NotificationRepository
@@ -55,10 +56,26 @@ class NotificationDeliveryHandler:
                 if error.code is not ErrorCode.RECIPIENT_UNKNOWN:
                     raise
                 await self.repository.set_delivery(
-                    session, row, NotificationStatus.FAILED, attempt, None
+                    session,
+                    row,
+                    NotificationStatus.FAILED,
+                    attempt,
+                    None,
+                    ErrorCode.RECIPIENT_UNKNOWN.value,
                 )
                 await self._audit(session, row, "notification.failed", attempt)
                 return TaskResult.dead(ErrorCode.RECIPIENT_UNKNOWN)
+            if not channel_addresses(resolved, NotificationChannel(row.channel)):
+                await self.repository.set_delivery(
+                    session,
+                    row,
+                    NotificationStatus.FAILED,
+                    attempt,
+                    None,
+                    ErrorCode.RECIPIENT_UNREACHABLE.value,
+                )
+                await self._audit(session, row, "notification.failed", attempt)
+                return TaskResult.dead(ErrorCode.RECIPIENT_UNREACHABLE)
             message: CensoredMessage = rehydrate(row)
             channel: str = row.channel
 
@@ -85,7 +102,12 @@ class NotificationDeliveryHandler:
                     return TaskResult.done()
                 if task.attempt >= task.max_attempts:
                     await self.repository.set_delivery(
-                        session, current, NotificationStatus.FAILED, attempt, None
+                        session,
+                        current,
+                        NotificationStatus.FAILED,
+                        attempt,
+                        None,
+                        ErrorCode.DELIVERY_FAILED.value,
                     )
                     await self._audit(session, current, "notification.failed", attempt)
                     return TaskResult.dead(ErrorCode.DELIVERY_FAILED)
@@ -112,13 +134,11 @@ class NotificationDeliveryHandler:
     ) -> None:
         """Send to each resolved endpoint for the row's channel."""
         channel: NotificationChannel = NotificationChannel(channel_name)
-        if channel is NotificationChannel.SLACK:
-            targets: tuple[str, ...] = recipients.slack_channels + recipients.slack_user_ids
-            for target in targets:
+        for target in channel_addresses(recipients, channel):
+            if channel is NotificationChannel.SLACK:
                 await self.slack.send(target, message)
-            return
-        for target in recipients.emails:
-            await self.email.send(target, message)
+            else:
+                await self.email.send(target, message)
 
     async def _audit(
         self, session: AsyncSession, row: NotificationRow, action: str, attempt: int

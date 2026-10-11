@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://telescreen.invalid/schemas/workflow-v2.schema.json",
+  "title": "Telescreen Workflow v1 and v2",
+  "type": "object",
+  "required": ["apiVersion", "kind", "name", "start", "steps"],
+  "properties": {
+    "apiVersion": {"enum": ["telescreen.workflow/v1", "telescreen.workflow/v2"]},
+    "kind": {"const": "Workflow"},
+    "name": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+    "description": {"type": "string"},
+    "trigger": {"type": "object"},
+    "defaults": {"type": "object"},
+    "start": {"type": "string"},
+    "notification_sets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "targets"],
+        "properties": {
+          "name": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+          "targets": {"$ref": "#/$defs/targets"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "type"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+          "type": {"enum": ["detect", "ai_agent", "condition", "human_task", "notify", "evidence_upload", "police_verify", "wait", "send_back", "parallel", "join", "sub_workflow", "map", "end"]},
+          "kind": {"enum": ["approval", "owner_review"]},
+          "notification_set": {"type": "string"},
+          "targets": {"$ref": "#/$defs/targets"},
+          "template": {"$ref": "#/$defs/templateName"},
+          "notify_set": {"type": "string"},
+          "notify_targets": {"$ref": "#/$defs/targets"}
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "templateName": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]{0,63}$"},
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["recipients", "channels"],
+        "properties": {
+          "recipients": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string", "pattern": "^(member|team|email|slack|slack_channel):.+$"}
+          },
+          "channels": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"enum": ["slack", "email"]}
+          },
+          "template": {"$ref": "#/$defs/templateName"}
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

@@ -3,11 +3,18 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from sqlalchemy import delete, select
-from sqlalchemy.engine import ScalarResult
+from sqlalchemy import delete, func, select
+from sqlalchemy.engine import Row, ScalarResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from telescreen.db.models import ApiTokenRow, MemberRow, TeamMembershipRow, TeamRow
+from telescreen.core.vocabulary import MembershipOrigin, Role
+from telescreen.db.models import (
+    ApiTokenRow,
+    MemberIdentityRow,
+    MemberRow,
+    TeamMembershipRow,
+    TeamRow,
+)
 
 
 @dataclass
@@ -64,5 +71,88 @@ class DirectoryRepository:
         """Replace the complete team membership set."""
         await session.execute(delete(TeamMembershipRow).where(TeamMembershipRow.team_id == team_id))
         session.add_all(
-            TeamMembershipRow(team_id=team_id, member_id=member_id) for member_id in member_ids
+            TeamMembershipRow(
+                team_id=team_id, member_id=member_id, origin=MembershipOrigin.MANUAL.value
+            )
+            for member_id in member_ids
         )
+
+    async def member_by_id(self, session: AsyncSession, member_id: str) -> MemberRow | None:
+        """Find a member by its identifier."""
+        return await session.scalar(select(MemberRow).where(MemberRow.id == member_id))
+
+    async def identity_by_key(
+        self, session: AsyncSession, kind: str, identity_key: str
+    ) -> MemberIdentityRow | None:
+        """Find a keyed identity row by kind and digest."""
+        return await session.scalar(
+            select(MemberIdentityRow).where(
+                MemberIdentityRow.kind == kind,
+                MemberIdentityRow.identity_key == identity_key,
+            )
+        )
+
+    async def identity_of_kind(
+        self, session: AsyncSession, member_id: str, kind: str
+    ) -> MemberIdentityRow | None:
+        """Find any identity row of one kind for a member."""
+        return await session.scalar(
+            select(MemberIdentityRow)
+            .where(MemberIdentityRow.member_id == member_id, MemberIdentityRow.kind == kind)
+            .limit(1)
+        )
+
+    async def active_members_by_email(
+        self, session: AsyncSession, email: str
+    ) -> Sequence[MemberRow]:
+        """List active members whose email matches case-insensitively."""
+        result: ScalarResult[MemberRow] = await session.scalars(
+            select(MemberRow)
+            .where(func.lower(MemberRow.email) == email.lower(), MemberRow.active.is_(True))
+            .order_by(MemberRow.handle)
+        )
+        return result.all()
+
+    async def active_admins_for_update(self, session: AsyncSession) -> Sequence[MemberRow]:
+        """Lock and list every active admin member."""
+        result: ScalarResult[MemberRow] = await session.scalars(
+            select(MemberRow)
+            .where(MemberRow.role == Role.ADMIN.value, MemberRow.active.is_(True))
+            .with_for_update()
+        )
+        return result.all()
+
+    async def member_ids_with_identity_kind(self, session: AsyncSession, kind: str) -> set[str]:
+        """Return the identifiers of members holding at least one identity of a kind."""
+        result: ScalarResult[str] = await session.scalars(
+            select(MemberIdentityRow.member_id).where(MemberIdentityRow.kind == kind).distinct()
+        )
+        return set(result.all())
+
+    async def team_slugs_by_member(self, session: AsyncSession) -> Sequence[Row[tuple[str, str]]]:
+        """List (member id, team slug) pairs in stable slug order."""
+        return (
+            await session.execute(
+                select(TeamMembershipRow.member_id, TeamRow.slug)
+                .join(TeamRow, TeamRow.id == TeamMembershipRow.team_id)
+                .order_by(TeamRow.slug)
+            )
+        ).all()
+
+    async def membership(
+        self, session: AsyncSession, team_id: str, member_id: str
+    ) -> TeamMembershipRow | None:
+        """Find one membership row of any origin."""
+        return await session.scalar(
+            select(TeamMembershipRow).where(
+                TeamMembershipRow.team_id == team_id,
+                TeamMembershipRow.member_id == member_id,
+            )
+        )
+
+    async def list_api_tokens(self, session: AsyncSession) -> Sequence[ApiTokenRow]:
+        """List tokens in creation order."""
+        result: ScalarResult[ApiTokenRow] = await session.scalars(
+            select(ApiTokenRow).order_by(ApiTokenRow.created_at, ApiTokenRow.id)
+        )
+        return result.all()

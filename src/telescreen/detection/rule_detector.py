@@ -1,5 +1,6 @@
 """Deterministic synchronous rules and the batched rule detector."""
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -7,6 +8,12 @@ from telescreen.core.vocabulary import DetectorKind, severity_for
 from telescreen.detection.normalize import NormalizedText, normalize, to_original
 from telescreen.detection.rules.catalog import RULES, RuleSpec
 from telescreen.detection.types import DetectionResult, RawFinding, ScanItem, Span
+
+# Canonical UUIDs are identifiers. A rule match covering only part of one (digit runs that
+# look like phone or My Number values) is a false positive; whole-UUID matches still count.
+_UUID: re.Pattern[str] = re.compile(
+    r"(?<![0-9A-Za-z])[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(?![0-9A-Za-z])"
+)
 
 
 @dataclass(frozen=True)
@@ -19,11 +26,18 @@ class RuleDetector:
     def scan_text(self, text: str) -> list[RawFinding]:
         """Return span-only findings for a text value."""
         normalized: NormalizedText = normalize(text)
+        uuid_spans: tuple[Span, ...] = tuple(
+            Span(match.start(), match.end()) for match in _UUID.finditer(normalized.text)
+        )
         candidates: list[RawFinding] = []
         for rule in self.rules:
             for match in rule.pattern.finditer(normalized.text):
                 value: str = match.group(rule.value_group)
                 if rule.validator is not None and not rule.validator(value):
+                    continue
+                if self._inside_identifier(
+                    Span(match.start(rule.value_group), match.end(rule.value_group)), uuid_spans
+                ):
                     continue
                 if rule.keywords and not self._has_keyword(
                     normalized.text,
@@ -75,6 +89,16 @@ class RuleDetector:
         window_end: int = min(len(text), end + rule.keyword_window)
         context: str = text[window_start:window_end].lower()
         return any(keyword in context for keyword in rule.keywords)
+
+    @staticmethod
+    def _inside_identifier(span: Span, identifiers: tuple[Span, ...]) -> bool:
+        """Return whether a span overlaps a UUID without covering the whole UUID."""
+        return any(
+            span.start < identifier.end
+            and identifier.start < span.end
+            and not (span.start <= identifier.start and identifier.end <= span.end)
+            for identifier in identifiers
+        )
 
     @staticmethod
     def _overlap(left: Span, right: Span) -> bool:

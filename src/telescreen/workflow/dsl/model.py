@@ -72,6 +72,23 @@ type Template = tuple[TemplatePart, ...]
 
 
 @dataclass(frozen=True)
+class NotificationTargetSpec:
+    """Recipients notified on each listed channel, optionally through a named template."""
+
+    recipients: tuple[str, ...]
+    channels: tuple[NotificationChannel, ...]
+    template: str | None = None
+
+
+@dataclass(frozen=True)
+class NotificationSetSpec:
+    """Named reusable list of notification targets (DSL v2)."""
+
+    name: str
+    targets: tuple[NotificationTargetSpec, ...]
+
+
+@dataclass(frozen=True)
 class RetrySpec:
     """Retry limit and base delay."""
 
@@ -210,6 +227,9 @@ class HumanTaskStep:
     escalation_policy: str | None = None
     notify_on_assign: bool = True
     kind: HumanTaskKind = HumanTaskKind.APPROVAL
+    notify_set: str | None = None
+    notify_targets: tuple[NotificationTargetSpec, ...] = ()
+    set_targets: tuple[NotificationTargetSpec, ...] = ()
     step_type: ClassVar[StepType] = StepType.HUMAN_TASK
 
 
@@ -226,6 +246,10 @@ class NotifyStep:
     to: tuple[str, ...] = ()
     subject: Template = ()
     body: Template = ()
+    notification_set: str | None = None
+    targets: tuple[NotificationTargetSpec, ...] = ()
+    template: str | None = None
+    set_targets: tuple[NotificationTargetSpec, ...] = ()
     step_type: ClassVar[StepType] = StepType.NOTIFY
 
 
@@ -243,6 +267,9 @@ class EvidenceUploadStep:
     min_files: int = 1
     sla: timedelta | None = None
     escalation_policy: str | None = None
+    notify_set: str | None = None
+    notify_targets: tuple[NotificationTargetSpec, ...] = ()
+    set_targets: tuple[NotificationTargetSpec, ...] = ()
     step_type: ClassVar[StepType] = StepType.EVIDENCE_UPLOAD
 
 
@@ -391,9 +418,17 @@ type StepSpec = (
 )
 
 
+API_VERSION_V1: str = "telescreen.workflow/v1"
+API_VERSION_V2: str = "telescreen.workflow/v2"
+
+
 @dataclass(frozen=True)
 class CompiledWorkflow:
-    """Validated workflow definition consumed by the engine."""
+    """Validated workflow definition consumed by the engine.
+
+    Step ``set_targets`` fields are derived from ``notification_sets`` at load time and are
+    never serialized.
+    """
 
     name: str
     description: str | None
@@ -401,6 +436,8 @@ class CompiledWorkflow:
     defaults: Defaults
     start: str
     steps: tuple[StepSpec, ...]
+    api_version: str = "telescreen.workflow/v1"
+    notification_sets: tuple[NotificationSetSpec, ...] = ()
 
     def step(self, step_id: str) -> StepSpec:
         """Return a step by id or raise KeyError."""
