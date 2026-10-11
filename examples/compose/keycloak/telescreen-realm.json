@@ -1,0 +1,163 @@
+{
+  "realm": "telescreen",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "telescreen-admin",
+        "description": "Telescreen administrator"
+      },
+      {
+        "name": "telescreen-responder",
+        "description": "Telescreen incident responder"
+      },
+      {
+        "name": "telescreen-viewer",
+        "description": "Telescreen read-only viewer"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "name": "security"
+    },
+    {
+      "name": "dev"
+    },
+    {
+      "name": "ghe-admin"
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "telescreen-ui",
+      "name": "Telescreen UI",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://127.0.0.1:5174/*",
+        "http://localhost:5174/*",
+        "http://127.0.0.1:8000/*",
+        "http://localhost:8000/*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      },
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "config": {
+            "claim.name": "groups",
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "telescreen-ui",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "alice",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "alice@example.test",
+      "firstName": "Alice",
+      "lastName": "Test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "alice-dev-pass",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "telescreen-admin"
+      ],
+      "groups": [
+        "security"
+      ]
+    },
+    {
+      "username": "bob",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "bob@example.test",
+      "firstName": "Bob",
+      "lastName": "Test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "bob-dev-pass",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "telescreen-responder"
+      ],
+      "groups": [
+        "dev"
+      ]
+    },
+    {
+      "username": "carol",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "carol@example.test",
+      "firstName": "Carol",
+      "lastName": "Test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "carol-dev-pass",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "telescreen-viewer"
+      ],
+      "groups": [
+        "ghe-admin"
+      ]
+    },
+    {
+      "username": "dave",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "dave@example.test",
+      "firstName": "Dave",
+      "lastName": "Test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dave-dev-pass",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [],
+      "groups": []
+    }
+  ]
+}
