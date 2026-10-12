@@ -194,6 +194,25 @@ v1.2 additions (`design-v1-2-notifications-and-identity.md` section 2):
 - `IssueSnapshot` gains `masked_excerpt`.
 - New tables and columns are listed in `design-data-model.md` ("v1.2 additions").
 
+v1.3 additions (`design-v1-3-sentry-parity.md` section 2):
+
+- New L3 packages:
+  - `telescreen.alerts` (alert rules, evaluator, maintenance);
+  - `telescreen.integrations` (integration status and tests).
+- New `telescreen.issues` subpackages and modules:
+  - `query` (stream query language, counts, trend);
+  - `activity` (comments, mentions, subscriptions, bookmarks, activity feed);
+  - `external` (links, GitHub create);
+  - `views`, `archive`, `groups`, `bulk`, `merge`, `ownership`, `dashboard`.
+- `ports/issues.py` adds `FindingsObserver`, `IssueActivityNotifier`, `IssueReportSource`
+  and `AssigneeSuggester`. `IssueSnapshot` gains `priority` and `assignee_team_slug`.
+- `ports/notifications.py` adds `NotificationRequest.category`,
+  `NotificationSender.send_to_member`, `NotificationTester` and `OutboundContentGuard`.
+- `ports/workflow.py` adds `RunStarter`. `ports/directory.py` adds `ActorDirectory`.
+- The issue event sink becomes a fan-out to workflow triggers and the alert evaluator,
+  built in `wiring_v13.py`.
+- New tables and columns are listed in `design-data-model.md` ("v1.3 additions").
+
 Repositories live in the feature package that owns the tables: directory tables
 (`members`, `teams`, `team_memberships`, `api_tokens`) in `telescreen.directory`; collectors
 tables in `telescreen.collectors` (collectors-core); issues, findings, history and `counters` in
@@ -419,6 +438,8 @@ gitleaks pre-commit hook does not flag committed sources.
 | `design-docs/specs/design-ui-sentry.md` | Sentry-based UI: tokens, components, shell, issue list/detail and page patterns, licensing constraints |
 | `design-docs/specs/design-v1-1-dspm-adoption.md` | v1.1 gap analysis against comparable DSPM/DLP systems and adopted features F1-F10 (exposure, placement policies, verified resolution, coverage, owner routing, health, linked occurrences, risk score, exceptions) |
 | `design-docs/specs/design-v1-2-notifications-and-identity.md` | v1.2: editable notification templates, workflow notification sets, live delivery verification, roles and permission matrix, OIDC SSO, threat model, v1.2 plan shape |
+| `design-docs/specs/design-v1-3-sentry-parity-review.md` | v1.3 Sentry parity self-review: defects B1-B7, gap table, adopted scope S0-S10, deferrals, and its verification against the code |
+| `design-docs/specs/design-v1-3-sentry-parity.md` | v1.3: stream tabs, query language, saved views, bulk and merge, archive and escalating, issue detail, alert rules, notification settings and weekly report, dashboard, organization pages, UX polish, leak matrix, v1.3 plan shape |
 | `design-docs/specs/design-api-and-ui.md` | REST API, auth, Assistant MCP/chat, evidence API, UI |
 | `design-docs/specs/command.md` | CLI, environment variables, exit codes, dependencies |
 | `design-docs/specs/notes.md` | Engine rationale vs Airflow/n8n/Kestra, riela mapping, tooling notes |

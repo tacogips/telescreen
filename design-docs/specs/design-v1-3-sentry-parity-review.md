@@ -1,6 +1,8 @@
 # Telescreen v1.3: Sentry Parity Self-Review
 
 Status: review accepted by the owner request of 2026-10-12; input to the v1.3 design and plans.
+Verified against the code at `57f389b` on 2026-10-12 (section 7). The corrections in section 7
+are binding where they differ from sections 2-4. The design is `design-v1-3-sentry-parity.md`.
 
 The owner asked (translated): "Self-review the UI and the features. Do we provide the same
 usability and functionality as Sentry? If not, improve it." This document records the
@@ -143,3 +145,40 @@ mentions carry masked values or fingerprints only, and the leak matrix covers th
 - Live check on the dev stack (Keycloak, Mailpit, Slack test channel): an alert rule fires on
   a synthetic leak and notifies Slack and email once per action interval; a mention notifies
   the mentioned user according to their settings.
+
+## 7. Verification against the code (2026-10-12, `57f389b`)
+
+Each defect and gap row was checked against the source. Line numbers refer to `57f389b`,
+which has the same source as `583751c`.
+
+### 7.1 Defects
+
+| Id | Verdict | Evidence and correction |
+|----|---------|-------------------------|
+| B1 | Confirmed | `GET /api/issues/{id}/events` orders `observed_at DESC` (`api/routers/issues.py:289`). The UI "First" button selects `events[0]`, which is the newest, and "Latest" selects `events.at(-1)` (`IssueDetailSections.tsx:173-188`). "Previous"/"Next" move by array index, so "Previous" moves to a newer finding |
+| B2 | Confirmed, evidence corrected | There is no `issues/search` module. `query.ts:115-118` sends `assignee=none`. The list route passes any value other than `me`/`my_teams` to `RecipientResolver.assignee_of` (`api/routers/issues.py:172-178`), which raises `RECIPIENT_UNKNOWN` (`directory/resolver.py:97`) |
+| B3 | Confirmed, wider | `is:unresolved` becomes `status=unresolved`, and the API filters on exact status (`issues.py:131-132`). The default view hides `regressed`, and also `acknowledged` and `in_progress` |
+| B4 | Confirmed | The list renders `assignee_member_id ?? assignee_team_id` (`IssueListRows.tsx:146-150`). The detail assignee select shows the same raw ids as its current option (`IssueDetailHeader.tsx:209-211`). The sidebar "People" section already shows display names |
+| B5 | Confirmed | `query.ts:99` skips negated tokens. The API has no query parameter at all, so negation is impossible server-side |
+| B6 | Corrected | Comments are persisted. `IssueService.comment` writes an `issue_history` row of kind `commented` with the redacted body in `note` and the `actor_ref` (`issues/service.py:743-761`), and the history API returns `actor_ref`. The defect is in the UI. The sidebar Activity shows only the kind label (no body, no actor) plus a session-local echo of new comments (`IssueDetailSidebar.tsx:141-158`, `IssueDetail.tsx:83,163`). The main Timeline shows the note but no actor. Comments cannot be edited or deleted |
+| B7 | Confirmed | The detail page loads one page of events (default limit 50, `api/common/pagination.py:25`; `IssueDetail.tsx:47`). The chart (`eventGraph`), the tag chips (`tagCounts`) and the navigation all use only that page (`IssueDetailSections.tsx:32-63,120-195`) |
+
+### 7.2 Gap-table corrections
+
+| Row | Correction |
+|-----|-----------|
+| Stream tabs | The left-nav "For review" item is `assigned:me` (`components/shell/nav.ts:8`), not Sentry's For Review (new or changed issues nobody has triaged yet). v1.3 renames the item to "Assigned to me" and adds a real For review tab |
+| Columns | Issues are grouped per (source, resource, rule class) (`issues/keys.py`). Every issue therefore has exactly one resource; only a merged group (S3) spans several. The analog of Sentry's "Users" is the number of distinct detected values (`distinct_fingerprints`, keyed fingerprints). S1's "Resources column" becomes a **Values** column. S2's `resources:` key becomes `values:`. S4's "until N more affected resources" becomes "until N more distinct values". S6's "affected resources over an interval" becomes "distinct values over an interval" |
+| Detail header | There is no priority attribute. The list "Priority" column renders severity (`IssueListRows.tsx:141-145`). An editable priority needs a new issue field (design D5) |
+| Bulk | The loop is `runBulk` in `IssueList.tsx:249-271` (`Promise.all`), not `IssueBulkActions.tsx`. It covers acknowledge, in progress, reopen, assign, start workflow and mark remediated. There is no resolve, archive or server endpoint |
+| Archive | `ignored` is used only as the approved-exception state (`issues/exceptions.py`). Archive is therefore a new `archived` status and never reuses `ignored` |
+| Workflows list | Three columns: name, latest version, active version (`pages/workflows/index.tsx:26`) |
+| Mock data | The mock has 9 issues across 8 statuses (`api/mock/fixtures/issues.ts`, `v11.ts`). The default `is:unresolved` view shows only one of them because of B3. The seed is still far from realistic, so S10 stands |
+| Search | Meilisearch indexes issues (`search/documents.py`), but `/api/issues` does not use it; it filters with SQL `LIKE` (`issues.py:179-182`). v1.3 keeps the stream on SQL (design D7) |
+
+Every other row matches the code: Sparkline is unused, there is one global 14-day chart,
+saved views are in localStorage only, the palette lists areas only, there are no list
+shortcuts and no onboarding, workflow triggers have 3 filters and are edited as YAML,
+there are no per-user notification settings or subscriptions, the token UI is a CLI hint,
+there is no integrations page, ownership is CODEOWNERS plus owner routing, and there is
+no member edit or deactivate, no merge and no external issue links.

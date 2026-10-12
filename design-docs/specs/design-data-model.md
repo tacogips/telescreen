@@ -215,6 +215,66 @@ Audited actions added: `template.created`, `template.activated`, `template.rejec
 `token.created` and `token.revoked` now carry the calling principal's actor ref. No audit
 detail holds a token, `sub`, claim value or template text.
 
+### v1.3 additions (revision `0004_v1_3`)
+
+Behavior is in `design-v1-3-sentry-parity.md` (section 13.1 lists every column). One new
+revision, `0004_v1_3` (`down_revision = "0003_v1_2"`), adds everything below and is
+idempotent in the same way as `0003_v1_2`. Earlier revisions are never edited.
+
+Issue status machine: `IssueStatus` adds `archived` and `escalating`.
+
+- The stream's open set is `UNRESOLVED_STATUSES` (unresolved, acknowledged, in_progress,
+  regressed, escalating).
+- The internal `OPEN_STATUSES` and `RECONCILED_STATUSES` add `archived` and `escalating`.
+- User transitions add `escalating -> acknowledged | in_progress | unresolved` and
+  `archived -> unresolved`.
+- `archived` is entered only through the archive route. It leaves through:
+  - its condition (-> `escalating`);
+  - widened exposure (-> `escalating`);
+  - `archive_until` (-> `unresolved`);
+  - unarchive;
+  - verification, resolution, an exception approval or policy `allowed`.
+
+  Every exit clears the archive columns. `archive_until` is never null while archived and
+  is at most 90 days after `archived_at`. `ignored` remains reachable only through an
+  approved exception.
+
+New columns:
+
+| Table | Columns | Backfill / notes |
+|-------|---------|------------------|
+| `issues` | `priority` String(16) not null server default `medium`, `priority_manual` Boolean default false, `needs_review` Boolean default false, `merged_into_id` String(36) nullable INDEX, `archive_kind` String(32), `archive_until`, `archive_threshold` Integer, `archive_baseline` Integer, `archived_at` (all nullable) | `priority` from severity (`critical`/`high` -> `high`, `medium` -> `medium`). `needs_review` true for `unresolved` and `regressed`. INDEX(`status`, `merged_into_id`) |
+| `notifications` | `category` String(32) nullable | Null for earlier rows. `skipped` rows may carry `recipient_opted_out` |
+
+New tables. Owner `issues`:
+
+- `saved_views`, `saved_view_stars`, `saved_view_defaults`;
+- `issue_comments`, `issue_mentions`, `issue_subscriptions`, `issue_bookmarks`;
+- `external_issue_links`, `issue_merges`, `ownership_rules`.
+
+Owner `alerts`: `alert_rules`, `alert_fires`. Owner `notifications`:
+`notification_settings`. Owner `integrations`: `integration_checks`.
+
+Text columns that hold user or admin input (view name and query, rule name, ownership
+pattern, link title and URL) are `Redactor`-checked and rejected on a hit. Comment bodies
+are redacted before storage. `filters_json` and `actions_json` are canonical JSON of typed
+dataclasses.
+
+Audited actions added:
+
+- issues: `issue.archived`, `issue.unarchived`, `issue.escalated`, `issue.priority_changed`,
+  `issue.reviewed`, `issue.merged`, `issue.unmerged`, `issue.bulk`;
+- comments: `comment.edited`, `comment.deleted`;
+- views: `view.created`, `view.updated`, `view.deleted`;
+- external issues: `external_issue.linked`, `external_issue.unlinked`,
+  `external_issue.created`, `external_issue.blocked`;
+- alerts: `alert_rule.created`, `alert_rule.updated`, `alert_rule.deleted`,
+  `alert_rule.muted`, `alert_rule.unmuted`;
+- members and organization: `member.updated`, `member.deactivated`, `member.reactivated`,
+  `ownership_rule.changed`, `integration.tested`.
+
+Details hold ids, enums, counts and field names only.
+
 ## References
 
 See `design-docs/references/README.md`.

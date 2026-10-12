@@ -163,6 +163,20 @@ Details are in `design-v1-2-notifications-and-identity.md` sections 3 and 8.
   with locally signed tokens (the token strings, including the issued access token, must
   appear in no sink); the notify test path. The v1 sink list applies unchanged.
 
+### v1.3 additions (views, activity, alerts, external issues)
+
+`design-v1-3-sentry-parity.md` section 14 is binding.
+
+- User and admin text that is persisted is checked with `Redactor` and rejected on a hit
+  (422 `raw_value_detected`, nothing stored, no echo). This covers saved-view names and
+  queries, alert rule names, ownership patterns and test locators, and external link
+  titles and URLs.
+- Comment bodies are redacted before storage and before mention parsing.
+- Tag, stats, dashboard and weekly report values come only from already-masked columns.
+- The GitHub issue body is built from allow-listed masked fields and passes `Redactor` and
+  the DLP gate (`OutboundContentGuard`) before egress.
+- The leak matrix extension is `tests/leak/flows_v13.py` and `test_leak_matrix_v13.py`.
+
 ### Re-scan of inbound masked data
 
 Police results, pushed findings (`/api/ingest/v1/findings`), human task comments, issue

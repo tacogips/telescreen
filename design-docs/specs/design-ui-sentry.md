@@ -588,6 +588,79 @@ applies: data the API does not return is omitted, not emulated.
 
 `src/web/package.json` and `bun.lock` do not change; WebCrypto replaces any OIDC library.
 
+### 11. v1.3 additions (binding for the v1.3 run)
+
+This section extends sections 8-10 for `design-v1-3-sentry-parity.md` (sections in
+parentheses refer to it), against the "v1.3 endpoints" of `design-api-and-ui.md`. The rule
+of section 8 still applies: data the API does not return is omitted, not emulated. There
+is no new dependency; charts are hand-rendered SVG (`Sparkline`, `MiniBarChart`).
+
+#### 11.1 Components and shell (`v13-p03`)
+
+- **New components:**
+  - `Avatar`: initials plus a deterministic hue from the ref, and the display name. Used
+    for every assignee, actor and member chip (B4);
+  - `PeriodPicker`: all, 24h, 7d, 14d, 30d, custom range;
+  - `StreamTabs`: tab plus count badge;
+  - `ShortcutHelp`: the overlay for `?`;
+  - a shortcut registry that ignores editable targets.
+
+  `Sparkline` is used by the stream trend column.
+- **Navigation:**
+  - Issues area: Feed (the Unresolved tab), Assigned to me (renamed from "For review"),
+    Bookmarks (`bookmarks:me`), Allowed, Verifying;
+  - new top-level areas: Dashboard (`/dashboard`) and Alerts (`/alerts`);
+  - Settings adds Profile, Integrations, Tokens and Ownership rules. Members edit and
+    deactivate live in Users and roles.
+- **Palette** (Cmd/Ctrl+K): local page and action search, plus debounced issue search
+  through `GET /api/issues?query=&limit=8`. Arrow keys and Enter select.
+- **Routes:**
+  - `/dashboard`;
+  - `/alerts`, `/alerts/new`, `/alerts/:id` (editor plus history tab);
+  - `/settings/profile`, `/settings/integrations`, `/settings/tokens`,
+    `/settings/ownership`.
+
+  p03 creates stubs that the page plans replace.
+
+#### 11.2 Pages
+
+| Page | Behavior (API source) |
+|------|-----------------------|
+| Issue stream (p13) | `StreamTabs` with counts (`/api/issues/counts`) above the search bar. The search bar sends the raw `query` and autocompletes keys and values, including members and teams. There are a period picker, a sort select and a 24h/14d trend toggle. Columns: select, issue, trend, events, values, priority, risk, assignee (`Avatar`), last seen, age. The bulk bar has resolve, archive (menu), assign, priority, mark reviewed, merge, and "Select all N matching" (`/api/issues/bulk`, merge). Saved views come from `/api/views` (personal and shared sections, star, set default; one-time `localStorage` import). A new-issues banner is driven by 30 s polling of `updated_since`. Shortcuts: j/k, o/Enter, x, r, a, e, / |
+| Issue detail (p14) | The header follows design 8.1. Below it: the finding chart from `/stats` with a `PeriodPicker`, tag bars with percentages from `/tags`, and event navigation (Oldest, Previous, Next, Latest, Recommended; "n of total") from `/events/{selector}`. A child shows a "Merged into TELE-n" banner; a primary shows a "Merged issues" fold section with Unmerge. Activity is a feed from `/activity` with `Avatar`, actor name, relative time, comment edit and delete for own comments, and `@` autocomplete over members. External issues are a fold section with link and GitHub create dialogs (the repo select comes from `/api/external-issues/github/repos`). The sidebar shows suggested assignees, the subscription reason and the bookmark |
+| Alerts (p15) | The list has name, trigger, filters summary, actions summary, interval, status (enabled, disabled, muted until), last fired and 24 h fires, with enable and mute actions. The editor is a form builder: trigger, threshold and window, filter chips, target rows (recipients, channels, template), start workflow, interval. It calls `/validate` before save. History is a paged table of fires (time, issue link, trigger, outcome tag, notifications, run link) |
+| Profile (p15) | A category x channel matrix (`email`, `slack`, `off`; "As configured" for alerts and workflow tasks), my tokens (create with role-limited scopes, secret shown once with copy, revoke), default view select, theme |
+| Dashboard (p16) | `PeriodPicker`; stacked severity bars and a new-vs-resolved chart (SVG); open-by-exposure and open-by-source bars; tiles for MTTR, MTTA, unassigned high priority, archived and escalating; a top-issues table; the onboarding checklist. Tiles link to stream queries |
+| Settings (p16) | Integrations: one card per kind with configured state, last check, docs link and a Test button, plus a Collectors card from `/api/collectors`. Tokens (admin): list, create, revoke. Ownership rules: an ordered table with move up and down, create and edit, and a "Test locator" box. Users and roles: edit member and deactivate or reactivate (409 `last_admin` inline) |
+| Workflows list (p16) | Name, trigger events, active, last run, 30-day run counts |
+
+#### 11.3 Mock API and screenshots (`v13-p03`)
+
+- The mock router serves every v1.3 endpoint from the realistic seed of design section 13.
+  The mock evaluates the query language for the stream, using the same key spec as
+  `query.ts`.
+- The fixture value rules of 8.3, 9.4 and 10.4 still apply, and
+  `tests/leak/test_ui_fixtures.py` must pass.
+- The screenshot smoke adds every new page and state in light and dark, with zero page or
+  console errors:
+  - each stream tab, a period, bulk selection, the archive menu;
+  - detail menus, activity, tags, a merged primary and child;
+  - the alerts list, editor and history;
+  - dashboard, profile, integrations, tokens, ownership rules, member edit;
+  - the workflows list, palette open, the shortcut overlay, and the onboarding checklist.
+
+  States are reached through scripted interactions listed in `scripts/screenshots.ts`.
+
+#### 11.4 Plan boundaries (v1.3 run)
+
+| Plan | Owns | Wave |
+|------|------|------|
+| v13-p03-ui-foundation | `src/web/src/api/**`, `src/web/src/components/**`, `src/web/src/{routes,App}.tsx`, `src/web/src/shell.test.tsx`, new page stubs, `src/web/scripts/screenshots.ts` | 1 |
+| v13-p13-ui-stream | `src/web/src/pages/issues/` list files (see design 15) | 2 |
+| v13-p14-ui-detail | `src/web/src/pages/issues/detail/**` and the `IssueDetail*` files | 2 |
+| v13-p15-ui-alerts-profile | `src/web/src/pages/{alerts,profile}/**` | 2 |
+| v13-p16-ui-dashboard-org | `src/web/src/pages/{dashboard,settings,workflows}/**` | 2 |
+
 ## Sources
 
 | Topic | Source |

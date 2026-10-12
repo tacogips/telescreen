@@ -40,7 +40,41 @@ Large features are split into multiple related plans with cross-references.
 All plans share `impl-plans/conventions.md` (ownership, typing, verification and
 progress-log rules).
 
-There are no active plans.
+### v1.3 (Sentry parity: S0-S10 of `design-docs/specs/design-v1-3-sentry-parity.md`)
+
+Created 2026-10-12 at base 57f389b from `design-docs/specs/design-v1-3-sentry-parity.md`
+section 15. Waves run in order. Within a wave, write paths are disjoint. Files created by a
+wave-1 plan and edited by a later plan are listed in that later plan's `sharedPaths` with a
+note.
+
+Dispatch runs (at most 8 plans each; later runs record accepted plans as
+`acceptedDependencies`):
+
+- run 1: p01, p02, p03, p04, p05, p09, p13 (7 plans);
+- run 2: p06, p07, p08, p10, p11, p14, p15, p16 (8 plans);
+- run 3: p12, p17.
+
+Every plan's wave is greater than the waves of its dependencies.
+
+| Plan | Wave | Depends On | Design Reference |
+|------|------|------------|------------------|
+| `active/v13-p01-foundation.md` | W1 | - | v1.3 s2, s15 |
+| `active/v13-p02-db.md` | W1 | - | v1.3 s13.1; design-data-model.md v1.3 additions |
+| `active/v13-p03-ui-foundation.md` | W1 | - | design-ui-sentry.md s11.1, s11.3 |
+| `active/v13-p04-issue-stream-backend.md` | W2 | p01, p02 | v1.3 s3 (B2, B3, B5), s4, s5 |
+| `active/v13-p05-triage-lifecycle-backend.md` | W2 | p01, p02 | v1.3 s6.2, s6.3, s7, s8.1 |
+| `active/v13-p08-alerts-backend.md` | W2 | p01, p02 | v1.3 s9 |
+| `active/v13-p09-notifications-backend.md` | W2 | p01, p02 | v1.3 s10 |
+| `active/v13-p11-directory-ownership-backend.md` | W2 | p01, p02 | v1.3 s12 |
+| `active/v13-p13-ui-stream.md` | W2 | p03 | design-ui-sentry.md s11.2 |
+| `active/v13-p07-issue-detail-backend.md` | W3 | p01, p02, p04 | v1.3 s3 (B1, B4, B6, B7), s8 |
+| `active/v13-p10-dashboard-integrations-backend.md` | W3 | p01, p02, p04 | v1.3 s11, s12 |
+| `active/v13-p14-ui-detail.md` | W3 | p03, p13 | design-ui-sentry.md s11.2 |
+| `active/v13-p15-ui-alerts-profile.md` | W2 | p03 | design-ui-sentry.md s11.2 |
+| `active/v13-p16-ui-dashboard-org.md` | W2 | p03 | design-ui-sentry.md s11.2 |
+| `active/v13-p06-bulk-merge-backend.md` | W3 | p04, p05 | v1.3 s6 |
+| `active/v13-p12-wiring.md` | W4 | p04-p11 | v1.3 s2, s15 |
+| `active/v13-p17-verification-docs.md` | W5 | p12, p13-p16 | v1.3 s14, s16 |
 
 Telescreen v1 is complete (all 32 plans integration-accepted, final commit 7a8c600).
 Telescreen v1.1 (F1-F10 of `design-docs/specs/design-v1-1-dspm-adoption.md`) is complete:

@@ -129,6 +129,38 @@ and never echo text.
 | Workflows (changed) | Upload accepts `telescreen.workflow/v2` and applies the template and set checks of section 4.2; `GET /api/workflows/schema` serves a schema that accepts v1 and v2 | unchanged |
 | Runs (changed) | v2 `notify` step outputs carry per-target counts (section 4.3) | unchanged |
 
+### v1.3 endpoints
+
+Behavior is in `design-v1-3-sentry-parity.md` (section numbers below refer to it).
+Permissions are those of its section 2. Every new router has its own `<Area>RouterDeps` and
+is registered by the wiring plan. Validation errors never echo the query, URL, pattern or
+text.
+
+| Area | Endpoint | Permission |
+|------|----------|-----------|
+| Stream (changed) | `GET /api/issues` adds `query`, `period`/`start`/`end`, `trend`, sorts `values`/`priority`/`trending`; items add `priority`, `priority_manual`, `needs_review`, `assignee {kind, ref, display_name}`, `archive`, `merged_count`, `bookmarked`, `updated_at`, `trend`; `assignee=none` fixed; merged children excluded (4, 5.1) | `issues.read` |
+| | `GET /api/issues/counts?query&period&updated_since` -> `{tabs, updated_since_count}` (4) | `issues.read` |
+| Views | `GET`/`POST /api/views`, `PATCH`/`DELETE /api/views/{id}`, `PUT`/`DELETE /api/views/{id}/star`, `PUT /api/views/default` (5.2) | `views.read` / `views.write`; shared: `views.manage_shared` |
+| Triage | `POST /api/issues/{id}/archive`, `/unarchive`, `/review`; `PATCH /api/issues/{id}` adds `priority` (7, 8.1) | `issues.write` |
+| Bulk and merge | `POST /api/issues/bulk`, `POST /api/issues/merge`, `POST /api/issues/{id}/unmerge` (6) | `issues.write` (+ `issues.resolve_unverified` for that reason) |
+| Detail (changed) | `GET /api/issues/{id}` adds `subscription`, `merged_into`, `merged_children`, `suggested_assignees` and the stream fields; `GET /api/issues/{id}/events` adds `order` and `issue_short_id` (8.1, 8.2) | `issues.read` |
+| | `GET /api/issues/{id}/events/{oldest\|latest\|recommended\|finding_id}`, `GET /api/issues/{id}/tags`, `GET /api/issues/{id}/stats`, `GET /api/issues/{id}/activity` (8.2-8.4) | `issues.read` |
+| Comments | `POST /api/issues/{id}/comments` (now an `issue_comments` row); `PATCH`/`DELETE /api/issues/{id}/comments/{comment_id}` (author, or `comments.manage_any`) (8.4) | `issues.write` |
+| Follow | `PUT /api/issues/{id}/subscription`, `PUT`/`DELETE /api/issues/{id}/bookmark` (8.4) | `issues.follow` |
+| External issues | `GET /api/issues/{id}/external-issues`, `GET /api/external-issues/github/repos` | `issues.read` |
+| | `POST /api/issues/{id}/external-issues`, `DELETE /api/issues/{id}/external-issues/{link_id}`, `POST /api/issues/{id}/external-issues/github` (8.5) | `external_issues.write` |
+| Alerts | `GET /api/alert-rules`, `GET /api/alert-rules/{id}`, `GET /api/alert-rules/{id}/history` | `alerts.read` |
+| | `POST /api/alert-rules`, `POST /api/alert-rules/validate`, `PUT`/`DELETE /api/alert-rules/{id}`, `POST /api/alert-rules/{id}/enable\|disable` (9) | `alerts.write` |
+| | `POST /api/alert-rules/{id}/mute\|unmute` | `alerts.mute` |
+| Workflows (changed) | `GET /api/workflows` items add `trigger_events`, `active`, `last_run_at`, `runs_30d` (9) | `workflows.read` |
+| Profile | `GET`/`PUT /api/auth/me/notification-settings`; `GET`/`POST /api/auth/me/tokens`, `POST /api/auth/me/tokens/{id}/revoke` (10.1, 12) | `profile.self` |
+| Dashboard | `GET /api/dashboard?period` (11) | `issues.read` |
+| Integrations | `GET /api/integrations` / `POST /api/integrations/{kind}/test` (12) | `integrations.read` / `integrations.test` |
+| Members | `PATCH /api/members/{handle}` | `directory.write` |
+| | `POST /api/members/{handle}/deactivate\|reactivate` (12) | `users.write` |
+| Ownership | `GET /api/ownership-rules`, `POST /api/ownership-rules/test` | `ownership.read` |
+| | `POST /api/ownership-rules`, `PUT`/`DELETE /api/ownership-rules/{id}`, `POST /api/ownership-rules/reorder` (12) | `ownership.write` |
+
 ### Evidence
 
 - Upload is a raw request body (`application/octet-stream`), read in memory up to
