@@ -9,7 +9,7 @@
 
 - planId: `v13-p15-ui-alerts-profile`
 - planPath: `impl-plans/active/v13-p15-ui-alerts-profile.md`
-- wave: 2
+- wave: 2 (run 2; Last Updated 2026-10-13 with the run-2 screenshot contract)
 - dependsOn: `v13-p03-ui-foundation`
 - writePaths:
   - `impl-plans/active/v13-p15-ui-alerts-profile.md`
@@ -99,6 +99,22 @@ validate flows, permission-aware actions) and `pages/settings/UsersRoles.tsx`.
 - Token create shows the secret once; after the dialog closes, the secret text is not in
   the DOM. Viewer scopes offer only `read`.
 
+- Screenshot contract (design section 15, run 2): on `/alerts/alert-01` the detail view
+  has a `tab` whose accessible name is exactly "History", and selecting it shows the
+  history table. Add a test that asserts `getByRole("tab", { name: "History" })`.
+
+## Run-2 shared-file rules
+
+- Read-only in this run: `src/web/src/api/**` (client, types, mock router and fixtures),
+  `src/web/src/components/**`, `src/web/src/routes.tsx`, `src/web/scripts/screenshots.ts`
+  and every page directory other than `pages/alerts` and `pages/profile`.
+- The p03 client and mock already serve `/api/alert-rules*`, `/api/auth/me/*` and
+  `/api/views`. A missing client call or mock field is a Reconciliation request, not an
+  edit.
+- This plan does not run `bun run screenshots`: v13-p16 is the single wave-2 screenshot
+  runner and owner. Its run covers `alerts-list`, `alerts-new`, `alerts-detail-history`
+  and `profile`.
+
 ## Verification
 
 ```bash
@@ -108,11 +124,15 @@ bun install --frozen-lockfile > /tmp/telescreen-v13-p15-install.log 2>&1; echo "
 bun run typecheck 2>&1 | tee /tmp/telescreen-v13-p15-typecheck.log; echo "exit=$?"
 bun run test 2>&1 | tee /tmp/telescreen-v13-p15-test.log; echo "exit=$?"
 bun run build --outDir /tmp/telescreen-v13-p15-web --emptyOutDir 2>&1 | tee /tmp/telescreen-v13-p15-build.log; echo "exit=$?"
+test -z "$(git diff --name-only HEAD -- src/web/src/api src/web/src/components src/web/src/routes.tsx src/web/package.json src/web/bun.lock)"
 ```
 
-Expected: each command exits 0.
+Expected: each command exits 0. A vitest failure caused only by v13-p16's in-progress
+files is recorded as such.
 
 ## Completion Criteria
+
+- [ ] The "History" tab test passes.
 
 - [ ] The alerts list, editor and history, and the profile page, are implemented per
   section 11.2.

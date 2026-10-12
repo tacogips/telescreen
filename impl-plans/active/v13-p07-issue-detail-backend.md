@@ -9,7 +9,7 @@
 
 - planId: `v13-p07-issue-detail-backend`
 - planPath: `impl-plans/active/v13-p07-issue-detail-backend.md`
-- wave: 3
+- wave: 3 (run 2; Last Updated 2026-10-13 with the run-2 shared-file rules)
 - dependsOn: `v13-p01-foundation`, `v13-p02-db`, `v13-p04-issue-stream-backend`. p07
   consumes p04's `_issue_json` extras emission (`assignee`, `merged_count`, `bookmarked`)
   and `issue_item_extras` in `issues_common.py`. p04 runs in run 1 and p07 in run 2.
@@ -23,6 +23,10 @@
   - `src/telescreen/api/routers/issue_external.py`
   - `tests/issues/v13_detail`
   - `tests/api/v13_detail`
+  - `tests/issues/test_issues.py`
+  - `tests/issues/test_issues_api.py`
+  - `tests/api/v11_issues/test_issues_router.py`
+  - `tests/e2e/test_flow_ingest.py`
 - sharedPaths:
   - `src/telescreen/api/routers/issues_detail.py`
   - `src/telescreen/api/routers/issues_comments.py`
@@ -31,7 +35,10 @@
     move). This plan is its only wave-2 editor: the detail-only fields, extras, and the
     events `order` parameter.
   - `src/telescreen/api/routers/issues_comments.py`: created by v13-p01. This plan is its
-    only wave-2 editor: the POST route uses `CommentService`.
+    only run-2 editor: the POST route uses `CommentService`.
+  - The four existing tests above were owned by p04 or p05 in run 1. This plan owns them
+    in run 2 (wave 3): they are expected to pass unchanged, and only a D14-broken
+    assertion may change.
 - artifactRoots: none
 
 Read `impl-plans/conventions.md` first.
@@ -239,22 +246,53 @@ Imitate:
     unconfigured -> 200 `{configured: false, repos: []}`; an unlisted repo -> 422.
 - Bookmark and subscription with an unbound token -> 403.
 
+## Run-2 shared-file rules (design section 15, run 2)
+
+- `issues_detail.py` and `issues_comments.py` are registered through the `issues.py`
+  composer. Add no route there (see Invariants), so `tests/e2e/test_route_permissions.py`,
+  `tests/e2e/test_api_routes.py` and `tests/api/v12_rbac/**` stay read-only. The three
+  new router modules are unregistered until v13-p12 and are tested by building them
+  directly. Never use `include_router` in source.
+- Owned shared tests (this plan's writePaths in the run-2 manifest; no other wave-3 plan
+  edits them). They are expected to pass unchanged. Edit only an assertion that a D14
+  fact breaks (a comment row plus a `commented` history row with `note = null`), and
+  record the reason in the Progress Log:
+  - `tests/issues/test_issues.py` (comment POST and history, around line 690);
+  - `tests/issues/test_issues_api.py` (events paging);
+  - `tests/api/v11_issues/test_issues_router.py` (safe detail);
+  - `tests/e2e/test_flow_ingest.py` (events of an ingested issue).
+- No new table, migration, template variable or notification kind. `issue_mentioned`,
+  `issue_activity` and `issue_assigned` already exist (v13-p01). `tests/db/test_models.py`,
+  `tests/notifications/**` and `tests/leak/**` are read-only. The masking of comments,
+  mentions, activity and external-issue bodies is asserted in `tests/issues/v13_detail`
+  and `tests/api/v13_detail` with `tests.support.samples`. The full leak matrix is
+  v13-p17.
+- Do not edit `issues_common.py`, `issues/service.py`, `lifecycle.py` or
+  `issues/archive.py`. v13-p06 runs in the same wave and only reads them.
+
 ## Verification
 
 Start every shell with `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1`.
 
 ```bash
-uv run --frozen ruff format --check --no-cache src/telescreen/issues/detail src/telescreen/issues/activity src/telescreen/issues/external src/telescreen/api/routers tests/issues/v13_detail tests/api/v13_detail
-uv run --frozen ruff check --no-cache src/telescreen/issues src/telescreen/api/routers tests/issues/v13_detail tests/api/v13_detail
-uv run --frozen ty check src/telescreen/issues src/telescreen/api/routers tests/issues/v13_detail tests/api/v13_detail
-uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p07-typelint.log 2>&1; grep -E '^(src/telescreen/issues/(detail|activity|external)|src/telescreen/api/routers/(issues_detail|issues_comments|issue_events|issue_activity|issue_external)|tests/(issues/v13_detail|api/v13_detail))' /tmp/telescreen-v13-p07-typelint.log
-uv run --frozen pytest -p no:cacheprovider tests/issues/v13_detail tests/api/v13_detail tests/api/v11_issues tests/issues/test_issues_api.py 2>&1 | tee /tmp/telescreen-v13-p07-pytest.log; echo "exit=$?"
+uv run --frozen ruff format --check --no-cache src/telescreen/issues/detail src/telescreen/issues/activity src/telescreen/issues/external src/telescreen/api/routers/issues_detail.py src/telescreen/api/routers/issues_comments.py src/telescreen/api/routers/issue_events.py src/telescreen/api/routers/issue_activity.py src/telescreen/api/routers/issue_external.py tests/issues/v13_detail tests/api/v13_detail tests/issues/test_issues.py tests/issues/test_issues_api.py tests/api/v11_issues/test_issues_router.py tests/e2e/test_flow_ingest.py
+uv run --frozen ruff check --no-cache src/telescreen/issues/detail src/telescreen/issues/activity src/telescreen/issues/external src/telescreen/api/routers/issues_detail.py src/telescreen/api/routers/issues_comments.py src/telescreen/api/routers/issue_events.py src/telescreen/api/routers/issue_activity.py src/telescreen/api/routers/issue_external.py tests/issues/v13_detail tests/api/v13_detail tests/issues/test_issues.py tests/issues/test_issues_api.py tests/api/v11_issues/test_issues_router.py tests/e2e/test_flow_ingest.py
+uv run --frozen ty check src/telescreen/issues/detail src/telescreen/issues/activity src/telescreen/issues/external src/telescreen/api/routers/issues_detail.py src/telescreen/api/routers/issues_comments.py src/telescreen/api/routers/issue_events.py src/telescreen/api/routers/issue_activity.py src/telescreen/api/routers/issue_external.py tests/issues/v13_detail tests/api/v13_detail tests/issues/test_issues.py tests/issues/test_issues_api.py tests/api/v11_issues/test_issues_router.py tests/e2e/test_flow_ingest.py
+uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p07-typelint.log 2>&1; ! grep -E '^(src/telescreen/issues/(detail|activity|external)/|src/telescreen/api/routers/(issues_detail|issues_comments|issue_events|issue_activity|issue_external)[.]py|tests/(issues/v13_detail|api/v13_detail)/|tests/issues/test_issues(_api)?[.]py|tests/api/v11_issues/test_issues_router[.]py|tests/e2e/test_flow_ingest[.]py)' /tmp/telescreen-v13-p07-typelint.log
+uv run --frozen pytest -p no:cacheprovider tests/issues/v13_detail tests/api/v13_detail tests/api/v11_issues tests/issues/test_issues_api.py tests/issues/test_issues.py tests/e2e/test_flow_ingest.py 2>&1 | tee /tmp/telescreen-v13-p07-pytest.log; echo "exit=$?"
+uv run --frozen pytest -p no:cacheprovider tests/e2e/test_route_permissions.py tests/e2e/test_api_routes.py tests/api/v12_rbac tests/leak 2>&1 | tee /tmp/telescreen-v13-p07-pytest-shared.log; echo "exit=$?"
 uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-v13-p07-pytest-all.log 2>&1; echo "exit=$?"
 ```
 
-Expected: the scoped checks exit 0, the typelint grep prints nothing, and the existing
-issue-API tests pass. The full run is informational. Tests assert only this plan's fields,
-never the full item key set.
+Expected:
+
+- the scoped checks exit 0, and the typelint grep finds nothing;
+- the existing issue-API tests and the shared read-only suites pass;
+- every Python file is under 1000 lines (`wc -l src/telescreen/api/routers/issues_detail.py
+  src/telescreen/api/routers/issues_comments.py`).
+
+The full run is informational. Tests assert only this plan's fields, never the full item
+key set.
 
 ## Completion Criteria
 

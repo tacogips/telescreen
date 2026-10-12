@@ -9,14 +9,20 @@
 
 - planId: `v13-p16-ui-dashboard-org`
 - planPath: `impl-plans/active/v13-p16-ui-dashboard-org.md`
-- wave: 2
+- wave: 2 (run 2; Last Updated 2026-10-13 with the run-2 screenshot contract)
 - dependsOn: `v13-p03-ui-foundation`
 - writePaths:
   - `impl-plans/active/v13-p16-ui-dashboard-org.md`
   - `src/web/src/pages/dashboard`
   - `src/web/src/pages/settings`
   - `src/web/src/pages/workflows`
+  - `src/web/scripts/screenshots.ts`
 - sharedPaths: none
+- sharedPathNotes:
+  - `src/web/scripts/screenshots.ts`: created by v13-p03, edited by v13-p13 (run 1). This
+    plan is its single run-2 editor (design section 15). Change ONLY the `member-edit`
+    action name from "Edit Alex" to "Edit Alex Morgan". Keep every other state,
+    selector and the `TELESCREEN_SCREENSHOTS_STRICT` handling byte-identical.
 - artifactRoots: none
 
 This plan creates `pages/dashboard/index.tsx` (discovered by `routes.tsx`) and owns all of
@@ -115,6 +121,27 @@ Imitate:
   changed fields only.
 - Workflows list: trigger tags and run counts render.
 
+- Screenshot contract (design section 15, run 2):
+  - each Users and roles row's Edit button is named `Edit <display_name>`, for example
+    "Edit Alex Morgan" for the mock member `alex`. Test it with `getByRole("button",
+    { name: "Edit Alex Morgan" })`;
+  - the dashboard has a `button` named exactly "Getting started" that opens the
+    onboarding checklist. Test it.
+
+## Run-2 shared-file rules
+
+- Read-only in this run: `src/web/src/api/**` (client, types, mock router and fixtures),
+  `src/web/src/components/**`, `src/web/src/routes.tsx`, `pages/alerts`, `pages/profile`
+  (v13-p15, same wave) and every other page directory.
+- `screenshots.ts`: only the one action-name change described in the sharedPathNotes.
+- The existing tests in `pages/settings/*.test.tsx` and `pages/workflows/*.test.ts(x)`
+  are inside this plan's writePaths. Change an assertion only when this plan's accepted
+  design change breaks it, and record the reason in the Progress Log.
+- This plan is the single wave-2 screenshot runner. Its own states are `dashboard`,
+  `integrations`, `tokens`, `ownership-rules`, `member-edit`, `workflows-list` and
+  `onboarding`. The alerts and profile states belong to v13-p15 and may be skipped while
+  p15 is in progress.
+
 ## Verification
 
 ```bash
@@ -124,11 +151,25 @@ bun install --frozen-lockfile > /tmp/telescreen-v13-p16-install.log 2>&1; echo "
 bun run typecheck 2>&1 | tee /tmp/telescreen-v13-p16-typecheck.log; echo "exit=$?"
 bun run test 2>&1 | tee /tmp/telescreen-v13-p16-test.log; echo "exit=$?"
 bun run build --outDir /tmp/telescreen-v13-p16-web --emptyOutDir 2>&1 | tee /tmp/telescreen-v13-p16-build.log; echo "exit=$?"
+bun run screenshots 2>&1 | tee /tmp/telescreen-v13-p16-shots.log; echo "exit=$?"
+! grep -E '^state-skipped: (member-edit|onboarding)$' /tmp/telescreen-v13-p16-shots.log
+test -z "$(git diff --name-only HEAD -- src/web/src/api src/web/src/components src/web/src/routes.tsx src/web/package.json src/web/bun.lock)"
 ```
 
-Expected: each command exits 0, including the existing settings and workflow page tests.
+Expected:
+
+- each command exits 0, including the existing settings and workflow page tests;
+- the screenshot run has 0 browser errors and no skip for `member-edit` or `onboarding`.
+
+A missing browser (`exit=2`) is a recorded verification gap, never a pass. A vitest or
+screenshot failure caused only by v13-p15's in-progress files is recorded as such.
 
 ## Completion Criteria
+
+- [ ] The "Edit Alex Morgan" and "Getting started" tests pass, and the screenshot log has
+  no `state-skipped:` line for `member-edit` or `onboarding`.
+- [ ] `git diff HEAD -- src/web/scripts/screenshots.ts` shows exactly one changed line
+  (the member-edit action name).
 
 - [ ] The dashboard, onboarding, integrations, tokens, ownership rules, member edit and
   workflows list are implemented per section 11.2.

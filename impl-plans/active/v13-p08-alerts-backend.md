@@ -9,7 +9,7 @@
 
 - planId: `v13-p08-alerts-backend`
 - planPath: `impl-plans/active/v13-p08-alerts-backend.md`
-- wave: 2
+- wave: 2 (run 2; Last Updated 2026-10-13 with the run-2 shared-file rules)
 - dependsOn: `v13-p01-foundation`, `v13-p02-db`
 - writePaths:
   - `impl-plans/active/v13-p08-alerts-backend.md`
@@ -169,21 +169,55 @@ Imitate:
   create); history paging.
 - Workflows list: `runs_30d` counts seeded runs; `active` reflects the active version.
 
+## Run-2 shared-file rules (design section 15, run 2)
+
+- `alerts.py` is a new, unregistered router module. Its tests build it directly with
+  `build_alerts_router`. p12 (run 3) registers it by copying `APIRoute` objects; never use
+  `include_router` in source.
+- `workflows.py` is already registered. Add NO route there: only list-item fields and
+  defaulted `WorkflowsRouterDeps` fields. Then `tests/e2e/test_route_permissions.py`,
+  `tests/e2e/test_api_routes.py` and `tests/api/v12_rbac/**` stay read-only and must keep
+  passing.
+- `WorkflowTriggerService` keeps its public behavior. `starter.py` reuses its active-run
+  check without changing `on_issue_event`. The existing tests that use it
+  (`tests/workflow/engine/test_engine_extended.py`, `tests/workflow/engine/
+  test_resume_gaps.py`, `tests/core/test_v11_foundation.py`) and the `/api/workflows`
+  flows (`tests/leak/flows.py`, `tests/leak/flows_v12.py`,
+  `tests/e2e/test_flow_v12_notifications.py`, `tests/examples/test_examples.py`) are
+  read-only and must pass unchanged.
+- No new table, migration, template variable or notification event kind. `alert_fired`
+  and the `alerts` category already exist (v13-p01), so `tests/db/test_models.py`,
+  `tests/notifications/**` and `tests/leak/**` are read-only.
+- Masking: alert rule names pass `Redactor`, and fire rows and notification contexts hold
+  masked issue fields only. Assert it in `tests/alerts` with `tests.support.samples`: the
+  raw sample is absent from `alert_rules`, `alert_fires`, the queued requests and every
+  response.
+
 ## Verification
 
 Start every shell with `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1`.
 
 ```bash
 uv run --frozen ruff format --check --no-cache src/telescreen/alerts src/telescreen/workflow/triggers src/telescreen/api/routers/alerts.py src/telescreen/api/routers/workflows.py tests/alerts tests/workflow/v13
-uv run --frozen ruff check --no-cache src/telescreen/alerts src/telescreen/workflow src/telescreen/api/routers tests/alerts tests/workflow
-uv run --frozen ty check src/telescreen/alerts src/telescreen/workflow src/telescreen/api/routers tests/alerts tests/workflow
-uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p08-typelint.log 2>&1; grep -E '^(src/telescreen/(alerts|workflow/triggers)|src/telescreen/api/routers/(alerts|workflows)|tests/(alerts|workflow/v13))' /tmp/telescreen-v13-p08-typelint.log
-uv run --frozen pytest -p no:cacheprovider tests/alerts tests/workflow 2>&1 | tee /tmp/telescreen-v13-p08-pytest.log; echo "exit=$?"
+uv run --frozen ruff check --no-cache src/telescreen/alerts src/telescreen/workflow/triggers src/telescreen/api/routers/alerts.py src/telescreen/api/routers/workflows.py tests/alerts tests/workflow/v13
+uv run --frozen ty check src/telescreen/alerts src/telescreen/workflow/triggers src/telescreen/api/routers/alerts.py src/telescreen/api/routers/workflows.py tests/alerts tests/workflow/v13
+uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p08-typelint.log 2>&1; ! grep -E '^(src/telescreen/(alerts|workflow/triggers)/|src/telescreen/api/routers/(alerts|workflows)[.]py|tests/(alerts|workflow/v13)/)' /tmp/telescreen-v13-p08-typelint.log
+uv run --frozen pytest -p no:cacheprovider tests/alerts tests/workflow tests/core/test_v11_foundation.py 2>&1 | tee /tmp/telescreen-v13-p08-pytest.log; echo "exit=$?"
+uv run --frozen pytest -p no:cacheprovider tests/e2e/test_route_permissions.py tests/e2e/test_api_routes.py tests/api/v12_rbac tests/e2e/test_flow_v12_notifications.py tests/examples/test_examples.py tests/leak/test_leak_matrix.py tests/leak/test_leak_matrix_v12.py 2>&1 | tee /tmp/telescreen-v13-p08-pytest-shared.log; echo "exit=$?"
 uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-v13-p08-pytest-all.log 2>&1; echo "exit=$?"
 ```
 
-Expected: the scoped checks exit 0, the typelint grep prints nothing, and the existing
-workflow tests pass. The full run is informational.
+Expected:
+
+- the scoped checks exit 0, and the typelint grep finds nothing;
+- the existing workflow tests and the shared read-only suites pass;
+- `git diff --name-only HEAD -- pyproject.toml uv.lock src/telescreen/db tests/db
+  tests/leak tests/notifications tests/e2e tests/examples tests/workflow/engine tests/core
+  tests/api/v12_rbac/rbac_world.py tools/typelint.py` is empty. Sibling v13-p11 edits
+  `tests/api/v12_rbac/test_v12_rbac_router_permissions.py`; ignore that path.
+
+The full run is informational. A failure caused only by v13-p11's in-progress files is
+recorded as such.
 
 ## Completion Criteria
 

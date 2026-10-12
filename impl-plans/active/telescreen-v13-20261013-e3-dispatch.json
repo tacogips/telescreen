@@ -1,0 +1,577 @@
+{
+  "taskId": "telescreen-v13-20261013-e3",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "9accc07cf1a83973c8e178665a01f280e6bfa807",
+  "evidenceRoot": "tmp/telescreen-v13-20261013-e3",
+  "evidenceRootNotes": "Untracked (gitignored by **/tmp); never staged or committed. Use per-plan and per-attempt subdirectories: tmp/telescreen-v13-20261013-e3/<planId>/attempt-<n>/. Command logs go to /tmp/telescreen-<planId>-*.log and builds to /tmp/telescreen-<planId>-web or /tmp/telescreen-<planId>-dist (conventions section 7). Do not read from or write to tmp/telescreen-v13-20261012-e1 or -e2.",
+  "supersedes": "none (run 1 manifests telescreen-v13-20261012-e1 and -e2 stay untouched for reference)",
+  "runScope": "Run 2 of 3 of Telescreen v1.3 (Sentry parity, design-docs/specs/design-v1-3-sentry-parity.md section 15) at base 9accc07. Wave 2: v13-p08-alerts-backend, v13-p11-directory-ownership-backend, v13-p15-ui-alerts-profile, v13-p16-ui-dashboard-org. Wave 3: v13-p06-bulk-merge-backend (including the run-1 carry-over INT-W2-04, INT-W2-05 and archive until_escalating parsing, server and UI), v13-p07-issue-detail-backend, v13-p10-dashboard-integrations-backend, v13-p14-ui-detail. Run 3: v13-p12-wiring (wave 4) and v13-p17-verification-docs (wave 5). No plan is archived in this run.",
+  "planModes": {
+    "implement": "Implement the plan's deliverables inside writePaths (and the scoped sharedPaths edits described in sharedPathNotes), then run every manifest verification command. Paths listed in readOnlySharedPaths must pass unchanged; a failure there is a Reconciliation request in the plan Progress Log, never an edit."
+  },
+  "designDocPaths": [
+    "design-docs/specs/design-v1-3-sentry-parity.md",
+    "design-docs/specs/design-v1-3-sentry-parity-review.md",
+    "design-docs/specs/design-ui-sentry.md",
+    "design-docs/specs/architecture.md",
+    "design-docs/specs/design-api-and-ui.md",
+    "design-docs/specs/design-data-model.md",
+    "design-docs/specs/design-masking.md"
+  ],
+  "planIndexPath": "impl-plans/README.md",
+  "conventionsPath": "impl-plans/conventions.md",
+  "acceptedDependencies": [
+    {"planId": "v13-p01-foundation", "planPath": "impl-plans/active/v13-p01-foundation.md", "commit": "9accc07cf1a83973c8e178665a01f280e6bfa807", "provides": "v1.3 vocabulary, permissions, config, ports (issues, notifications, workflow, directory) and the split issues routers (issues_common, issues_list, issues_detail, issues_actions, issues_comments)", "acceptedIn": "run 1, session 12, comm-000580"},
+    {"planId": "v13-p02-db", "planPath": "impl-plans/active/v13-p02-db.md", "commit": "9accc07cf1a83973c8e178665a01f280e6bfa807", "provides": "v1.3 DB models and the single v1.3 Alembic revision", "acceptedIn": "run 1, session 12, comm-000580"},
+    {"planId": "v13-p03-ui-foundation", "planPath": "impl-plans/active/v13-p03-ui-foundation.md", "commit": "9accc07cf1a83973c8e178665a01f280e6bfa807", "provides": "web API client, types (BulkParams), mock router and fixtures, shared components, routes discovery and the screenshot script", "acceptedIn": "run 1, session 12, comm-000580"},
+    {"planId": "v13-p04-issue-stream-backend", "planPath": "impl-plans/active/v13-p04-issue-stream-backend.md", "commit": "9accc07cf1a83973c8e178665a01f280e6bfa807", "provides": "issue query (parse_period, QueryContext, select_matching_ids), stream tabs and counts, trends, sorts, search syntax and saved views", "acceptedIn": "run 1, session 12, comm-000580"},
+    {"planId": "v13-p05-triage-lifecycle-backend", "planPath": "impl-plans/active/v13-p05-triage-lifecycle-backend.md", "commit": "9accc07cf1a83973c8e178665a01f280e6bfa807", "provides": "archive/escalating (validate_archive_request, archive_issue, rebase_archive), priority, For review and request_verification lifecycle", "acceptedIn": "run 1, session 12, comm-000580"},
+    {"planId": "v13-p09-notifications-backend", "planPath": "impl-plans/active/v13-p09-notifications-backend.md", "commit": "9accc07cf1a83973c8e178665a01f280e6bfa807", "provides": "per-user notification settings, weekly report and outbound guard", "acceptedIn": "run 1, session 12, comm-000580"},
+    {"planId": "v13-p13-ui-stream", "planPath": "impl-plans/active/v13-p13-ui-stream.md", "commit": "9accc07cf1a83973c8e178665a01f280e6bfa807", "provides": "Sentry-like issue stream UI (IssueList, bulk actions, ArchiveMenu, stream views)", "acceptedIn": "run 1, session 12, comm-000580"}
+  ],
+  "checkpointAdjustments": [
+    "Wave order is encoded in dependsOn: every wave-3 plan depends on all four wave-2 plans (impl-plans/README.md: waves run in order). Without these edges no wave-3 plan depended on a wave-2 plan, so a DAG dispatcher would have run all 8 at once: p06 edits src/web/src/api/client.ts while p15/p16 assert src/web/src/api unchanged, p07 edits tests/e2e/test_flow_ingest.py while p08/p11 assert tests/e2e unchanged, and p14 and p16 would both run screenshots on port 4319.",
+    "p06 and p14 verification accepts p16's single wave-2 change to src/web/scripts/screenshots.ts (empty diff or exactly 1 added/1 removed line) instead of requiring an empty diff, because HEAD stays at 9accc07 during the run; the matching Completion Criteria lines in v13-p06 and v13-p14 say the same."
+  ],
+  "laterRunPlans": [
+    {"planId": "v13-p12-wiring", "planPath": "impl-plans/active/v13-p12-wiring.md", "plannedRun": 3, "wave": 4, "dependsOn": ["v13-p04-issue-stream-backend", "v13-p05-triage-lifecycle-backend", "v13-p06-bulk-merge-backend", "v13-p07-issue-detail-backend", "v13-p08-alerts-backend", "v13-p09-notifications-backend", "v13-p10-dashboard-integrations-backend", "v13-p11-directory-ownership-backend"]},
+    {"planId": "v13-p17-verification-docs", "planPath": "impl-plans/active/v13-p17-verification-docs.md", "plannedRun": 3, "wave": 5, "dependsOn": ["v13-p12-wiring", "v13-p13-ui-stream", "v13-p14-ui-detail", "v13-p15-ui-alerts-profile", "v13-p16-ui-dashboard-org"]}
+  ],
+  "serialFinalization": "Not in this run. After v13-p17-verification-docs (run 3) is integration-accepted: move impl-plans/active/v13-p*.md to impl-plans/completed/ and the v13 dispatch manifests (e1, e2, e3 and later) to impl-plans/completed/dispatch/; update impl-plans/README.md and the status lines of the v1.3 design documents. Serial and outside fanout.",
+  "sharedFileOwnership": {
+    "rule": "design-v1-3-sentry-parity.md section 15 run-2 notes: every existing file a plan's change can touch or break is either in that plan's writePaths (sole owner in its wave) or listed in its readOnlySharedPaths and must pass unchanged. Same-wave plans own disjoint files. Audit at 9accc07 found no file that two same-wave plans must edit, so no same-wave dependsOn is needed.",
+    "routeWalk": "New router modules (alerts, ownership, issue_events, issue_activity, issue_external, issue_bulk, dashboard, integrations) stay unregistered until v13-p12 and are tested by building the router directly; composition copies APIRoute objects as src/telescreen/api/routers/issues.py does, never include_router (FastAPI 0.142 lazy _IncludedRouter is invisible to the walk). Only v13-p11 adds routes to registered modules (directory.py, users.py) and owns tests/api/v12_rbac/test_v12_rbac_router_permissions.py. tests/e2e/test_route_permissions.py and tests/e2e/test_api_routes.py are read-only for every run-2 plan.",
+    "inventoryTests": "No run-2 plan adds a table, migration, template variable or notification event kind: tests/db/test_models.py, tests/notifications/** and tests/leak/** are read-only. Each backend plan asserts masking of its own surfaces in its own test directory; the full v13 leak matrix is v13-p17.",
+    "frontend": "src/web/src/api/types.ts, src/web/src/api/mock/fixtures, src/web/src/components and src/web/src/routes.tsx are read-only. Wave 2: v13-p16 is the single editor of src/web/scripts/screenshots.ts (one selector: member-edit 'Edit Alex' -> 'Edit Alex Morgan') and the single wave-2 screenshot runner. Wave 3: v13-p06 is the single editor of src/web/src/api/client.ts (issuesApi.bulk only), src/web/src/api/mock/router.ts and mock.test.ts (bulk handler only) and src/web/src/pages/issues/IssueList.tsx and IssueList.test.tsx; v13-p14 is the single wave-3 screenshot runner (port 4319 and the /tmp screenshot directory are shared, so only one plan per wave runs screenshots).",
+    "readOnlyForAllRun2Plans": [
+      "tests/db/test_models.py",
+      "tests/e2e/test_route_permissions.py",
+      "tests/e2e/test_api_routes.py",
+      "tests/leak",
+      "tests/notifications",
+      "tests/api/v12_rbac/rbac_world.py",
+      "src/web/src/api/types.ts",
+      "src/web/src/api/mock/fixtures",
+      "src/web/src/components",
+      "src/web/src/routes.tsx",
+      "pyproject.toml",
+      "uv.lock",
+      "src/web/package.json",
+      "src/web/bun.lock",
+      "tools/typelint.py"
+    ]
+  },
+  "reviewContext": {
+    "issueReference": {
+      "title": "Telescreen v1.3: Sentry parity for UI and features (self-review follow-up)",
+      "githubIssue": "none supplied (issue-resolution workflowInput)",
+      "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-13",
+      "requirements": "design-docs/specs/design-v1-3-sentry-parity-review.md, corrected in its section 7",
+      "designAcceptance": "design-docs/specs/design-v1-3-sentry-parity.md accepted in session 11; session 13 Step 2 (comm-000589) revised section 6.1 (bulk start/end, params keys, issue_id failure key, params validated before any change) and section 15 (run-2 shared-file ownership), accepted by Step 3 (comm-000590, decisions R2-D1..R2-D8). Step 4 corrected the member-edit screenshot accessible name to 'Edit Alex Morgan' (the mock member is Alex Morgan).",
+      "planAcceptance": "17 plans accepted in session 11 (comm-000487); session 13 Step 4 revised p06 (carry-over items, UI writePaths, bun verification), added run-2 shared-file rules and scoped verification to p07, p08, p10 and p11, and the screenshot accessible-name contract to p14, p15 and p16."
+    },
+    "userProblem": "The owner asked (translated): 'Self-review the UI and the features. Are we providing the same usability and functionality as Sentry? If not, improve it.' The committed self-review found 7 defects (B1-B7) and a 60-item Sentry gap table; the adopted scope is S0-S10.",
+    "requiredOutcomes": [
+      "Wave 2: p08 (S6 alert rules, evaluator, action interval, mute, history, RunStarter, enriched workflows list), p11 (ActorDirectory, member edit/deactivate, self tokens, ownership rules, suggested assignees), p15 (alerts list/editor/history and profile UI) and p16 (dashboard, onboarding, integrations, tokens, ownership rules, member edit, workflows list UI).",
+      "Wave 3: p06 (S3 bulk, merge, unmerge, safety rule 5, plus INT-W2-04, INT-W2-05 and archive until_escalating parsing regressions on server, client, mock and IssueList), p07 (B1, B4, B6, B7, S5 detail backend), p10 (S8 dashboard, IssueReportSource, integrations status and tests) and p14 (B1, B4, B6, B7 detail UI).",
+      "Every new route declares exactly one permission; new routers are unregistered until p12 and compose by copying APIRoute objects.",
+      "Raw sample values never reach rows, logs, responses or payloads on the new surfaces (alert rules, fires and payloads, ownership rules and test locators, member edits, tokens, comments, mentions, activity, external issue bodies, dashboard, integration status, bulk and merge audit).",
+      "Final repository gates after the run: uv run ruff format --check . && uv run ruff check . && uv run python tools/typelint.py && uv run ty check && uv run pytest && uv build (run-1 baseline 922 passed / 8 skipped); cd src/web && bun install --frozen-lockfile && bun run typecheck && bun run test && bun run build && bun run screenshots (run-1 baseline vitest 199 passed, 0 browser errors)."
+    ],
+    "nonGoals": [
+      "Deferred by the accepted review: releases, environments, projects, Discover, Jira create, replay/performance/profiling.",
+      "No redispatch or re-implementation of p01-p05, p09, p13; no dispatch of p12 or p17; no archiving.",
+      "No dependency change, no Alembic revision, no edit of existing migrations, no change to tools/typelint.py, ruff ANN/PGH or ty strictness, no per-file-ignore entries.",
+      "No router registration or wiring (v13-p12, run 3); no full v13 leak matrix, E2E flows, strict screenshots or live checks (v13-p17, run 3)."
+    ],
+    "constraints": [
+      "AGENTS.md / CLAUDE.md: English only, no emojis, python-coding-standards; plan files under 400 lines; every Python file under 1000 lines.",
+      "Strict typing via tools/typelint.py, ruff ANN/PGH and ty; no type-ignore or ty-ignore; no Any, object, dict/mapping types or **kwargs; dataclasses and enums only.",
+      "Masking contract: raw detected values are never persisted, logged, indexed, notified or returned; user text passes Redactor; errors never echo input.",
+      "Default uv run pytest passes offline; integration tests skip without TELESCREEN_TEST_DATABASE_URL / TELESCREEN_TEST_MEILI_URL; live tests skip offline.",
+      "Conventions 2 and 7a: write only inside writePaths; per-edit fresh read and pre/post SHA-256 in the Progress Log; a needed change elsewhere is a Reconciliation request; fixed findings only in addressedFeedback; verification lists only final passing commands.",
+      "No git checkout/restore/stash/reset/clean/commit/add by workers; bun install only with --frozen-lockfile; builds and logs go to /tmp."
+    ],
+    "intentionalTradeoffs": [
+      "Scoped ruff/ty commands cover only each plan's own paths, so a sibling's in-progress file cannot fail them; typelint runs on the whole repository and is filtered to the plan's paths.",
+      "The full pytest run is informational during fanout and is rerun at integration; a failure caused only by a sibling's in-progress file is recorded as such.",
+      "p06 is named a backend plan but also owns the UI side of the bulk contract in wave 3, so the carry-over items close end to end in one plan without a same-wave collision.",
+      "Only one plan per wave runs bun run screenshots (p16 in wave 2, p14 in wave 3) because port 4319 and /tmp/telescreen-v13-p03-screenshots are shared; the integration review reruns screenshots on the combined tree; p17 runs them strict in run 3. A missing browser is a recorded verification gap, never a pass.",
+      "Run-2 plans assert masking on their own surfaces in their own test directories; tests/leak/** stays read-only until p17."
+    ],
+    "designDecisionsAndRationale": [
+      "R2-D1: bulk body accepts start/end with the same parse_period rules as GET /api/issues; the UI sends them for a custom period (INT-W2-04).",
+      "R2-D2: bulk params keys follow the accepted client BulkParams; the failure key is issue_id.",
+      "R2-D3: params are validated once before any issue changes; archive goes through validate_archive_request with no default kind; until_escalating takes neither duration nor count.",
+      "R2-D4: all-matching Mark remediated sends bulk request_verification {verification: {action: remove, include_linked: false}} (INT-W2-05); merge and start workflow stay finite-selection only.",
+      "R2-D5..R2-D8: p06 owns the carry-over end to end; inventory tests read-only; p11 owns the v12 RBAC inventory; same-wave dependsOn rule (not needed at 9accc07).",
+      "D11-D13, D18-D21, D25-D27, D30 and sections 8, 9, 11, 12 of the design are unchanged from session 11."
+    ],
+    "supportedEdgeCases": [
+      "p06: period=custom without start/end -> 422 and no change; until_escalating with duration -> 422; archive without kind -> 422; 1002 matching -> processed 1000 and truncated; merge with a requested exception -> merged_group; merge into an archived primary never escalates and never changes archive_until.",
+      "p08: a second match within the action interval writes one suppressed_interval row per window; a rule whose start_workflow is already triggered by the same event -> duplicate_trigger; archived issues and merged children never match frequency or values.",
+      "p11: deactivating the last admin -> 409 last_admin; a viewer self token with write -> 422; an ownership pattern or test locator with a sample secret -> 422 with no echo.",
+      "p07: First/Latest navigation is chronological (B1); 120 findings counted fully (B7); mention edits notify only new mentions; a manual unsubscribe is never overridden; GitHub create body holds masked fields only and a DLP block sends nothing.",
+      "p10: means are null with no data; integrations responses hold no token, host, email or secret ref.",
+      "p14/p15/p16: accessible names 'More', 'History', 'Edit Alex Morgan' and 'Getting started' exist so the screenshot states do not skip."
+    ],
+    "outOfScopeEdgeCases": [
+      "Router registration, wiring and route-walk inclusion of the new routers: v13-p12, run 3.",
+      "Full v13 leak matrix, E2E flows E1-E5, strict screenshots and live checks: v13-p17, run 3.",
+      "Deferred product areas: releases, environments, projects, Discover, Jira create, replay, performance and profiling."
+    ],
+    "sourcePaths": [
+      "impl-plans/conventions.md",
+      "impl-plans/README.md",
+      "design-docs/specs/design-v1-3-sentry-parity.md",
+      "src/telescreen/api/routers/issues.py",
+      "src/telescreen/api/routers/issues_common.py",
+      "src/telescreen/api/routers/issue_triage.py",
+      "src/telescreen/issues/archive.py",
+      "src/telescreen/issues/query/period.py",
+      "src/telescreen/issues/query/select.py",
+      "src/web/src/api/client.ts",
+      "src/web/src/api/types.ts",
+      "src/web/src/api/mock/router.ts",
+      "src/web/src/pages/issues/IssueList.tsx",
+      "src/web/scripts/screenshots.ts"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "v13-p08-alerts-backend",
+      "planPath": "impl-plans/active/v13-p08-alerts-backend.md",
+      "wave": 2,
+      "mode": "implement",
+      "dependsOn": ["v13-p01-foundation", "v13-p02-db"],
+      "writePaths": [
+        "impl-plans/active/v13-p08-alerts-backend.md",
+        "src/telescreen/alerts",
+        "src/telescreen/workflow/triggers",
+        "src/telescreen/api/routers/workflows.py",
+        "src/telescreen/api/routers/alerts.py",
+        "tests/alerts",
+        "tests/workflow/v13"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "src/telescreen/api/routers/workflows.py", "intendedEdit": "Registered router: list items add trigger_events, active, last_run_at and runs_30d; WorkflowsRouterDeps gains only defaulted fields; NO new route, so the route walk and v12 RBAC inventory stay unchanged."},
+        {"path": "src/telescreen/workflow/triggers", "intendedEdit": "Add starter.py (WorkflowRunStarter implements RunStarter); WorkflowTriggerService public behavior unchanged."}
+      ],
+      "readOnlySharedPaths": [
+        "tests/workflow/engine",
+        "tests/core/test_v11_foundation.py",
+        "tests/e2e/test_route_permissions.py",
+        "tests/e2e/test_api_routes.py",
+        "tests/api/v12_rbac",
+        "tests/e2e/test_flow_v12_notifications.py",
+        "tests/examples/test_examples.py",
+        "tests/leak",
+        "tests/notifications",
+        "tests/db/test_models.py"
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "AlertEvaluator satisfies IssueEventSink and FindingsObserver and WorkflowRunStarter satisfies RunStarter (ty check); telescreen.alerts imports no telescreen.issues or telescreen.notifications module.",
+        "Validation (field paths and codes only), D19 duplicate_trigger, D21 one suppressed_interval or muted row per window, archived and merged-child exclusions, blocked and failed outcomes, and the 90-day fire retention each have a named test.",
+        "Each alerts route has exactly one permission dependency (ALERTS_READ, ALERTS_MUTE or ALERTS_WRITE) asserted over the built router; workflows.py adds no route.",
+        "A rule name with a sample secret returns 422 with no row; the raw sample is absent from alert_rules, alert_fires, queued notification requests and responses.",
+        "Read-only shared suites pass unchanged; every Completion Criteria box ticked; Progress Log with hashes and command evidence."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/alerts src/telescreen/workflow/triggers src/telescreen/api/routers/alerts.py src/telescreen/api/routers/workflows.py tests/alerts tests/workflow/v13",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/alerts src/telescreen/workflow/triggers src/telescreen/api/routers/alerts.py src/telescreen/api/routers/workflows.py tests/alerts tests/workflow/v13",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/alerts src/telescreen/workflow/triggers src/telescreen/api/routers/alerts.py src/telescreen/api/routers/workflows.py tests/alerts tests/workflow/v13",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p08-typelint.log 2>&1; ! grep -E '^(src/telescreen/(alerts|workflow/triggers)/|src/telescreen/api/routers/(alerts|workflows)[.]py|tests/(alerts|workflow/v13)/)' /tmp/telescreen-v13-p08-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/alerts tests/workflow tests/core/test_v11_foundation.py 2>&1 | tee /tmp/telescreen-v13-p08-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/e2e/test_route_permissions.py tests/e2e/test_api_routes.py tests/api/v12_rbac tests/e2e/test_flow_v12_notifications.py tests/examples/test_examples.py tests/leak/test_leak_matrix.py tests/leak/test_leak_matrix_v12.py 2>&1 | tee /tmp/telescreen-v13-p08-pytest-shared.log",
+        "wc -l src/telescreen/alerts/*.py src/telescreen/workflow/triggers/*.py src/telescreen/api/routers/alerts.py src/telescreen/api/routers/workflows.py > /tmp/telescreen-v13-p08-wc.log; ! awk '$2 != \"total\" && $1 >= 1000' /tmp/telescreen-v13-p08-wc.log | grep -q .",
+        "test -z \"$(git diff --name-only HEAD -- pyproject.toml uv.lock src/telescreen/db tests/db tests/leak tests/notifications tests/e2e tests/examples tests/workflow/engine tests/core tests/api/v12_rbac/rbac_world.py tools/typelint.py)\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v13-p08-alerts-backend.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v13-p11-directory-ownership-backend",
+      "planPath": "impl-plans/active/v13-p11-directory-ownership-backend.md",
+      "wave": 2,
+      "mode": "implement",
+      "dependsOn": ["v13-p01-foundation", "v13-p02-db"],
+      "writePaths": [
+        "impl-plans/active/v13-p11-directory-ownership-backend.md",
+        "src/telescreen/directory",
+        "src/telescreen/issues/routing.py",
+        "src/telescreen/issues/ownership.py",
+        "src/telescreen/api/routers/directory.py",
+        "src/telescreen/api/routers/users.py",
+        "src/telescreen/api/routers/ownership.py",
+        "tests/directory/v13",
+        "tests/issues/v13_ownership",
+        "tests/api/v12_rbac/test_v12_rbac_router_permissions.py"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "tests/api/v12_rbac/test_v12_rbac_router_permissions.py", "intendedEdit": "Sole run-2 owner (exact per-module inventory). Add one RouteRule per new route in directory and users only; never weaken or remove an existing row."},
+        {"path": "src/telescreen/issues/routing.py", "intendedEdit": "IssueOwnerRouter.route inserts the first matching ownership-rule team between the owner member and decision.owner_team; signature and constructor unchanged (defaulted fields only); with no rules the output is byte-identical."},
+        {"path": "src/telescreen/api/routers/directory.py", "intendedEdit": "Registered router: add PATCH /api/members/{handle} (DIRECTORY_WRITE) and POST deactivate/reactivate (USERS_WRITE), each with exactly one permission marker."},
+        {"path": "src/telescreen/api/routers/users.py", "intendedEdit": "Registered router: add GET/POST /api/auth/me/tokens and POST /api/auth/me/tokens/{token_id}/revoke (PROFILE_SELF, member principal required), each with exactly one permission marker."}
+      ],
+      "readOnlySharedPaths": [
+        "tests/api/v12_rbac/rbac_world.py",
+        "tests/directory/v12",
+        "tests/directory/test_v11_identities.py",
+        "tests/api/v12_routers",
+        "tests/issues/test_issues.py",
+        "tests/issues/v11_record",
+        "tests/e2e/harness.py",
+        "tests/e2e/test_route_permissions.py",
+        "tests/e2e/test_api_routes.py",
+        "tests/e2e/test_flow_ingest.py",
+        "tests/e2e/test_flow_v11_owner_health.py",
+        "tests/e2e/test_flow_v11_policy.py",
+        "tests/e2e/test_flow_v12_identity.py",
+        "tests/e2e/test_wiring_v11.py",
+        "tests/leak",
+        "tests/notifications",
+        "tests/db/test_models.py"
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "DirectoryActorDirectory satisfies ActorDirectory and OwnershipAssigneeSuggester satisfies AssigneeSuggester (ty check); display() keeps input length and order and never raises for unknown refs.",
+        "The last-admin rule covers deactivation (409 last_admin); deactivation releases open (UNRESOLVED_STATUSES or archived) issues through IssueRemediation.release_to_team and leaves resolved issues untouched.",
+        "Self tokens are bound to the caller, scopes limited by role, list/revoke own only (other member's id -> 404); member edit and ownership patterns/locators with a sample secret -> 422 with no row and no echo; audits hold field names and ids only.",
+        "RouteRule rows exist for every new directory and users route and tests/api/v12_rbac passes; ownership.py routes each declare exactly one permission (asserted over the built router); the read-only shared suites pass unchanged.",
+        "Every Completion Criteria box ticked; Progress Log with hashes and command evidence."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/directory src/telescreen/issues/routing.py src/telescreen/issues/ownership.py src/telescreen/api/routers/directory.py src/telescreen/api/routers/users.py src/telescreen/api/routers/ownership.py tests/directory/v13 tests/issues/v13_ownership tests/api/v12_rbac/test_v12_rbac_router_permissions.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/directory src/telescreen/issues/routing.py src/telescreen/issues/ownership.py src/telescreen/api/routers/directory.py src/telescreen/api/routers/users.py src/telescreen/api/routers/ownership.py tests/directory/v13 tests/issues/v13_ownership tests/api/v12_rbac/test_v12_rbac_router_permissions.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/directory src/telescreen/issues/routing.py src/telescreen/issues/ownership.py src/telescreen/api/routers/directory.py src/telescreen/api/routers/users.py src/telescreen/api/routers/ownership.py tests/directory/v13 tests/issues/v13_ownership tests/api/v12_rbac/test_v12_rbac_router_permissions.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p11-typelint.log 2>&1; ! grep -E '^(src/telescreen/directory/|src/telescreen/issues/(routing|ownership)[.]py|src/telescreen/api/routers/(directory|users|ownership)[.]py|tests/(directory/v13|issues/v13_ownership)/|tests/api/v12_rbac/test_v12_rbac_router_permissions[.]py)' /tmp/telescreen-v13-p11-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/directory tests/issues/v13_ownership tests/api/v12_rbac tests/api/v12_routers tests/issues/v11_record tests/issues/test_issues.py 2>&1 | tee /tmp/telescreen-v13-p11-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/e2e/test_route_permissions.py tests/e2e/test_api_routes.py tests/e2e/test_flow_ingest.py tests/e2e/test_flow_v11_owner_health.py tests/e2e/test_flow_v11_policy.py tests/e2e/test_flow_v12_identity.py tests/e2e/test_wiring_v11.py tests/leak/test_leak_matrix_v11.py 2>&1 | tee /tmp/telescreen-v13-p11-pytest-shared.log",
+        "wc -l src/telescreen/directory/*.py src/telescreen/issues/routing.py src/telescreen/issues/ownership.py src/telescreen/api/routers/directory.py src/telescreen/api/routers/users.py src/telescreen/api/routers/ownership.py > /tmp/telescreen-v13-p11-wc.log; ! awk '$2 != \"total\" && $1 >= 1000' /tmp/telescreen-v13-p11-wc.log | grep -q .",
+        "test -z \"$(git diff --name-only HEAD -- pyproject.toml uv.lock src/telescreen/db tests/db tests/leak tests/notifications tests/e2e tests/api/v12_rbac/rbac_world.py tools/typelint.py)\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v13-p11-directory-ownership-backend.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v13-p15-ui-alerts-profile",
+      "planPath": "impl-plans/active/v13-p15-ui-alerts-profile.md",
+      "wave": 2,
+      "mode": "implement",
+      "dependsOn": ["v13-p03-ui-foundation"],
+      "writePaths": [
+        "impl-plans/active/v13-p15-ui-alerts-profile.md",
+        "src/web/src/pages/alerts",
+        "src/web/src/pages/profile"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "src/web/src/pages/profile", "intendedEdit": "Create ProfilePage.tsx with the default export ProfilePage; v13-p16 loads it lazily by import.meta.glob for /settings/profile, so keep the file name and export exactly."}
+      ],
+      "readOnlySharedPaths": [
+        "src/web/src/api",
+        "src/web/src/components",
+        "src/web/src/routes.tsx",
+        "src/web/scripts/screenshots.ts",
+        "src/web/src/pages/settings",
+        "src/web/package.json",
+        "src/web/bun.lock"
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Alerts list, editor (validate before save, inline {field, code} errors, no echoed values) and history, and the profile page (settings matrix with 'As configured' -> stored null, my tokens with a once-shown secret, default view, theme) per design-ui-sentry.md section 11.2.",
+        "Permission-aware actions tested (viewer: no 'New alert rule'; responder: Mute but not Edit); the alert detail exposes a tab named exactly 'History' (tested).",
+        "No edits outside pages/alerts and pages/profile; no new npm package; typecheck, the whole vitest suite and build pass.",
+        "Every Completion Criteria box ticked; Progress Log with hashes and command evidence."
+      ],
+      "verification": [
+        "set -o pipefail; cd src/web && bun install --frozen-lockfile > /tmp/telescreen-v13-p15-install.log 2>&1",
+        "set -o pipefail; cd src/web && bun run typecheck 2>&1 | tee /tmp/telescreen-v13-p15-typecheck.log",
+        "set -o pipefail; cd src/web && bun run test 2>&1 | tee /tmp/telescreen-v13-p15-test.log",
+        "set -o pipefail; cd src/web && bun run build --outDir /tmp/telescreen-v13-p15-web --emptyOutDir 2>&1 | tee /tmp/telescreen-v13-p15-build.log",
+        "test -z \"$(git diff --name-only HEAD -- src/web/src/api src/web/src/components src/web/src/routes.tsx src/web/package.json src/web/bun.lock)\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v13-p15-ui-alerts-profile.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v13-p16-ui-dashboard-org",
+      "planPath": "impl-plans/active/v13-p16-ui-dashboard-org.md",
+      "wave": 2,
+      "mode": "implement",
+      "dependsOn": ["v13-p03-ui-foundation"],
+      "writePaths": [
+        "impl-plans/active/v13-p16-ui-dashboard-org.md",
+        "src/web/src/pages/dashboard",
+        "src/web/src/pages/settings",
+        "src/web/src/pages/workflows",
+        "src/web/scripts/screenshots.ts"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "src/web/scripts/screenshots.ts", "intendedEdit": "Sole run-2 editor (design section 15). Change ONLY the member-edit action name 'Edit Alex' -> 'Edit Alex Morgan'; every other state, selector and the TELESCREEN_SCREENSHOTS_STRICT handling stay byte-identical."},
+        {"path": "src/web/src/pages/settings", "intendedEdit": "Owns the existing settings page tests (index.test.tsx, UsersRoles.test.tsx, Templates*.test.tsx); change an assertion only when this plan's accepted change breaks it, with the reason in the Progress Log."},
+        {"path": "src/web/src/pages/workflows", "intendedEdit": "Owns the existing workflow page tests (graph.test.ts, NotificationSets.test.tsx, WorkflowEditor.test.tsx); same rule."}
+      ],
+      "readOnlySharedPaths": [
+        "src/web/src/api",
+        "src/web/src/components",
+        "src/web/src/routes.tsx",
+        "src/web/src/pages/alerts",
+        "src/web/src/pages/profile",
+        "src/web/package.json",
+        "src/web/bun.lock"
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Dashboard (period default 14d, SVG bars, tiles linking to stream queries, MTTR/MTTA '-' when null), onboarding checklist (hidden items without read permission; dismissal in localStorage telescreen.onboarding.dismissed), integrations, admin tokens, ownership rules (reorder, test box, generic 422 message), member edit/deactivate (inline last_admin) and the enriched workflows list per design-ui-sentry.md section 11.2.",
+        "Users and roles Edit buttons are named 'Edit <display_name>' ('Edit Alex Morgan' tested) and the dashboard has a button named exactly 'Getting started' (tested); /settings/profile loads p15's ProfilePage via import.meta.glob with an Unavailable fallback.",
+        "screenshots.ts diff is exactly the one member-edit action name; the screenshot run reports 0 browser errors and no state-skipped line for member-edit or onboarding (a missing browser is a recorded gap, not a pass).",
+        "No new npm package; typecheck, the whole vitest suite and build pass; every Completion Criteria box ticked; Progress Log with hashes and command evidence."
+      ],
+      "verification": [
+        "set -o pipefail; cd src/web && bun install --frozen-lockfile > /tmp/telescreen-v13-p16-install.log 2>&1",
+        "set -o pipefail; cd src/web && bun run typecheck 2>&1 | tee /tmp/telescreen-v13-p16-typecheck.log",
+        "set -o pipefail; cd src/web && bun run test 2>&1 | tee /tmp/telescreen-v13-p16-test.log",
+        "set -o pipefail; cd src/web && bun run build --outDir /tmp/telescreen-v13-p16-web --emptyOutDir 2>&1 | tee /tmp/telescreen-v13-p16-build.log",
+        "set -o pipefail; cd src/web && bun run screenshots 2>&1 | tee /tmp/telescreen-v13-p16-shots.log",
+        "! grep -E '^state-skipped: (member-edit|onboarding)$' /tmp/telescreen-v13-p16-shots.log",
+        "test \"$(git diff --numstat HEAD -- src/web/scripts/screenshots.ts | awk '{print $1\"/\"$2}')\" = \"1/1\"",
+        "test -z \"$(git diff --name-only HEAD -- src/web/src/api src/web/src/components src/web/src/routes.tsx src/web/package.json src/web/bun.lock)\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v13-p16-ui-dashboard-org.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v13-p06-bulk-merge-backend",
+      "planPath": "impl-plans/active/v13-p06-bulk-merge-backend.md",
+      "wave": 3,
+      "mode": "implement",
+      "dependsOn": ["v13-p03-ui-foundation", "v13-p04-issue-stream-backend", "v13-p05-triage-lifecycle-backend", "v13-p13-ui-stream", "v13-p08-alerts-backend", "v13-p11-directory-ownership-backend", "v13-p15-ui-alerts-profile", "v13-p16-ui-dashboard-org"],
+      "writePaths": [
+        "impl-plans/active/v13-p06-bulk-merge-backend.md",
+        "src/telescreen/issues/bulk.py",
+        "src/telescreen/issues/merge.py",
+        "src/telescreen/api/routers/issue_bulk.py",
+        "tests/issues/v13_bulk",
+        "src/web/src/api/client.ts",
+        "src/web/src/api/mock/router.ts",
+        "src/web/src/api/mock/mock.test.ts",
+        "src/web/src/pages/issues/IssueList.tsx",
+        "src/web/src/pages/issues/IssueList.test.tsx"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "src/web/src/api/client.ts", "intendedEdit": "Created by v13-p03. Sole wave-3 editor. Edit ONLY issuesApi.bulk: add optional start/end forwarded when defined (INT-W2-04)."},
+        {"path": "src/web/src/api/mock/router.ts", "intendedEdit": "Created by v13-p03. Sole wave-3 editor. Edit ONLY the /api/issues/bulk handler: honor start/end, reject archive without kind (422 validation_error), for_duration -> now + duration, other kinds -> now + 90 days, until_escalating threshold null. Must keep tests/leak/test_ui_fixtures.py passing (no sample secret literal)."},
+        {"path": "src/web/src/api/mock/mock.test.ts", "intendedEdit": "Created by v13-p03. Add bulk until_escalating, missing-kind and custom-window tests only."},
+        {"path": "src/web/src/pages/issues/IssueList.tsx", "intendedEdit": "Created by v13-p13. Edit ONLY runBulk (spread start/end when period is custom, as listRequest does) and remediate (all-matching -> runBulk request_verification {verification: {action: remove, include_linked: false}}); merge and start-workflow finite-selection guards unchanged."},
+        {"path": "src/web/src/pages/issues/IssueList.test.tsx", "intendedEdit": "Replace 'keeps remediation selection-only when all matching issues are selected' with the INT-W2-05 bulk test; add the INT-W2-04 custom-period bulk test; keep the merge finite-selection assertion."}
+      ],
+      "readOnlySharedPaths": [
+        "src/telescreen/issues/query",
+        "src/telescreen/issues/archive.py",
+        "src/telescreen/issues/groups.py",
+        "src/telescreen/issues/service.py",
+        "src/telescreen/issues/lifecycle.py",
+        "src/telescreen/api/routers/issues_common.py",
+        "tests/issues/v13_lifecycle",
+        "tests/issues/v13_query",
+        "tests/leak/test_ui_fixtures.py",
+        "src/web/src/api/types.ts",
+        "src/web/src/api/mock/fixtures",
+        "src/web/src/pages/issues/ArchiveMenu.tsx",
+        "src/web/src/pages/issues/IssueBulkActions.tsx",
+        "src/web/scripts/screenshots.ts"
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "BulkService runs each issue in its own transaction through the single-issue service methods; params and period are validated once before any change (422, nothing changed); one issue.bulk audit with counts only; manual_unverified without ISSUES_RESOLVE_UNVERIFIED -> 403; 1002 matching -> processed 1000 and truncated.",
+        "INT-W2-04 (custom start/end scope equals GET /api/issues; custom without start/end -> 422), INT-W2-05 (query-mode request_verification) and archive parsing (until_escalating stored with archived_at + 90 days; with duration -> 422; missing kind -> 422) each have a Python regression test whose docstring names the item.",
+        "Merge and unmerge per design 6.2 with D13 preconditions; safety rule 5 tests (no escalation, archive_until unchanged, no issue_escalating event in the transaction; later findings still escalate).",
+        "UI: all-matching Mark remediated posts one bulk request_verification body; custom-period all-matching bulk posts start/end; mock bulk handler regressions pass; 'Remediation requires a finite selected set' no longer in IssueList.tsx; merge stays finite-selection only.",
+        "Each of the three routes declares exactly one permission (ISSUES_WRITE) asserted over the built router; no include_router in source; types.ts, mock fixtures and screenshots.ts unchanged; every Completion Criteria box ticked; Progress Log with hashes and command evidence."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/issues/bulk.py src/telescreen/issues/merge.py src/telescreen/api/routers/issue_bulk.py tests/issues/v13_bulk",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/issues/bulk.py src/telescreen/issues/merge.py src/telescreen/api/routers/issue_bulk.py tests/issues/v13_bulk",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/issues/bulk.py src/telescreen/issues/merge.py src/telescreen/api/routers/issue_bulk.py tests/issues/v13_bulk",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p06-typelint.log 2>&1; ! grep -E '^(src/telescreen/issues/(bulk|merge)[.]py|src/telescreen/api/routers/issue_bulk[.]py|tests/issues/v13_bulk/)' /tmp/telescreen-v13-p06-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/issues/v13_bulk tests/issues/v13_lifecycle tests/issues/v13_query tests/leak/test_ui_fixtures.py 2>&1 | tee /tmp/telescreen-v13-p06-pytest.log",
+        "set -o pipefail; cd src/web && bun install --frozen-lockfile > /tmp/telescreen-v13-p06-install.log 2>&1",
+        "set -o pipefail; cd src/web && bun run typecheck 2>&1 | tee /tmp/telescreen-v13-p06-typecheck.log",
+        "set -o pipefail; cd src/web && bun run test 2>&1 | tee /tmp/telescreen-v13-p06-test.log",
+        "set -o pipefail; cd src/web && bun run build --outDir /tmp/telescreen-v13-p06-web --emptyOutDir 2>&1 | tee /tmp/telescreen-v13-p06-build.log",
+        "! grep -n 'Remediation requires a finite selected set' src/web/src/pages/issues/IssueList.tsx",
+        "! grep -n 'include_router' src/telescreen/api/routers/issue_bulk.py",
+        "wc -l src/telescreen/issues/bulk.py src/telescreen/issues/merge.py src/telescreen/api/routers/issue_bulk.py > /tmp/telescreen-v13-p06-wc.log; ! awk '$2 != \"total\" && $1 >= 1000' /tmp/telescreen-v13-p06-wc.log | grep -q .",
+        "test -z \"$(git diff --name-only HEAD -- src/web/src/api/types.ts src/web/src/api/mock/fixtures src/web/package.json src/web/bun.lock pyproject.toml uv.lock tests/leak tests/db src/telescreen/issues/archive.py src/telescreen/issues/groups.py src/telescreen/issues/query)\"",
+        "test -z \"$(git diff --numstat HEAD -- src/web/scripts/screenshots.ts | awk '$1 != 1 || $2 != 1')\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v13-p06-bulk-merge-backend.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v13-p07-issue-detail-backend",
+      "planPath": "impl-plans/active/v13-p07-issue-detail-backend.md",
+      "wave": 3,
+      "mode": "implement",
+      "dependsOn": ["v13-p01-foundation", "v13-p02-db", "v13-p04-issue-stream-backend", "v13-p08-alerts-backend", "v13-p11-directory-ownership-backend", "v13-p15-ui-alerts-profile", "v13-p16-ui-dashboard-org"],
+      "writePaths": [
+        "impl-plans/active/v13-p07-issue-detail-backend.md",
+        "src/telescreen/issues/detail",
+        "src/telescreen/issues/activity",
+        "src/telescreen/issues/external",
+        "src/telescreen/api/routers/issue_events.py",
+        "src/telescreen/api/routers/issue_activity.py",
+        "src/telescreen/api/routers/issue_external.py",
+        "tests/issues/v13_detail",
+        "tests/api/v13_detail",
+        "tests/issues/test_issues.py",
+        "tests/issues/test_issues_api.py",
+        "tests/api/v11_issues/test_issues_router.py",
+        "tests/e2e/test_flow_ingest.py"
+      ],
+      "sharedPaths": [
+        "src/telescreen/api/routers/issues_detail.py",
+        "src/telescreen/api/routers/issues_comments.py"
+      ],
+      "sharedPathNotes": [
+        {"path": "src/telescreen/api/routers/issues_detail.py", "intendedEdit": "Created by v13-p01; sole run-2 editor. GET /api/issues/{id} passes p04's issue_item_extras to _issue_json (B4) and appends subscription, merged_into, merged_children, suggested_assignees; GET /events adds order=asc|desc and issue_short_id over the group. No new route (registered module in the RBAC inventory)."},
+        {"path": "src/telescreen/api/routers/issues_comments.py", "intendedEdit": "Created by v13-p01; sole run-2 editor. The existing POST uses CommentService.create with the same path, permission and 201 response. No new route."},
+        {"path": "tests/issues/test_issues.py", "intendedEdit": "Owned in wave 3 (p05 owned it in run 1). Expected to pass unchanged; edit only an assertion that the D14 comment model breaks, with the reason in the Progress Log; never weaken assert_no_leaks."},
+        {"path": "tests/issues/test_issues_api.py", "intendedEdit": "Owned in wave 3 (p04 owned it in run 1). Events paging must pass unchanged with the default order=desc."},
+        {"path": "tests/api/v11_issues/test_issues_router.py", "intendedEdit": "Owned in wave 3 (p04 owned it in run 1). Safe-detail assertions must pass unchanged; assert only presence of p07 fields, never the full key set."},
+        {"path": "tests/e2e/test_flow_ingest.py", "intendedEdit": "Owned in wave 3 (p05 owned it in run 1). Events of an ingested issue must stay masked; expected unchanged."}
+      ],
+      "readOnlySharedPaths": [
+        "src/telescreen/api/routers/issues_common.py",
+        "src/telescreen/api/routers/issues.py",
+        "src/telescreen/issues/service.py",
+        "src/telescreen/issues/lifecycle.py",
+        "tests/e2e/test_route_permissions.py",
+        "tests/e2e/test_api_routes.py",
+        "tests/api/v12_rbac",
+        "tests/leak",
+        "tests/notifications",
+        "tests/db/test_models.py"
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "B1 (chronological oldest/latest, previous = older), B4 (assignee display name via ActorDirectory), B6 (persisted activity with actor displays) and B7 (120 findings counted in total, tags and stats) regression tests pass; each docstring names the defect.",
+        "Comments redacted before storage and mention parsing; edit/delete owner or comments.manage_any else 403; only newly added mentions notify (max 10); manual unsubscribe never overridden; SubscriptionActivityNotifier satisfies IssueActivityNotifier (ty check).",
+        "External links: https only, no userinfo, <= 2048, Redactor hit -> 422 with no row and no echo; GitHub create body from masked allow-listed fields only, DLP block -> 422 dlp_blocked with no HTTP call, unconfigured -> 503.",
+        "Every new route declares exactly one permission (asserted over the built routers); no route added to issues_detail.py or issues_comments.py; the owned and read-only shared suites pass.",
+        "Every Completion Criteria box ticked; Progress Log with hashes and command evidence."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/issues/detail src/telescreen/issues/activity src/telescreen/issues/external src/telescreen/api/routers/issues_detail.py src/telescreen/api/routers/issues_comments.py src/telescreen/api/routers/issue_events.py src/telescreen/api/routers/issue_activity.py src/telescreen/api/routers/issue_external.py tests/issues/v13_detail tests/api/v13_detail tests/issues/test_issues.py tests/issues/test_issues_api.py tests/api/v11_issues/test_issues_router.py tests/e2e/test_flow_ingest.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/issues/detail src/telescreen/issues/activity src/telescreen/issues/external src/telescreen/api/routers/issues_detail.py src/telescreen/api/routers/issues_comments.py src/telescreen/api/routers/issue_events.py src/telescreen/api/routers/issue_activity.py src/telescreen/api/routers/issue_external.py tests/issues/v13_detail tests/api/v13_detail tests/issues/test_issues.py tests/issues/test_issues_api.py tests/api/v11_issues/test_issues_router.py tests/e2e/test_flow_ingest.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/issues/detail src/telescreen/issues/activity src/telescreen/issues/external src/telescreen/api/routers/issues_detail.py src/telescreen/api/routers/issues_comments.py src/telescreen/api/routers/issue_events.py src/telescreen/api/routers/issue_activity.py src/telescreen/api/routers/issue_external.py tests/issues/v13_detail tests/api/v13_detail tests/issues/test_issues.py tests/issues/test_issues_api.py tests/api/v11_issues/test_issues_router.py tests/e2e/test_flow_ingest.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p07-typelint.log 2>&1; ! grep -E '^(src/telescreen/issues/(detail|activity|external)/|src/telescreen/api/routers/(issues_detail|issues_comments|issue_events|issue_activity|issue_external)[.]py|tests/(issues/v13_detail|api/v13_detail)/|tests/issues/test_issues(_api)?[.]py|tests/api/v11_issues/test_issues_router[.]py|tests/e2e/test_flow_ingest[.]py)' /tmp/telescreen-v13-p07-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/issues/v13_detail tests/api/v13_detail tests/api/v11_issues tests/issues/test_issues_api.py tests/issues/test_issues.py tests/e2e/test_flow_ingest.py 2>&1 | tee /tmp/telescreen-v13-p07-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/e2e/test_route_permissions.py tests/e2e/test_api_routes.py tests/api/v12_rbac tests/leak 2>&1 | tee /tmp/telescreen-v13-p07-pytest-shared.log",
+        "wc -l src/telescreen/issues/detail/*.py src/telescreen/issues/activity/*.py src/telescreen/issues/external/*.py src/telescreen/api/routers/issues_detail.py src/telescreen/api/routers/issues_comments.py src/telescreen/api/routers/issue_events.py src/telescreen/api/routers/issue_activity.py src/telescreen/api/routers/issue_external.py > /tmp/telescreen-v13-p07-wc.log; ! awk '$2 != \"total\" && $1 >= 1000' /tmp/telescreen-v13-p07-wc.log | grep -q .",
+        "test -z \"$(git diff --name-only HEAD -- pyproject.toml uv.lock src/telescreen/db src/telescreen/api/routers/issues_common.py src/telescreen/issues/service.py src/telescreen/issues/lifecycle.py tests/leak tests/db tests/notifications tools/typelint.py)\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v13-p07-issue-detail-backend.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v13-p10-dashboard-integrations-backend",
+      "planPath": "impl-plans/active/v13-p10-dashboard-integrations-backend.md",
+      "wave": 3,
+      "mode": "implement",
+      "dependsOn": ["v13-p01-foundation", "v13-p02-db", "v13-p04-issue-stream-backend", "v13-p08-alerts-backend", "v13-p11-directory-ownership-backend", "v13-p15-ui-alerts-profile", "v13-p16-ui-dashboard-org"],
+      "writePaths": [
+        "impl-plans/active/v13-p10-dashboard-integrations-backend.md",
+        "src/telescreen/issues/dashboard.py",
+        "src/telescreen/integrations",
+        "src/telescreen/api/routers/dashboard.py",
+        "src/telescreen/api/routers/integrations.py",
+        "tests/issues/v13_dashboard",
+        "tests/integrations"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "readOnlySharedPaths": [
+        "src/telescreen/issues/query/period.py",
+        "src/telescreen/ports/issues.py",
+        "src/telescreen/notifications/weekly.py",
+        "tests/notifications",
+        "tests/e2e/test_route_permissions.py",
+        "tests/e2e/test_api_routes.py",
+        "tests/api/v12_rbac",
+        "tests/leak",
+        "tests/db/test_models.py"
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "DashboardService per design 11 (open = UNRESOLVED_STATUSES, merged children excluded, null means with no data, masked display_title only); IssueReportSourceImpl satisfies IssueReportSource (ty check).",
+        "IntegrationStatusService and IntegrationTester per design 12 with booleans, timestamps and enum codes only; a test asserts specific configured token, host, email and secret-ref values are absent from responses; unconfigured -> 503; viewer GET -> 403.",
+        "Each route declares exactly one permission (ISSUES_READ, INTEGRATIONS_READ or INTEGRATIONS_TEST) asserted over the built routers; no include_router in source.",
+        "Every Completion Criteria box ticked; Progress Log with hashes and command evidence."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/issues/dashboard.py src/telescreen/integrations src/telescreen/api/routers/dashboard.py src/telescreen/api/routers/integrations.py tests/issues/v13_dashboard tests/integrations",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/issues/dashboard.py src/telescreen/integrations src/telescreen/api/routers/dashboard.py src/telescreen/api/routers/integrations.py tests/issues/v13_dashboard tests/integrations",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/issues/dashboard.py src/telescreen/integrations src/telescreen/api/routers/dashboard.py src/telescreen/api/routers/integrations.py tests/issues/v13_dashboard tests/integrations",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p10-typelint.log 2>&1; ! grep -E '^(src/telescreen/issues/dashboard[.]py|src/telescreen/integrations/|src/telescreen/api/routers/(dashboard|integrations)[.]py|tests/(issues/v13_dashboard|integrations)/)' /tmp/telescreen-v13-p10-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/issues/v13_dashboard tests/integrations tests/notifications/v13 2>&1 | tee /tmp/telescreen-v13-p10-pytest.log",
+        "wc -l src/telescreen/issues/dashboard.py src/telescreen/integrations/*.py src/telescreen/api/routers/dashboard.py src/telescreen/api/routers/integrations.py > /tmp/telescreen-v13-p10-wc.log; ! awk '$2 != \"total\" && $1 >= 1000' /tmp/telescreen-v13-p10-wc.log | grep -q .",
+        "test -z \"$(git diff --name-only HEAD -- pyproject.toml uv.lock src/telescreen/db src/telescreen/ports src/telescreen/notifications tests/leak tests/db tests/notifications tools/typelint.py)\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v13-p10-dashboard-integrations-backend.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v13-p14-ui-detail",
+      "planPath": "impl-plans/active/v13-p14-ui-detail.md",
+      "wave": 3,
+      "mode": "implement",
+      "dependsOn": ["v13-p03-ui-foundation", "v13-p13-ui-stream", "v13-p08-alerts-backend", "v13-p11-directory-ownership-backend", "v13-p15-ui-alerts-profile", "v13-p16-ui-dashboard-org"],
+      "writePaths": [
+        "impl-plans/active/v13-p14-ui-detail.md",
+        "src/web/src/pages/issues/detail",
+        "src/web/src/pages/issues/IssueDetail.tsx",
+        "src/web/src/pages/issues/IssueDetail.test.tsx",
+        "src/web/src/pages/issues/issue-detail.css",
+        "src/web/src/pages/issues/uploadEvidence.ts"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "src/web/src/pages/issues/IssueDetail.test.tsx", "intendedEdit": "Owned test of the changed page; update the existing stubs for the new endpoints (stats, tags, activity, selector) and add the B1/B4/B6/B7 and 'More' button tests."}
+      ],
+      "readOnlySharedPaths": [
+        "src/web/src/api",
+        "src/web/src/components",
+        "src/web/src/routes.tsx",
+        "src/web/scripts/screenshots.ts",
+        "src/web/src/pages/issues/ArchiveMenu.tsx",
+        "src/web/src/pages/issues/IssueList.tsx",
+        "src/web/src/pages/issues/IssueList.test.tsx",
+        "src/web/src/pages/issues/IssueBulkActions.tsx",
+        "src/web/package.json",
+        "src/web/bun.lock"
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "B1 (selector endpoints, Previous = older), B4 (display names with Avatar), B6 (activity refetch, no local echo) and B7 (chart from /stats, tags from /tags) UI regression tests pass; grep for eventGraph, tagCounts and setComments in src/web/src/pages/issues prints nothing.",
+        "Header (resolve split, ArchiveMenu imported read-only, assignee picker with suggestions, priority, bookmark/subscribe, a button named exactly 'More'), sections (chart, tags, navigation 'n of total', merged banner and Unmerge, external issues dialogs) and sidebar (activity, comment edit/delete only when can_edit, @ autocomplete) per design-ui-sentry.md section 11.2.",
+        "Screenshot run reports 0 browser errors and no state-skipped line for issue-merged-primary or issue-merged-child (a missing browser is a recorded gap, not a pass).",
+        "No edits in api/**, components/** or the stream files; no new npm package; typecheck, the whole vitest suite and build pass; every Completion Criteria box ticked; Progress Log with hashes and command evidence."
+      ],
+      "verification": [
+        "set -o pipefail; cd src/web && bun install --frozen-lockfile > /tmp/telescreen-v13-p14-install.log 2>&1",
+        "set -o pipefail; cd src/web && bun run typecheck 2>&1 | tee /tmp/telescreen-v13-p14-typecheck.log",
+        "set -o pipefail; cd src/web && bun run test 2>&1 | tee /tmp/telescreen-v13-p14-test.log",
+        "set -o pipefail; cd src/web && bun run build --outDir /tmp/telescreen-v13-p14-web --emptyOutDir 2>&1 | tee /tmp/telescreen-v13-p14-build.log",
+        "set -o pipefail; cd src/web && bun run screenshots 2>&1 | tee /tmp/telescreen-v13-p14-shots.log",
+        "! grep -E '^state-skipped: issue-merged-(primary|child)$' /tmp/telescreen-v13-p14-shots.log",
+        "! grep -rn -e 'eventGraph' -e 'tagCounts' -e 'setComments' src/web/src/pages/issues",
+        "test -z \"$(git diff --name-only HEAD -- src/web/src/components src/web/src/routes.tsx src/web/src/api/types.ts src/web/src/api/mock/fixtures src/web/src/pages/issues/ArchiveMenu.tsx src/web/package.json src/web/bun.lock)\"",
+        "test -z \"$(git diff --numstat HEAD -- src/web/scripts/screenshots.ts | awk '$1 != 1 || $2 != 1')\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v13-p14-ui-detail.md)\" -eq 0"
+      ]
+    }
+  ]
+}

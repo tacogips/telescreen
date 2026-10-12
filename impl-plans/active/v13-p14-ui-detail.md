@@ -9,7 +9,7 @@
 
 - planId: `v13-p14-ui-detail`
 - planPath: `impl-plans/active/v13-p14-ui-detail.md`
-- wave: 3
+- wave: 3 (run 2; Last Updated 2026-10-13 with the run-2 screenshot contract)
 - dependsOn: `v13-p03-ui-foundation`, `v13-p13-ui-stream` (for the read-only
   `ArchiveMenu.tsx`; p13 runs in run 1 and p14 in run 2)
 - writePaths:
@@ -107,6 +107,21 @@ Imitate the existing `IssueDetail.tsx` resource and `run()` refetch pattern and 
   disabled.
 - A merged child shows the banner link to the primary.
 
+- Screenshot contract (design section 15, run 2): the header's More menu trigger is a
+  `button` whose accessible name is exactly "More". Add a test that asserts
+  `getByRole("button", { name: "More" })` exists on the primary `v13-iss-01` and on the
+  child `v13-iss-02`.
+
+## Run-2 shared-file rules
+
+- Read-only in this run: `src/web/src/api/**` (client, types, mock router and fixtures),
+  `src/web/src/components/**`, `src/web/scripts/screenshots.ts`,
+  `src/web/src/pages/issues/{IssueList*,ArchiveMenu,IssueBulkActions,StreamViews*}` and
+  every other page directory. v13-p06 edits `client.ts`, the mock bulk handler and
+  `IssueList*` in the same wave.
+- This plan is the only wave-3 plan that runs `bun run screenshots`. Its own states are
+  `issue-merged-primary` and `issue-merged-child`.
+
 ## Verification
 
 ```bash
@@ -116,13 +131,27 @@ bun install --frozen-lockfile > /tmp/telescreen-v13-p14-install.log 2>&1; echo "
 bun run typecheck 2>&1 | tee /tmp/telescreen-v13-p14-typecheck.log; echo "exit=$?"
 bun run test 2>&1 | tee /tmp/telescreen-v13-p14-test.log; echo "exit=$?"
 bun run build --outDir /tmp/telescreen-v13-p14-web --emptyOutDir 2>&1 | tee /tmp/telescreen-v13-p14-build.log; echo "exit=$?"
+bun run screenshots 2>&1 | tee /tmp/telescreen-v13-p14-shots.log; echo "exit=$?"
+! grep -E '^state-skipped: issue-merged-(primary|child)$' /tmp/telescreen-v13-p14-shots.log
 ```
 
-Expected: each command exits 0, and the whole vitest suite passes.
+Expected:
+
+- each command exits 0, and the whole vitest suite passes;
+- the screenshot run reports 0 browser errors and does not skip the two detail states.
+
+A missing browser (`exit=2`, "No Chrome or Chromium browser found") is a recorded
+verification gap, never a pass. A vitest failure caused only by v13-p06's in-progress
+`IssueList*` or `api/**` edits is recorded as such.
 
 ## Completion Criteria
 
 - [ ] B1, B4, B6 and B7 UI regression tests pass.
+- [ ] The "More" button test passes, and the screenshot log has no `state-skipped:` line
+  for `issue-merged-primary` or `issue-merged-child`.
+- [ ] `git diff --name-only HEAD -- src/web/src/api src/web/src/components src/web/scripts/screenshots.ts src/web/package.json src/web/bun.lock`
+  is empty, apart from v13-p06's declared `api` files and v13-p16's one-line member-edit
+  name change in `screenshots.ts` (wave 2).
 - [ ] `grep -n "eventGraph\|tagCounts\|setComments" src/web/src/pages/issues` prints
   nothing.
 - [ ] The Progress Log has hashes and command evidence.

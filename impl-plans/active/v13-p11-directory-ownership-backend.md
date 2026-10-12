@@ -9,7 +9,7 @@
 
 - planId: `v13-p11-directory-ownership-backend`
 - planPath: `impl-plans/active/v13-p11-directory-ownership-backend.md`
-- wave: 2
+- wave: 2 (run 2; Last Updated 2026-10-13 with the run-2 shared-file rules)
 - dependsOn: `v13-p01-foundation`, `v13-p02-db`
 - writePaths:
   - `impl-plans/active/v13-p11-directory-ownership-backend.md`
@@ -21,8 +21,8 @@
   - `src/telescreen/api/routers/ownership.py`
   - `tests/directory/v13`
   - `tests/issues/v13_ownership`
-- sharedPaths:
   - `tests/api/v12_rbac/test_v12_rbac_router_permissions.py`
+- sharedPaths: none
 - sharedPathNotes:
   - `tests/api/v12_rbac/test_v12_rbac_router_permissions.py`: v13-p01 edited it in wave 1
     (issue module rename). This plan adds `RouteRule` rows only for its own new routes in
@@ -172,21 +172,50 @@ Imitate:
 API: the permission per route (a viewer can test rules but not create; a responder cannot
 deactivate). `tests/api/v12_rbac` passes with the new rows.
 
+## Run-2 shared-file rules (design section 15, run 2)
+
+- This plan is the only run-2 plan that adds routes to already registered modules
+  (`directory.py`, `users.py`). It is therefore the single run-2 owner of
+  `tests/api/v12_rbac/test_v12_rbac_router_permissions.py`, an exact per-module
+  inventory: add rows only. `tests/api/v12_rbac/rbac_world.py` is read-only.
+- Every new route carries exactly one permission marker, so
+  `tests/e2e/test_route_permissions.py` and `tests/e2e/test_api_routes.py` stay read-only
+  and must pass unchanged. `ownership.py` is a new, unregistered module, tested by
+  building the router directly. Never use `include_router` in source.
+- `IssueOwnerRouter.route` keeps its signature and constructor. Add defaulted fields
+  only. With no ownership rules, routing output must be byte-identical. Many existing
+  tests build it through `tests/e2e/harness.py` and `tests/leak/harness.py`, and these
+  stay read-only: `tests/issues/test_issues.py`, `tests/issues/v11_record/**`,
+  `tests/e2e/test_flow_ingest.py`, `tests/e2e/test_flow_v11_owner_health.py`,
+  `tests/e2e/test_flow_v11_policy.py`, `tests/e2e/test_wiring_v11.py` and
+  `tests/leak/test_leak_matrix_v11.py`.
+- `TokenService` changes are additive. `tests/directory/v12/**` is read-only.
+- No new table, migration or notification kind. `tests/db/test_models.py`,
+  `tests/notifications/**` and `tests/leak/**` are read-only.
+
 ## Verification
 
 Start every shell with `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1`.
 
 ```bash
-uv run --frozen ruff format --check --no-cache src/telescreen/directory src/telescreen/issues/routing.py src/telescreen/issues/ownership.py src/telescreen/api/routers/directory.py src/telescreen/api/routers/users.py src/telescreen/api/routers/ownership.py tests/directory/v13 tests/issues/v13_ownership tests/api/v12_rbac
-uv run --frozen ruff check --no-cache src/telescreen/directory src/telescreen/issues src/telescreen/api/routers tests/directory tests/issues/v13_ownership tests/api/v12_rbac
-uv run --frozen ty check src/telescreen/directory src/telescreen/issues src/telescreen/api/routers tests/directory tests/issues/v13_ownership tests/api/v12_rbac
-uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p11-typelint.log 2>&1; grep -E '^(src/telescreen/directory|src/telescreen/issues/(routing|ownership)|src/telescreen/api/routers/(directory|users|ownership)|tests/(directory/v13|issues/v13_ownership|api/v12_rbac))' /tmp/telescreen-v13-p11-typelint.log
-uv run --frozen pytest -p no:cacheprovider tests/directory tests/issues/v13_ownership tests/api/v12_rbac tests/api/v12_routers tests/issues/v11_record 2>&1 | tee /tmp/telescreen-v13-p11-pytest.log; echo "exit=$?"
+uv run --frozen ruff format --check --no-cache src/telescreen/directory src/telescreen/issues/routing.py src/telescreen/issues/ownership.py src/telescreen/api/routers/directory.py src/telescreen/api/routers/users.py src/telescreen/api/routers/ownership.py tests/directory/v13 tests/issues/v13_ownership tests/api/v12_rbac/test_v12_rbac_router_permissions.py
+uv run --frozen ruff check --no-cache src/telescreen/directory src/telescreen/issues/routing.py src/telescreen/issues/ownership.py src/telescreen/api/routers/directory.py src/telescreen/api/routers/users.py src/telescreen/api/routers/ownership.py tests/directory/v13 tests/issues/v13_ownership tests/api/v12_rbac/test_v12_rbac_router_permissions.py
+uv run --frozen ty check src/telescreen/directory src/telescreen/issues/routing.py src/telescreen/issues/ownership.py src/telescreen/api/routers/directory.py src/telescreen/api/routers/users.py src/telescreen/api/routers/ownership.py tests/directory/v13 tests/issues/v13_ownership tests/api/v12_rbac/test_v12_rbac_router_permissions.py
+uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p11-typelint.log 2>&1; ! grep -E '^(src/telescreen/directory/|src/telescreen/issues/(routing|ownership)[.]py|src/telescreen/api/routers/(directory|users|ownership)[.]py|tests/(directory/v13|issues/v13_ownership)/|tests/api/v12_rbac/test_v12_rbac_router_permissions[.]py)' /tmp/telescreen-v13-p11-typelint.log
+uv run --frozen pytest -p no:cacheprovider tests/directory tests/issues/v13_ownership tests/api/v12_rbac tests/api/v12_routers tests/issues/v11_record tests/issues/test_issues.py 2>&1 | tee /tmp/telescreen-v13-p11-pytest.log; echo "exit=$?"
+uv run --frozen pytest -p no:cacheprovider tests/e2e/test_route_permissions.py tests/e2e/test_api_routes.py tests/e2e/test_flow_ingest.py tests/e2e/test_flow_v11_owner_health.py tests/e2e/test_flow_v11_policy.py tests/e2e/test_flow_v12_identity.py tests/e2e/test_wiring_v11.py tests/leak/test_leak_matrix_v11.py 2>&1 | tee /tmp/telescreen-v13-p11-pytest-shared.log; echo "exit=$?"
 uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-v13-p11-pytest-all.log 2>&1; echo "exit=$?"
 ```
 
-Expected: the scoped checks exit 0, the typelint grep prints nothing, and the existing
-directory, routing and v12 router tests pass. The full run is informational.
+Expected:
+
+- the scoped checks exit 0, and the typelint grep finds nothing;
+- the existing directory, routing, v12 router and shared read-only suites pass;
+- every file under `tests/` that changed is in `tests/directory/v13/**`,
+  `tests/issues/v13_ownership/**` or `tests/api/v12_rbac/test_v12_rbac_router_permissions.py`.
+
+The full run is informational. A failure caused only by v13-p08's in-progress files is
+recorded as such.
 
 ## Completion Criteria
 

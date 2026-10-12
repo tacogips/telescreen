@@ -9,7 +9,7 @@
 
 - planId: `v13-p10-dashboard-integrations-backend`
 - planPath: `impl-plans/active/v13-p10-dashboard-integrations-backend.md`
-- wave: 3
+- wave: 3 (run 2; Last Updated 2026-10-13 with the run-2 shared-file rules)
 - dependsOn: `v13-p01-foundation`, `v13-p02-db`, `v13-p04-issue-stream-backend` (reuses
   `issues/query/period.py:parse_period`; p04 runs in run 1 and this plan in run 2)
 - writePaths:
@@ -129,21 +129,33 @@ Imitate:
 - oidc with a fake verifier that raises `idp_unavailable` -> not ok.
 - Unconfigured -> 503. A viewer cannot GET (403). An admin can.
 
+## Run-2 shared-file rules (design section 15, run 2)
+
+- Both routers are new, unregistered modules, tested by building them directly. Never
+  use `include_router` in source. Route-walk files (`tests/e2e/test_route_permissions.py`,
+  `tests/e2e/test_api_routes.py`, `tests/api/v12_rbac/**`) are read-only.
+- No new table, migration or notification kind (`integration_checks` exists from
+  v13-p02). `tests/db/test_models.py`, `tests/notifications/**` and `tests/leak/**` are
+  read-only. Assert the absence of secrets and hosts in `tests/integrations`, and masked
+  `display_title` only in `tests/issues/v13_dashboard`.
+- Write nothing outside this plan's paths. `IssueReportSource` (`ports/issues.py`) and
+  the weekly-report consumer (v13-p09) are read-only.
+
 ## Verification
 
 Start every shell with `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1`.
 
 ```bash
 uv run --frozen ruff format --check --no-cache src/telescreen/issues/dashboard.py src/telescreen/integrations src/telescreen/api/routers/dashboard.py src/telescreen/api/routers/integrations.py tests/issues/v13_dashboard tests/integrations
-uv run --frozen ruff check --no-cache src/telescreen/issues src/telescreen/integrations src/telescreen/api/routers tests/issues/v13_dashboard tests/integrations
-uv run --frozen ty check src/telescreen/issues src/telescreen/integrations src/telescreen/api/routers tests/issues/v13_dashboard tests/integrations
-uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p10-typelint.log 2>&1; grep -E '^(src/telescreen/(issues/dashboard|integrations)|src/telescreen/api/routers/(dashboard|integrations)|tests/(issues/v13_dashboard|integrations))' /tmp/telescreen-v13-p10-typelint.log
-uv run --frozen pytest -p no:cacheprovider tests/issues/v13_dashboard tests/integrations 2>&1 | tee /tmp/telescreen-v13-p10-pytest.log; echo "exit=$?"
+uv run --frozen ruff check --no-cache src/telescreen/issues/dashboard.py src/telescreen/integrations src/telescreen/api/routers/dashboard.py src/telescreen/api/routers/integrations.py tests/issues/v13_dashboard tests/integrations
+uv run --frozen ty check src/telescreen/issues/dashboard.py src/telescreen/integrations src/telescreen/api/routers/dashboard.py src/telescreen/api/routers/integrations.py tests/issues/v13_dashboard tests/integrations
+uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p10-typelint.log 2>&1; ! grep -E '^(src/telescreen/issues/dashboard[.]py|src/telescreen/integrations/|src/telescreen/api/routers/(dashboard|integrations)[.]py|tests/(issues/v13_dashboard|integrations)/)' /tmp/telescreen-v13-p10-typelint.log
+uv run --frozen pytest -p no:cacheprovider tests/issues/v13_dashboard tests/integrations tests/notifications/v13 2>&1 | tee /tmp/telescreen-v13-p10-pytest.log; echo "exit=$?"
 uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-v13-p10-pytest-all.log 2>&1; echo "exit=$?"
 ```
 
-Expected: the scoped checks exit 0 and the typelint grep prints nothing. The full run is
-informational.
+Expected: the scoped checks exit 0, the typelint grep finds nothing, and the weekly-report
+tests in `tests/notifications/v13` still pass. The full run is informational.
 
 ## Completion Criteria
 

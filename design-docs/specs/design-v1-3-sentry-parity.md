@@ -6,7 +6,10 @@ not, improve it." The accepted requirements are `design-v1-3-sentry-parity-revie
 (defects B1-B7, gap table, scope S0-S10, deferrals, acceptance), as corrected in its
 section 7.
 
-Status: design accepted as the baseline for the `v13-pNN` plans (2026-10-12). It extends the
+Status: design accepted as the baseline for the `v13-pNN` plans (2026-10-12). On 2026-10-13
+(run 2) section 6.1 was revised: the bulk `start`/`end`, the `params` keys and the
+`issue_id` failure key now match the accepted client contract. Section 15 also gained the
+run-2 shared-file ownership notes. It extends the
 implemented v1, v1.1 and v1.2 designs and replaces none of their decisions except those in
 section 1. The summary tables are in `design-data-model.md` ("v1.3 additions"),
 `design-api-and-ui.md` ("v1.3 endpoints"), `design-ui-sentry.md` section 11 and
@@ -63,7 +66,7 @@ Baseline facts (checked against `main` at `57f389b`):
 | D8 | Period | `period` = `all` (default), `24h`, `7d`, `14d`, `30d`, or `start`/`end` (custom, span <= 365 days). It scopes the list and counts to issues with `last_seen >= start` and `first_seen <= end`. The stream default is `all` | Divergence from Sentry's 14-day default: an old exposure stays exposed even when nothing new is seen |
 | D9 | Values column | "Values" = `distinct_fingerprints` (distinct detected values, keyed fingerprints). The search key is `values:`. The archive condition is "until N more values". The alert trigger is "distinct values over an interval" | Review correction 7.2: every issue has one resource |
 | D10 | Saved views | Server table, personal or shared, starred per member, and one default view per member. Name and query pass `Redactor`; a hit gives 422 `raw_value_detected` and nothing is stored. Each personal view needs a member principal | Views are persisted user text, so they need the same gate as templates (v1.2 3.4) |
-| D11 | Bulk | `POST /api/issues/bulk` accepts either `ids` (<= 1000) or `query` + `period` ("select all matching", evaluated at request time, capped at 1000 with `truncated`). Each issue runs in its own transaction through the same service method as the single-issue route, with its own history and audit records, plus one `issue.bulk` audit summary | Partial success is explicit; there is no side door around per-issue validation |
+| D11 | Bulk | `POST /api/issues/bulk` accepts either `ids` (<= 1000) or `query` + `period` (or `start`/`end`) ("select all matching", evaluated at request time, capped at 1000 with `truncated`). Each issue runs in its own transaction through the same service method as the single-issue route, with its own history and audit records, plus one `issue.bulk` audit summary | Partial success is explicit; there is no side door around per-issue validation |
 | D12 | Merge model | A merge keeps the child rows. A child gets `merged_into_id` and is hidden from the stream, counts and tabs. Findings stay on the child. The primary's `times_seen`, `distinct_fingerprints`, `first_seen` and `last_seen` are recomputed over the group. Group actions cascade to the children. Child changes propagate to the primary (section 6.3). Unmerge clears `merged_into_id` | Per-resource verification, auto-resolve and exposure keep working; unmerge is exact |
 | D13 | Merge preconditions | Every member is in the open set or `archived`. None has a `requested` or `active` exception. There is no nesting: a selected primary's children are re-parented. At most 50 children per primary. An exception request on any group member (a primary with children, or a merged child) is rejected (`merged_group`); unmerge first | Merge cannot bypass the exception approval flow |
 | D14 | Comments | New `issue_comments` table (redacted body, author, edit and soft-delete timestamps). A new comment also writes a `commented` history row with `to_value = comment id` and `note = null`. Legacy `commented` rows are shown read-only as comments | Edit and delete need a mutable record; history stays append-only |
@@ -286,26 +289,42 @@ once (one `POST` each; a failed view stays local and is reported in a toast).
 
 #### 6.1 Bulk
 
-`POST /api/issues/bulk {ids? | query + period?, action, params}`. Actions and parameters:
+`POST /api/issues/bulk {ids? | query + (period? | start + end), action, params}`. The
+query-mode scope uses the same `parse_period(period, start, end, now)` rules as
+`GET /api/issues` (D8): `start`/`end` go together with `period` absent or `custom`, and the
+span is at most 365 days; otherwise the request is rejected with `VALIDATION_ERROR` before
+any change. `params` is one object whose keys follow the accepted client contract
+(`BulkParams` in `src/web/src/api/types.ts`):
 
-| Action | Parameters |
-|--------|-----------|
+| Action | `params` keys |
+|--------|---------------|
 | `status` | `status` |
-| `assign` | `assignee_ref` or null |
+| `assign` | `assignee_ref` (null unassigns) |
 | `priority` | `priority` |
-| `archive` | as section 7 |
+| `archive` | `archive {kind, duration_minutes?, count?}` (section 7) |
 | `unarchive` | none |
 | `resolve` | `reason`, `note` |
 | `mark_reviewed` | none |
-| `request_verification` | `action`, `include_linked` |
+| `request_verification` | `verification {action, include_linked}` |
+
+The action's parameters are parsed and validated once, before the first issue is touched.
+A missing or invalid parameter rejects the whole request with 422 `VALIDATION_ERROR` and
+changes nothing. `archive` is parsed into the same `ArchiveRequest` and checked by the same
+`validate_archive_request` as the single-issue route: `kind` is required and never
+defaulted, `until_escalating` takes neither `duration_minutes` nor `count`, `for_duration`
+takes only `duration_minutes` (30-129600), and the count kinds take only `count`
+(1-100000).
 
 The existing per-issue "Start workflow" bulk action is not part of this endpoint. It stays
 a client loop over `POST /api/workflows/{name}/runs`, because each run is already an
-audited, per-issue operation.
+audited, per-issue operation. Every other stream bulk action uses this endpoint when
+"Select all N matching" is active. That includes "Mark remediated", which is
+`request_verification` with `verification {action: "remove", include_linked: false}`. The
+UI sends `start`/`end` whenever the stream period is `custom`.
 
-The response is `{matched, processed, truncated, succeeded: [id], failed: [{id, code}]}`.
-Search indexing runs after each issue commit. An unknown or invisible id becomes a
-`not_found` failure.
+The response is `{matched, processed, truncated, succeeded: [issue_id], failed:
+[{issue_id, code}]}`. Search indexing runs after each issue commit. An unknown or
+invisible id becomes a `not_found` failure.
 
 #### 6.2 Merge and unmerge
 
@@ -815,7 +834,7 @@ No plan changes `pyproject.toml`, `uv.lock`, `src/web/package.json` or `bun.lock
 | 3 | v13-p14-ui-detail | `src/web/src/pages/issues/detail/**`, `src/web/src/pages/issues/{IssueDetail*,issue-detail.css,uploadEvidence}.ts(x)` | p03, p13 |
 | 2 | v13-p15-ui-alerts-profile | new `src/web/src/pages/{alerts,profile}/**` | p03 |
 | 2 | v13-p16-ui-dashboard-org | new `src/web/src/pages/dashboard/**`, `src/web/src/pages/{settings,workflows}/**` | p03 |
-| 3 | v13-p06-bulk-merge-backend | new `src/telescreen/issues/{bulk,merge}.py`, new `src/telescreen/api/routers/issue_bulk.py`, `tests/issues/v13_bulk/**` (S3) | p04, p05 |
+| 3 | v13-p06-bulk-merge-backend | new `src/telescreen/issues/{bulk,merge}.py`, new `src/telescreen/api/routers/issue_bulk.py`, `tests/issues/v13_bulk/**` (S3); the run-1 carry-over UI side of the bulk contract (6.1): `src/web/src/api/client.ts` (`bulk` signature only), `src/web/src/api/mock/{router,mock.test}.ts` (bulk handler only), `src/web/src/pages/issues/IssueList{,.test}.tsx` | p03, p04, p05, p13 |
 | 4 | v13-p12-wiring | `src/telescreen/wiring.py`, new `src/telescreen/wiring_v13.py`, `src/telescreen/api/app.py`, `tests/e2e/{test_api_routes,test_route_permissions}.py`, new `tests/e2e/test_wiring_v13.py` | p04-p11 |
 | 5 | v13-p17-verification-docs | `tests/leak/**` (new v13 files), new `tests/e2e/test_flow_v13_*.py`, new `tests/live/v13/**`, `README.md`, `impl-plans/README.md`, status lines of the design documents, archiving v13 plans | all |
 
@@ -878,6 +897,59 @@ order:
 Run 1 was dispatched twice: manifest `telescreen-v13-20261012-e1` (blocked on write paths;
 the owner reconciled at `d8073b1`) and `telescreen-v13-20261012-e2` (same scope; p01 and
 p02 in re-verify mode, p03 finishing its remaining deliverables).
+
+Run 2 (session 13, base `9accc07`): p01-p05, p09 and p13 are integration-accepted
+dependencies. p12 and p17 stay for run 3, and no plan is archived. Shared files, checked
+against the plans and the tree at `9accc07`:
+
+- **Carry-over items, all owned by p06** (wave 3, section 6.1), each with a regression
+  test that fails on the old behavior:
+  - INT-W2-04: all-matching bulk in a `custom` period sends and honors `start`/`end`
+    (server body, `client.ts` `bulk`, `IssueList.tsx`, mock bulk handler). The server
+    alone is not enough, because `period=custom` without `start`/`end` is a
+    `VALIDATION_ERROR`.
+  - INT-W2-05: "Mark remediated" with all matching sends bulk `request_verification`
+    instead of the "finite selected set" warning.
+  - archive `until_escalating` parsing: bulk `params.archive` goes through
+    `validate_archive_request`, with no default kind. The mock bulk handler stops
+    defaulting `kind` to `for_duration` and stops giving every kind a 24 h `until`: the
+    count and escalation kinds get `archived_at + 90 days`.
+- **Inventory tests are read-only in run 2.** No run-2 plan adds a table, migration,
+  template variable or notification event kind. So `tests/db/test_models.py`,
+  `tests/notifications/**` counts and `tests/leak/**` stay unchanged and must keep
+  passing. Each run-2 backend plan asserts the masking of its own new surfaces in its own
+  test directory. The full v13 leak matrix stays with p17.
+- **Route walk.** The new router modules (`alerts`, `ownership`, `issue_events`,
+  `issue_activity`, `issue_external`, `issue_bulk`, `dashboard`, `integrations`) stay
+  unregistered until p12, and their tests build the router directly. A composed router
+  copies `APIRoute` objects as `api/routers/issues.py` does, never `include_router`
+  (FastAPI 0.142 keeps an included router as a lazy `_IncludedRouter`, which the walk
+  cannot see). The only run-2 plan that adds routes to an already registered module is
+  p11 (`directory.py`, `users.py`). p11 therefore owns
+  `tests/api/v12_rbac/test_v12_rbac_router_permissions.py`, an exact per-module inventory.
+  `tests/e2e/test_route_permissions.py` and `tests/e2e/test_api_routes.py` are read-only:
+  they check that each registered route has exactly one marker, not a route count. p08
+  changes only the `workflows.py` list payload, and p07 adds no route to
+  `issues_detail.py` or `issues_comments.py`.
+- **Frontend.** p15, p16 and p14 do not edit `src/web/src/api/**` or `components/**`.
+  `screenshots.ts` already lists every run-2 state (p17 runs it strict in run 3). The
+  pages render the accessible names that those states target:
+  - tab "History" on `/alerts/alert-01`;
+  - button "Edit Alex Morgan" on `/settings/users`;
+  - button "Getting started" on `/dashboard`;
+  - button "More" on the issue detail.
+
+  The member-edit state at `9accc07` targets the exact name "Edit Alex". The mock member
+  is "Alex Morgan", and the Edit button is named "Edit <display_name>" so that it is
+  unique per row. p16 is therefore the single run-2 editor of `screenshots.ts` (wave 2),
+  and it changes only that one action name. Every other plan keeps the file read-only.
+
+  In wave 3, p06 is the only editor of `client.ts`, the mock router and its test, and
+  `IssueList{,.test}.tsx`. `types.ts` and the mock fixtures are read-only, because
+  `BulkParams` already carries `archive` and `verification`.
+- **Same-wave rule.** If a manifest audit finds a file that two same-wave plans must edit,
+  one plan owns it and the other declares `dependsOn` on the owner and runs after it
+  inside the wave. This audit found no such file.
 
 ### 16. Verification
 

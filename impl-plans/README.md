@@ -59,10 +59,18 @@ Dispatch runs (at most 8 plans each; later runs record accepted plans as
   non-strict screenshots 0 browser errors). They stay in `active/` as
   `acceptedDependencies` for runs 2 and 3 and are archived by the serial finalization
   after v13-p17. The new routers are unregistered until v13-p12 (run 3). Open low items:
-  INT-W2-04 (custom-period all-matching bulk lacks start/end; p06/p17), INT-W2-05
-  (all-matching request_verification is selection-only; p06), archive
-  `until_escalating` parsing (p06);
-- run 2: p08, p11, p15, p16 (wave 2); p06, p07, p10, p14 (wave 3) (8 plans);
+  INT-W2-04 (custom-period all-matching bulk lacks start/end), INT-W2-05 (all-matching
+  request_verification is selection-only) and archive `until_escalating` parsing. All
+  three are owned by p06 in run 2, on both server and UI (design section 6.1 and the
+  section 15 run-2 notes);
+- run 2: p08, p11, p15, p16 (wave 2); p06, p07, p10, p14 (wave 3) (8 plans). Manifest
+  `active/telescreen-v13-20261013-e3-dispatch.json` (base 9accc07) records p01-p05, p09
+  and p13 as `acceptedDependencies` and p12 and p17 as `laterRunPlans`. The shared-file
+  owners in run 2 are: p11 for `tests/api/v12_rbac/test_v12_rbac_router_permissions.py`;
+  p16 for the one `screenshots.ts` selector; p06 for the bulk parts of `client.ts`, the
+  mock router and `IssueList*`; p07 for the four existing issue tests it may break.
+  Inventory tests (`tests/db/test_models.py`, `tests/notifications/**`, `tests/leak/**`,
+  the route walk) are read-only;
 - run 3: p12 (wave 4), p17 (wave 5).
 
 Every plan's wave is greater than the waves of its dependencies.
@@ -83,7 +91,7 @@ Every plan's wave is greater than the waves of its dependencies.
 | `active/v13-p14-ui-detail.md` | W3 | p03, p13 | design-ui-sentry.md s11.2 |
 | `active/v13-p15-ui-alerts-profile.md` | W2 | p03 | design-ui-sentry.md s11.2 |
 | `active/v13-p16-ui-dashboard-org.md` | W2 | p03 | design-ui-sentry.md s11.2 |
-| `active/v13-p06-bulk-merge-backend.md` | W3 | p04, p05 | v1.3 s6 |
+| `active/v13-p06-bulk-merge-backend.md` | W3 | p03, p04, p05, p13 | v1.3 s6, s15 (run-2 carry-over) |
 | `active/v13-p12-wiring.md` | W4 | p04-p11 | v1.3 s2, s15 |
 | `active/v13-p17-verification-docs.md` | W5 | p12, p13-p16 | v1.3 s14, s16 |
 
