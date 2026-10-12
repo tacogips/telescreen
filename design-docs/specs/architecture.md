@@ -20,6 +20,9 @@ archived under `impl-plans/completed/` as well. That document's v1.2 notes below
 and in the supporting specs are additions; they replace only decision 6 (Authentication)
 of section 5.
 
+The v1.3 Sentry-parity additions are implemented (2026-10-13); their plans are archived
+under `impl-plans/completed/`.
+
 ---
 
 ## Sections
@@ -195,6 +198,8 @@ v1.2 additions (`design-v1-2-notifications-and-identity.md` section 2):
 - New tables and columns are listed in `design-data-model.md` ("v1.2 additions").
 
 v1.3 additions (`design-v1-3-sentry-parity.md` section 2):
+
+Status: implemented 2026-10-13.
 
 - New L3 packages:
   - `telescreen.alerts` (alert rules, evaluator, maintenance);

@@ -1,6 +1,6 @@
 # Telescreen v1.3: Sentry Parity Self-Review
 
-Status: review accepted by the owner request of 2026-10-12; input to the v1.3 design and plans.
+Status: implemented 2026-10-13; review accepted by the owner request of 2026-10-12 and used as input to the v1.3 design and plans.
 Verified against the code at `57f389b` on 2026-10-12 (section 7). The corrections in section 7
 are binding where they differ from sections 2-4. The design is `design-v1-3-sentry-parity.md`.
 

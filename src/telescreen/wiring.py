@@ -24,7 +24,6 @@ from telescreen.api.routers.exceptions import ExceptionsRouterDeps, build_except
 from telescreen.api.routers.health import build_health_router
 from telescreen.api.routers.human_tasks import HumanTasksRouterDeps, build_human_tasks_router
 from telescreen.api.routers.ingest import IngestRouterDeps, build_ingest_router
-from telescreen.api.routers.issues import IssuesRouterDeps, build_issues_router
 from telescreen.api.routers.map_jobs import MapJobsRouterDeps, build_map_jobs_router
 from telescreen.api.routers.police import PoliceRouterDeps, build_police_router
 from telescreen.api.routers.policies import PoliciesRouterDeps, build_policies_router
@@ -104,6 +103,7 @@ from telescreen.wiring_v11 import (
     build_policy_and_risk,
 )
 from telescreen.wiring_v12 import WiringV12, WiringV12Parts, build_v12
+from telescreen.wiring_v13 import IssueEventFanout, WiringV13, WiringV13Parts, build_v13
 from telescreen.workflow.engine.child import ChildRunFinishedHandler
 from telescreen.workflow.engine.definitions import WorkflowService
 from telescreen.workflow.engine.engine import AdvanceStepHandler, RunEngine, TimerFiredHandler
@@ -144,7 +144,7 @@ from telescreen.workflow.triggers.service import WorkflowTriggerService
 class DeferredIssueEventSink(IssueEventSink):
     """Break the issue-trigger-engine construction cycle during assembly."""
 
-    target: WorkflowTriggerService | None = None
+    target: IssueEventSink | None = None
 
     async def on_issue_event(self, session: AsyncSession, event: IssueEvent) -> None:
         """Forward an issue event after the workflow engine has been assembled."""
@@ -188,6 +188,7 @@ class Container:
     owns_http: bool
     owns_engine: bool
     v12: WiringV12
+    v13: WiringV13
 
     async def ensure_indexes(self) -> None:
         """Initialize configured search indexes before serving requests."""
@@ -478,7 +479,31 @@ def build_container(
         workflow_repository,
     )
     executors.register(SubWorkflowExecutor(run_engine))
-    deferred_events.target = WorkflowTriggerService(run_engine, workflow_repository)
+    workflow_triggers: WorkflowTriggerService = WorkflowTriggerService(
+        run_engine, workflow_repository
+    )
+    v13: WiringV13 = build_v13(
+        WiringV13Parts(
+            settings,
+            env,
+            http,
+            ctx,
+            primitives,
+            resolver,
+            directory_v11.owners,
+            issue_service,
+            issue_ops,
+            notification_service,
+            notification_handler,
+            notification_gate,
+            queue,
+            workflow_triggers,
+            workflow_repository,
+            run_engine,
+            v12_parts,
+        )
+    )
+    deferred_events.target = IssueEventFanout((workflow_triggers, v13.alert_evaluator))
     escalation: EscalationPolicyService = EscalationPolicyService(
         primitives.audit, primitives.clock, primitives.redactor
     )
@@ -506,6 +531,7 @@ def build_container(
             issue_ops.exception_maintenance,
             health.collector_provider,
             health.police_provider,
+            *v13.providers,
         ),
         primitives.clock,
     )
@@ -518,6 +544,8 @@ def build_container(
         )
     )
     handlers.register(cast(TaskHandler, notification_handler))
+    for handler in v13.handlers:
+        handlers.register(handler)
     handlers.register(issue_ops.verify_handler)
     handlers.register(issue_ops.policy_handler)
     handlers.register(issue_ops.digest_handler)
@@ -650,18 +678,10 @@ def build_container(
     )
     collector_secrets: WebhookSecrets = build_webhook_secrets(settings, env, channel_key)
     routers: tuple[APIRouter, ...] = (
+        *v13.routers,
         build_health_router(),
-        build_directory_router(DirectoryRouterDeps(ctx, directory, directory_v11.identities)),
-        build_issues_router(
-            IssuesRouterDeps(
-                ctx,
-                issue_service,
-                primitives.indexer,
-                issue_ops.remediation,
-                issue_ops.exceptions,
-                directory_v11.owners,
-                resolver,
-            )
+        build_directory_router(
+            DirectoryRouterDeps(ctx, directory, directory_v11.identities, v13.member_admin)
         ),
         build_exceptions_router(
             ExceptionsRouterDeps(
@@ -753,4 +773,5 @@ def build_container(
             v12_parts.roles,
             v12_parts.sign_in,
         ),
+        v13,
     )

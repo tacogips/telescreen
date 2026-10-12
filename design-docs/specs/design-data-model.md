@@ -217,6 +217,8 @@ detail holds a token, `sub`, claim value or template text.
 
 ### v1.3 additions (revision `0004_v1_3`)
 
+Status: implemented 2026-10-13.
+
 Behavior is in `design-v1-3-sentry-parity.md` (section 13.1 lists every column). One new
 revision, `0004_v1_3` (`down_revision = "0003_v1_2"`), adds everything below and is
 idempotent in the same way as `0003_v1_2`. Earlier revisions are never edited.

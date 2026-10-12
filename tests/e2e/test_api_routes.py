@@ -10,7 +10,7 @@ from httpx import ASGITransport, AsyncClient
 from telescreen.api.app import create_app
 from telescreen.core.config import TelescreenSettings
 from telescreen.core.secrets import EnvSource
-from telescreen.core.vocabulary import ApiScope
+from telescreen.core.vocabulary import ApiScope, Role, RoleChangeSource
 from telescreen.directory.tokens import CreatedToken, TokenService
 from telescreen.wiring import Container, build_container, close_container
 from tests.support.db import SqliteHarness, make_sqlite_harness
@@ -70,8 +70,30 @@ async def test_assembled_feature_list_routes_return_200() -> None:
                 headers={"Authorization": f"Bearer {token.token}"},
             )
             assert member_response.status_code == 201, member_response.text
+            async with database.sessions.begin() as session:
+                await container.v12.roles.set_role(
+                    session,
+                    "route-smoke-member",
+                    Role.ADMIN,
+                    f"token:{token.token_id}",
+                    RoleChangeSource.MANUAL,
+                )
+                member_token: CreatedToken = await TokenService(
+                    container.audit, container.clock
+                ).create(
+                    session,
+                    "route-smoke-member",
+                    frozenset((ApiScope.ADMIN,)),
+                    member_response.json()["id"],
+                )
             for path in (
                 "/api/issues",
+                "/api/issues/counts",
+                "/api/alert-rules",
+                "/api/dashboard",
+                "/api/integrations",
+                "/api/ownership-rules",
+                "/api/external-issues/github/repos",
                 "/api/workflows",
                 "/api/runs",
                 "/api/police/workers",
@@ -87,6 +109,18 @@ async def test_assembled_feature_list_routes_return_200() -> None:
             ):
                 response: httpx.Response = await client.get(
                     path, headers={"Authorization": f"Bearer {token.token}"}
+                )
+                assert response.status_code == 200, (path, response.text)
+                if path == "/api/issues/counts":
+                    assert "tabs" in response.json()
+                if path == "/api/external-issues/github/repos":
+                    assert response.json() == {"configured": False, "repos": []}
+            for path in (
+                "/api/views",
+                "/api/auth/me/notification-settings",
+            ):
+                response: httpx.Response = await client.get(
+                    path, headers={"Authorization": f"Bearer {member_token.token}"}
                 )
                 assert response.status_code == 200, (path, response.text)
     finally:

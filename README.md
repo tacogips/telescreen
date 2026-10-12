@@ -43,6 +43,24 @@ as `telescreen.collectors`, `telescreen.detection`, `/api/issues`, and Issues.
 
 See the [v1.2 design](design-docs/specs/design-v1-2-notifications-and-identity.md) for the permission matrix, configuration, and operator walkthrough.
 
+## Features (v1.3)
+
+- Issue streams have status tabs with counts, period and trend controls, rich server-side
+  search, sortable trends, and personal or shared saved views.
+- Bulk actions resolve, archive, assign, set priority, review, remediate, and merge matching
+  issues. Archive conditions can escalate; approved exceptions remain distinct.
+- Issue details include finding navigation and statistics, tag distributions, actor-aware
+  activity, editable comments and mentions, subscriptions, bookmarks, and external links.
+- Alert rules support filters, action intervals, mute controls, delivery history, and workflow
+  actions. Per-user notification settings and a scheduled weekly report are available.
+- The dashboard summarizes issue trends, exposure, sources, response times, and top issues.
+  Organization settings cover integrations, API tokens, member management, and ownership rules.
+- The command palette searches pages, actions, and issues; keyboard shortcuts and a getting-started
+  checklist help with triage and setup.
+
+See the [v1.3 design](design-docs/specs/design-v1-3-sentry-parity.md) for behavior and the
+masking contract.
+
 Telescreen does not check provider credential validity or reveal raw values (it links to
 the source location only), and it remains read-only on every monitored source.
 
@@ -107,6 +125,24 @@ OIDC sign-in. Every route declares one permission, and a route-walk test fails o
 undeclared route. A bearer credential is either a static API token or an IdP access token;
 see the "v1.2 endpoints" section of `design-docs/specs/design-api-and-ui.md`.
 
+v1.3 adds issue counts, saved views, archive and bulk actions, merge, issue events, tags,
+statistics, activity, comments, subscriptions, bookmarks, external issue links, alert rules,
+notification settings, dashboard statistics, integration checks, member administration, and
+ownership rules. The v1.3 endpoint families are:
+
+- Issues: `GET /api/issues/counts`, `GET /api/issues`, `POST /api/issues/bulk`,
+  `POST /api/issues/merge`, `POST /api/issues/{id}/unmerge`, and per-issue
+  `/events`, `/tags`, `/stats`, `/activity`, `/comments`, `/subscription`,
+  `/bookmark`, `/archive`, `/external-issues`, and `/history` routes.
+- Views and alerts: `/api/views`, `/api/alert-rules` and their history, mute, enable,
+  disable, and validation routes.
+- Profile and organization: `/api/auth/me/notification-settings`, `/api/auth/me/tokens`,
+  `/api/integrations`, `/api/ownership-rules`, `/api/dashboard`, and member administration
+  under `/api/members`.
+
+See the [v1.3 endpoint table](design-docs/specs/design-api-and-ui.md#v13-endpoints) for
+request shapes and permissions.
+
 ## Web application
 
 The SolidJS application is in `src/web`. Install dependencies and run the frontend
@@ -138,6 +174,13 @@ and version activation) and Users and roles. The workflow definition view shows 
 notification sets of v2 workflows. Navigation and actions follow the signed-in member's
 role.
 
+In v1.3 the UI adds `/dashboard`, `/alerts` and alert-rule editors, plus Profile,
+Integrations, Tokens, and Ownership rules under Settings. The issue stream adds tabs,
+counts, saved views, query autocomplete, bulk actions, and shortcuts; issue details add
+finding navigation, trends, activity, comments, mentions, and external links. The dashboard's
+getting-started checklist links to [Collectors](#collectors), [Notifications](#notifications),
+[Members](#members), and [Alert rules](#alert-rules).
+
 To serve a production build locally, run `cd src/web && bun run build`, then set
 `TELESCREEN_WEB_DIST=src/web/dist` when running `telescreen serve`. The directory must
 contain `index.html`; otherwise startup exits with code 3. The Python wheel does not
@@ -157,6 +200,33 @@ The v1.2 OIDC settings (`TELESCREEN_OIDC_ISSUER`, `TELESCREEN_OIDC_CLIENT_ID`,
 `TELESCREEN_OIDC_TEAM_MAP`, `TELESCREEN_OIDC_PROVISIONING` and the others) and
 `TELESCREEN_UI_TOKEN_LOGIN` are also in `command.md`. Without a mapped role and without a
 default role, an SSO user gets HTTP 403 (`no_role`).
+
+v1.3 adds these optional settings; defaults and validation are documented in
+[`design-docs/specs/command.md`](design-docs/specs/command.md): `TELESCREEN_ESCALATING_MIN_FINDINGS`,
+`TELESCREEN_ESCALATING_FACTOR`, `TELESCREEN_WEEKLY_REPORT_CRON`,
+`TELESCREEN_GITHUB_ISSUES_TOKEN`, and `TELESCREEN_GITHUB_ISSUES_REPOS`. The GitHub token
+uses the existing secret-reference format; do not put token values in configuration files.
+
+### Collectors
+
+Connect a supported collector from the Collectors page. The onboarding checklist links to
+`/collectors`; operator settings are documented in `command.md`.
+
+### Notifications
+
+Configure Slack or email delivery in Settings → Integrations and choose per-category
+notification preferences in Profile. The onboarding checklist links to `/settings/integrations`.
+
+### Members
+
+Invite or manage members from Settings → Users and roles. The onboarding checklist links to
+`/settings/users`; role and identity configuration is described in the
+[v1.2 design](design-docs/specs/design-v1-2-notifications-and-identity.md).
+
+### Alert rules
+
+Create alert rules from Alerts → New alert. Rules can send notifications or start a workflow;
+the onboarding checklist links to `/alerts/new`.
 
 ### Slack app
 

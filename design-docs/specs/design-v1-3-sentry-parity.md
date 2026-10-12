@@ -6,8 +6,9 @@ not, improve it." The accepted requirements are `design-v1-3-sentry-parity-revie
 (defects B1-B7, gap table, scope S0-S10, deferrals, acceptance), as corrected in its
 section 7.
 
-Status: design accepted as the baseline for the `v13-pNN` plans (2026-10-12). On 2026-10-13
-(run 2) section 6.1 was revised: the bulk `start`/`end`, the `params` keys and the
+Status: implemented 2026-10-13; the 17 `v13-pNN` plans and the e1-e4 dispatch manifests
+are archived under `impl-plans/completed/`. The design was accepted as the baseline for the `v13-pNN`
+plans on 2026-10-12. On 2026-10-13 (run 2) section 6.1 was revised: the bulk `start`/`end`, the `params` keys and the
 `issue_id` failure key now match the accepted client contract. Section 15 also gained the
 run-2 shared-file ownership notes. On 2026-10-13 (run 3, base `ca818c3`) section 15 gained
 the run-3 and finalization notes, and section 16 the live-check command. It extends the

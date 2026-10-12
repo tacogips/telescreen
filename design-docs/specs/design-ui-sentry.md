@@ -590,6 +590,8 @@ applies: data the API does not return is omitted, not emulated.
 
 ### 11. v1.3 additions (binding for the v1.3 run)
 
+Status: implemented 2026-10-13.
+
 This section extends sections 8-10 for `design-v1-3-sentry-parity.md` (sections in
 parentheses refer to it), against the "v1.3 endpoints" of `design-api-and-ui.md`. The rule
 of section 8 still applies: data the API does not return is omitted, not emulated. There
@@ -620,7 +622,7 @@ is no new dependency; charts are hand-rendered SVG (`Sparkline`, `MiniBarChart`)
   - `/settings/profile`, `/settings/integrations`, `/settings/tokens`,
     `/settings/ownership`.
 
-  p03 creates stubs that the page plans replace.
+  The p03 page stubs have been replaced by the v1.3 page implementations.
 
 #### 11.2 Pages
 

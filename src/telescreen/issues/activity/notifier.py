@@ -11,7 +11,7 @@ from telescreen.core.vocabulary import (
     NotificationEvent,
     SubscriptionReason,
 )
-from telescreen.db.models import IssueRow, IssueSubscriptionRow
+from telescreen.db.models import IssueMentionRow, IssueRow, IssueSubscriptionRow
 from telescreen.issues.activity.subscriptions import auto_subscribe
 from telescreen.ports.directory import ActorDirectory
 from telescreen.ports.issues import IssueActivity, IssueActivityNotifier
@@ -64,10 +64,26 @@ class SubscriptionActivityNotifier(IssueActivityNotifier):
                     activity.issue_id,
                 ),
             )
+        # Members mentioned in this comment already got the mention notification.
+        mentioned: frozenset[str] = (
+            frozenset(
+                await session.scalars(
+                    select(IssueMentionRow.member_id).where(
+                        IssueMentionRow.comment_id == activity.comment_id
+                    )
+                )
+            )
+            if activity.comment_id is not None
+            else frozenset()
+        )
         actor_values: tuple[str, ...] = (activity.actor_ref,)
         actor_display: str = (await self.actors.display(session, actor_values))[0].display_name
         for row in subscribers:
-            if row.member_id == actor_member_id or row.member_id == activity.assignee_member_id:
+            if (
+                row.member_id == actor_member_id
+                or row.member_id == activity.assignee_member_id
+                or row.member_id in mentioned
+            ):
                 continue
             await self.notifier.send_to_member(
                 session,

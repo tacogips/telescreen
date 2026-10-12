@@ -40,65 +40,7 @@ Large features are split into multiple related plans with cross-references.
 All plans share `impl-plans/conventions.md` (ownership, typing, verification and
 progress-log rules).
 
-### v1.3 (Sentry parity: S0-S10 of `design-docs/specs/design-v1-3-sentry-parity.md`)
-
-Created 2026-10-12 at base 57f389b from `design-docs/specs/design-v1-3-sentry-parity.md`
-section 15. Waves run in order. Within a wave, write paths are disjoint. Files created by a
-wave-1 plan and edited by a later plan are listed in that later plan's `sharedPaths` with a
-note.
-
-Dispatch runs (at most 8 plans each; later runs record accepted plans as
-`acceptedDependencies`):
-
-- run 1: p01, p02, p03 (wave 1); p04, p05, p09, p13 (wave 2) (7 plans). Manifest
-  `active/telescreen-v13-20261012-e1-dispatch.json` was blocked on write paths (owner
-  reconciled at `d8073b1`); `active/telescreen-v13-20261012-e2-dispatch.json` redispatches
-  the same scope (p01 and p02 re-verify, p03 finishes). Session 12 (2026-10-13): all 7
-  run-1 plans are Completed (0 open boxes) and the combined wave-2 tree passed the
-  integration review (comm-000580: pytest 922 passed / 8 skipped, vitest 199 passed,
-  non-strict screenshots 0 browser errors). They stay in `active/` as
-  `acceptedDependencies` for runs 2 and 3 and are archived by the serial finalization
-  after v13-p17. The new routers are unregistered until v13-p12 (run 3). Open low items:
-  INT-W2-04 (custom-period all-matching bulk lacks start/end), INT-W2-05 (all-matching
-  request_verification is selection-only) and archive `until_escalating` parsing. All
-  three are owned by p06 in run 2, on both server and UI (design section 6.1 and the
-  section 15 run-2 notes);
-- run 2: p08, p11, p15, p16 (wave 2); p06, p07, p10, p14 (wave 3) (8 plans). Manifest
-  `active/telescreen-v13-20261013-e3-dispatch.json` (base 9accc07) records p01-p05, p09
-  and p13 as `acceptedDependencies` and p12 and p17 as `laterRunPlans`. The shared-file
-  owners in run 2 are: p11 for `tests/api/v12_rbac/test_v12_rbac_router_permissions.py`;
-  p16 for the one `screenshots.ts` selector; p06 for the bulk parts of `client.ts`, the
-  mock router and `IssueList*`; p07 for the four existing issue tests it may break.
-  Inventory tests (`tests/db/test_models.py`, `tests/notifications/**`, `tests/leak/**`,
-  the route walk) are read-only;
-- run 3: p07 (wave 3, re-verify), p12 (wave 4), p17 (wave 5), then serial finalization.
-  Manifest `active/telescreen-v13-20261013-e4-dispatch.json` (base ca818c3) records p01-p06,
-  p08-p11 and p13-p16 as `acceptedDependencies`. Waves A (p07), B (p12) and C (p17) run
-  serially with one plan each, so every shared file a plan's change can break is in that
-  plan's writePaths (design section 15 "Run 3" notes). The finalization moves the v13
-  plans to `completed/` and the e1-e4 manifests to `completed/dispatch/`.
-
-Every plan's wave is greater than the waves of its dependencies.
-
-| Plan | Wave | Depends On | Design Reference |
-|------|------|------------|------------------|
-| `active/v13-p01-foundation.md` | W1 | - | v1.3 s2, s15 |
-| `active/v13-p02-db.md` | W1 | - | v1.3 s13.1; design-data-model.md v1.3 additions |
-| `active/v13-p03-ui-foundation.md` | W1 | - | design-ui-sentry.md s11.1, s11.3 |
-| `active/v13-p04-issue-stream-backend.md` | W2 | p01, p02 | v1.3 s3 (B2, B3, B5), s4, s5 |
-| `active/v13-p05-triage-lifecycle-backend.md` | W2 | p01, p02 | v1.3 s6.2, s6.3, s7, s8.1 |
-| `active/v13-p08-alerts-backend.md` | W2 | p01, p02 | v1.3 s9 |
-| `active/v13-p09-notifications-backend.md` | W2 | p01, p02 | v1.3 s10 |
-| `active/v13-p11-directory-ownership-backend.md` | W2 | p01, p02 | v1.3 s12 |
-| `active/v13-p13-ui-stream.md` | W2 | p03 | design-ui-sentry.md s11.2 |
-| `active/v13-p07-issue-detail-backend.md` | W3 | p01, p02, p04 | v1.3 s3 (B1, B4, B6, B7), s8 |
-| `active/v13-p10-dashboard-integrations-backend.md` | W3 | p01, p02, p04 | v1.3 s11, s12 |
-| `active/v13-p14-ui-detail.md` | W3 | p03, p13 | design-ui-sentry.md s11.2 |
-| `active/v13-p15-ui-alerts-profile.md` | W2 | p03 | design-ui-sentry.md s11.2 |
-| `active/v13-p16-ui-dashboard-org.md` | W2 | p03 | design-ui-sentry.md s11.2 |
-| `active/v13-p06-bulk-merge-backend.md` | W3 | p03, p04, p05, p13 | v1.3 s6, s15 (run-2 carry-over) |
-| `active/v13-p12-wiring.md` | W4 | p04-p11 | v1.3 s2, s15 |
-| `active/v13-p17-verification-docs.md` | W5 | p12, p13-p16 | v1.3 s14, s16 |
+No plans are active.
 
 Telescreen v1 is complete (all 32 plans integration-accepted, final commit 7a8c600).
 Telescreen v1.1 (F1-F10 of `design-docs/specs/design-v1-1-dspm-adoption.md`) is complete:
@@ -106,11 +48,82 @@ all 21 v11 plans are integration-accepted and archived under `completed/` (2026-
 Telescreen v1.2 (N1-N3, R1, R2 of
 `design-docs/specs/design-v1-2-notifications-and-identity.md`) is complete: all 12 v12
 plans are integration-accepted and archived under `completed/` (2026-10-12).
-Run dispatch manifests, including the v1.1 manifests `telescreen-v11-20261010-c1` to `-c4`
-and the v1.2 manifests `telescreen-v12-20261011-d1` to `-d4`, are archived under
-`completed/dispatch/`.
+Telescreen v1.3 (S0-S10 of `design-docs/specs/design-v1-3-sentry-parity.md`) is complete:
+all 17 v13 plans are accepted and archived under `completed/` (2026-10-13).
+Run dispatch manifests, including the v1.1 manifests `telescreen-v11-20261010-c1` to `-c4`,
+the v1.2 manifests `telescreen-v12-20261011-d1` to `-d4` and the v1.3 manifests
+`telescreen-v13-20261012-e1`, `-e2`, `telescreen-v13-20261013-e3` and `-e4`, are archived
+under `completed/dispatch/`.
 
 ## Completed Plans
+
+### v1.3 (Sentry parity: S0-S10 of `design-docs/specs/design-v1-3-sentry-parity.md`)
+
+Created 2026-10-12 at base 57f389b from `design-docs/specs/design-v1-3-sentry-parity.md`
+section 15. Waves ran in order. Within a wave, write paths were disjoint. Files created by a
+wave-1 plan and edited by a later plan are listed in that later plan's `sharedPaths` with a
+note. All 17 plans were archived to `completed/` (and the e1-e4 manifests to
+`completed/dispatch/`) by the serial finalization on 2026-10-13, after p17 passed test
+integrity and adversarial review.
+
+Dispatch runs (at most 8 plans each; later runs record accepted plans as
+`acceptedDependencies`):
+
+- run 1: p01, p02, p03 (wave 1); p04, p05, p09, p13 (wave 2) (7 plans). Manifest
+  `completed/dispatch/telescreen-v13-20261012-e1-dispatch.json` was blocked on write paths
+  (owner reconciled at `d8073b1`); `completed/dispatch/telescreen-v13-20261012-e2-dispatch.json`
+  redispatches the same scope (p01 and p02 re-verify, p03 finishes). Session 12 (2026-10-13):
+  all 7 run-1 plans are Completed (0 open boxes) and the combined wave-2 tree passed the
+  integration review (comm-000580: pytest 922 passed / 8 skipped, vitest 199 passed,
+  non-strict screenshots 0 browser errors). They were `acceptedDependencies` for runs 2
+  and 3. The new routers were unregistered until v13-p12 (run 3). Open low items:
+  INT-W2-04 (custom-period all-matching bulk lacks start/end), INT-W2-05 (all-matching
+  request_verification is selection-only) and archive `until_escalating` parsing. All
+  three are owned by p06 in run 2, on both server and UI (design section 6.1 and the
+  section 15 run-2 notes);
+- run 2: p08, p11, p15, p16 (wave 2); p06, p07, p10, p14 (wave 3) (8 plans). Manifest
+  `completed/dispatch/telescreen-v13-20261013-e3-dispatch.json` (base 9accc07) records p01-p05, p09
+  and p13 as `acceptedDependencies` and p12 and p17 as `laterRunPlans`. The shared-file
+  owners in run 2 are: p11 for `tests/api/v12_rbac/test_v12_rbac_router_permissions.py`;
+  p16 for the one `screenshots.ts` selector; p06 for the bulk parts of `client.ts`, the
+  mock router and `IssueList*`; p07 for the four existing issue tests it may break.
+  Inventory tests (`tests/db/test_models.py`, `tests/notifications/**`, `tests/leak/**`,
+  the route walk) are read-only;
+- run 3: p07 (wave 3, re-verify), p12 (wave 4), p17 (wave 5), then serial finalization.
+  Manifest `completed/dispatch/telescreen-v13-20261013-e4-dispatch.json` (base ca818c3)
+  records p01-p06, p08-p11 and p13-p16 as `acceptedDependencies`. Waves A (p07), B (p12)
+  and C (p17) ran serially with one plan each, so every shared file a plan's change can
+  break was in that plan's writePaths (design section 15 "Run 3" notes). p07 was
+  re-verified green; p12 wired the v1.3 routers and passed the full Python suite (991
+  passed, 8 skipped, 0 failed) plus the API, route-permission, typing, formatting, and
+  build gates. p17 verified leak flows 1-9 (after the P17-LEAK-01 repair) and E1-E5
+  offline (998 passed, 10 skipped, 0 failed), recorded the owner-only live checks (not run
+  in the agent environment; 5 passed on the owner's dev stack), passed strict screenshots
+  (89 outputs, no skipped state or browser error), and updated README/design status. Test
+  integrity and adversarial review accepted p17; the serial finalization archived the v13
+  plans and the e1-e4 manifests.
+
+Every plan's wave is greater than the waves of its dependencies.
+
+| Plan | Wave | Depends On | Design Reference |
+|------|------|------------|------------------|
+| `completed/v13-p01-foundation.md` | W1 | - | v1.3 s2, s15 |
+| `completed/v13-p02-db.md` | W1 | - | v1.3 s13.1; design-data-model.md v1.3 additions |
+| `completed/v13-p03-ui-foundation.md` | W1 | - | design-ui-sentry.md s11.1, s11.3 |
+| `completed/v13-p04-issue-stream-backend.md` | W2 | p01, p02 | v1.3 s3 (B2, B3, B5), s4, s5 |
+| `completed/v13-p05-triage-lifecycle-backend.md` | W2 | p01, p02 | v1.3 s6.2, s6.3, s7, s8.1 |
+| `completed/v13-p08-alerts-backend.md` | W2 | p01, p02 | v1.3 s9 |
+| `completed/v13-p09-notifications-backend.md` | W2 | p01, p02 | v1.3 s10 |
+| `completed/v13-p11-directory-ownership-backend.md` | W2 | p01, p02 | v1.3 s12 |
+| `completed/v13-p13-ui-stream.md` | W2 | p03 | design-ui-sentry.md s11.2 |
+| `completed/v13-p07-issue-detail-backend.md` | W3 | p01, p02, p04 | v1.3 s3 (B1, B4, B6, B7), s8 |
+| `completed/v13-p10-dashboard-integrations-backend.md` | W3 | p01, p02, p04 | v1.3 s11, s12 |
+| `completed/v13-p14-ui-detail.md` | W3 | p03, p13 | design-ui-sentry.md s11.2 |
+| `completed/v13-p15-ui-alerts-profile.md` | W2 | p03 | design-ui-sentry.md s11.2 |
+| `completed/v13-p16-ui-dashboard-org.md` | W2 | p03 | design-ui-sentry.md s11.2 |
+| `completed/v13-p06-bulk-merge-backend.md` | W3 | p03, p04, p05, p13 | v1.3 s6, s15 (run-2 carry-over) |
+| `completed/v13-p12-wiring.md` | W4 | p04-p11 | v1.3 s2, s15 |
+| `completed/v13-p17-verification-docs.md` | W5 | p12, p13-p16 | v1.3 s14, s16 |
 
 ### v1.2 (notification templates, notification sets, roles, OIDC SSO, live verification)
 
@@ -232,6 +245,11 @@ Only plans from eligible phases should be read to minimize context loading.
 | 15 (v1.2 wave W3) | COMPLETED | Phase 14 |
 | 16 (v1.2 wave W4) | COMPLETED | Phase 15 |
 | 17 (v1.2 wave W5) | COMPLETED | Phase 16 |
+| 18 (v1.3 wave W1) | COMPLETED | Phase 17 |
+| 19 (v1.3 wave W2) | COMPLETED | Phase 18 (per-plan dependencies) |
+| 20 (v1.3 wave W3) | COMPLETED | Phase 19 (per-plan dependencies) |
+| 21 (v1.3 wave W4) | COMPLETED | Phase 20 |
+| 22 (v1.3 wave W5) | COMPLETED | Phase 21 |
 
 Run B added `p30-ui-design-system.md` and `p31-ui-mock-api.md` (wave B1, before the
 reworked p12, p13 and p14), split the end-to-end and leak tests into p28b and p28c after
@@ -266,7 +284,16 @@ PHASE_TO_PLANS = {
        "v12-p09-ui-pages.md"],
   15: ["v12-p10-api-routers.md"],
   16: ["v12-p11-wiring-cli.md"],
-  17: ["v12-p12-verification-docs.md"]
+  17: ["v12-p12-verification-docs.md"],
+  18: ["v13-p01-foundation.md", "v13-p02-db.md", "v13-p03-ui-foundation.md"],
+  19: ["v13-p04-issue-stream-backend.md", "v13-p05-triage-lifecycle-backend.md",
+       "v13-p08-alerts-backend.md", "v13-p09-notifications-backend.md",
+       "v13-p11-directory-ownership-backend.md", "v13-p13-ui-stream.md",
+       "v13-p15-ui-alerts-profile.md", "v13-p16-ui-dashboard-org.md"],
+  20: ["v13-p06-bulk-merge-backend.md", "v13-p07-issue-detail-backend.md",
+       "v13-p10-dashboard-integrations-backend.md", "v13-p14-ui-detail.md"],
+  21: ["v13-p12-wiring.md"],
+  22: ["v13-p17-verification-docs.md"]
 }
 ```
 

@@ -131,9 +131,11 @@ and never echo text.
 
 ### v1.3 endpoints
 
+Status: implemented 2026-10-13.
+
 Behavior is in `design-v1-3-sentry-parity.md` (section numbers below refer to it).
 Permissions are those of its section 2. Every new router has its own `<Area>RouterDeps` and
-is registered by the wiring plan. Validation errors never echo the query, URL, pattern or
+is registered by `build_container` through the v1.3 wiring implementation. Validation errors never echo the query, URL, pattern or
 text.
 
 | Area | Endpoint | Permission |
