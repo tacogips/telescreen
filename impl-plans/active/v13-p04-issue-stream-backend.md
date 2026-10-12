@@ -19,6 +19,8 @@
   - `src/telescreen/api/routers/issue_views.py`
   - `tests/issues/v13_query`
   - `tests/api/v13_stream`
+  - `tests/issues/test_issues_api.py`
+  - `tests/api/v11_issues/test_issues_router.py`
 - sharedPaths:
   - `src/telescreen/api/routers/issues_list.py`
   - `src/telescreen/api/routers/issues_common.py`
@@ -30,6 +32,15 @@
     fields of `_issue_json` and the new `issue_item_extras`. v13-p05 and v13-p07 never
     edit it.
 - artifactRoots: none
+- Shared-test ownership (run-1 manifest e2; design section 15): this plan owns the two
+  existing issue-API tests above because it changes the list route and the item
+  serializer they call. Edit them only for an assertion your change breaks (for example a
+  legacy filter that now goes through the parser); never weaken a masking or permission
+  assertion. v13-p05 runs both files read-only. No existing test asserts the exact item
+  key set (checked at `d8073b1`). The route walk (`tests/e2e/test_route_permissions.py`,
+  `tests/e2e/test_api_routes.py`, `tests/api/v12_rbac/**`) is not affected because
+  `issue_counts.py` and `issue_views.py` are not registered until v13-p12; do not add any
+  route to `issues_list.py`.
 
 Read `impl-plans/conventions.md` first.
 
@@ -207,7 +218,7 @@ uv run --frozen ruff format --check --no-cache src/telescreen/issues/query src/t
 uv run --frozen ruff check --no-cache src/telescreen/issues src/telescreen/api/routers tests/issues/v13_query tests/api/v13_stream
 uv run --frozen ty check src/telescreen/issues src/telescreen/api/routers tests/issues/v13_query tests/api/v13_stream
 uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p04-typelint.log 2>&1; grep -E '^(src/telescreen/issues/(query|views)|src/telescreen/api/routers/(issues_list|issues_common|issue_counts|issue_views)|tests/(issues/v13_query|api/v13_stream))' /tmp/telescreen-v13-p04-typelint.log
-uv run --frozen pytest -p no:cacheprovider tests/issues/v13_query tests/api/v13_stream tests/api/v11_issues tests/issues/test_issues_api.py 2>&1 | tee /tmp/telescreen-v13-p04-pytest.log; echo "exit=$?"
+uv run --frozen pytest -p no:cacheprovider tests/issues/v13_query tests/api/v13_stream tests/api/v11_issues tests/issues/test_issues_api.py tests/e2e/test_route_permissions.py tests/api/v12_rbac 2>&1 | tee /tmp/telescreen-v13-p04-pytest.log; echo "exit=$?"
 uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-v13-p04-pytest-all.log 2>&1; echo "exit=$?"
 ```
 

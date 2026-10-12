@@ -35,8 +35,14 @@
   - `tests/core/test_v11_foundation.py`
   - `tests/core/v12/test_permissions_and_oidc_settings.py`
   - `tests/api/v12_rbac/test_v12_rbac_router_permissions.py`
+  - `tests/notifications/v12/test_template_validation.py`
+  - `tests/e2e/test_route_permissions.py`
 - sharedPaths: none
 - artifactRoots: none
+- run-1 manifest e2 (`telescreen-v13-20261012-e2`): mode `re-verify`. The two last
+  writePaths were reconciled by the owner at `d8073b1` (30 template variables; route walk
+  over the copied sub-router routes). They are listed so a re-verify regression in them
+  is owned here; edit them only if a Verification command fails on them.
 
 Ownership handoffs (explicit; wave 1 to wave 2):
 

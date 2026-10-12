@@ -25,8 +25,17 @@
   - `src/web/src/pages/issues/StreamViews.tsx`
   - `src/web/src/pages/issues/ArchiveMenu.tsx`
   - `src/web/src/pages/issues/StreamViews.test.tsx`
+  - `src/web/scripts/screenshots.ts`
 - sharedPaths: none
 - artifactRoots: none
+- Shared-file ownership (run-1 manifest e2; design section 15): `screenshots.ts` was
+  written by v13-p03 in wave 1 and is handed to this plan for wave 2. Edit only the
+  stream state steps (tabs, period, bulk selection, archive menu, views, banner) so their
+  selectors match the new DOM; keep every route and state that p03 listed and keep the
+  `TELESCREEN_SCREENSHOTS_STRICT` handling. No other page or component test imports the
+  stream modules at `d8073b1` (`pages/issues/index.tsx` only imports `IssueList`, keep its
+  export name). `src/web/src/components/ui/ui.test.tsx` covers `SearchQueryBuilder`, which
+  is p03-owned and must not be edited here.
 
 `ArchiveMenu.tsx` is shared UI that v13-p14 imports read-only in its header; only this
 plan edits it.
@@ -133,9 +142,12 @@ bun install --frozen-lockfile > /tmp/telescreen-v13-p13-install.log 2>&1; echo "
 bun run typecheck 2>&1 | tee /tmp/telescreen-v13-p13-typecheck.log; echo "exit=$?"
 bun run test 2>&1 | tee /tmp/telescreen-v13-p13-test.log; echo "exit=$?"
 bun run build --outDir /tmp/telescreen-v13-p13-web --emptyOutDir 2>&1 | tee /tmp/telescreen-v13-p13-build.log; echo "exit=$?"
+bun run screenshots 2>&1 | tee /tmp/telescreen-v13-p13-shots.log; echo "exit=$?"
 ```
 
-Expected: each command exits 0, and the whole vitest suite passes.
+Expected: each command exits 0, the whole vitest suite passes, and the non-strict
+screenshot smoke reports zero page or console errors. A missing browser is a recorded
+verification gap, never a pass.
 
 ## Completion Criteria
 

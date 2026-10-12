@@ -806,13 +806,13 @@ No plan changes `pyproject.toml`, `uv.lock`, `src/web/package.json` or `bun.lock
 | 1 | v13-p03-ui-foundation | `src/web/src/api/**` (types, client, mock router and the realistic seed for every v1.3 endpoint), `src/web/src/components/**` (Avatar, PeriodPicker, StreamTabs, Sparkline use, palette search, shortcut registry and help overlay, nav rename), `src/web/src/{routes,App}.tsx`, `src/web/src/shell.test.tsx`, stub `index.tsx` for the new page directories, `src/web/scripts/screenshots.ts` (all new routes and states) | - |
 | 2 | v13-p04-issue-stream-backend | `src/telescreen/issues/query/**`, `src/telescreen/issues/views.py`, `src/telescreen/api/routers/issues_list.py`, `src/telescreen/api/routers/issues_common.py` (single wave-2 owner of the shared item serializer; see the notes), any existing issue-API test that asserts the exact item key set (none found at `57f389b` in `tests/issues/test_issues_api.py` or `tests/api/v11_issues/**`; if one appears, p04 owns it), new `src/telescreen/api/routers/{issue_counts,issue_views}.py`, `tests/issues/v13_query/**`, `tests/api/v13_stream/**` (B2, B3, B5, S1, S2) | p01, p02 |
 | 2 | v13-p05-triage-lifecycle-backend | `src/telescreen/issues/{service,ingest_transitions,lifecycle,repository,exceptions,policy_apply,archive,groups}.py`, `src/telescreen/api/routers/issues_actions.py`, new `src/telescreen/api/routers/issue_triage.py` (archive, unarchive, review), `tests/issues/v13_lifecycle/**` (S4, priority, review, group coordination, `ArchiveMaintenanceProvider`, findings observer and activity calls, clearing archive fields on exception approval) | p01, p02 |
-| 2 | v13-p07-issue-detail-backend | `src/telescreen/issues/{activity,external}/**`, `src/telescreen/api/routers/{issues_detail,issues_comments}.py`, new `src/telescreen/api/routers/{issue_events,issue_activity,issue_external}.py`, `tests/issues/v13_detail/**`, `tests/api/v13_detail/**` (B1, B4, B6, B7, S5) | p01, p02 |
+| 3 | v13-p07-issue-detail-backend | `src/telescreen/issues/{activity,external}/**`, `src/telescreen/api/routers/{issues_detail,issues_comments}.py`, new `src/telescreen/api/routers/{issue_events,issue_activity,issue_external}.py`, `tests/issues/v13_detail/**`, `tests/api/v13_detail/**` (B1, B4, B6, B7, S5) | p01, p02, p04 |
 | 2 | v13-p08-alerts-backend | new `src/telescreen/alerts/**`, `src/telescreen/workflow/triggers/**` (`RunStarter`), `src/telescreen/api/routers/workflows.py`, new `src/telescreen/api/routers/alerts.py`, `tests/alerts/**`, `tests/workflow/v13/**` (S6, workflows list) | p01, p02 |
 | 2 | v13-p09-notifications-backend | `src/telescreen/notifications/**` (settings, `send_to_member`, category filter, tester, outbound guard, weekly report, built-ins), new `src/telescreen/api/routers/notification_settings.py`, `tests/notifications/v13/**` (S7) | p01, p02 |
-| 2 | v13-p10-dashboard-integrations-backend | new `src/telescreen/issues/dashboard.py` (`IssueReportSource`), new `src/telescreen/integrations/**`, new `src/telescreen/api/routers/{dashboard,integrations}.py`, `tests/issues/v13_dashboard/**`, `tests/integrations/**` (S8, S9 integrations) | p01, p02 |
+| 3 | v13-p10-dashboard-integrations-backend | new `src/telescreen/issues/dashboard.py` (`IssueReportSource`), new `src/telescreen/integrations/**`, new `src/telescreen/api/routers/{dashboard,integrations}.py`, `tests/issues/v13_dashboard/**`, `tests/integrations/**` (S8, S9 integrations) | p01, p02, p04 |
 | 2 | v13-p11-directory-ownership-backend | `src/telescreen/directory/**` (member edit, deactivate, `ActorDirectory`, self tokens), `src/telescreen/issues/{routing,ownership}.py`, `src/telescreen/api/routers/{directory,users}.py`, new `src/telescreen/api/routers/ownership.py`, `tests/directory/v13/**`, `tests/issues/v13_ownership/**` (S9) | p01, p02 |
 | 2 | v13-p13-ui-stream | `src/web/src/pages/issues/{IssueList*,IssueBulkActions,query*,savedViews,issues.css,index}.ts(x)` and their tests | p03 |
-| 2 | v13-p14-ui-detail | `src/web/src/pages/issues/detail/**`, `src/web/src/pages/issues/{IssueDetail*,issue-detail.css,uploadEvidence}.ts(x)` | p03 |
+| 3 | v13-p14-ui-detail | `src/web/src/pages/issues/detail/**`, `src/web/src/pages/issues/{IssueDetail*,issue-detail.css,uploadEvidence}.ts(x)` | p03, p13 |
 | 2 | v13-p15-ui-alerts-profile | new `src/web/src/pages/{alerts,profile}/**` | p03 |
 | 2 | v13-p16-ui-dashboard-org | new `src/web/src/pages/dashboard/**`, `src/web/src/pages/{settings,workflows}/**` | p03 |
 | 3 | v13-p06-bulk-merge-backend | new `src/telescreen/issues/{bulk,merge}.py`, new `src/telescreen/api/routers/issue_bulk.py`, `tests/issues/v13_bulk/**` (S3) | p04, p05 |
@@ -850,16 +850,34 @@ Plan-to-file notes:
 - p07 implements `IssueActivityNotifier`; p05 and p07 call it through the port.
 - A plan that breaks a shared exact-count or inventory test owns that test. Known owners:
   `tests/db/test_models.py` (p02); the route tests (p12); the page `*.test.tsx` files (the
-  page plan); `src/web/src/api/mock/*.test.ts` and the screenshot list (p03); `tests/leak/**`
-  (p17).
+  page plan); `src/web/src/api/mock/*.test.ts` and the screenshot list (p03); new
+  `tests/leak/**` v13 files (p17).
+- Shared-test ownership per dispatch manifest (added 2026-10-12 after the run-1 blockers,
+  which were all tests outside the breaking plan's writePaths). Before a manifest is
+  written, each plan is checked against the existing tests its change can break, and every
+  such file is listed by exact path in that plan's manifest `writePaths`. Plans in the same
+  wave split these files one owner per file; a plan that does not own a file must leave it
+  passing unchanged, and a failure there is a reconciliation request, not an edit. A plan
+  in a later wave may own a file that an earlier wave owned (for example
+  `src/web/scripts/screenshots.ts`: p03 in wave 1, p13 in wave 2 for stream selectors).
+  The route walk (`tests/e2e/test_route_permissions.py`, `tests/e2e/test_api_routes.py`)
+  and `tests/api/v12_rbac/test_v12_rbac_router_permissions.py` see only routers built by
+  `build_container`, so new unregistered router modules (wave 2) do not change them; they
+  are owned by p12 unless a wave-2 plan adds a route to an already registered module.
 
-Runs (at most 8 plans each; later runs record accepted plans as `acceptedDependencies`):
+Runs (at most 8 plans each; later runs record accepted plans as `acceptedDependencies`).
+The plan waves above are authoritative; a run dispatches whole waves or wave slices in
+order:
 
 | Run | Plans |
 |-----|-------|
-| 1 | p01, p02, p03, p04, p05, p07, p09, p13 |
-| 2 | p06, p08, p10, p11, p14, p15, p16 |
-| 3 | p12, p17 |
+| 1 | p01, p02, p03 (wave 1); p04, p05, p09, p13 (wave 2) |
+| 2 | p08, p11, p15, p16 (wave 2); p06, p07, p10, p14 (wave 3) |
+| 3 | p12 (wave 4), p17 (wave 5) |
+
+Run 1 was dispatched twice: manifest `telescreen-v13-20261012-e1` (blocked on write paths;
+the owner reconciled at `d8073b1`) and `telescreen-v13-20261012-e2` (same scope; p01 and
+p02 in re-verify mode, p03 finishing its remaining deliverables).
 
 ### 16. Verification
 

@@ -23,6 +23,20 @@
   - `src/telescreen/issues/groups.py`
   - `src/telescreen/api/routers/issue_triage.py`
   - `tests/issues/v13_lifecycle`
+  - `tests/issues/test_issues.py`
+  - `tests/issues/v11_policy`
+  - `tests/issues/v11_record`
+  - `tests/issues/v11_remediation`
+  - `tests/e2e/test_flow_ingest.py`
+  - `tests/e2e/test_flow_v11_policy.py`
+  - `tests/e2e/test_flow_v11_owner_health.py`
+  - `tests/e2e/test_flow_v11_remediation.py`
+  - `tests/leak/flows.py`
+  - `tests/leak/test_leak_matrix.py`
+  - `tests/leak/flows_v11.py`
+  - `tests/leak/test_leak_matrix_v11.py`
+  - `tests/assistant/test_assistant.py`
+  - `tests/evidence/test_evidence.py`
 - sharedPaths:
   - `src/telescreen/api/routers/issues_actions.py`
 - sharedPathNotes:
@@ -30,6 +44,18 @@
     move). This plan is its only wave-2 editor: `IssuePatchBody.priority` and the PATCH
     status rejections.
 - artifactRoots: none
+- Shared-test ownership (run-1 manifest e2; design section 15): the existing tests listed
+  after `tests/issues/v13_lifecycle` read issue rows, issue history or the ingest path
+  that this plan changes (priority, `needs_review`, `OPEN_STATUSES`/`RECONCILED_STATUSES`,
+  the `ingest_transitions.py` move). Expect them to pass unchanged; edit one only when
+  an assertion encodes a v1.2 fact the design changes (for example an exact history row
+  count that now includes a v1.3 row), and record the reason in the Progress Log. Never
+  weaken a leak assertion: a leak failure is a defect in your source change.
+  Read-only for this plan: `tests/issues/test_issues_api.py` and
+  `tests/api/v11_issues/test_issues_router.py` (owned by v13-p04), `tests/leak/harness.py`,
+  `tests/leak/sinks.py` (v13-p09) and every route-walk test. A failure there is a
+  Reconciliation request. `issue_triage.py` is not registered until v13-p12, so the route
+  walk does not change; do not add routes to `issues_actions.py`.
 
 Read `impl-plans/conventions.md` first.
 
@@ -237,7 +263,8 @@ uv run --frozen ruff format --check --no-cache src/telescreen/issues src/telescr
 uv run --frozen ruff check --no-cache src/telescreen/issues src/telescreen/api/routers tests/issues
 uv run --frozen ty check src/telescreen/issues src/telescreen/api/routers tests/issues
 uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p05-typelint.log 2>&1; grep -E '^(src/telescreen/issues/(service|ingest_transitions|lifecycle|repository|exceptions|policy_apply|archive|groups)|src/telescreen/api/routers/(issues_actions|issue_triage)|tests/issues/v13_lifecycle)' /tmp/telescreen-v13-p05-typelint.log
-uv run --frozen pytest -p no:cacheprovider tests/issues tests/api/v11_issues 2>&1 | tee /tmp/telescreen-v13-p05-pytest.log; echo "exit=$?"
+uv run --frozen pytest -p no:cacheprovider tests/issues tests/api/v11_issues --ignore=tests/issues/v13_query 2>&1 | tee /tmp/telescreen-v13-p05-pytest.log; echo "exit=$?"
+uv run --frozen pytest -p no:cacheprovider tests/e2e/test_flow_ingest.py tests/e2e/test_flow_v11_policy.py tests/e2e/test_flow_v11_owner_health.py tests/e2e/test_flow_v11_remediation.py tests/leak/test_leak_matrix.py tests/leak/test_leak_matrix_v11.py tests/assistant/test_assistant.py tests/evidence/test_evidence.py 2>&1 | tee /tmp/telescreen-v13-p05-pytest-shared.log; echo "exit=$?"
 uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-v13-p05-pytest-all.log 2>&1; echo "exit=$?"
 ```
 

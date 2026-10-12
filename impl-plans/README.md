@@ -50,9 +50,12 @@ note.
 Dispatch runs (at most 8 plans each; later runs record accepted plans as
 `acceptedDependencies`):
 
-- run 1: p01, p02, p03, p04, p05, p09, p13 (7 plans);
-- run 2: p06, p07, p08, p10, p11, p14, p15, p16 (8 plans);
-- run 3: p12, p17.
+- run 1: p01, p02, p03 (wave 1); p04, p05, p09, p13 (wave 2) (7 plans). Manifest
+  `active/telescreen-v13-20261012-e1-dispatch.json` was blocked on write paths (owner
+  reconciled at `d8073b1`); `active/telescreen-v13-20261012-e2-dispatch.json` redispatches
+  the same scope (p01 and p02 re-verify, p03 finishes);
+- run 2: p08, p11, p15, p16 (wave 2); p06, p07, p10, p14 (wave 3) (8 plans);
+- run 3: p12 (wave 4), p17 (wave 5).
 
 Every plan's wave is greater than the waves of its dependencies.
 

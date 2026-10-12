@@ -22,6 +22,13 @@
   - `src/telescreen/notifications/weekly.py`
   - `src/telescreen/api/routers/notification_settings.py`
   - `tests/notifications/v13`
+  - `tests/notifications/test_notifications.py`
+  - `tests/notifications/v12`
+  - `tests/e2e/test_flow_v12_notifications.py`
+  - `tests/e2e/test_wiring_v12.py`
+  - `tests/leak/flows_v12.py`
+  - `tests/leak/test_leak_matrix_v12.py`
+  - `tests/leak/sinks.py`
 - sharedPaths:
   - `src/telescreen/notifications/templates/builtins.py`
   - `src/telescreen/notifications/templates/variables.py`
@@ -32,6 +39,16 @@
   - `src/telescreen/notifications/templates/variables.py`: from v13-p01. Same rule.
   - `src/telescreen/notifications/templates/synthetic.py`: from v13-p01. Same rule.
 - artifactRoots: none
+- Shared-test ownership (run-1 manifest e2; design section 15): the existing tests listed
+  after `tests/notifications/v13` read `NotificationRow` or build `NotificationService`.
+  Uncategorized v1.2 requests must stay byte-for-byte unchanged, so they are expected to
+  pass unchanged. Edit one only for an assertion that a v1.3 design fact breaks (for
+  example a row now carrying `category`), and record the reason in the Progress Log.
+  Never weaken a leak or DLP assertion. `tests/notifications/v12/test_template_validation.py`
+  already expects 30 variables (owner fix at `d8073b1`); keep it at 30 unless this plan
+  adds a v1.3 variable path. `notification_settings.py` is not registered until v13-p12,
+  so the route walk does not change. Read-only: `tests/leak/harness.py` and every
+  route-walk test.
 
 Read `impl-plans/conventions.md` first.
 
@@ -166,6 +183,7 @@ uv run --frozen ruff check --no-cache src/telescreen/notifications src/telescree
 uv run --frozen ty check src/telescreen/notifications src/telescreen/api/routers tests/notifications
 uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p09-typelint.log 2>&1; grep -E '^(src/telescreen/notifications|src/telescreen/api/routers/notification_settings|tests/notifications/v13)' /tmp/telescreen-v13-p09-typelint.log
 uv run --frozen pytest -p no:cacheprovider tests/notifications 2>&1 | tee /tmp/telescreen-v13-p09-pytest.log; echo "exit=$?"
+uv run --frozen pytest -p no:cacheprovider tests/e2e/test_flow_v12_notifications.py tests/e2e/test_wiring_v12.py tests/leak/test_leak_matrix_v12.py 2>&1 | tee /tmp/telescreen-v13-p09-pytest-shared.log; echo "exit=$?"
 uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-v13-p09-pytest-all.log 2>&1; echo "exit=$?"
 ```
 

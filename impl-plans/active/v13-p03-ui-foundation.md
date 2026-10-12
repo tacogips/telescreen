@@ -21,6 +21,15 @@
   - `src/web/scripts/screenshots.ts`
 - sharedPaths: none
 - artifactRoots: none
+- run-1 manifest e2 (`telescreen-v13-20261012-e2`): mode `implement` (finish). The
+  `src/web/src/components` writePath includes `components/shell/PrimaryRail.tsx` and
+  `components/ui/**`; the owner already added the Dashboard and Alerts rail icons. The
+  three vitest failures at `d8073b1` are in `src/web/src/shell.test.tsx` (rail order;
+  nav "For review" renamed "Assigned to me"; localStorage saved views removed from the
+  nav) and `src/web/src/api/mock/mock.test.ts` (risk-order expectation after the 40-issue
+  seed). Fix the tests to the accepted design, not the design to the tests. Never edit
+  `tests/leak/test_ui_fixtures.py`: if it fails, change the fixture. `screenshots.ts`
+  is handed to v13-p13 after this wave.
 
 No page files are created here. `routes.tsx:AreaPage` already renders `Unavailable` for an
 area without `pages/<area>/index.tsx`. The page directories therefore belong entirely to
