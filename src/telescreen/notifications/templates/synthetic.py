@@ -35,6 +35,15 @@ _SYNTHETIC: NotificationContext = NotificationContext(
         "last_failure_at=2026-01-01T00:00:00+00:00; consecutive_failures=3; "
         "public_unscannable=0"
     ),
+    alert_rule="Example alert",
+    alert_trigger="frequency",
+    alert_count="10",
+    alert_window="1h",
+    activity_kind="commented",
+    activity_actor="Example Member",
+    comment_excerpt="Example comment",
+    report_summary="Open issues: 3",
+    report_assigned_open="1",
 )
 
 

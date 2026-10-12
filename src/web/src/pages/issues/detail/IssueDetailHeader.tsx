@@ -25,6 +25,8 @@ const ALLOWED_TRANSITIONS: Readonly<
   ignored: ["unresolved"],
   allowed: ["unresolved"],
   pending_verification: ["unresolved"],
+  escalating: ["acknowledged", "in_progress", "unresolved"],
+  archived: ["unresolved"],
 };
 
 function severity(value: string): "critical" | "high" | "medium" {

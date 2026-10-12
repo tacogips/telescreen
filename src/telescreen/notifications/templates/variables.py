@@ -25,6 +25,15 @@ VARIABLE_FIELDS: tuple[tuple[str, str], ...] = (
     ("health.target", "health_target"),
     ("health.condition", "health_condition"),
     ("health.details", "health_details"),
+    ("alert.rule", "alert_rule"),
+    ("alert.trigger", "alert_trigger"),
+    ("alert.count", "alert_count"),
+    ("alert.window", "alert_window"),
+    ("activity.kind", "activity_kind"),
+    ("activity.actor", "activity_actor"),
+    ("comment.excerpt", "comment_excerpt"),
+    ("report.summary", "report_summary"),
+    ("report.assigned_open", "report_assigned_open"),
 )
 
 _ISSUE: str = "issue"
@@ -34,6 +43,10 @@ _TASK: str = "task"
 _ASSIGNEE: str = "assignee"
 _DIGEST: str = "digest"
 _HEALTH: str = "health"
+_ALERT: str = "alert"
+_ACTIVITY: str = "activity"
+_COMMENT: str = "comment"
+_REPORT: str = "report"
 
 EVENT_GROUPS: tuple[tuple[NotificationEvent, tuple[str, ...]], ...] = (
     (NotificationEvent.WORKFLOW_NOTIFY, (_ISSUE, _RUN, _STEP, _TASK, _ASSIGNEE)),
@@ -46,6 +59,12 @@ EVENT_GROUPS: tuple[tuple[NotificationEvent, tuple[str, ...]], ...] = (
     (NotificationEvent.VERIFICATION_INCONCLUSIVE, (_ISSUE,)),
     (NotificationEvent.COLLECTOR_HEALTH_ALERT, (_HEALTH,)),
     (NotificationEvent.POLICE_HEALTH_ALERT, (_HEALTH,)),
+    (NotificationEvent.ALERT_FIRED, (_ALERT, _ISSUE)),
+    (NotificationEvent.ISSUE_ASSIGNED, (_ISSUE, _ACTIVITY)),
+    (NotificationEvent.ISSUE_MENTIONED, (_ACTIVITY, _COMMENT, _ISSUE)),
+    (NotificationEvent.ISSUE_ACTIVITY, (_ISSUE, _ACTIVITY, _COMMENT)),
+    (NotificationEvent.WEEKLY_REPORT, (_REPORT,)),
+    (NotificationEvent.INTEGRATION_TEST, (_HEALTH,)),
 )
 
 

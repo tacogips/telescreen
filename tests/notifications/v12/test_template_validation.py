@@ -39,9 +39,9 @@ def issues_of(
 
 
 def test_variable_table_matches_context_fields() -> None:
-    """All 21 variables map to distinct NotificationContext fields."""
+    """All 30 variables (21 from v1.2, 9 added by v1.3 events) map to distinct context fields."""
     context_fields: set[str] = {item.name for item in fields(NotificationContext)}
-    assert len(VARIABLE_FIELDS) == 21
+    assert len(VARIABLE_FIELDS) == 30
     assert {pair[1] for pair in VARIABLE_FIELDS} == context_fields
     assert lookup(NotificationContext(issue_risk_score=7), "issue.risk_score") == "7"
     assert lookup(NotificationContext(), "issue.title") == ""

@@ -10,7 +10,7 @@ from typing import Protocol
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.core.json import JsonValue, json_null
-from telescreen.core.vocabulary import EngineTaskKind, ErrorCode
+from telescreen.core.vocabulary import EngineTaskKind, ErrorCode, IssueEventKind, RunTrigger
 
 
 class StepSignalKind(StrEnum):
@@ -126,4 +126,20 @@ class ScheduleProvider(Protocol):
 
     async def tick(self, session: AsyncSession, now: datetime) -> int:
         """Create due work and return the count created."""
+        ...
+
+
+class RunStarter(Protocol):
+    """Start issue workflows and inspect event triggers."""
+
+    async def start_for_issue(
+        self, session: AsyncSession, workflow_name: str, issue_id: str, trigger: RunTrigger
+    ) -> str | None:
+        """Start a workflow for an issue, or return None when it cannot start."""
+        ...
+
+    async def trigger_events(
+        self, session: AsyncSession, workflow_name: str
+    ) -> tuple[IssueEventKind, ...] | None:
+        """Return configured event triggers, or None when the workflow is absent."""
         ...

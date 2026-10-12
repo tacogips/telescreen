@@ -3,6 +3,7 @@ import { eventFixtures, historyFixtures, issueFixtures, maskedExamples } from ".
 import { auditFixtures, collectorFixtures, escalationFixtures, evidenceFixtures, mapJobFixtures, policeFixtures, runDetailFixture, runFixtures, searchFixtures, taskFixtures } from "./fixtures/operations";
 import { memberFixtures, teamFixtures } from "./fixtures/directory";
 import { coverageResourceFixtures, exceptionFixtures, occurrenceFixtures, policyFixtures, policyVersionFixtures, v11Issues } from "./fixtures/v11";
+import { v13AlertFires, v13AlertRules, v13Integrations, v13Issues, v13OwnershipRules, v13Settings, v13Tokens } from "./fixtures/v13";
 
 function luhnValid(value: string): boolean {
   const digits = [...value].map(Number);
@@ -17,6 +18,7 @@ function luhnValid(value: string): boolean {
 
 const serializedFixtures = JSON.stringify({ issueFixtures, eventFixtures, historyFixtures, maskedExamples, auditFixtures, collectorFixtures, escalationFixtures, evidenceFixtures, mapJobFixtures, policeFixtures, runDetailFixture, runFixtures, searchFixtures, taskFixtures, memberFixtures, teamFixtures });
 const serializedV11Fixtures = JSON.stringify({ v11Issues, occurrenceFixtures, exceptionFixtures, policyFixtures, policyVersionFixtures, coverageResourceFixtures });
+const serializedV13Fixtures = JSON.stringify({ v13Issues, v13AlertFires, v13AlertRules, v13Integrations, v13OwnershipRules, v13Settings, v13Tokens });
 
 describe("masked fixture corpus", () => {
   it("keeps the v1.1 fixtures free of file names", () => {
@@ -34,9 +36,21 @@ describe("masked fixture corpus", () => {
       /\d{12}/,
       /[A-Za-z0-9._%+-]+@(?!example\.(?:com|org|net)\b|[A-Za-z0-9.-]+\.invalid\b)[A-Za-z0-9.-]+\.[A-Za-z]{2,}/,
     ];
-    expect(patterns.some((pattern) => pattern.test(serializedFixtures))).toBe(false);
-    expect([...serializedFixtures.matchAll(/\b\d{13,19}\b/g)].map(([value]) => value).every(luhnValid)).toBe(true);
-    expect(serializedFixtures).not.toMatch(/\d{8,}/);
+    expect(patterns.some((pattern) => pattern.test(`${serializedFixtures}${serializedV13Fixtures}`))).toBe(false);
+    expect([...`${serializedFixtures}${serializedV13Fixtures}`.matchAll(/\b\d{13,19}\b/g)].map(([value]) => value).every(luhnValid)).toBe(true);
+    expect(`${serializedFixtures}${serializedV13Fixtures}`).not.toMatch(/\d{8,}/);
+  });
+
+  it("seeds v1.3 with at least two issues in every status and all dimensions", () => {
+    expect(v13Issues.length).toBeGreaterThanOrEqual(40);
+    for (const status of ["unresolved", "acknowledged", "in_progress", "regressed", "escalating", "archived", "resolved", "ignored", "allowed", "pending_verification"]) {
+      expect(v13Issues.filter((issue) => issue.status === status).length).toBeGreaterThanOrEqual(2);
+    }
+    expect(new Set(v13Issues.map((issue) => issue.source)).size).toBeGreaterThanOrEqual(7);
+    expect(new Set(v13Issues.map((issue) => issue.severity)).size).toBe(3);
+    expect(new Set(v13Issues.map((issue) => issue.priority)).size).toBe(3);
+    expect(new Set(v13Issues.map((issue) => issue.exposure_visibility)).size).toBe(7);
+    expect(v13Issues.filter((issue) => issue.merged_into_id === "v13-iss-01")).toHaveLength(2);
   });
 
   it("includes approved masked examples for every fixture kind", () => {

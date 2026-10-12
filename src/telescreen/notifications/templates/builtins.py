@@ -57,6 +57,39 @@ BUILTIN_TEMPLATES: tuple[BuiltinTemplate, ...] = (
         "Telescreen health: police {{ health.target }} {{ health.condition }}",
         "Police worker {{ health.target }} is silent.",
     ),
+    _builtin(
+        NotificationEvent.ALERT_FIRED,
+        "Telescreen alert: {{ alert.rule }} {{ issue.short_id }}",
+        (
+            "{{ issue.title }}\n{{ alert.trigger }} {{ alert.count }} "
+            "{{ alert.window }}\n{{ issue.link }}"
+        ),
+    ),
+    _builtin(
+        NotificationEvent.ISSUE_ASSIGNED,
+        "Assigned to you: {{ issue.short_id }}",
+        "{{ issue.title }}\nby {{ activity.actor }}\n{{ issue.link }}",
+    ),
+    _builtin(
+        NotificationEvent.ISSUE_MENTIONED,
+        "{{ activity.actor }} mentioned you on {{ issue.short_id }}",
+        "{{ comment.excerpt }}\n{{ issue.link }}",
+    ),
+    _builtin(
+        NotificationEvent.ISSUE_ACTIVITY,
+        "{{ issue.short_id }}: {{ activity.kind }}",
+        "{{ activity.actor }}\n{{ comment.excerpt }}\n{{ issue.link }}",
+    ),
+    _builtin(
+        NotificationEvent.WEEKLY_REPORT,
+        "Telescreen weekly report",
+        "{{ report.summary }}\nAssigned to you and open: {{ report.assigned_open }}",
+    ),
+    _builtin(
+        NotificationEvent.INTEGRATION_TEST,
+        "Telescreen test notification",
+        "Test from {{ health.target }}",
+    ),
 )
 
 

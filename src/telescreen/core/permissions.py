@@ -49,14 +49,37 @@ class Permission(StrEnum):
     TOKENS_WRITE = "tokens.write"
     AUTH_SELF = "auth.self"
     INGEST_PUSH = "ingest.push"
+    VIEWS_READ = "views.read"
+    VIEWS_WRITE = "views.write"
+    VIEWS_MANAGE_SHARED = "views.manage_shared"
+    ISSUES_FOLLOW = "issues.follow"
+    COMMENTS_MANAGE_ANY = "comments.manage_any"
+    EXTERNAL_ISSUES_WRITE = "external_issues.write"
+    ALERTS_READ = "alerts.read"
+    ALERTS_WRITE = "alerts.write"
+    ALERTS_MUTE = "alerts.mute"
+    PROFILE_SELF = "profile.self"
+    INTEGRATIONS_READ = "integrations.read"
+    INTEGRATIONS_TEST = "integrations.test"
+    OWNERSHIP_READ = "ownership.read"
+    OWNERSHIP_WRITE = "ownership.write"
 
 
 READ_PERMISSIONS: frozenset[Permission] = frozenset(
     permission
     for permission in Permission
     if permission.value.endswith(".read")
-    and permission not in (Permission.USERS_READ, Permission.TOKENS_READ)
-) | frozenset((Permission.CHAT_USE, Permission.AUTH_SELF))
+    and permission
+    not in (Permission.USERS_READ, Permission.TOKENS_READ, Permission.INTEGRATIONS_READ)
+) | frozenset(
+    (
+        Permission.CHAT_USE,
+        Permission.AUTH_SELF,
+        Permission.VIEWS_WRITE,
+        Permission.ISSUES_FOLLOW,
+        Permission.PROFILE_SELF,
+    )
+)
 WRITE_PERMISSIONS: frozenset[Permission] = READ_PERMISSIONS | frozenset(
     (
         Permission.ISSUES_WRITE,
@@ -65,6 +88,9 @@ WRITE_PERMISSIONS: frozenset[Permission] = READ_PERMISSIONS | frozenset(
         Permission.RUNS_WRITE,
         Permission.HUMAN_TASKS_COMPLETE,
         Permission.EVIDENCE_UPLOAD,
+        Permission.VIEWS_MANAGE_SHARED,
+        Permission.EXTERNAL_ISSUES_WRITE,
+        Permission.ALERTS_MUTE,
     )
 )
 ALL_PERMISSIONS: frozenset[Permission] = frozenset(Permission)

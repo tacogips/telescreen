@@ -5,7 +5,13 @@ from typing import Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from telescreen.core.vocabulary import DlpVerdict, NotificationChannel, NotificationEvent
+from telescreen.core.vocabulary import (
+    DlpVerdict,
+    ErrorCode,
+    NotificationCategory,
+    NotificationChannel,
+    NotificationEvent,
+)
 
 
 @dataclass(frozen=True)
@@ -33,6 +39,15 @@ class NotificationContext:
     health_target: str | None = None
     health_condition: str | None = None
     health_details: str | None = None
+    alert_rule: str | None = None
+    alert_trigger: str | None = None
+    alert_count: str | None = None
+    alert_window: str | None = None
+    activity_kind: str | None = None
+    activity_actor: str | None = None
+    comment_excerpt: str | None = None
+    report_summary: str | None = None
+    report_assigned_open: str | None = None
 
 
 @dataclass(frozen=True)
@@ -60,6 +75,7 @@ class NotificationRequest:
     set_name: str | None = None
     target_index: int | None = None
     record_unreachable: bool = False
+    category: NotificationCategory | None = None
 
 
 @dataclass(frozen=True)
@@ -79,4 +95,58 @@ class NotificationSender(Protocol):
         self, session: AsyncSession, request: NotificationRequest
     ) -> NotificationReceipt:
         """Apply DLP and queue a notification."""
+        ...
+
+
+@dataclass(frozen=True)
+class MemberNotification:
+    """One member-directed notification and its allow-listed context."""
+
+    member_id: str
+    category: NotificationCategory
+    event: NotificationEvent
+    context: NotificationContext
+    issue_id: str | None = None
+
+
+class MemberNotifier(Protocol):
+    """Send a category-tagged notification to one member."""
+
+    async def send_to_member(
+        self, session: AsyncSession, notification: MemberNotification
+    ) -> NotificationReceipt:
+        """Queue the member notification in the caller transaction."""
+        ...
+
+
+@dataclass(frozen=True)
+class TestOutcome:
+    """Safe outcome of a notification channel test."""
+
+    ok: bool
+    error_code: ErrorCode | None
+    notification_id: str | None
+
+
+class NotificationTester(Protocol):
+    """Send a test notification using its own transaction."""
+
+    async def send_test(self, channel: NotificationChannel, member_id: str) -> TestOutcome:
+        """Send one test to the specified member and channel."""
+        ...
+
+
+@dataclass(frozen=True)
+class GuardVerdict:
+    """Count-only result of inspecting outbound content."""
+
+    allowed: bool
+    hit_count: int
+
+
+class OutboundContentGuard(Protocol):
+    """Inspect content before it leaves the application boundary."""
+
+    async def inspect(self, text: str) -> GuardVerdict:
+        """Return whether content passes outbound checks without returning matches."""
         ...

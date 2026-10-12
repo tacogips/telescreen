@@ -1,8 +1,10 @@
 """Per-router table test: every route declares exactly one permission or external kind."""
 
 from dataclasses import dataclass
+from typing import Protocol, runtime_checkable
 
 import pytest
+from fastapi import APIRouter
 from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute
 
@@ -36,18 +38,24 @@ class Declared:
 
 TABLE: tuple[RouteRule, ...] = (
     RouteRule("health", "GET", "/api/health", external=ExternalAuthKind.PUBLIC),
-    RouteRule("issues", "GET", "/api/issues", Permission.ISSUES_READ),
-    RouteRule("issues", "GET", "/api/issues/stats", Permission.ISSUES_READ),
-    RouteRule("issues", "GET", "/api/issues/{issue_id}", Permission.ISSUES_READ),
-    RouteRule("issues", "GET", "/api/issues/{issue_id}/events", Permission.ISSUES_READ),
-    RouteRule("issues", "GET", "/api/issues/{issue_id}/history", Permission.ISSUES_READ),
-    RouteRule("issues", "GET", "/api/issues/{issue_id}/occurrences", Permission.ISSUES_READ),
-    RouteRule("issues", "POST", "/api/issues/{issue_id}/remediation", Permission.ISSUES_WRITE),
-    RouteRule("issues", "POST", "/api/issues/{issue_id}/resolve", Permission.ISSUES_WRITE),
-    RouteRule("issues", "POST", "/api/issues/{issue_id}/release", Permission.ISSUES_WRITE),
-    RouteRule("issues", "PATCH", "/api/issues/{issue_id}", Permission.ISSUES_WRITE),
-    RouteRule("issues", "POST", "/api/issues/{issue_id}/comments", Permission.ISSUES_WRITE),
-    RouteRule("issues", "POST", "/api/issues/{issue_id}/exceptions", Permission.EXCEPTIONS_WRITE),
+    RouteRule("issues_list", "GET", "/api/issues", Permission.ISSUES_READ),
+    RouteRule("issues_list", "GET", "/api/issues/stats", Permission.ISSUES_READ),
+    RouteRule("issues_detail", "GET", "/api/issues/{issue_id}", Permission.ISSUES_READ),
+    RouteRule("issues_detail", "GET", "/api/issues/{issue_id}/events", Permission.ISSUES_READ),
+    RouteRule("issues_detail", "GET", "/api/issues/{issue_id}/history", Permission.ISSUES_READ),
+    RouteRule("issues_detail", "GET", "/api/issues/{issue_id}/occurrences", Permission.ISSUES_READ),
+    RouteRule(
+        "issues_actions", "POST", "/api/issues/{issue_id}/remediation", Permission.ISSUES_WRITE
+    ),
+    RouteRule("issues_actions", "POST", "/api/issues/{issue_id}/resolve", Permission.ISSUES_WRITE),
+    RouteRule("issues_actions", "POST", "/api/issues/{issue_id}/release", Permission.ISSUES_WRITE),
+    RouteRule("issues_actions", "PATCH", "/api/issues/{issue_id}", Permission.ISSUES_WRITE),
+    RouteRule(
+        "issues_comments", "POST", "/api/issues/{issue_id}/comments", Permission.ISSUES_WRITE
+    ),
+    RouteRule(
+        "issues_actions", "POST", "/api/issues/{issue_id}/exceptions", Permission.EXCEPTIONS_WRITE
+    ),
     RouteRule("exceptions", "GET", "/api/exceptions", Permission.EXCEPTIONS_READ),
     RouteRule(
         "exceptions", "POST", "/api/exceptions/{exception_id}/approve", Permission.EXCEPTIONS_WRITE
@@ -188,7 +196,10 @@ MODULES: tuple[str, ...] = (
     "health",
     "human_tasks",
     "ingest",
-    "issues",
+    "issues_actions",
+    "issues_comments",
+    "issues_detail",
+    "issues_list",
     "map_jobs",
     "police",
     "policies",
@@ -197,6 +208,24 @@ MODULES: tuple[str, ...] = (
     "workflows",
 )
 ROUTER_PACKAGE: str = "telescreen.api.routers."
+
+
+@runtime_checkable
+class IncludedRouter(Protocol):
+    """FastAPI's lazy router include wrapper exposes the nested router."""
+
+    original_router: APIRouter
+
+
+def _api_routes(router: APIRouter) -> tuple[APIRoute, ...]:
+    """Flatten route declarations from included routers for inventory checks."""
+    routes: list[APIRoute] = []
+    for route in router.routes:
+        if isinstance(route, APIRoute):
+            routes.append(route)
+        elif isinstance(route, IncludedRouter):
+            routes.extend(_api_routes(route.original_router))
+    return tuple(routes)
 
 
 def _markers(dependant: Dependant) -> tuple[tuple[Permission, ...], tuple[ExternalAuthKind, ...]]:
@@ -218,9 +247,7 @@ def _declared_routes(world: RbacWorld) -> tuple[Declared, ...]:
     """Return the markers of every route defined by the 17 existing router modules."""
     declared: list[Declared] = []
     for router in world.container.routers:
-        for route in router.routes:
-            if not isinstance(route, APIRoute):
-                continue
+        for route in _api_routes(router):
             module_path: str = route.endpoint.__module__
             if not module_path.startswith(ROUTER_PACKAGE):
                 continue

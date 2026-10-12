@@ -11,10 +11,12 @@ from telescreen.core.vocabulary import (
     ExceptionDuration,
     IssueEventKind,
     IssueHistoryKind,
+    IssuePriority,
     IssueStatus,
     RemediationAction,
     RuleClass,
     Severity,
+    SuggestionReason,
     Visibility,
 )
 from telescreen.ports.collectors import ResourceContent
@@ -91,6 +93,120 @@ class IssueSnapshot:
     risk_score: int = 0
     visibility: Visibility = Visibility.UNKNOWN
     masked_excerpt: str | None = None
+    priority: IssuePriority | None = None
+    assignee_team_slug: str | None = None
+
+
+@dataclass(frozen=True)
+class FindingsRecorded:
+    """Count-only observation that findings were attached to an issue."""
+
+    issue_id: str
+    inserted: int
+    observed_at: datetime
+
+
+class FindingsObserver(Protocol):
+    """Observe issue finding inserts in the caller transaction."""
+
+    async def on_findings_recorded(self, session: AsyncSession, event: FindingsRecorded) -> None:
+        """React to finding inserts without receiving detected content."""
+        ...
+
+
+@dataclass(frozen=True)
+class IssueActivity:
+    """Masked issue activity data for an outbound notification."""
+
+    kind: IssueHistoryKind
+    issue_id: str
+    actor_ref: str
+    at: datetime
+    assignee_member_id: str | None = None
+    comment_id: str | None = None
+    from_value: str | None = None
+    to_value: str | None = None
+
+
+class IssueActivityNotifier(Protocol):
+    """Notify subscribers about persisted issue activity."""
+
+    async def on_activity(self, session: AsyncSession, activity: IssueActivity) -> None:
+        """Handle one issue activity event."""
+        ...
+
+
+@dataclass(frozen=True)
+class ReportIssue:
+    """Masked issue summary included in the weekly report."""
+
+    issue_id: str
+    short_id: str
+    display_title: str
+    findings: int
+
+
+@dataclass(frozen=True)
+class WeeklySummary:
+    """Count-only and masked weekly issue summary."""
+
+    start: datetime
+    end: datetime
+    new_count: int
+    resolved_count: int
+    regressed_count: int
+    escalating_count: int
+    open_count: int
+    mttr_seconds: int | None
+    top_issues: tuple[ReportIssue, ...]
+
+
+class IssueReportSource(Protocol):
+    """Provide masked weekly summaries and member open issue counts."""
+
+    async def weekly_summary(
+        self, session: AsyncSession, start: datetime, end: datetime
+    ) -> WeeklySummary:
+        """Return one weekly summary over a caller-selected range."""
+        ...
+
+    async def assigned_open_count(self, session: AsyncSession, member_id: str) -> int:
+        """Return the open issue count assigned to a member."""
+        ...
+
+
+@dataclass(frozen=True)
+class SuggestedAssignee:
+    """A suggested member or team reference and its source."""
+
+    ref: str
+    reason: SuggestionReason
+
+
+class AssigneeSuggester(Protocol):
+    """Suggest issue assignees from ownership and policy."""
+
+    async def suggest(self, session: AsyncSession, issue_id: str) -> tuple[SuggestedAssignee, ...]:
+        """Return ordered masked assignee references."""
+        ...
+
+
+@dataclass(frozen=True)
+class NoopFindingsObserver:
+    """Default no-op findings observer."""
+
+    async def on_findings_recorded(self, session: AsyncSession, event: FindingsRecorded) -> None:
+        """Accept a findings event without taking action."""
+        del session, event
+
+
+@dataclass(frozen=True)
+class NoopIssueActivityNotifier:
+    """Default no-op issue activity notifier."""
+
+    async def on_activity(self, session: AsyncSession, activity: IssueActivity) -> None:
+        """Accept an activity event without taking action."""
+        del session, activity
 
 
 @dataclass(frozen=True)

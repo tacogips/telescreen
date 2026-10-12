@@ -118,6 +118,8 @@ def test_vocabulary_status_groups_ranks_and_critical_trigger() -> None:
         IssueStatus.IN_PROGRESS,
         IssueStatus.REGRESSED,
         IssueStatus.PENDING_VERIFICATION,
+        IssueStatus.ESCALATING,
+        IssueStatus.ARCHIVED,
     )
     assert RECONCILED_STATUSES == OPEN_STATUSES + (IssueStatus.ALLOWED,)
     assert tuple(item.value for item in CREDENTIAL_CLASSES) == (

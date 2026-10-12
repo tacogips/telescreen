@@ -45,6 +45,8 @@ const TRANSITIONS: Readonly<Record<IssueStatus, readonly IssueStatus[]>> = {
   ignored: ["unresolved"],
   allowed: ["unresolved"],
   pending_verification: ["unresolved"],
+  escalating: ["acknowledged", "in_progress", "unresolved"],
+  archived: ["unresolved"],
 };
 
 type BulkData = Readonly<{

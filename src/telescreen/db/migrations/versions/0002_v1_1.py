@@ -94,11 +94,16 @@ def upgrade() -> None:
         existing_indexes: set[str] = {
             index["name"] for index in inspector.get_indexes(table_name) if index["name"]
         }
+        # The models describe the newest schema; skip indexes on columns that later
+        # revisions add, so an upgrade through this revision never references them.
+        present_columns: set[str] = {
+            column["name"] for column in sa.inspect(bind).get_columns(table_name)
+        }
         for index in table.indexes:
             if index.name is None:
                 continue
-            if index.name not in existing_indexes:
-                index_columns: list[str] = [column.name for column in index.columns]
+            index_columns: list[str] = [column.name for column in index.columns]
+            if index.name not in existing_indexes and set(index_columns) <= present_columns:
                 op.create_index(index.name, table_name, index_columns, unique=index.unique)
                 existing_indexes.add(index.name)
 

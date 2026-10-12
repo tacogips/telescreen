@@ -4,6 +4,7 @@ import { mapJobSummaryFixtures, runDetailFixture } from "./fixtures/operations";
 import { memberFixtures, teamFixtures } from "./fixtures/directory";
 import { state, workflowRefs } from "./state";
 import type { MockTemplateVersion } from "./fixtures/v12";
+import { evaluateIssueQuery, tokenizeIssueQuery } from "../issueQuery";
 
 type Handler = (url: URL, request: Request, match: RegExpExecArray) => Response | Promise<Response>;
 type MockRoute = Readonly<{ method: string; pattern: RegExp; handler: Handler }>;
@@ -42,16 +43,67 @@ function byId<T extends Readonly<{ id: string }>>(items: T[], id: string): T | u
   return items.find((item) => item.id === id);
 }
 function issuePage(url: URL): Readonly<{ items: Issue[]; next_cursor: string | null }> {
-  let items = filtered(state.issues, url, ["status", "source", "rule_class", "severity"]);
+  const queryText = url.searchParams.get("query") ?? "";
+  let items = state.issues.filter((item) => item.merged_into_id == null && evaluateIssueQuery(item, tokenizeIssueQuery(queryText), Date.now()));
+  items = filtered(items, url, ["status", "source", "rule_class", "severity"]);
   const assignee = url.searchParams.get("assignee");
   if (assignee === "me") items = items.filter((item) => item.assignee_member_id === "mem-01");
   else if (assignee === "my_teams") items = items.filter((item) => item.assignee_team_id === "team-01");
+  else if (assignee === "none") items = items.filter((item) => item.assignee_member_id === null && item.assignee_team_id === null);
   else if (assignee !== null) items = items.filter((item) => assignee === `member:${item.assignee_member_id}` || assignee === `team:${item.assignee_team_id}` || assignee === item.assignee_member_id || assignee === item.assignee_team_id);
   const exposure = url.searchParams.get("exposure");
   if (exposure !== null) items = items.filter((item) => item.exposure_visibility === exposure);
   const sort = url.searchParams.get("sort") ?? "last_seen";
-  items.sort((left, right) => sort === "risk" ? (right.risk_score ?? 0) - (left.risk_score ?? 0) : sort === "times_seen" ? right.times_seen - left.times_seen : (right[sort === "first_seen" ? "first_seen" : "last_seen"].localeCompare(left[sort === "first_seen" ? "first_seen" : "last_seen"])));
+  items.sort((left, right) => sort === "risk" ? (right.risk_score ?? 0) - (left.risk_score ?? 0) : sort === "times_seen" ? right.times_seen - left.times_seen : sort === "priority" ? (left.priority ?? "medium").localeCompare(right.priority ?? "medium") : sort === "values" ? right.distinct_fingerprints - left.distinct_fingerprints : (right[sort === "first_seen" ? "first_seen" : "last_seen"].localeCompare(left[sort === "first_seen" ? "first_seen" : "last_seen"])));
   return page(items, url);
+}
+
+async function routeV13(url: URL, request: Request, method: string): Promise<Response | null> {
+  const path = url.pathname;
+  const issueId = /^\/api\/issues\/([^/]+)/.exec(path)?.[1];
+  const issue = issueId === undefined ? undefined : byId(state.issues, decodeURIComponent(issueId));
+  if (method === "GET" && path === "/api/issues/counts") {
+    const statuses = ["unresolved", "for_review", "regressed", "escalating", "archived", "resolved"] as const;
+    return response({ tabs: statuses.map((tab) => ({ tab, count: state.issues.filter((item) => item.merged_into_id == null && (tab === "for_review" ? item.needs_review && ["unresolved", "acknowledged", "in_progress", "regressed", "escalating"].includes(item.status) : tab === "unresolved" ? ["unresolved", "acknowledged", "in_progress", "regressed", "escalating"].includes(item.status) : item.status === tab)).length })), updated_since_count: 0 });
+  }
+  if (path === "/api/views" && method === "GET") return response({ items: state.savedViews });
+  if (path === "/api/views" && method === "POST") { const value = await body(request); const view = { id: `view-${state.savedViews.length + 1}`, name: String(value.name ?? "Saved view"), query: String(value.query ?? ""), sort: String(value.sort ?? "last_seen"), visibility: value.visibility === "shared" ? "shared" as const : "personal" as const, starred: false, is_default: false }; state.savedViews.push(view); return response(view, 201); }
+  const viewMatch = /^\/api\/views\/([^/]+)(?:\/(star))?$/.exec(path);
+  if (viewMatch !== null) { const index = state.savedViews.findIndex((item) => item.id === decodeURIComponent(viewMatch[1]!)); if (index < 0) return error("not_found", "Not found.", 404); const view = state.savedViews[index]!; if (viewMatch[2] === "star") { state.savedViews[index] = { ...view, starred: method === "PUT" }; return response(state.savedViews[index]); } if (method === "DELETE") { state.savedViews.splice(index, 1); return response(null, 204); } if (method === "PATCH") { const value = await body(request); state.savedViews[index] = { ...view, name: typeof value.name === "string" ? value.name : view.name, query: typeof value.query === "string" ? value.query : view.query, sort: typeof value.sort === "string" ? value.sort : view.sort }; return response(state.savedViews[index]); } }
+  if (path === "/api/views/default" && method === "PUT") { const value = await body(request); state.savedViews = state.savedViews.map((item) => ({ ...item, is_default: item.id === value.id })); return response(null, 204); }
+  if (path === "/api/alert-rules" && method === "GET") return response({ items: state.alertRules });
+  if (path === "/api/alert-rules" && method === "POST") { const value = await body(request); const rule = { id: `alert-${state.alertRules.length + 1}`, name: String(value.name ?? "New alert"), enabled: false, trigger: String(value.trigger ?? "issue_created"), query: String(value.query ?? ""), action_interval_minutes: Number(value.action_interval_minutes ?? 60), muted_until: null }; state.alertRules.push(rule); return response(rule, 201); }
+  if (path === "/api/alert-rules/validate" && method === "POST") return response({ valid: true, errors: [] });
+  const alertMatch = /^\/api\/alert-rules\/([^/]+)(?:\/(history|enable|disable|mute|unmute))?$/.exec(path);
+  if (alertMatch !== null) { const id = decodeURIComponent(alertMatch[1]!); const index = state.alertRules.findIndex((item) => item.id === id); if (index < 0) return error("not_found", "Not found.", 404); const rule = state.alertRules[index]!; if (alertMatch[2] === "history") return response({ items: state.alertFires.filter((fire) => fire.rule_id === id) }); if (alertMatch[2] !== undefined) { const updated = { ...rule, enabled: alertMatch[2] === "enable" ? true : alertMatch[2] === "disable" ? false : rule.enabled, muted_until: alertMatch[2] === "mute" ? new Date(Date.now() + 3_600_000).toISOString() : alertMatch[2] === "unmute" ? null : rule.muted_until }; state.alertRules[index] = updated; return response(updated); } if (method === "GET") return response(rule); if (method === "DELETE") { state.alertRules.splice(index, 1); return response(null, 204); } if (method === "PUT") { const value = await body(request); state.alertRules[index] = { ...rule, name: typeof value.name === "string" ? value.name : rule.name, query: typeof value.query === "string" ? value.query : rule.query, action_interval_minutes: typeof value.action_interval_minutes === "number" ? value.action_interval_minutes : rule.action_interval_minutes }; return response(state.alertRules[index]); } }
+  if (path === "/api/auth/me/notification-settings" && method === "GET") return response({ items: state.notificationSettings });
+  if (path === "/api/auth/me/notification-settings" && method === "PUT") { const value = await body(request); if (Array.isArray(value.items)) state.notificationSettings = value.items.filter((item): item is { category: string; preference: "email" | "slack" | "off" } => typeof item === "object" && item !== null && "category" in item && "preference" in item) as typeof state.notificationSettings; return response({ items: state.notificationSettings }); }
+  if (path === "/api/auth/me/tokens" && method === "GET") return response({ items: state.selfTokens });
+  if (path === "/api/auth/me/tokens" && method === "POST") { const value = await body(request); const token = { id: `self-token-${state.selfTokens.length + 1}`, label: String(value.label ?? "Personal token"), scopes: Array.isArray(value.scopes) ? value.scopes.filter((item): item is string => typeof item === "string") : [], preview: "ts_live_••••71a2", created_at: new Date().toISOString() }; state.selfTokens.push(token); return response({ id: token.id, token: "mock-token-value" }, 201); }
+  const tokenMatch = /^\/api\/auth\/me\/tokens\/([^/]+)\/revoke$/.exec(path); if (tokenMatch !== null && method === "POST") { state.selfTokens = state.selfTokens.filter((item) => item.id !== decodeURIComponent(tokenMatch[1]!)); return response(null, 204); }
+  if (path === "/api/dashboard" && method === "GET") return response({ period: url.searchParams.get("period") ?? "14d", open_issues: state.issues.filter((item) => ["unresolved", "acknowledged", "in_progress", "regressed", "escalating"].includes(item.status)).length, new_issues: 8, resolved_issues: 4, findings: state.issues.reduce((total, item) => total + item.times_seen, 0), trend: Array.from({ length: 14 }, (_, index) => ({ start: new Date(Date.now() - (13 - index) * 86_400_000).toISOString(), count: index + 2 })) });
+  if (path === "/api/integrations" && method === "GET") return response({ items: state.integrations });
+  const integrationMatch = /^\/api\/integrations\/([^/]+)\/test$/.exec(path); if (integrationMatch !== null && method === "POST") { const item = state.integrations.find((entry) => entry.kind === decodeURIComponent(integrationMatch[1]!)); return item?.configured ? response({ status: "passed", detail: "Connection test passed." }) : error("integration_unconfigured", "Integration is not configured.", 422); }
+  if (path === "/api/ownership-rules" && method === "GET") return response({ items: state.ownershipRules });
+  if (path === "/api/ownership-rules" && method === "POST") { const value = await body(request); const rule = { id: `ownership-${state.ownershipRules.length + 1}`, source: typeof value.source === "string" ? value.source : null, pattern: String(value.pattern ?? "example.test/*"), team_ref: String(value.team_ref ?? "team:engineering"), position: state.ownershipRules.length }; state.ownershipRules.push(rule); return response(rule, 201); }
+  if (path === "/api/ownership-rules/test" && method === "POST") return response({ team_ref: state.ownershipRules[0]?.team_ref ?? null });
+  if (path === "/api/ownership-rules/reorder" && method === "POST") return response(null, 204);
+  const ownershipMatch = /^\/api\/ownership-rules\/([^/]+)$/.exec(path); if (ownershipMatch !== null) { const id = decodeURIComponent(ownershipMatch[1]!); const index = state.ownershipRules.findIndex((item) => item.id === id); if (index < 0) return error("not_found", "Not found.", 404); if (method === "DELETE") { state.ownershipRules.splice(index, 1); return response(null, 204); } if (method === "PUT") { const value = await body(request); state.ownershipRules[index] = { ...state.ownershipRules[index]!, ...value } as typeof state.ownershipRules[number]; return response(state.ownershipRules[index]); } }
+  if (issue !== undefined && issueId !== undefined) {
+    const decoded = decodeURIComponent(issueId);
+    if (path.endsWith("/events/oldest") || path.endsWith("/events/latest") || path.endsWith("/events/recommended")) { const event = eventFixtures.find((item) => item.issue_id === decoded) ?? eventFixtures[0]!; return response({ event, previous_id: null, next_id: null, position: 1, total: 1 }); }
+    if (path.endsWith("/tags")) return response({ items: [{ key: "source", value: issue.source, count: issue.times_seen }, { key: "rule", value: issue.rule_class, count: issue.times_seen }], total: issue.times_seen });
+    if (path.endsWith("/stats")) return response({ buckets: Array.from({ length: 14 }, (_, index) => ({ start: new Date(Date.now() - (13 - index) * 86_400_000).toISOString(), count: issue.trend?.[index] ?? 0 })) });
+    if (path.endsWith("/activity")) return response({ items: [{ id: "activity-01", kind: "commented", actor: { kind: "member", ref: "member:mem-01", display_name: "Alice Example" }, body: "Reviewed masked example.", at: new Date().toISOString() }] });
+    if (path.endsWith("/external-issues") && method === "GET") return response({ items: state.externalLinks.filter((item) => item.issue_id === decoded) });
+    const extId = /\/external-issues\/([^/]+)$/.exec(path)?.[1]; if (extId !== undefined && method === "DELETE") { state.externalLinks = state.externalLinks.filter((item) => item.id !== decodeURIComponent(extId)); return response(null, 204); }
+    if (path.endsWith("/external-issues") && method === "POST") { const value = await body(request); const link = { id: `ext-${state.externalLinks.length + 1}`, issue_id: decoded, kind: "url" as const, url: String(value.url ?? "https://example.test/issue"), title: null, created_at: new Date().toISOString() }; state.externalLinks.push(link); return response(link, 201); }
+    if (path.endsWith("/bookmark")) { state.issues = state.issues.map((item) => item.id === decoded ? { ...item, bookmarked: method === "PUT" } : item); return response(null, 204); }
+    if (path.endsWith("/subscription")) { if (!state.subscriptions.includes(decoded)) state.subscriptions.push(decoded); return response({ subscribed: true }); }
+    if (path.endsWith("/archive") && method === "POST") { state.issues = state.issues.map((item) => item.id === decoded ? { ...item, status: "archived", archive: { kind: "for_duration", until: new Date(Date.now() + 86_400_000).toISOString(), threshold: null, baseline: null } } : item); return response(state.issues.find((item) => item.id === decoded)); }
+    if (path.endsWith("/unarchive") || path.endsWith("/review")) { state.issues = state.issues.map((item) => item.id === decoded ? { ...item, status: path.endsWith("/unarchive") ? "unresolved" : item.status, archive: null, needs_review: false } : item); return response(state.issues.find((item) => item.id === decoded)); }
+  }
+  return null;
 }
 const routes: MockRoute[] = [
   { method: "GET", pattern: /^\/api\/auth\/config$/, handler: () => response({ oidc: { issuer: "https://idp.example.test/realms/telescreen", client_id: "telescreen-ui", authorization_endpoint: "https://idp.example.test/authorize", token_endpoint: "https://idp.example.test/token", end_session_endpoint: "https://idp.example.test/logout", scopes: ["openid", "profile", "email"] }, token_login: true }) },
@@ -266,6 +318,8 @@ export async function routeMockRequest(path: string, init: RequestInit): Promise
   const url = new URL(path, globalThis.location?.origin ?? "http://localhost");
   const request = new Request(url, init);
   const method = request.method.toUpperCase();
+  const v13Response = await routeV13(url, request, method);
+  if (v13Response !== null) return v13Response;
   for (const route of routes) {
     if (route.method !== method) continue;
     const match = route.pattern.exec(url.pathname);

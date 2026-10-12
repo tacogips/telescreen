@@ -6,6 +6,7 @@ import type {
   OccurrencesResponse, PolicySummary, PolicyValidation, PolicyVersion, RemediationReceipt, Team, ValidateResponse, WorkflowVersion, WorkflowVersionRef, RunDetail, RunSummary, RunHumanTask,
   AuthConfig, AuthMe, AuthSession, CreatedToken, RoleMatrix, TemplateDetail, TemplatePreview, TemplateSummary, TemplateValidation, TemplateValidationErrorItem, TemplateVersionText, TokenSummary, UserSummary,
 } from "./types";
+import type * as V13 from "./types";
 import { clearSession, getSession, setSession } from "../auth/session";
 import { refreshIfNeeded } from "../auth/oidc";
 
@@ -189,6 +190,77 @@ export const issuesApi = {
   occurrences: (id: string): Promise<OccurrencesResponse> => apiFetch(`/api/issues/${encodeURIComponent(id)}/occurrences`),
   requestException: (id: string, value: Readonly<{ reason: string; duration: ExceptionDuration }>): Promise<IssueException> => apiFetch(`/api/issues/${encodeURIComponent(id)}/exceptions`, json("POST", value)),
   comment: (id: string, body: string): Promise<Readonly<{ accepted: boolean }>> => apiFetch(`/api/issues/${encodeURIComponent(id)}/comments`, json("POST", { body })),
+  listQuery: (filters: V13.StreamQuery): Promise<Page<Issue>> => apiFetch(`/api/issues${query(params(filters))}`),
+  counts: (filters: Readonly<{ query?: string; period?: string; updated_since?: string }> = {}): Promise<V13.CountsResponse> => apiFetch(`/api/issues/counts${query(new URLSearchParams(Object.entries(filters).flatMap(([key, value]) => value === undefined ? [] : [[key, value]])))}`),
+  archive: (id: string, value: Readonly<{ kind: string; duration_days?: number; count?: number }>): Promise<Issue> => apiFetch(`/api/issues/${encodeURIComponent(id)}/archive`, json("POST", value)),
+  unarchive: (id: string): Promise<Issue> => apiFetch(`/api/issues/${encodeURIComponent(id)}/unarchive`, json("POST")),
+  review: (id: string): Promise<Issue> => apiFetch(`/api/issues/${encodeURIComponent(id)}/review`, json("POST")),
+  setPriority: (id: string, priority: V13.IssuePriority): Promise<Issue> => apiFetch(`/api/issues/${encodeURIComponent(id)}`, json("PATCH", { priority })),
+  bulk: (value: Readonly<{ ids?: readonly string[]; query?: string; period?: string; action: string; status?: string }>): Promise<V13.BulkResult> => apiFetch("/api/issues/bulk", json("POST", { ...(value.ids === undefined ? {} : { ids: [...value.ids] }), ...(value.query === undefined ? {} : { query: value.query }), ...(value.period === undefined ? {} : { period: value.period }), action: value.action, ...(value.status === undefined ? {} : { status: value.status }) })),
+  merge: (value: Readonly<{ primary_id: string; child_ids: readonly string[] }>): Promise<Issue> => apiFetch("/api/issues/merge", json("POST", { primary_id: value.primary_id, child_ids: [...value.child_ids] })),
+  unmerge: (id: string): Promise<Issue> => apiFetch(`/api/issues/${encodeURIComponent(id)}/unmerge`, json("POST")),
+  eventAt: (id: string, selector: "oldest" | "latest" | "recommended" | string): Promise<V13.EventSelection> => apiFetch(`/api/issues/${encodeURIComponent(id)}/events/${encodeURIComponent(selector)}`),
+  tags: (id: string): Promise<V13.TagDistribution> => apiFetch(`/api/issues/${encodeURIComponent(id)}/tags`),
+  issueStats: (id: string, period = "14d"): Promise<IssueStatsBuckets> => apiFetch(`/api/issues/${encodeURIComponent(id)}/stats${query(new URLSearchParams({ period }))}`),
+  activity: (id: string): Promise<Readonly<{ items: V13.ActivityItem[] }>> => apiFetch(`/api/issues/${encodeURIComponent(id)}/activity`),
+  editComment: (id: string, commentId: string, body: string): Promise<Readonly<{ id: string }>> => apiFetch(`/api/issues/${encodeURIComponent(id)}/comments/${encodeURIComponent(commentId)}`, json("PATCH", { body })),
+  deleteComment: (id: string, commentId: string): Promise<void> => apiFetch(`/api/issues/${encodeURIComponent(id)}/comments/${encodeURIComponent(commentId)}`, json("DELETE")),
+  setSubscription: (id: string, subscribed: boolean): Promise<Readonly<{ subscribed: boolean }>> => apiFetch(`/api/issues/${encodeURIComponent(id)}/subscription`, json("PUT", { subscribed })),
+  bookmark: (id: string): Promise<void> => apiFetch(`/api/issues/${encodeURIComponent(id)}/bookmark`, json("PUT")),
+  unbookmark: (id: string): Promise<void> => apiFetch(`/api/issues/${encodeURIComponent(id)}/bookmark`, json("DELETE")),
+  externalIssues: (id: string): Promise<Readonly<{ items: V13.ExternalIssueLink[] }>> => apiFetch(`/api/issues/${encodeURIComponent(id)}/external-issues`),
+  linkExternal: (id: string, url: string): Promise<V13.ExternalIssueLink> => apiFetch(`/api/issues/${encodeURIComponent(id)}/external-issues`, json("POST", { url })),
+  unlinkExternal: (id: string, linkId: string): Promise<void> => apiFetch(`/api/issues/${encodeURIComponent(id)}/external-issues/${encodeURIComponent(linkId)}`, json("DELETE")),
+  githubRepos: (): Promise<Readonly<{ items: string[] }>> => apiFetch("/api/external-issues/github/repos"),
+  createGithubIssue: (id: string, repo: string, title: string): Promise<V13.ExternalIssueLink> => apiFetch(`/api/issues/${encodeURIComponent(id)}/external-issues/github`, json("POST", { repo, title })),
+};
+
+export const viewsApi = {
+  list: (): Promise<Readonly<{ items: V13.SavedView[] }>> => apiFetch("/api/views"),
+  create: (value: Readonly<{ name: string; query: string; sort: string; visibility: "personal" | "shared" }>): Promise<V13.SavedView> => apiFetch("/api/views", json("POST", value)),
+  update: (id: string, value: Readonly<{ name?: string; query?: string; sort?: string }>): Promise<V13.SavedView> => apiFetch(`/api/views/${encodeURIComponent(id)}`, json("PATCH", value)),
+  delete: (id: string): Promise<void> => apiFetch(`/api/views/${encodeURIComponent(id)}`, json("DELETE")),
+  star: (id: string): Promise<void> => apiFetch(`/api/views/${encodeURIComponent(id)}/star`, json("PUT")),
+  unstar: (id: string): Promise<void> => apiFetch(`/api/views/${encodeURIComponent(id)}/star`, json("DELETE")),
+  setDefault: (id: string): Promise<void> => apiFetch("/api/views/default", json("PUT", { id })),
+};
+export const alertsApi = {
+  list: (): Promise<Readonly<{ items: V13.AlertRule[] }>> => apiFetch("/api/alert-rules"),
+  get: (id: string): Promise<V13.AlertRule> => apiFetch(`/api/alert-rules/${encodeURIComponent(id)}`),
+  create: (value: Readonly<{ name: string; trigger: string; query: string; action_interval_minutes: number }>): Promise<V13.AlertRule> => apiFetch("/api/alert-rules", json("POST", value)),
+  update: (id: string, value: Readonly<{ name?: string; query?: string; action_interval_minutes?: number }>): Promise<V13.AlertRule> => apiFetch(`/api/alert-rules/${encodeURIComponent(id)}`, json("PUT", value)),
+  delete: (id: string): Promise<void> => apiFetch(`/api/alert-rules/${encodeURIComponent(id)}`, json("DELETE")),
+  validate: (value: Readonly<{ trigger: string; query: string }>): Promise<Readonly<{ valid: boolean; errors: readonly string[] }>> => apiFetch("/api/alert-rules/validate", json("POST", value)),
+  enable: (id: string): Promise<V13.AlertRule> => apiFetch(`/api/alert-rules/${encodeURIComponent(id)}/enable`, json("POST")),
+  disable: (id: string): Promise<V13.AlertRule> => apiFetch(`/api/alert-rules/${encodeURIComponent(id)}/disable`, json("POST")),
+  mute: (id: string, until: string): Promise<V13.AlertRule> => apiFetch(`/api/alert-rules/${encodeURIComponent(id)}/mute`, json("POST", { until })),
+  unmute: (id: string): Promise<V13.AlertRule> => apiFetch(`/api/alert-rules/${encodeURIComponent(id)}/unmute`, json("POST")),
+  history: (id: string): Promise<Readonly<{ items: V13.AlertFire[] }>> => apiFetch(`/api/alert-rules/${encodeURIComponent(id)}/history`),
+};
+export const meApi = {
+  notificationSettings: (): Promise<Readonly<{ items: V13.NotificationSetting[] }>> => apiFetch("/api/auth/me/notification-settings"),
+  updateNotificationSettings: (items: readonly V13.NotificationSetting[]): Promise<Readonly<{ items: V13.NotificationSetting[] }>> => apiFetch("/api/auth/me/notification-settings", json("PUT", { items: [...items] })),
+  tokens: (): Promise<Readonly<{ items: V13.SelfToken[] }>> => apiFetch("/api/auth/me/tokens"),
+  createToken: (value: Readonly<{ label: string; scopes: readonly string[] }>): Promise<Readonly<{ id: string; token: string }>> => apiFetch("/api/auth/me/tokens", json("POST", { ...value, scopes: [...value.scopes] })),
+  revokeToken: (id: string): Promise<void> => apiFetch(`/api/auth/me/tokens/${encodeURIComponent(id)}/revoke`, json("POST")),
+};
+export const dashboardApi = { get: (period = "14d"): Promise<V13.DashboardResponse> => apiFetch(`/api/dashboard${query(new URLSearchParams({ period }))}`) };
+export const integrationsApi = {
+  list: (): Promise<Readonly<{ items: V13.IntegrationStatus[] }>> => apiFetch("/api/integrations"),
+  test: (kind: string): Promise<Readonly<{ status: string; detail: string }>> => apiFetch(`/api/integrations/${encodeURIComponent(kind)}/test`, json("POST")),
+};
+export const membersApi = {
+  update: (handle: string, value: Readonly<{ display_name?: string; email?: string | null }>): Promise<Member> => apiFetch(`/api/members/${encodeURIComponent(handle)}`, json("PATCH", value)),
+  deactivate: (handle: string): Promise<void> => apiFetch(`/api/members/${encodeURIComponent(handle)}/deactivate`, json("POST")),
+  reactivate: (handle: string): Promise<void> => apiFetch(`/api/members/${encodeURIComponent(handle)}/reactivate`, json("POST")),
+};
+export const ownershipApi = {
+  list: (): Promise<Readonly<{ items: V13.OwnershipRule[] }>> => apiFetch("/api/ownership-rules"),
+  create: (value: Readonly<{ source?: string; pattern: string; team_ref: string }>): Promise<V13.OwnershipRule> => apiFetch("/api/ownership-rules", json("POST", value)),
+  update: (id: string, value: Readonly<{ source?: string | null; pattern?: string; team_ref?: string }>): Promise<V13.OwnershipRule> => apiFetch(`/api/ownership-rules/${encodeURIComponent(id)}`, json("PUT", value)),
+  delete: (id: string): Promise<void> => apiFetch(`/api/ownership-rules/${encodeURIComponent(id)}`, json("DELETE")),
+  reorder: (ids: readonly string[]): Promise<void> => apiFetch("/api/ownership-rules/reorder", json("POST", { ids: [...ids] })),
+  test: (source: string, display_locator: string): Promise<Readonly<{ team_ref: string | null }>> => apiFetch("/api/ownership-rules/test", json("POST", { source, display_locator })),
 };
 
 export const exceptionsApi = {

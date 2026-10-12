@@ -16,6 +16,7 @@ class IssueRow(Base, kw_only=True):
         Index("ix_issues_sweep_lookup", "collector_config_id", "status", "last_checked_at"),
         Index("ix_issues_status_last_seen", "status", "last_seen"),
         Index("ix_issues_status_risk", "status", "risk_score"),
+        Index("ix_issues_status_merged", "status", "merged_into_id"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
@@ -62,6 +63,15 @@ class IssueRow(Base, kw_only=True):
     policy_version: Mapped[int | None] = mapped_column(Integer, default=None)
     risk_score: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     asset_tier: Mapped[str | None] = mapped_column(String(32), default=None)
+    priority: Mapped[str] = mapped_column(String(16), default="medium", server_default="medium")
+    priority_manual: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    needs_review: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    merged_into_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
+    archive_kind: Mapped[str | None] = mapped_column(String(32), default=None)
+    archive_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    archive_threshold: Mapped[int | None] = mapped_column(Integer, default=None)
+    archive_baseline: Mapped[int | None] = mapped_column(Integer, default=None)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
 
 class FindingRow(Base, kw_only=True):

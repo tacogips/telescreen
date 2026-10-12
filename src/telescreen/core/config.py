@@ -1,5 +1,6 @@
 """Typed environment configuration for Telescreen."""
 
+import re
 from dataclasses import dataclass, field
 from typing import TypeVar
 
@@ -89,6 +90,11 @@ class TelescreenSettings:
     risk_weights: RiskWeights = RiskWeights()
     oidc: OidcSettings | None = None
     ui_token_login: bool = True
+    escalating_min_findings: int = 10
+    escalating_factor: int = 3
+    weekly_report_cron: str | None = "0 9 * * 1"
+    github_issues_token_ref: str | None = None
+    github_issues_repos: tuple[str, ...] = ()
 
 
 def _read(env: EnvSource, name: str) -> str | None:
@@ -203,6 +209,28 @@ def _digest_cron(env: EnvSource) -> str | None:
     return raw
 
 
+def _weekly_report_cron(env: EnvSource) -> str | None:
+    """Read the optional weekly report schedule, with an empty value disabling it."""
+    raw: str | None = _read(env, "WEEKLY_REPORT_CRON")
+    if raw is None:
+        return "0 9 * * 1"
+    if not raw.strip():
+        return None
+    if not croniter.is_valid(raw):
+        raise ConfigError("TELESCREEN_WEEKLY_REPORT_CRON is invalid")
+    return raw
+
+
+def _github_issues_repos(env: EnvSource) -> tuple[str, ...]:
+    """Read the bounded GitHub issue repository allow-list."""
+    values: tuple[str, ...] = _comma_values(env, "GITHUB_ISSUES_REPOS")
+    if len(values) > 20 or any(
+        re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", value) is None for value in values
+    ):
+        raise ConfigError("TELESCREEN_GITHUB_ISSUES_REPOS is invalid")
+    return values
+
+
 def _boolean(env: EnvSource, name: str, default: bool) -> bool:
     """Read a case-insensitive boolean setting."""
     raw: str | None = _read(env, name)
@@ -314,4 +342,17 @@ def load_settings(env: EnvSource) -> TelescreenSettings:
         risk_weights=parse_risk_weights(_read(env, "RISK_WEIGHTS")),
         oidc=load_oidc_settings(env),
         ui_token_login=_boolean(env, "UI_TOKEN_LOGIN", True),
+        escalating_min_findings=_bounded_integer(env, "ESCALATING_MIN_FINDINGS", 10, 100000),
+        escalating_factor=_bounded_integer(env, "ESCALATING_FACTOR", 3, 100),
+        weekly_report_cron=_weekly_report_cron(env),
+        github_issues_token_ref=_optional(env, "GITHUB_ISSUES_TOKEN"),
+        github_issues_repos=_github_issues_repos(env),
     )
+
+
+def _bounded_integer(env: EnvSource, name: str, default: int, maximum: int) -> int:
+    """Read an integer constrained to the inclusive range from one to maximum."""
+    value: int = _integer(env, name, default)
+    if value > maximum:
+        raise ConfigError(f"TELESCREEN_{name} is outside the allowed range")
+    return value

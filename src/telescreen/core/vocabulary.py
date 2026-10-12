@@ -25,6 +25,119 @@ class Severity(StrEnum):
     CRITICAL = "critical"
 
 
+class IssuePriority(StrEnum):
+    """Triage priority independent from detection severity."""
+
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+class ArchiveKind(StrEnum):
+    """Bounded conditions that can unarchive an issue."""
+
+    UNTIL_ESCALATING = "until_escalating"
+    FOR_DURATION = "for_duration"
+    UNTIL_FINDINGS = "until_findings"
+    UNTIL_VALUES = "until_values"
+
+
+class AlertTriggerKind(StrEnum):
+    """Conditions that can fire an alert rule."""
+
+    ISSUE_CREATED = "issue_created"
+    ISSUE_REGRESSED = "issue_regressed"
+    ISSUE_ESCALATING = "issue_escalating"
+    FREQUENCY = "frequency"
+    VALUES = "values"
+
+
+class AlertFireOutcome(StrEnum):
+    """Outcome recorded for an evaluated alert rule."""
+
+    DELIVERED = "delivered"
+    BLOCKED = "blocked"
+    MUTED = "muted"
+    SUPPRESSED_INTERVAL = "suppressed_interval"
+    FAILED = "failed"
+
+
+class NotificationCategory(StrEnum):
+    """Member-controlled notification categories."""
+
+    ASSIGNED = "assigned"
+    MENTIONS = "mentions"
+    SUBSCRIBED = "subscribed"
+    ALERTS = "alerts"
+    WORKFLOW_TASKS = "workflow_tasks"
+    WEEKLY_REPORT = "weekly_report"
+
+
+class NotificationPreference(StrEnum):
+    """Available member notification delivery preferences."""
+
+    EMAIL = "email"
+    SLACK = "slack"
+    OFF = "off"
+
+
+class SavedViewVisibility(StrEnum):
+    """Visibility of a saved issue view."""
+
+    PERSONAL = "personal"
+    SHARED = "shared"
+
+
+class SubscriptionReason(StrEnum):
+    """Reason a member follows an issue."""
+
+    MANUAL = "manual"
+    ASSIGNED = "assigned"
+    COMMENTED = "commented"
+    MENTIONED = "mentioned"
+
+
+class ExternalIssueKind(StrEnum):
+    """Supported external issue link kinds."""
+
+    URL = "url"
+    GITHUB = "github"
+
+
+class IntegrationKind(StrEnum):
+    """Integration status categories exposed by the organization API."""
+
+    SLACK = "slack"
+    EMAIL = "email"
+    GITHUB_ISSUES = "github_issues"
+    OIDC = "oidc"
+
+
+class SuggestionReason(StrEnum):
+    """Reason an assignee was suggested."""
+
+    OWNER = "owner"
+    OWNERSHIP_RULE = "ownership_rule"
+    POLICY_TEAM = "policy_team"
+
+
+class ActorDisplayKind(StrEnum):
+    """Resolved actor reference category for user-facing activity."""
+
+    MEMBER = "member"
+    TEAM = "team"
+    TOKEN = "token"
+    SYSTEM = "system"
+    UNKNOWN = "unknown"
+
+
+def priority_for_severity(s: Severity) -> IssuePriority:
+    """Return the default issue priority for a detected severity."""
+    if s in (Severity.CRITICAL, Severity.HIGH):
+        return IssuePriority.HIGH
+    return IssuePriority.MEDIUM
+
+
 def severity_rank(s: Severity) -> int:
     """Return the total ordering rank for an issue severity."""
     if s is Severity.CRITICAL:
@@ -76,6 +189,8 @@ class IssueStatus(StrEnum):
     REGRESSED = "regressed"
     ALLOWED = "allowed"
     PENDING_VERIFICATION = "pending_verification"
+    ARCHIVED = "archived"
+    ESCALATING = "escalating"
 
 
 class IssueResolution(StrEnum):
@@ -114,6 +229,17 @@ class IssueHistoryKind(StrEnum):
     EXCEPTION_REJECTED = "exception_rejected"
     EXCEPTION_REVOKED = "exception_revoked"
     EXCEPTION_EXPIRED = "exception_expired"
+    ARCHIVED = "archived"
+    UNARCHIVED = "unarchived"
+    ESCALATED = "escalated"
+    PRIORITY_CHANGED = "priority_changed"
+    REVIEWED = "reviewed"
+    MERGED = "merged"
+    UNMERGED = "unmerged"
+    COMMENT_EDITED = "comment_edited"
+    COMMENT_DELETED = "comment_deleted"
+    EXTERNAL_ISSUE_LINKED = "external_issue_linked"
+    EXTERNAL_ISSUE_UNLINKED = "external_issue_unlinked"
 
 
 class IssueEventKind(StrEnum):
@@ -121,6 +247,7 @@ class IssueEventKind(StrEnum):
 
     ISSUE_CREATED = "issue_created"
     ISSUE_REGRESSED = "issue_regressed"
+    ISSUE_ESCALATING = "issue_escalating"
 
 
 class CollectorKind(StrEnum):
@@ -195,6 +322,12 @@ class NotificationEvent(StrEnum):
     VERIFICATION_INCONCLUSIVE = "verification_inconclusive"
     COLLECTOR_HEALTH_ALERT = "collector_health_alert"
     POLICE_HEALTH_ALERT = "police_health_alert"
+    ALERT_FIRED = "alert_fired"
+    ISSUE_ASSIGNED = "issue_assigned"
+    ISSUE_MENTIONED = "issue_mentioned"
+    ISSUE_ACTIVITY = "issue_activity"
+    WEEKLY_REPORT = "weekly_report"
+    INTEGRATION_TEST = "integration_test"
 
 
 class Role(StrEnum):
@@ -294,6 +427,8 @@ class RunTrigger(StrEnum):
     ISSUE_REGRESSED = "issue_regressed"
     MANUAL = "manual"
     SUB_WORKFLOW = "sub_workflow"
+    ISSUE_ESCALATING = "issue_escalating"
+    ALERT_RULE = "alert_rule"
 
 
 class StepRunStatus(StrEnum):
@@ -339,6 +474,7 @@ class EngineTaskKind(StrEnum):
     VERIFY_RESCAN = "verify_rescan"
     POLICY_REEVALUATE = "policy_reevaluate"
     OWNER_DIGEST = "owner_digest"
+    WEEKLY_REPORT = "weekly_report"
 
 
 class EngineTaskStatus(StrEnum):
@@ -518,6 +654,13 @@ class ErrorCode(StrEnum):
     TEMPLATE_EVENT_MISMATCH = "template_event_mismatch"
     LAST_ADMIN = "last_admin"
     NO_ROLE = "no_role"
+    INVALID_QUERY = "invalid_query"
+    RECIPIENT_OPTED_OUT = "recipient_opted_out"
+    MERGED_GROUP = "merged_group"
+    DLP_BLOCKED = "dlp_blocked"
+    INTEGRATION_UNCONFIGURED = "integration_unconfigured"
+    DUPLICATE_TRIGGER = "duplicate_trigger"
+    LIMIT_EXCEEDED = "limit_exceeded"
     NOT_PROVISIONED = "not_provisioned"
     IDENTITY_CONFLICT = "identity_conflict"
     IDP_UNAVAILABLE = "idp_unavailable"
@@ -687,12 +830,21 @@ class AssetTier(StrEnum):
     PII = "pii"
 
 
+UNRESOLVED_STATUSES: tuple[IssueStatus, ...] = (
+    IssueStatus.UNRESOLVED,
+    IssueStatus.ACKNOWLEDGED,
+    IssueStatus.IN_PROGRESS,
+    IssueStatus.REGRESSED,
+    IssueStatus.ESCALATING,
+)
 OPEN_STATUSES: tuple[IssueStatus, ...] = (
     IssueStatus.UNRESOLVED,
     IssueStatus.ACKNOWLEDGED,
     IssueStatus.IN_PROGRESS,
     IssueStatus.REGRESSED,
     IssueStatus.PENDING_VERIFICATION,
+    IssueStatus.ESCALATING,
+    IssueStatus.ARCHIVED,
 )
 RECONCILED_STATUSES: tuple[IssueStatus, ...] = OPEN_STATUSES + (IssueStatus.ALLOWED,)
 CREDENTIAL_CLASSES: tuple[RuleClass, ...] = (

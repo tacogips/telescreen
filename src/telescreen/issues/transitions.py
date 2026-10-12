@@ -26,6 +26,11 @@ USER_TRANSITIONS: tuple[tuple[IssueStatus, tuple[IssueStatus, ...]], ...] = (
     (IssueStatus.PENDING_VERIFICATION, (IssueStatus.UNRESOLVED,)),
     (IssueStatus.RESOLVED, (IssueStatus.UNRESOLVED,)),
     (IssueStatus.IGNORED, (IssueStatus.UNRESOLVED,)),
+    (
+        IssueStatus.ESCALATING,
+        (IssueStatus.ACKNOWLEDGED, IssueStatus.IN_PROGRESS, IssueStatus.UNRESOLVED),
+    ),
+    (IssueStatus.ARCHIVED, (IssueStatus.UNRESOLVED,)),
 )
 
 

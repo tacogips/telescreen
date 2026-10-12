@@ -6,6 +6,8 @@ from typing import Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from telescreen.core.vocabulary import ActorDisplayKind
+
 SLACK_CHANNEL_ID: re.Pattern[str] = re.compile(r"^[CG][A-Z0-9]{8,}$")
 """Public (C) or private (G) Slack channel id; user (U/W) and DM (D) ids are not channels."""
 
@@ -65,4 +67,31 @@ class OwnerDirectory(Protocol):
 
     async def team_lead(self, session: AsyncSession, team_slug: str) -> str | None:
         """Return the lead member reference for a team slug."""
+        ...
+
+
+@dataclass(frozen=True)
+class ActorDisplay:
+    """Safe display identity resolved from an actor reference."""
+
+    ref: str
+    kind: ActorDisplayKind
+    display_name: str
+    handle: str | None
+    active: bool
+
+
+class ActorDirectory(Protocol):
+    """Resolve member, team, token and system actor references for display.
+
+    `member:<x>` resolves by member id, then handle; `team:<x>` resolves by team id,
+    then slug; `token:<id>` is the token label; `system:*` displays as Telescreen.
+    Other references resolve to kind unknown and display name Unknown. Results preserve
+    the length and order of the input refs.
+    """
+
+    async def display(
+        self, session: AsyncSession, refs: tuple[str, ...]
+    ) -> tuple[ActorDisplay, ...]:
+        """Resolve actor references into safe display identities."""
         ...
