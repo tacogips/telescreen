@@ -1,4 +1,7 @@
-export type IssueView = Readonly<{
+import type { SavedView } from "../../api/types";
+
+export type IssueView = SavedView;
+export type LegacyIssueView = Readonly<{
   id: string;
   name: string;
   query: string;
@@ -6,62 +9,27 @@ export type IssueView = Readonly<{
   starred: boolean;
 }>;
 
-const VIEW_KEY = "telescreen.issueViews";
-const VIEW_EVENT = "telescreen:issue-views";
+export const LEGACY_VIEW_KEY = "telescreen.issueViews";
 
-function isIssueView(value: unknown): value is IssueView {
+function isLegacyIssueView(value: unknown): value is LegacyIssueView {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
-  return (
-    typeof record.id === "string" &&
-    typeof record.name === "string" &&
-    typeof record.query === "string" &&
-    typeof record.sort === "string" &&
-    typeof record.starred === "boolean"
-  );
+  return typeof record.id === "string" && typeof record.name === "string" &&
+    typeof record.query === "string" && typeof record.sort === "string" &&
+    typeof record.starred === "boolean";
 }
 
-export function readIssueViews(): IssueView[] {
+export function readLegacyIssueViews(): LegacyIssueView[] {
   try {
-    const raw = globalThis.localStorage?.getItem(VIEW_KEY);
-    const parsed: unknown =
-      raw === null || raw === undefined ? [] : JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter(isIssueView) : [];
+    const raw = globalThis.localStorage?.getItem(LEGACY_VIEW_KEY);
+    if (raw === null || raw === undefined) return [];
+    const value: unknown = JSON.parse(raw);
+    return Array.isArray(value) ? value.filter(isLegacyIssueView) : [];
   } catch {
     return [];
   }
 }
 
-function writeIssueViews(views: readonly IssueView[]): void {
-  globalThis.localStorage?.setItem(VIEW_KEY, JSON.stringify(views));
-  globalThis.window?.dispatchEvent(new Event(VIEW_EVENT));
-}
-
-export function saveIssueView(
-  views: readonly IssueView[],
-  name: string,
-  query: string,
-  sort: string,
-): IssueView[] {
-  const normalized = name.trim();
-  if (normalized === "") return [...views];
-  const created: IssueView = {
-    id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${views.length}`,
-    name: normalized,
-    query,
-    sort,
-    starred: false,
-  };
-  const next = [...views, created];
-  writeIssueViews(next);
-  return next;
-}
-
-export function removeIssueView(
-  views: readonly IssueView[],
-  id: string,
-): IssueView[] {
-  const next = views.filter((view) => view.id !== id);
-  writeIssueViews(next);
-  return next;
+export function clearLegacyIssueViews(): void {
+  globalThis.localStorage?.removeItem(LEGACY_VIEW_KEY);
 }

@@ -1,7 +1,7 @@
 import type { Evidence, Issue, IssueStatus, MapJob, WorkflowVersion } from "../types";
 import { eventFixtures, historyFixtures } from "./fixtures/issues";
 import { mapJobSummaryFixtures, runDetailFixture } from "./fixtures/operations";
-import { memberFixtures, teamFixtures } from "./fixtures/directory";
+import { teamFixtures } from "./fixtures/directory";
 import { state, workflowRefs } from "./state";
 import type { MockTemplateVersion } from "./fixtures/v12";
 import { evaluateIssueQuery, tokenizeIssueQuery } from "../issueQuery";
@@ -42,9 +42,18 @@ function filtered<T>(items: T[], url: URL, fields: readonly string[]): T[] {
 function byId<T extends Readonly<{ id: string }>>(items: T[], id: string): T | undefined {
   return items.find((item) => item.id === id);
 }
+function inPeriod(issue: Issue, url: URL): boolean {
+  const startText = url.searchParams.get("start");
+  const endText = url.searchParams.get("end");
+  const period = url.searchParams.get("period") ?? "all";
+  const end = endText === null ? Date.now() : Date.parse(endText);
+  const start = startText !== null ? Date.parse(startText) : period === "all" ? Number.NEGATIVE_INFINITY : end - (period === "24h" ? 86_400_000 : Number.parseInt(period, 10) * 86_400_000);
+  const seen = Date.parse(issue.last_seen);
+  return Number.isFinite(start) || start === Number.NEGATIVE_INFINITY ? seen >= start && seen <= end : true;
+}
 function issuePage(url: URL): Readonly<{ items: Issue[]; next_cursor: string | null }> {
   const queryText = url.searchParams.get("query") ?? "";
-  let items = state.issues.filter((item) => item.merged_into_id == null && evaluateIssueQuery(item, tokenizeIssueQuery(queryText), Date.now()));
+  let items = state.issues.filter((item) => item.merged_into_id == null && inPeriod(item, url) && evaluateIssueQuery(item, tokenizeIssueQuery(queryText), Date.now()));
   items = filtered(items, url, ["status", "source", "rule_class", "severity"]);
   const assignee = url.searchParams.get("assignee");
   if (assignee === "me") items = items.filter((item) => item.assignee_member_id === "mem-01");
@@ -54,7 +63,7 @@ function issuePage(url: URL): Readonly<{ items: Issue[]; next_cursor: string | n
   const exposure = url.searchParams.get("exposure");
   if (exposure !== null) items = items.filter((item) => item.exposure_visibility === exposure);
   const sort = url.searchParams.get("sort") ?? "last_seen";
-  items.sort((left, right) => sort === "risk" ? (right.risk_score ?? 0) - (left.risk_score ?? 0) : sort === "times_seen" ? right.times_seen - left.times_seen : sort === "priority" ? (left.priority ?? "medium").localeCompare(right.priority ?? "medium") : sort === "values" ? right.distinct_fingerprints - left.distinct_fingerprints : (right[sort === "first_seen" ? "first_seen" : "last_seen"].localeCompare(left[sort === "first_seen" ? "first_seen" : "last_seen"])));
+  items.sort((left, right) => sort === "risk" ? (right.risk_score ?? 0) - (left.risk_score ?? 0) : sort === "times_seen" ? right.times_seen - left.times_seen : sort === "priority" ? (left.priority ?? "medium").localeCompare(right.priority ?? "medium") : sort === "values" ? right.distinct_fingerprints - left.distinct_fingerprints : sort === "trending" ? (right.trend?.[13] ?? 0) - (left.trend?.[13] ?? 0) || right.last_seen.localeCompare(left.last_seen) : (right[sort === "first_seen" ? "first_seen" : "last_seen"].localeCompare(left[sort === "first_seen" ? "first_seen" : "last_seen"])));
   return page(items, url);
 }
 
@@ -64,18 +73,84 @@ async function routeV13(url: URL, request: Request, method: string): Promise<Res
   const issue = issueId === undefined ? undefined : byId(state.issues, decodeURIComponent(issueId));
   if (method === "GET" && path === "/api/issues/counts") {
     const statuses = ["unresolved", "for_review", "regressed", "escalating", "archived", "resolved"] as const;
-    return response({ tabs: statuses.map((tab) => ({ tab, count: state.issues.filter((item) => item.merged_into_id == null && (tab === "for_review" ? item.needs_review && ["unresolved", "acknowledged", "in_progress", "regressed", "escalating"].includes(item.status) : tab === "unresolved" ? ["unresolved", "acknowledged", "in_progress", "regressed", "escalating"].includes(item.status) : item.status === tab)).length })), updated_since_count: 0 });
+    const queryText = url.searchParams.get("query") ?? "";
+    const queryTokens = tokenizeIssueQuery(queryText);
+    const tabTokens = queryTokens.filter((token) => token.key !== "is");
+    const matchingTabs = state.issues.filter((item) => item.merged_into_id == null && inPeriod(item, url) && evaluateIssueQuery(item, tabTokens, Date.now()));
+    const matchingQuery = state.issues.filter((item) => item.merged_into_id == null && inPeriod(item, url) && evaluateIssueQuery(item, queryTokens, Date.now()));
+    const open = ["unresolved", "acknowledged", "in_progress", "regressed", "escalating"];
+    const updatedSince = Date.parse(url.searchParams.get("updated_since") ?? "");
+    return response({ tabs: statuses.map((tab) => ({ tab, count: matchingTabs.filter((item) => tab === "for_review" ? item.needs_review && open.includes(item.status) : tab === "unresolved" ? open.includes(item.status) : item.status === tab).length })), updated_since_count: Number.isFinite(updatedSince) ? matchingQuery.filter((item) => Date.parse(item.updated_at ?? item.last_seen) > updatedSince).length : 0 });
+  }
+  if (path === "/api/issues/bulk" && method === "POST") {
+    const value = await body(request);
+    const bulkPeriod = new URLSearchParams();
+    bulkPeriod.set("period", String(value.period ?? "all"));
+    const params = record(value.params);
+    const archive = record(params.archive);
+    const verification = record(params.verification);
+    const requested = Array.isArray(value.ids) ? value.ids.filter((id): id is string => typeof id === "string") : state.issues.filter((item) => item.merged_into_id == null && inPeriod(item, new URL(`http://mock.local/api/issues?${bulkPeriod}`)) && evaluateIssueQuery(item, tokenizeIssueQuery(String(value.query ?? "")), Date.now())).map((item) => item.id);
+    const succeeded: string[] = [];
+    const failed: { issue_id: string; code: string }[] = [];
+    for (const id of requested) {
+      const target = byId(state.issues, id);
+      if (target === undefined) { failed.push({ issue_id: id, code: "not_found" }); continue; }
+      const action = String(value.action ?? "");
+      const status = typeof params.status === "string" ? params.status as IssueStatus : target.status;
+      const priority = typeof params.priority === "string" ? params.priority as Issue["priority"] : target.priority;
+      const assigneeRef = typeof params.assignee_ref === "string" ? params.assignee_ref : null;
+      const assigneeMemberId = assigneeRef?.startsWith("member:") ? assigneeRef.slice("member:".length) : params.assignee_ref === null ? null : target.assignee_member_id;
+      const assigneeTeamId = assigneeRef?.startsWith("team:") ? assigneeRef.slice("team:".length) : params.assignee_ref === null ? null : target.assignee_team_id;
+      const archiveState = action === "archive" ? { kind: String(archive.kind ?? "for_duration"), until: new Date(Date.now() + Number(archive.duration_minutes ?? 1440) * 60_000).toISOString(), threshold: typeof archive.count === "number" ? archive.count : null, baseline: null } : target.archive;
+      const updated: Issue = action === "priority" ? { ...target, priority: priority ?? "medium", priority_manual: true } : action === "assign" ? { ...target, assignee_member_id: assigneeMemberId, assignee_team_id: assigneeTeamId } : action === "mark_reviewed" ? { ...target, needs_review: false } : action === "archive" ? { ...target, status: "archived", archive: archiveState } : action === "unarchive" ? { ...target, status: "unresolved", archive: null } : action === "status" ? { ...target, status } : action === "resolve" ? { ...target, status: "resolved", resolution: typeof params.reason === "string" ? params.reason : "manual_unverified" } : action === "request_verification" ? { ...target, status: "pending_verification", resolution: typeof verification.action === "string" ? verification.action : target.resolution } : target;
+      state.issues[state.issues.findIndex((item) => item.id === id)] = updated;
+      succeeded.push(id);
+    }
+    return response({ matched: requested.length, processed: succeeded.length + failed.length, truncated: false, succeeded, failed });
+  }
+  if (path === "/api/issues/merge" && method === "POST") {
+    const value = await body(request);
+    const primary = byId(state.issues, String(value.primary_id ?? ""));
+    const childIds = Array.isArray(value.ids) ? value.ids.filter((id): id is string => typeof id === "string") : [];
+    if (primary === undefined) return error("not_found", "Not found.", 404);
+    state.issues = state.issues.map((item) => childIds.includes(item.id) ? { ...item, merged_into_id: primary.id } : item);
+    const children = state.issues.filter((item) => item.merged_into_id === primary.id);
+    const updated = { ...primary, merged_count: children.length };
+    state.issues[state.issues.findIndex((item) => item.id === primary.id)] = updated;
+    return response(updated);
+  }
+  if (path === "/api/external-issues/github/repos" && method === "GET") return response({ items: ["example-org/security-tools"] });
+  if (path === "/api/ownership-rules/reorder" && method === "POST") {
+    const value = await body(request);
+    const ids = Array.isArray(value.ids) ? value.ids.filter((id): id is string => typeof id === "string") : [];
+    state.ownershipRules = ids.flatMap((id, position) => { const rule = state.ownershipRules.find((item) => item.id === id); return rule === undefined ? [] : [{ ...rule, position }]; });
+    return response(null, 204);
+  }
+  const memberAction = /^\/api\/members\/([^/]+)(?:\/(deactivate|reactivate))?$/.exec(path);
+  if (memberAction !== null && method === "PATCH" || memberAction !== null && method === "POST") {
+    const handle = decodeURIComponent(memberAction![1]!);
+    const current = state.members.find((item) => item.handle === handle);
+    if (current === undefined) return error("not_found", "Not found.", 404);
+    if (method === "POST") {
+      const active = memberAction![2] === "reactivate";
+      state.members = state.members.map((item) => item.handle === handle ? { ...item, active } : item);
+      return response(null, 204);
+    }
+    const value = await body(request);
+    const updated = { ...current, display_name: typeof value.display_name === "string" ? value.display_name : current.display_name, email: typeof value.email === "string" || value.email === null ? value.email : current.email };
+    state.members = state.members.map((item) => item.handle === handle ? updated : item);
+    return response(updated);
   }
   if (path === "/api/views" && method === "GET") return response({ items: state.savedViews });
   if (path === "/api/views" && method === "POST") { const value = await body(request); const view = { id: `view-${state.savedViews.length + 1}`, name: String(value.name ?? "Saved view"), query: String(value.query ?? ""), sort: String(value.sort ?? "last_seen"), visibility: value.visibility === "shared" ? "shared" as const : "personal" as const, starred: false, is_default: false }; state.savedViews.push(view); return response(view, 201); }
+  if (path === "/api/views/default" && method === "PUT") { const value = await body(request); state.savedViews = state.savedViews.map((item) => ({ ...item, is_default: item.id === value.id })); return response(null, 204); }
   const viewMatch = /^\/api\/views\/([^/]+)(?:\/(star))?$/.exec(path);
   if (viewMatch !== null) { const index = state.savedViews.findIndex((item) => item.id === decodeURIComponent(viewMatch[1]!)); if (index < 0) return error("not_found", "Not found.", 404); const view = state.savedViews[index]!; if (viewMatch[2] === "star") { state.savedViews[index] = { ...view, starred: method === "PUT" }; return response(state.savedViews[index]); } if (method === "DELETE") { state.savedViews.splice(index, 1); return response(null, 204); } if (method === "PATCH") { const value = await body(request); state.savedViews[index] = { ...view, name: typeof value.name === "string" ? value.name : view.name, query: typeof value.query === "string" ? value.query : view.query, sort: typeof value.sort === "string" ? value.sort : view.sort }; return response(state.savedViews[index]); } }
-  if (path === "/api/views/default" && method === "PUT") { const value = await body(request); state.savedViews = state.savedViews.map((item) => ({ ...item, is_default: item.id === value.id })); return response(null, 204); }
   if (path === "/api/alert-rules" && method === "GET") return response({ items: state.alertRules });
   if (path === "/api/alert-rules" && method === "POST") { const value = await body(request); const rule = { id: `alert-${state.alertRules.length + 1}`, name: String(value.name ?? "New alert"), enabled: false, trigger: String(value.trigger ?? "issue_created"), query: String(value.query ?? ""), action_interval_minutes: Number(value.action_interval_minutes ?? 60), muted_until: null }; state.alertRules.push(rule); return response(rule, 201); }
   if (path === "/api/alert-rules/validate" && method === "POST") return response({ valid: true, errors: [] });
   const alertMatch = /^\/api\/alert-rules\/([^/]+)(?:\/(history|enable|disable|mute|unmute))?$/.exec(path);
-  if (alertMatch !== null) { const id = decodeURIComponent(alertMatch[1]!); const index = state.alertRules.findIndex((item) => item.id === id); if (index < 0) return error("not_found", "Not found.", 404); const rule = state.alertRules[index]!; if (alertMatch[2] === "history") return response({ items: state.alertFires.filter((fire) => fire.rule_id === id) }); if (alertMatch[2] !== undefined) { const updated = { ...rule, enabled: alertMatch[2] === "enable" ? true : alertMatch[2] === "disable" ? false : rule.enabled, muted_until: alertMatch[2] === "mute" ? new Date(Date.now() + 3_600_000).toISOString() : alertMatch[2] === "unmute" ? null : rule.muted_until }; state.alertRules[index] = updated; return response(updated); } if (method === "GET") return response(rule); if (method === "DELETE") { state.alertRules.splice(index, 1); return response(null, 204); } if (method === "PUT") { const value = await body(request); state.alertRules[index] = { ...rule, name: typeof value.name === "string" ? value.name : rule.name, query: typeof value.query === "string" ? value.query : rule.query, action_interval_minutes: typeof value.action_interval_minutes === "number" ? value.action_interval_minutes : rule.action_interval_minutes }; return response(state.alertRules[index]); } }
+  if (alertMatch !== null) { const id = decodeURIComponent(alertMatch[1]!); const index = state.alertRules.findIndex((item) => item.id === id); if (index < 0) return error("not_found", "Not found.", 404); const rule = state.alertRules[index]!; if (alertMatch[2] === "history") return response({ items: state.alertFires.filter((fire) => fire.rule_id === id) }); if (alertMatch[2] !== undefined) { const value = alertMatch[2] === "mute" ? await body(request) : {}; const updated = { ...rule, enabled: alertMatch[2] === "enable" ? true : alertMatch[2] === "disable" ? false : rule.enabled, muted_until: alertMatch[2] === "mute" ? typeof value.until === "string" ? value.until : new Date(Date.now() + 3_600_000).toISOString() : alertMatch[2] === "unmute" ? null : rule.muted_until }; state.alertRules[index] = updated; return response(updated); } if (method === "GET") return response(rule); if (method === "DELETE") { state.alertRules.splice(index, 1); return response(null, 204); } if (method === "PUT") { const value = await body(request); state.alertRules[index] = { ...rule, name: typeof value.name === "string" ? value.name : rule.name, query: typeof value.query === "string" ? value.query : rule.query, action_interval_minutes: typeof value.action_interval_minutes === "number" ? value.action_interval_minutes : rule.action_interval_minutes }; return response(state.alertRules[index]); } }
   if (path === "/api/auth/me/notification-settings" && method === "GET") return response({ items: state.notificationSettings });
   if (path === "/api/auth/me/notification-settings" && method === "PUT") { const value = await body(request); if (Array.isArray(value.items)) state.notificationSettings = value.items.filter((item): item is { category: string; preference: "email" | "slack" | "off" } => typeof item === "object" && item !== null && "category" in item && "preference" in item) as typeof state.notificationSettings; return response({ items: state.notificationSettings }); }
   if (path === "/api/auth/me/tokens" && method === "GET") return response({ items: state.selfTokens });
@@ -86,22 +161,26 @@ async function routeV13(url: URL, request: Request, method: string): Promise<Res
   const integrationMatch = /^\/api\/integrations\/([^/]+)\/test$/.exec(path); if (integrationMatch !== null && method === "POST") { const item = state.integrations.find((entry) => entry.kind === decodeURIComponent(integrationMatch[1]!)); return item?.configured ? response({ status: "passed", detail: "Connection test passed." }) : error("integration_unconfigured", "Integration is not configured.", 422); }
   if (path === "/api/ownership-rules" && method === "GET") return response({ items: state.ownershipRules });
   if (path === "/api/ownership-rules" && method === "POST") { const value = await body(request); const rule = { id: `ownership-${state.ownershipRules.length + 1}`, source: typeof value.source === "string" ? value.source : null, pattern: String(value.pattern ?? "example.test/*"), team_ref: String(value.team_ref ?? "team:engineering"), position: state.ownershipRules.length }; state.ownershipRules.push(rule); return response(rule, 201); }
-  if (path === "/api/ownership-rules/test" && method === "POST") return response({ team_ref: state.ownershipRules[0]?.team_ref ?? null });
+  if (path === "/api/ownership-rules/test" && method === "POST") { const value = await body(request); const source = typeof value.source === "string" ? value.source : ""; const locator = typeof value.display_locator === "string" ? value.display_locator : ""; const matched = state.ownershipRules.find((rule) => (rule.source === null || rule.source === source) && locator.startsWith(rule.pattern.replace(/\*.*$/, ""))); return response({ team_ref: matched?.team_ref ?? null }); }
   if (path === "/api/ownership-rules/reorder" && method === "POST") return response(null, 204);
   const ownershipMatch = /^\/api\/ownership-rules\/([^/]+)$/.exec(path); if (ownershipMatch !== null) { const id = decodeURIComponent(ownershipMatch[1]!); const index = state.ownershipRules.findIndex((item) => item.id === id); if (index < 0) return error("not_found", "Not found.", 404); if (method === "DELETE") { state.ownershipRules.splice(index, 1); return response(null, 204); } if (method === "PUT") { const value = await body(request); state.ownershipRules[index] = { ...state.ownershipRules[index]!, ...value } as typeof state.ownershipRules[number]; return response(state.ownershipRules[index]); } }
   if (issue !== undefined && issueId !== undefined) {
     const decoded = decodeURIComponent(issueId);
-    if (path.endsWith("/events/oldest") || path.endsWith("/events/latest") || path.endsWith("/events/recommended")) { const event = eventFixtures.find((item) => item.issue_id === decoded) ?? eventFixtures[0]!; return response({ event, previous_id: null, next_id: null, position: 1, total: 1 }); }
+    const eventSelection = /^\/api\/issues\/[^/]+\/events\/([^/]+)$/.exec(path);
+    if (eventSelection !== null) { const selector = decodeURIComponent(eventSelection[1]!); const issueEvents = eventFixtures.filter((item) => item.issue_id === decoded).sort((left, right) => left.observed_at.localeCompare(right.observed_at) || left.id.localeCompare(right.id)); const events = issueEvents.length > 0 ? issueEvents : eventFixtures; const foundIndex = events.findIndex((item) => item.id === selector); const index = selector === "oldest" || selector === "recommended" ? 0 : selector === "latest" ? events.length - 1 : Math.max(0, foundIndex); const event = events[index]!; return response({ event, previous_id: index > 0 ? events[index - 1]!.id : null, next_id: index + 1 < events.length ? events[index + 1]!.id : null, position: index + 1, total: events.length }); }
     if (path.endsWith("/tags")) return response({ items: [{ key: "source", value: issue.source, count: issue.times_seen }, { key: "rule", value: issue.rule_class, count: issue.times_seen }], total: issue.times_seen });
     if (path.endsWith("/stats")) return response({ buckets: Array.from({ length: 14 }, (_, index) => ({ start: new Date(Date.now() - (13 - index) * 86_400_000).toISOString(), count: issue.trend?.[index] ?? 0 })) });
-    if (path.endsWith("/activity")) return response({ items: [{ id: "activity-01", kind: "commented", actor: { kind: "member", ref: "member:mem-01", display_name: "Alice Example" }, body: "Reviewed masked example.", at: new Date().toISOString() }] });
+    if (path.endsWith("/activity")) return response({ items: state.comments.filter((item) => item.issue_id === decoded).map((item) => ({ id: item.id, kind: "commented", actor: { kind: "member" as const, ref: "member:mem-01", display_name: "Alice Example" }, body: item.display_text, at: new Date().toISOString() })) });
     if (path.endsWith("/external-issues") && method === "GET") return response({ items: state.externalLinks.filter((item) => item.issue_id === decoded) });
+    if (path.endsWith("/external-issues/github") && method === "POST") { const value = await body(request); const link = { id: `ext-${state.externalLinks.length + 1}`, issue_id: decoded, kind: "github" as const, url: `https://github.example.test/${String(value.repo ?? "example-org/security-tools")}/issues/42`, title: typeof value.title === "string" ? value.title : "Example issue", created_at: new Date().toISOString() }; state.externalLinks.push(link); return response(link, 201); }
     const extId = /\/external-issues\/([^/]+)$/.exec(path)?.[1]; if (extId !== undefined && method === "DELETE") { state.externalLinks = state.externalLinks.filter((item) => item.id !== decodeURIComponent(extId)); return response(null, 204); }
     if (path.endsWith("/external-issues") && method === "POST") { const value = await body(request); const link = { id: `ext-${state.externalLinks.length + 1}`, issue_id: decoded, kind: "url" as const, url: String(value.url ?? "https://example.test/issue"), title: null, created_at: new Date().toISOString() }; state.externalLinks.push(link); return response(link, 201); }
     if (path.endsWith("/bookmark")) { state.issues = state.issues.map((item) => item.id === decoded ? { ...item, bookmarked: method === "PUT" } : item); return response(null, 204); }
-    if (path.endsWith("/subscription")) { if (!state.subscriptions.includes(decoded)) state.subscriptions.push(decoded); return response({ subscribed: true }); }
+    if (path.endsWith("/subscription")) { const value = await body(request); const subscribed = value.subscribed !== false; state.subscriptions = subscribed ? [...new Set([...state.subscriptions, decoded])] : state.subscriptions.filter((id) => id !== decoded); return response({ subscribed }); }
     if (path.endsWith("/archive") && method === "POST") { state.issues = state.issues.map((item) => item.id === decoded ? { ...item, status: "archived", archive: { kind: "for_duration", until: new Date(Date.now() + 86_400_000).toISOString(), threshold: null, baseline: null } } : item); return response(state.issues.find((item) => item.id === decoded)); }
     if (path.endsWith("/unarchive") || path.endsWith("/review")) { state.issues = state.issues.map((item) => item.id === decoded ? { ...item, status: path.endsWith("/unarchive") ? "unresolved" : item.status, archive: null, needs_review: false } : item); return response(state.issues.find((item) => item.id === decoded)); }
+    const unmerge = /\/unmerge$/.test(path); if (unmerge && method === "POST") { const value = await body(request); const requestedIds = Array.isArray(value.ids) ? value.ids.filter((id): id is string => typeof id === "string") : []; const selectedIds = requestedIds.length === 0 ? null : requestedIds; state.issues = state.issues.map((item) => item.merged_into_id === decoded && (selectedIds === null || selectedIds.includes(item.id)) ? { ...item, merged_into_id: null, needs_review: true } : item); const primary = state.issues.find((item) => item.id === decoded); if (primary === undefined) return error("not_found", "Not found.", 404); const updated = { ...primary, merged_count: state.issues.filter((item) => item.merged_into_id === decoded).length }; state.issues[state.issues.findIndex((item) => item.id === decoded)] = updated; return response(updated); }
+    const commentMatch = /\/comments\/([^/]+)$/.exec(path); if (commentMatch !== null && (method === "PATCH" || method === "DELETE")) { const id = decodeURIComponent(commentMatch[1]!); const found = state.comments.some((item) => item.issue_id === decoded && item.id === id); if (!found) return error("not_found", "Not found.", 404); if (method === "DELETE") { state.comments = state.comments.filter((item) => !(item.issue_id === decoded && item.id === id)); return response(null, 204); } const value = await body(request); state.comments = state.comments.map((item) => item.id === id ? { ...item, display_text: String(value.body ?? item.display_text) } : item); return response({ id }); }
   }
   return null;
 }
@@ -181,6 +260,7 @@ const routes: MockRoute[] = [
     const updated: Issue = {
       ...issue,
       status: typeof status === "string" ? status as IssueStatus : issue.status,
+      ...(value.priority === "high" || value.priority === "medium" || value.priority === "low" ? { priority: value.priority, priority_manual: true } : {}),
       assignee_member_id: value.assignee_ref === null ? null : typeof value.assignee_ref === "string" && value.assignee_ref.startsWith("member:") ? value.assignee_ref.slice(7) : issue.assignee_member_id,
       assignee_team_id: value.assignee_ref === null ? null : typeof value.assignee_ref === "string" && value.assignee_ref.startsWith("team:") ? value.assignee_ref.slice(5) : issue.assignee_team_id,
     };
@@ -190,7 +270,7 @@ const routes: MockRoute[] = [
   } },
   { method: "POST", pattern: /^\/api\/issues\/([^/]+)\/comments$/, handler: (_url, _request, match) => {
     if (!byId(state.issues, match[1]!)) return error("not_found", "Not found.", 404);
-    state.comments = [...state.comments, { issue_id: match[1]!, display_text: "Comment saved in mock mode." }];
+    state.comments = [...state.comments, { id: `comment-${state.comments.length + 1}`, issue_id: match[1]!, display_text: "Comment saved in mock mode." }];
     return response({ accepted: true }, 201);
   } },
   { method: "GET", pattern: /^\/api\/workflows$/, handler: () => response({ items: workflowRefs() }) },
@@ -264,7 +344,7 @@ const routes: MockRoute[] = [
     state.escalations[index] = updated;
     return response(updated);
   } },
-  { method: "GET", pattern: /^\/api\/members$/, handler: (url) => response(page(memberFixtures, url)) },
+  { method: "GET", pattern: /^\/api\/members$/, handler: (url) => response(page(state.members, url)) },
   { method: "GET", pattern: /^\/api\/teams$/, handler: (url) => response(page(teamFixtures, url)) },
   { method: "POST", pattern: /^\/api\/teams$/, handler: async (_url, request) => { const value = await body(request); const team = { id: `team-${state.teams.length + 1}`, slug: String(value.slug ?? "new-team"), name: String(value.name ?? "New team"), email: null, slack_channel: null, lead: typeof value.lead === "string" ? value.lead : null }; state.teams.push(team); return response(team, 201); } },
   { method: "PUT", pattern: /^\/api\/teams\/([^/]+)\/lead$/, handler: async (_url, request, match) => { const team = state.teams.find((item) => item.slug === decodeURIComponent(match[1]!)); if (!team) return error("not_found", "Not found.", 404); const value = await body(request); const lead = typeof value.lead === "string" ? value.lead : null; state.teams[state.teams.findIndex((item) => item.id === team.id)] = { ...team, lead }; return response(null, 204); } },

@@ -47,7 +47,7 @@ function compareDate(value: string, filter: string, now: number): boolean {
 export function evaluateIssueQuery(issue: Issue, tokens: readonly QueryToken[], now: number): boolean {
   return tokens.every((token) => {
     let matched = true;
-    if (token.key === null) matched = `${issue.short_id} ${issue.display_title} ${issue.display_locator}`.toLowerCase().includes(token.value.toLowerCase());
+    if (token.key === null) { const shortId = /^TELE-(\d+)$/i.exec(token.value); matched = shortId === null ? `${issue.short_id} ${issue.display_title} ${issue.display_locator}`.toLowerCase().includes(token.value.toLowerCase()) : issue.number === Number(shortId[1]); }
     else if (token.key === "is") matched = token.value === "unresolved" ? ["unresolved", "acknowledged", "in_progress", "regressed", "escalating"].includes(issue.status) : issue.status === token.value;
     else if (token.key === "assigned") matched = token.value === "none" ? issue.assignee_member_id === null && issue.assignee_team_id === null : token.value === "me" ? issue.assignee_member_id === "mem-01" : true;
     else if (token.key === "has") matched = token.value === "assignee" ? issue.assignee_member_id !== null || issue.assignee_team_id !== null : true;

@@ -25,7 +25,9 @@ from telescreen.core.vocabulary import (
     Visibility,
 )
 from telescreen.db.models import IssueExceptionRow, IssueHistoryRow, IssueRow
+from telescreen.issues.archive import clear_archive
 from telescreen.issues.exceptions import ExceptionService
+from telescreen.issues.groups import GroupAction, GroupChange, active_children, cascade_to_children
 from telescreen.issues.keys import short_id
 from telescreen.issues.occurrences import OccurrenceResult, linked
 from telescreen.masking.redact import Redactor
@@ -69,11 +71,24 @@ class IssueRemediationService:
                 IssueStatus.ACKNOWLEDGED,
                 IssueStatus.IN_PROGRESS,
                 IssueStatus.REGRESSED,
+                IssueStatus.ESCALATING,
+                IssueStatus.ARCHIVED,
             )
         ):
             raise TelescreenError(ErrorCode.INVALID_TRANSITION, "invalid issue transition")
         now: datetime = self.clock.now()
         issue_ids: list[str] = [issue.id]
+        if issue.status == IssueStatus.ARCHIVED.value:
+            clear_archive(issue)
+        issue.needs_review = False
+        children: tuple[IssueRow, ...] = await active_children(session, issue.id)
+        if children:
+            await cascade_to_children(
+                session,
+                issue,
+                GroupChange(GroupAction.VERIFY, actor_ref, now),
+            )
+            issue_ids.extend(child.id for child in children)
         if include_linked and RuleClass(issue.rule_class) in self.include_linked_classes:
             occurrences: OccurrenceResult = await linked(session, issue.id)
             for occurrence in occurrences.items:
@@ -87,6 +102,8 @@ class IssueRemediationService:
             safe_note: str | None = self.redactor.redact(note).text[:4000] if note else None
             if current_id != issue.id:
                 safe_note = f"linked to {short_id(issue.number)}"
+            if current.status == IssueStatus.ARCHIVED.value:
+                clear_archive(current)
             current.status = IssueStatus.PENDING_VERIFICATION.value
             current.resolved_at = None
             current.resolution = None
@@ -150,6 +167,9 @@ class IssueRemediationService:
         await self._reject_requested_exceptions(session, issue.id, now)
         previous: str = issue.status
         issue.status = IssueStatus.RESOLVED.value
+        if previous == IssueStatus.ARCHIVED.value:
+            clear_archive(issue)
+        issue.needs_review = False
         issue.resolution = reason.value
         issue.resolved_at = now
         issue.updated_at = now
@@ -166,6 +186,11 @@ class IssueRemediationService:
             )
         )
         await self._audit(session, "issue.resolved", issue.id, actor_ref, 1)
+        await cascade_to_children(
+            session,
+            issue,
+            GroupChange(GroupAction.RESOLVE, actor_ref, now, status=IssueStatus.RESOLVED),
+        )
 
     async def release_to_team(self, session: AsyncSession, issue_id: str, actor_ref: str) -> None:
         """Clear a member assignment and assign the policy or default team."""

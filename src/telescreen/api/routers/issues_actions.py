@@ -20,6 +20,7 @@ from telescreen.core.permissions import Permission
 from telescreen.core.vocabulary import (
     ErrorCode,
     ExceptionDuration,
+    IssuePriority,
     IssueResolution,
     IssueStatus,
     RemediationAction,
@@ -30,10 +31,11 @@ from telescreen.ports.issues import RemediationReceipt
 
 @pydantic.dataclasses.dataclass
 class IssuePatchBody:
-    """Validated issue status and assignment patch."""
+    """Validated issue status, assignment, and priority patch."""
 
     status: IssueStatus | None = None
     assignee_ref: str | None = None
+    priority: IssuePriority | None = None
 
 
 @pydantic.dataclasses.dataclass(frozen=True)
@@ -195,7 +197,12 @@ def build_issues_actions_router(deps: IssuesRouterDeps) -> APIRouter:
             if issue is None:
                 raise TelescreenError(ErrorCode.NOT_FOUND, "issue not found")
             if body.status is not None:
-                if body.status in (IssueStatus.RESOLVED, IssueStatus.IGNORED):
+                if body.status in (
+                    IssueStatus.ARCHIVED,
+                    IssueStatus.ESCALATING,
+                    IssueStatus.RESOLVED,
+                    IssueStatus.IGNORED,
+                ):
                     return _invalid_transition()
                 issue = await deps.service.change_status(
                     session, issue_id, body.status, principal.actor_ref()
@@ -203,6 +210,10 @@ def build_issues_actions_router(deps: IssuesRouterDeps) -> APIRouter:
             if body.assignee_ref is not None:
                 issue = await deps.service.assign(
                     session, issue_id, body.assignee_ref, principal.actor_ref()
+                )
+            if body.priority is not None:
+                issue = await deps.service.set_priority(
+                    session, issue_id, body.priority, principal.actor_ref()
                 )
         await deps.indexer.index_issue(issue.id)
         return _response(_issue_json(issue))

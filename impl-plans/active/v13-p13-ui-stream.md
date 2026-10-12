@@ -1,9 +1,9 @@
 # V13-P13 UI Issue Stream: Tabs, Counts, Period, Trend, Values, Search, Server Views, Bulk, Merge, Shortcuts
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-ui-sentry.md section 11.2 (Issue stream); design-docs/specs/design-v1-3-sentry-parity.md sections 3 (B3, B4, B5), 4, 5, 6.1, 7, 13 (shortcuts), D29
 **Created**: 2026-10-12
-**Last Updated**: 2026-10-12
+**Last Updated**: 2026-10-13
 
 ## Plan Metadata
 
@@ -151,10 +151,67 @@ verification gap, never a pass.
 
 ## Completion Criteria
 
-- [ ] B3, B4 and B5 UI regression tests pass.
-- [ ] Every stream feature of design-ui-sentry.md 11.2 (Issue stream) is present.
-- [ ] The Progress Log has hashes and command evidence.
+- [x] B3, B4 and B5 UI regression tests pass.
+- [x] Every stream feature of design-ui-sentry.md 11.2 (Issue stream) is present.
+- [x] The Progress Log has hashes and command evidence.
 
 ## Progress Log
 
-(append sessions per conventions section 8)
+### Session 1 — 2026-10-12 — Stream implementation
+
+- Implemented the stream query parser adapter, tabs and counts, URL-backed period,
+  custom dates, sort and trend controls, autocomplete values, issue rows, server saved
+  views with one-time localStorage import, bulk toolbar, archive menu, merge action,
+  failure toasts, refresh banner and stream shortcuts. Added regression tests for B3,
+  B4, B5, tabs, custom dates, bulk selection, views, archive, refresh behavior and
+  shortcuts. The screenshot runner now targets the stream views, tabs, selection and
+  archive menu. All p13 stream screenshot states ran; the six non-strict skips are
+  downstream alert/member/onboarding states. No browser, page, HTTP or console errors.
+- Source SHA-256 before/after values are recorded in
+  `tmp/telescreen-v13-20261012-e2/p13/source-hashes.tsv`. The pre-edit plan hash was
+  `0c18dc5977a5cc8dfaab3152ee1c6fd04763e54393daf55e3439bc4adde00147`; final plan
+  hash is recorded in `tmp/telescreen-v13-20261012-e2/p13/plan-final.sha256`.
+- Reconciliation request: p13 cannot implement correct query-wide Assign, Priority,
+  Resolve-with-reason/note, conditional Archive, Remediate or Start workflow using
+  the current `issuesApi.bulk` contract in `src/web/src/api/client.ts`, which accepts
+  only `ids`, `query`, `period`, `action` and `status`. The p13 writePaths exclude that
+  client, and the matching bulk backend belongs to downstream v13-p06. Extend the
+  API/client and p06 contract to carry the required action payloads and add matching
+  tests, then let p13 wire each control to those fields. Until then, those actions
+  cannot be applied reliably to “all matching”; selected-row actions remain wired to
+  their per-issue APIs. No out-of-scope client or backend file was edited.
+- Verification (all exit 0):
+  - `cd src/web && bun install --frozen-lockfile` — `/tmp/telescreen-v13-p13-install-final.log`.
+  - `cd src/web && bun run typecheck` — `/tmp/telescreen-v13-p13-typecheck-final.log`.
+  - `cd src/web && bun run test` — `/tmp/telescreen-v13-p13-test-final.log`, 37 files / 193 tests passed.
+  - `cd src/web && bun run build --outDir /tmp/telescreen-v13-p13-web --emptyOutDir` — `/tmp/telescreen-v13-p13-build-final.log`.
+  - `cd src/web && bun run screenshots` — `/tmp/telescreen-v13-p13-shots-final.log`; exit 0, all p13 stream states captured, zero browser errors.
+- Implementation remains incomplete only for the query-wide action payload seam above;
+  formal review and integration are downstream workflow steps.
+
+### Session 2 — 2026-10-13 — INT-W2-02 query-wide bulk payload repair
+
+- Updated `IssueList.tsx` to pass typed `BulkParams` for selected and query-wide bulk
+  requests. Status now uses `params.status`; priority, member assignment (including
+  `assignee_ref: null` for Unassigned), archive conditions, and resolve reason/note are
+  sent in `params`. Remediation and Start workflow remain finite-selection actions and
+  show a warning when the selection is all matching. Added the Unassigned option to
+  `IssueBulkActions.tsx`.
+- Added exact request-body assertions for all-matching status, priority, member
+  assignment (including null for Unassigned), archive-until-findings, and resolve
+  actions. The merge assertion continues to expect `{primary_id, ids}`. Added a test
+  that all-matching remediation is selection only and warns. B3, B4, B5 and other stream
+  assertions remain intact.
+- Hashes: `IssueList.tsx` before=be6a2697e1c457786ab6b1fb81fa47b146335674d9141bc8be5556b7dac96d35 after=33697b399b316536944e2fa050e663a7bebdc4c1b2455fef3a244aee27280937; `IssueBulkActions.tsx` before=41662c6c340012d627dbd5c1aa6bcf114f40e25691392d4552937a9cdb64a91b after=eeb0685d92650dc3eac6b848fa21645d00882d643539982d07278e0cc79696fc; `IssueList.test.tsx` before=f4c13c7b3a6de7fc55ac7d25c7fe2d145eaa70f14f2a89000ca5138cbe631b56 after=b2c01458af032e405a547cd4fb6602ae30901e66660662300d858f7ca284d488. The plan pre-edit hash was b817a031c0419b468a3ea60fbc1914795c14953064bd9814a702d35b8814b622; post-edit hash is recorded in `tmp/telescreen-v13-20261012-e2/p13/reconcile-int-w2-02/plan-final.sha256`.
+- p03 API files remain untouched by this repair and match the reviewed contract hashes: `client.ts` 9c986c54d4ff733a5e8589aa73ba624d71f290689bb30bf8a3a12a667b741e3d, `types.ts` e090323511c15d680b613b8b68814276c93f48ff50c2f18f9c84d2321df6b5ab, `router.ts` 564c6a4bb1a7e1a8bb0c7e8ba4d6f66a2e8f8d78d20d8095105d629d4245b0a6, `mock.test.ts` 0a238952637d4c1fdc77cd099fdf4dcbd64ff8233988576ac9b0a4d5a01e14e3. `src/web/package.json` and `src/web/bun.lock` are unchanged.
+- Verification (final source, all exit 0):
+  - `cd src/web && bun install --frozen-lockfile` — `/tmp/telescreen-v13-p13-install.log`.
+  - `cd src/web && bun run typecheck` — `/tmp/telescreen-v13-p13-typecheck-final2.log`.
+  - `cd src/web && bun x vitest run src/pages/issues/IssueList.test.tsx` — `/tmp/telescreen-v13-p13-focused-test-final2.log`, 19 passed / 0 failed.
+  - `cd src/web && bun run test` — `/tmp/telescreen-v13-p13-test-final2.log`, 37 files / 199 tests passed / 0 failed.
+  - `cd src/web && bun run build --outDir /tmp/telescreen-v13-p13-web-final2 --emptyOutDir` — `/tmp/telescreen-v13-p13-build-final2.log`.
+  - `cd src/web && bun run screenshots` — `/tmp/telescreen-v13-p13-shots-final2.log`, exit 0; no browser errors, with the three downstream states explicitly skipped.
+  - `git diff --check -- src/web/src/pages/issues/IssueList.tsx src/web/src/pages/issues/IssueBulkActions.tsx src/web/src/pages/issues/IssueList.test.tsx impl-plans/active/v13-p13-ui-stream.md` — exit 0.
+  - Dependency file check (`git diff --name-only HEAD -- src/web/package.json src/web/bun.lock`) — no paths reported.
+- An initial full Vitest attempt failed only because the archive threshold test dispatched `change` while the input uses `onInput`; corrected the test event and reran the complete UI suite and full suite successfully. The original complete log is `/tmp/telescreen-v13-p13-test.log`; passing source-matched reruns are `/tmp/telescreen-v13-p13-test-final.log` and `/tmp/telescreen-v13-p13-test-final2.log`.
+- INT-W2-02 is addressed. Implementation-phase work for this plan is complete; independent review and run integration remain downstream workflow steps.

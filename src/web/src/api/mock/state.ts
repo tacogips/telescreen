@@ -26,7 +26,7 @@ export const state = {
   runs: structuredClone(runFixtures),
   search: structuredClone(searchFixtures),
   tasks: structuredClone(taskFixtures),
-  comments: [{ issue_id: "v13-iss-01", display_text: "Reviewed with @alice; masked example retained." }] as Readonly<{ issue_id: string; display_text: string }>[] ,
+  comments: [{ id: "comment-01", issue_id: "v13-iss-01", display_text: "Reviewed with @alice; masked example retained." }] as Readonly<{ id: string; issue_id: string; display_text: string }>[] ,
   runDetail: { ...structuredClone(runDetailFixture), steps: [...structuredClone(runDetailFixture.steps), { id: "step-notify", step_id: "notify-owner", visit: 1, branch_token: "main", status: "succeeded", attempt: 1, input_json: "{}", output_json: "{\"targets\":[{\"index\":0,\"channel\":\"email\",\"queued\":1,\"blocked\":0,\"skipped\":0}]}", error_code: null }] },
   workflows: [
     { id: "wf-01", name: "Credential remediation", version: 1, active: true, source_format: "yaml", source_text: "apiVersion: telescreen.workflow/v2\nname: Credential remediation\nnotification_sets:\n  - name: owner-alert\n    targets:\n      - recipients: [team:security]\n        channels: [slack, email]\n  - name: workflow-review\n    targets:\n      - recipients: [member:alex]\n        channels: [email]\n", compiled_json: "{\"apiVersion\":\"telescreen.workflow/v2\",\"notification_sets\":[{\"name\":\"owner-alert\",\"targets\":[{\"recipients\":[\"team:security\"],\"channels\":[\"slack\",\"email\"]}]},{\"name\":\"workflow-review\",\"targets\":[{\"recipients\":[\"member:alex\"],\"channels\":[\"email\"]}]}]}" },

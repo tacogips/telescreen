@@ -1,6 +1,6 @@
 # V13-P09 Notifications Backend: Per-User Settings, Member Delivery, Tester, Outbound Guard, Weekly Report
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-3-sentry-parity.md sections 1 (D22-D24), 2, 10, 12 (tests), 14
 **Created**: 2026-10-12
 **Last Updated**: 2026-10-12
@@ -192,13 +192,22 @@ Expected: the scoped checks exit 0, the typelint grep prints nothing, and the wh
 
 ## Completion Criteria
 
-- [ ] `NotificationService` satisfies both `NotificationSender` and `MemberNotifier`;
+- [x] `NotificationService` satisfies both `NotificationSender` and `MemberNotifier`;
   `NotificationServiceTester` satisfies `NotificationTester`; `DlpOutboundGuard`
   satisfies `OutboundContentGuard` (ty check).
-- [ ] The v1.2 behavior is unchanged for uncategorized requests (existing tests are
+- [x] The v1.2 behavior is unchanged for uncategorized requests (existing tests are
   green).
-- [ ] The Progress Log has hashes and command evidence.
+- [x] The Progress Log has hashes and command evidence.
 
 ## Progress Log
 
 (append sessions per conventions section 8)
+
+### Session: 2026-10-12 14:26
+**Tasks Completed**: Implemented category preferences and member delivery filtering, the notification settings API, notification tester, outbound DLP guard, and weekly report provider/handler with v1.3 regression tests. Existing v1.2 notification behavior remains covered by the green notification suite.
+**Tasks In Progress**: Formal integrity/adversarial review and combined-tree integration review are downstream workflow steps.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: Per-edit pre/post hashes and edit intentions are recorded in `tmp/telescreen-v13-20261012-e2/p09/hashes.log` and `tmp/telescreen-v13-20261012-e2/p09/edit-intents/`. Final source hashes: `src/telescreen/notifications/preferences.py` 318df37d552588252ac46a3d0e27940b848ef436d231b20dfc24c6a5a917dc92; `member_send.py` 85bb17becab46a4933cfe5b0cf40c398bffce65f91a28ca093e387ceaaa06a54; `sender.py` 0885a26e83d88c8002d3d14ec20bbdf4953cea04ea743a8b906b81fe10d9ba53; `tester.py` 000c4204860c2b13978bd90cd1afa0098916a028e0207f7443c1fe23a8da5006; `guard.py` af2c49e616be3559acf58dfc9bec361dd6b1cbcf6f0c1d1fae628d1fb868fe3a; `weekly.py` f2c5e49b7c7e85d014863f87492dfbc0b03a58237b038f06e502334abacfc678; `notification_settings.py` 8da007deafae06b94d249b3890e20822bdca524ab48fdab7c8fca1a689e3eabd; v13 tests: `fakes.py` 208fba16879c763f673e50a10d3d156f9ff551635559976084527ee40484d3e2, `test_preferences.py` e5e8db43b7263f6f140a2c0df1f3dce83c9ed9bf97b2e0d25750c0c0f3b4ccab, `test_sender.py` 58b23dabc43a71ab83dd39197140c33ea05c31acf54c33f9714c919cd526a5d8, `test_weekly.py` bb390b60741c9c13268e8bce0efd9ad4f041407419b8b4086685fc1298784bd2, `test_tester_guard.py` 27bf73d58ed705aeba0dc36610f4270ba49860747986f139299f28cf72c3681b, `test_router.py` 9bca1d72ec96ecc7fba665fca111f6e7f755247ca0d2b8f0582044f352183dc0.
+**Verification**: `uv run --frozen ruff format --check --no-cache src/telescreen/notifications src/telescreen/api/routers/notification_settings.py tests/notifications` -> exit 0 (log: `/tmp/telescreen-v13-p09-format-final2.log`); `uv run --frozen ruff check --no-cache src/telescreen/notifications src/telescreen/api/routers/notification_settings.py tests/notifications` -> exit 0 (log: `/tmp/telescreen-v13-p09-ruff-final2.log`); `uv run --frozen ty check src/telescreen/notifications src/telescreen/api/routers/notification_settings.py tests/notifications` -> exit 0 (log: `/tmp/telescreen-v13-p09-ty-final2.log`); `uv run --frozen python tools/typelint.py` plus p09-path filter -> whole-repository exit 1 for 11 sibling issue-stream diagnostics, p09-path filter exit 0 with 0 owned diagnostics (logs: `/tmp/telescreen-v13-p09-typelint-final2.log`, `/tmp/telescreen-v13-p09-typelint-owned-final2.log`); `uv run --frozen pytest -p no:cacheprovider tests/notifications` -> exit 0, 127 passed (log: `/tmp/telescreen-v13-p09-pytest-final2.log`); `uv run --frozen pytest -p no:cacheprovider tests/e2e/test_flow_v12_notifications.py tests/e2e/test_wiring_v12.py tests/leak/test_leak_matrix_v12.py` -> exit 0, 5 passed (log: `/tmp/telescreen-v13-p09-pytest-shared-final2.log`); `wc -l src/telescreen/notifications/*.py src/telescreen/api/routers/notification_settings.py` with per-file `<1000` gate -> exit 0, largest file `sender.py` 317 lines (log: `/tmp/telescreen-v13-p09-wc-final3.log`).
+**Notes**: All edits stayed within p09 `writePaths`; no shared template or v1.2 tests required changes. Router registration remains owned by v13-p12. Plan SHA-256 before this progress edit: `e235e2b11d558847ed0d3ab76e272162ddc2aa4adc14b2cb8b49db27ef9c30cc` (evidence: `tmp/telescreen-v13-20261012-e2/p09/plan-before-progress.sha256`).

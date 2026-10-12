@@ -53,7 +53,15 @@ Dispatch runs (at most 8 plans each; later runs record accepted plans as
 - run 1: p01, p02, p03 (wave 1); p04, p05, p09, p13 (wave 2) (7 plans). Manifest
   `active/telescreen-v13-20261012-e1-dispatch.json` was blocked on write paths (owner
   reconciled at `d8073b1`); `active/telescreen-v13-20261012-e2-dispatch.json` redispatches
-  the same scope (p01 and p02 re-verify, p03 finishes);
+  the same scope (p01 and p02 re-verify, p03 finishes). Session 12 (2026-10-13): all 7
+  run-1 plans are Completed (0 open boxes) and the combined wave-2 tree passed the
+  integration review (comm-000580: pytest 922 passed / 8 skipped, vitest 199 passed,
+  non-strict screenshots 0 browser errors). They stay in `active/` as
+  `acceptedDependencies` for runs 2 and 3 and are archived by the serial finalization
+  after v13-p17. The new routers are unregistered until v13-p12 (run 3). Open low items:
+  INT-W2-04 (custom-period all-matching bulk lacks start/end; p06/p17), INT-W2-05
+  (all-matching request_verification is selection-only; p06), archive
+  `until_escalating` parsing (p06);
 - run 2: p08, p11, p15, p16 (wave 2); p06, p07, p10, p14 (wave 3) (8 plans);
 - run 3: p12 (wave 4), p17 (wave 5).
 

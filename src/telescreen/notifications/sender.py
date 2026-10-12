@@ -13,11 +13,17 @@ from telescreen.core.vocabulary import (
     DlpVerdict,
     EngineTaskKind,
     ErrorCode,
+    NotificationCategory,
+    NotificationChannel,
+    NotificationEvent,
+    NotificationPreference,
     NotificationStatus,
 )
 from telescreen.db.models.notifications import NotificationRow
 from telescreen.notifications.addresses import channel_addresses
 from telescreen.notifications.dlp import CensoredMessage, DlpGate, OutboundMessage
+from telescreen.notifications.member_send import member_reference
+from telescreen.notifications.preferences import PreferenceRepository, PreferenceService
 from telescreen.notifications.repository import NotificationRepository
 from telescreen.notifications.templates.builtins import builtin_name
 from telescreen.notifications.templates.model import ResolvedTemplate
@@ -26,6 +32,7 @@ from telescreen.notifications.templates.resolver import BuiltinTemplateResolver,
 from telescreen.ports.audit import AuditEntry, AuditLog
 from telescreen.ports.directory import RecipientResolver, ResolvedRecipients
 from telescreen.ports.notifications import (
+    MemberNotification,
     NotificationContext,
     NotificationReceipt,
     NotificationRequest,
@@ -70,7 +77,10 @@ class NotificationService:
         self, session: AsyncSession, request: NotificationRequest
     ) -> NotificationReceipt:
         """Check recipients, render and gate once, then write one row per recipient."""
-        problems: tuple[ErrorCode | None, ...] = await self._check_recipients(session, request)
+        category: NotificationCategory | None = _category(request)
+        problems: tuple[ErrorCode | None, ...] = await self._check_recipients(
+            session, request, category
+        )
         rendered: _Rendered = await self._render(session, request)
         safe_message: CensoredMessage = rendered.message
         notification_ids: list[str] = []
@@ -105,6 +115,7 @@ class NotificationService:
                 set_name=request.set_name,
                 target_index=request.target_index,
                 error_code=problem.value if problem is not None else None,
+                category=category.value if category is not None else None,
             )
             await self.repository.insert(session, row)
             action: str = next(pair[1] for pair in _ACTIONS if pair[0] is status)
@@ -117,7 +128,7 @@ class NotificationService:
                     "notification",
                     notification_id,
                     action,
-                    _details(request, rendered, problem),
+                    _details(request, rendered, problem, category),
                 ),
             )
             if status is NotificationStatus.QUEUED:
@@ -139,13 +150,47 @@ class NotificationService:
             tuple(skipped_ids),
         )
 
+    async def send_to_member(
+        self, session: AsyncSession, notification: MemberNotification
+    ) -> NotificationReceipt:
+        """Choose a member's configured channel and send through the normal DLP path."""
+        recipient_ref: str = await member_reference(session, notification.member_id)
+        preferences: PreferenceService = PreferenceService(PreferenceRepository(), self.clock)
+        preference: NotificationPreference = await preferences.channel_for(
+            session, notification.member_id, notification.category
+        )
+        channel: NotificationChannel = (
+            NotificationChannel.SLACK
+            if preference is NotificationPreference.SLACK
+            else NotificationChannel.EMAIL
+        )
+        return await self.send(
+            session,
+            NotificationRequest(
+                channel,
+                (recipient_ref,),
+                "",
+                "",
+                "system:member-notification",
+                issue_id=notification.issue_id,
+                event=notification.event,
+                context=notification.context,
+                record_unreachable=True,
+                category=notification.category,
+            ),
+        )
+
     async def _check_recipients(
-        self, session: AsyncSession, request: NotificationRequest
+        self,
+        session: AsyncSession,
+        request: NotificationRequest,
+        category: NotificationCategory | None,
     ) -> tuple[ErrorCode | None, ...]:
         """Resolve each ref; record or raise unknown refs depending on the request."""
         problems: list[ErrorCode | None] = []
         for recipient_ref in request.recipients:
-            if not request.record_unreachable:
+            needs_filter: bool = category is not None and recipient_ref.startswith("member:")
+            if not request.record_unreachable and not needs_filter:
                 await self.resolver.resolve(session, recipient_ref)
                 problems.append(None)
                 continue
@@ -156,9 +201,54 @@ class NotificationService:
                     raise
                 problems.append(ErrorCode.RECIPIENT_UNKNOWN)
                 continue
+            member_problem: ErrorCode | None = None
+            if needs_filter and category is not None:
+                member_problem = await self._preference_problem(
+                    session, resolved, request, category
+                )
+            if member_problem is not None:
+                problems.append(member_problem)
+                continue
             reachable: bool = bool(channel_addresses(resolved, request.channel))
-            problems.append(None if reachable else ErrorCode.RECIPIENT_UNREACHABLE)
+            problems.append(
+                None
+                if reachable
+                else ErrorCode.RECIPIENT_UNREACHABLE
+                if request.record_unreachable
+                else None
+            )
         return tuple(problems)
+
+    async def _preference_problem(
+        self,
+        session: AsyncSession,
+        resolved: ResolvedRecipients,
+        request: NotificationRequest,
+        category: NotificationCategory,
+    ) -> ErrorCode | None:
+        """Apply direct channel choice or explicit filter-only member settings."""
+        if request.event is NotificationEvent.SLA_ESCALATED:
+            return None
+        if not resolved.member_ids:
+            return None
+        preferences: PreferenceService = PreferenceService(PreferenceRepository(), self.clock)
+        direct_category: bool = category in (
+            NotificationCategory.ASSIGNED,
+            NotificationCategory.MENTIONS,
+            NotificationCategory.SUBSCRIBED,
+            NotificationCategory.WEEKLY_REPORT,
+        )
+        for member_id in resolved.member_ids:
+            preference: NotificationPreference | None = (
+                await preferences.channel_for(session, member_id, category)
+                if direct_category
+                else await preferences.stored_for(session, member_id, category)
+            )
+            if preference is NotificationPreference.OFF:
+                return ErrorCode.RECIPIENT_OPTED_OUT
+            if preference is not None and preference.value != request.channel.value:
+                return ErrorCode.RECIPIENT_OPTED_OUT
+        return None
 
     async def _render(self, session: AsyncSession, request: NotificationRequest) -> _Rendered:
         """Produce the gated message for the v1, inline-event, or template path."""
@@ -187,7 +277,10 @@ class NotificationService:
 
 
 def _details(
-    request: NotificationRequest, rendered: _Rendered, problem: ErrorCode | None
+    request: NotificationRequest,
+    rendered: _Rendered,
+    problem: ErrorCode | None,
+    category: NotificationCategory | None,
 ) -> JsonValue:
     """Return safe audit details: enums, counts, names and indexes that are set."""
     members: list[tuple[str, JsonValue]] = [
@@ -199,6 +292,8 @@ def _details(
         members.append(("error_code", json_str(problem.value)))
     if request.event is not None:
         members.append(("event_kind", json_str(request.event.value)))
+    if category is not None:
+        members.append(("category", json_str(category.value)))
     if rendered.template_name is not None:
         members.append(("template_name", json_str(rendered.template_name)))
     if rendered.template_version is not None:
@@ -210,3 +305,13 @@ def _details(
     if rendered.fallback:
         members.append(("template_fallback", json_bool(True)))
     return json_object(members)
+
+
+def _category(request: NotificationRequest) -> NotificationCategory | None:
+    """Resolve the filter category implied by legacy workflow task events."""
+    if request.event in (
+        NotificationEvent.HUMAN_TASK_ASSIGNED,
+        NotificationEvent.OWNER_REVIEW_ASSIGNED,
+    ):
+        return NotificationCategory.WORKFLOW_TASKS
+    return request.category

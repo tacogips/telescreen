@@ -1,6 +1,6 @@
 # V13-P04 Issue Stream Backend: Query Language, Period, Trend, Sorts, Counts, Saved Views, Item Serializer
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-3-sentry-parity.md sections 1 (D1, D6-D10), 3 (B2, B3, B5), 4, 5, 15 ("Shared item serializer")
 **Created**: 2026-10-12
 **Last Updated**: 2026-10-12
@@ -214,24 +214,104 @@ Imitate:
 Start every shell with `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1`.
 
 ```bash
-uv run --frozen ruff format --check --no-cache src/telescreen/issues/query src/telescreen/issues/views.py src/telescreen/api/routers tests/issues/v13_query tests/api/v13_stream
-uv run --frozen ruff check --no-cache src/telescreen/issues src/telescreen/api/routers tests/issues/v13_query tests/api/v13_stream
-uv run --frozen ty check src/telescreen/issues src/telescreen/api/routers tests/issues/v13_query tests/api/v13_stream
-uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p04-typelint.log 2>&1; grep -E '^(src/telescreen/issues/(query|views)|src/telescreen/api/routers/(issues_list|issues_common|issue_counts|issue_views)|tests/(issues/v13_query|api/v13_stream))' /tmp/telescreen-v13-p04-typelint.log
-uv run --frozen pytest -p no:cacheprovider tests/issues/v13_query tests/api/v13_stream tests/api/v11_issues tests/issues/test_issues_api.py tests/e2e/test_route_permissions.py tests/api/v12_rbac 2>&1 | tee /tmp/telescreen-v13-p04-pytest.log; echo "exit=$?"
-uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-v13-p04-pytest-all.log 2>&1; echo "exit=$?"
+uv run --frozen ruff format --check --no-cache src/telescreen/issues/query src/telescreen/issues/views.py src/telescreen/api/routers/issues_list.py src/telescreen/api/routers/issues_common.py src/telescreen/api/routers/issue_counts.py src/telescreen/api/routers/issue_views.py tests/issues/v13_query tests/api/v13_stream tests/issues/test_issues_api.py tests/api/v11_issues/test_issues_router.py
+uv run --frozen ruff check --no-cache src/telescreen/issues/query src/telescreen/issues/views.py src/telescreen/api/routers/issues_list.py src/telescreen/api/routers/issues_common.py src/telescreen/api/routers/issue_counts.py src/telescreen/api/routers/issue_views.py tests/issues/v13_query tests/api/v13_stream tests/issues/test_issues_api.py tests/api/v11_issues/test_issues_router.py
+uv run --frozen ty check src/telescreen/issues/query src/telescreen/issues/views.py src/telescreen/api/routers/issues_list.py src/telescreen/api/routers/issues_common.py src/telescreen/api/routers/issue_counts.py src/telescreen/api/routers/issue_views.py tests/issues/v13_query tests/api/v13_stream tests/issues/test_issues_api.py tests/api/v11_issues/test_issues_router.py
+uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p04-typelint-final4.log 2>&1; ! grep -E '^(src/telescreen/issues/query/|src/telescreen/issues/views[.]py|src/telescreen/api/routers/(issues_list|issues_common|issue_counts|issue_views)[.]py|tests/issues/v13_query/|tests/api/v13_stream/|tests/issues/test_issues_api[.]py|tests/api/v11_issues/test_issues_router[.]py)' /tmp/telescreen-v13-p04-typelint-final4.log
+uv run --frozen pytest -p no:cacheprovider tests/issues/v13_query tests/api/v13_stream tests/api/v11_issues tests/issues/test_issues_api.py tests/e2e/test_route_permissions.py tests/api/v12_rbac > /tmp/telescreen-v13-p04-pytest-final4.log 2>&1
 ```
 
-Expected: the scoped checks exit 0, the typelint grep prints nothing, and the existing
-issue-API tests still pass. The full run is informational.
+Each command runs from the repository root after `set -o pipefail` and
+`export PYTHONDONTWRITEBYTECODE=1`. The final Progress Log records exits and full log
+paths. Whole-repository typelint may report concurrent sibling-plan findings; the filtered
+command must print no p04-owned findings. The full repository pytest run is informational.
 
 ## Completion Criteria
 
-- [ ] B2, B3 and B5 regression tests exist and pass. Each test's docstring names the defect.
-- [ ] `select_matching_ids` and `issue_item_extras` have the signatures above.
-- [ ] Every new route declares exactly one permission dependency.
-- [ ] Every file is under 1000 lines; the Progress Log is complete.
+- [x] B2, B3 and B5 regression tests exist and pass. Each test's docstring names the defect.
+- [x] `select_matching_ids` and `issue_item_extras` have the signatures above.
+- [x] Every new route declares exactly one permission dependency.
+- [x] Every file is under 1000 lines; the Progress Log is complete.
 
 ## Progress Log
 
 (append sessions per conventions section 8)
+
+### Session: 2026-10-12 23:58
+**Tasks Completed**: Implemented the query model/parser/filter/compiler, bounded periods,
+zero-filled issue trends, bounded matching-ID contract, list sorts and keyset cursors,
+counts router, safe saved-view service/router, and batched stream-item extras. Added B2/B3/B5
+regressions, API coverage for merged-child exclusion, counts, display-name serialization,
+safe query errors, cursor pagination and validation, period bounds, saved-view redaction,
+ownership/limits, audit masking, and exactly-one permission dependencies.
+**Tasks In Progress**: None.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `impl-plans/active/v13-p04-issue-stream-backend.md` before=94aac37f4c913ae2ca9494b8d82d40d5f0a01d32dfd701d879ed1215db5d47c9 after=`tmp/telescreen-v13-20261012-e2/p04/edit-24-after.sha256`; `src/telescreen/api/routers/issues_list.py` before=6fd80aeee03154fafc742924bf5ad7b1aa648fe339d93549351ce25782e398cd after=777af8dc8a7eca66563c79b913d557a2f2db666ea5aa094fd89a1faa823ed117; `src/telescreen/api/routers/issues_common.py` before=8a398bcba7a534cf8cc35a27345057d68f197c2e2276bf81d9efe69fe316616d after=99a92bffb7cca31c92b42be9a60c5c414ae1832f1eb406f5c85f06691d2bf226; new source/test files were absent before and their final hashes are in `tmp/telescreen-v13-20261012-e2/p04/final-hashes.sha256`. Per-edit before/after hashes and intent notes are in the same directory.
+**Verification**: `uv run --frozen ruff format --check --no-cache <p04 scoped paths>` -> exit 0 (log: `/tmp/telescreen-v13-p04-format-final3.log`); `uv run --frozen ruff check --no-cache <p04 scoped paths>` -> exit 0 (log: `/tmp/telescreen-v13-p04-ruff-final3.log`); `uv run --frozen ty check <p04 scoped paths>` -> exit 0 (log: `/tmp/telescreen-v13-p04-ty-final3.log`); `uv run --frozen python tools/typelint.py` filtered to p04 paths -> exit 0, no p04 findings (log: `/tmp/telescreen-v13-p04-typelint-final3.log`; whole-repository run reports three concurrent p05 archive-test annotations); `uv run --frozen pytest -p no:cacheprovider tests/issues/v13_query tests/api/v13_stream tests/api/v11_issues tests/issues/test_issues_api.py tests/e2e/test_route_permissions.py tests/api/v12_rbac` -> exit 0, 24 passed (log: `/tmp/telescreen-v13-p04-pytest-final3.log`); p04 source and test files line-count gate -> exit 0, largest 515 lines (log: `/tmp/telescreen-v13-p04-wc-final3.log`).
+**Notes**: Dependency acceptance was supplied by dispatch: `v13-p01-foundation` and `v13-p02-db` are in `acceptedPlanIds`. Independent review and final integration gates remain downstream workflow steps.
+
+### Session: 2026-10-13 00:14
+**Tasks Completed**: Fixed `P04-TIC-01`: the route-permission test now walks the retained counts and saved-views router route lists, recursively counts `PermissionDependency` markers, checks all eight expected `(method, path, permission)` entries, and asserts that exactly eight routes were inspected.
+**Tasks In Progress**: None.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `tests/api/v13_stream/test_issue_routes.py` edit-25 before=db80521995fe36c5ac22c3c965c9d87e427123cda7826ba6382294092c613686 after=5575808e57de8d2a368c157b24d4427deedec01cc1ef702cc4f2785a4091d67c; edit-26 before=5575808e57de8d2a368c157b24d4427deedec01cc1ef702cc4f2785a4091d67c after=2eeb833aa12dd4f321b19a73d12d608f3a8a5996d82289d4b89ecd4ca6c20d5e. Plan file: edit-27 before=8ab2601464e5b4f6a7746465724f68b743955dac3286fa5bb8d3f05c4cf33eaa after=0e8eda144452c48f0521253c453d99839898cb38163e66a094fb50ab38e5d790; edit-28 before=2a0400b6a564ef90a88b87205a49590ecece420ad1c2690206b990e306e25b42 after=0e8eda144452c48f0521253c453d99839898cb38163e66a094fb50ab38e5d790; edit-29 before=0e8eda144452c48f0521253c453d99839898cb38163e66a094fb50ab38e5d790 after=7ab0bef5a648961a35c53381a585f78eb8643ddbe288ccbd8e039a2b9e6427eb; edit-30 before=7ab0bef5a648961a35c53381a585f78eb8643ddbe288ccbd8e039a2b9e6427eb after=`tmp/telescreen-v13-20261012-e2/p04/edit-30-after.sha256`. Hash files and per-edit intents are in the p04 evidence directory.
+**Verification**: Required p04 pytest command -> exit 0, 24 passed (log: `/tmp/telescreen-v13-p04-pytest-final4.log`); scoped `ruff format --check` -> exit 0 (log: `/tmp/telescreen-v13-p04-format-final4.log`); scoped `ruff check` -> exit 0 (log: `/tmp/telescreen-v13-p04-ruff-final4.log`); scoped `ty check` -> exit 0 (log: `/tmp/telescreen-v13-p04-ty-final4.log`); whole-repository typelint and p04 path filter -> exit 0, all 468 files clean (log: `/tmp/telescreen-v13-p04-typelint-final4.log`). The route-walk assertion itself verifies all eight pairs and permissions during the passing pytest run.
+**Notes**: The corrected guard is test-only. No production router or out-of-scope test file changed. Review decision `P04-TIC-01` is addressed and ready for independent re-review; no review acceptance is claimed.
+
+### Session: 2026-10-13
+**Tasks Completed**: Fixed `P04-ADV-01-free-text-case-sensitive`: `build_filters` now uses
+`ilike` for both display columns while preserving escaped `%`/`_` patterns and the exact
+`TELE-<n>` branch. Added SQLite mixed-case matching and PostgreSQL dialect compilation
+regressions; all prior query assertions remain intact.
+**Tasks In Progress**: None.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `src/telescreen/issues/query/filters.py` edit-31 before=
+`ee268e72ee62625e93904fcacf07873103710afcbfc715ced09e2bd7555ed70f` after=
+`324a1eb6d09c4a54006c9bf90f13c32bbee592b3e61cdb9c300217fe7ffaf680`; 
+`tests/issues/v13_query/test_query.py` edit-32 before=
+`eb27467a95ee1f1ad344bff73fd1128332d0599ff1db3ee6d0512a2decc76e3f` after=
+`2fbdda420cee41ad2b5d1580330d21bfda8632ac1c1d585a9958ec37ef905c17`; plan edit-33
+before is in `tmp/telescreen-v13-20261012-e2/p04/edit-33-before.sha256`; its post-edit hash
+is recorded in `edit-33-after.sha256`. Per-edit intents and hashes are in the same p04
+evidence directory.
+**Verification**: `uv run --frozen pytest -p no:cacheprovider
+tests/issues/v13_query/test_query.py` -> exit 0, 10 passed
+(`/tmp/telescreen-v13-p04-query-case-final5.log`); required scoped pytest plus
+`tests/issues/test_issues.py` -> exit 0, 35 passed
+(`/tmp/telescreen-v13-p04-pytest-final5.log`); scoped `ruff format --check` -> exit 0
+(`/tmp/telescreen-v13-p04-format-final5.log`); scoped `ruff check` -> exit 0
+(`/tmp/telescreen-v13-p04-ruff-final5.log`); scoped `ty check` -> exit 0
+(`/tmp/telescreen-v13-p04-ty-final5.log`); whole-repository typelint with the p04 path
+filter -> exit 0, no p04 diagnostics (`/tmp/telescreen-v13-p04-typelint-final5.log`;
+whole-repository output reports 53 sibling p05 findings across 471 files); line-count gate
+-> exit 0, largest listed source file 412 lines
+(`/tmp/telescreen-v13-p04-wc-final5.log`); Completion Criteria unticked-box check -> exit 0.
+**Notes**: P04-ADV-01's source and behavioral verification are ready for independent
+re-review; no review acceptance is claimed. Combined-tree integration gates remain owned by
+the serial integration step.
+
+### Session: 2026-10-13 verification addendum
+**Tasks Completed**: Extended the SQLite free-text regression to prove `%` and `_` remain
+literal pattern characters (`100%_safe` matches the literal row and excludes `100X_safe`).
+**Tasks In Progress**: None.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: edit-34 `tests/issues/v13_query/test_query.py` before=
+`2fbdda420cee41ad2b5d1580330d21bfda8632ac1c1d585a9958ec37ef905c17` after=
+`b2255e37c984689857df3c04c7256b04928b33d61682639a2456be781e705556`; plan edit-35
+before is in `tmp/telescreen-v13-20261012-e2/p04/edit-35-before.sha256` and its post-edit
+hash is in `edit-35-after.sha256`.
+**Verification**: Query module -> exit 0, 10 passed
+(`/tmp/telescreen-v13-p04-query-case-final6.log`); scoped p04 suite plus
+`tests/issues/test_issues.py` -> exit 0, 35 passed
+(`/tmp/telescreen-v13-p04-pytest-final7.log`); scoped format, ruff and ty checks -> exit 0
+(`/tmp/telescreen-v13-p04-format-final7.log`, `/tmp/telescreen-v13-p04-ruff-final7.log`,
+`/tmp/telescreen-v13-p04-ty-final7.log`); whole-repository typelint with p04 path filter
+-> exit 0, no p04 diagnostics (`/tmp/telescreen-v13-p04-typelint-final7.log`; 53 sibling
+p05 diagnostics remain outside this plan); line-count and unticked-criteria checks -> exit
+0 (`/tmp/telescreen-v13-p04-wc-final7.log`).
+**Notes**: The required p04 criteria remain checked. Independent re-review and combined-tree
+integration gates remain downstream; no review acceptance is claimed.

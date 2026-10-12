@@ -38,8 +38,8 @@ describe("web shell", () => {
     render(() => <MemoryRouter root={AppShell}><AppRoutes /></MemoryRouter>);
     const rail = within(screen.getByRole("navigation", { name: "Primary navigation" }));
     const labels = rail.getAllByRole("link").slice(1).map((link) => link.querySelector(":scope > span")?.textContent?.trim());
-    expect(labels).toEqual(["Issues", "My tasks", "Search", "Workflows", "Police", "Collectors", "Policies", "Escalation", "Audit", "Assistant", "Settings"]);
-    expect(screen.getByRole("link", { name: "For review" })).toHaveAttribute("href", "/issues?query=assigned%3Ame");
+    expect(labels).toEqual(["Dashboard", "Issues", "Alerts", "My tasks", "Search", "Workflows", "Police", "Collectors", "Policies", "Escalation", "Audit", "Assistant", "Settings"]);
+    expect(screen.getByRole("link", { name: "Assigned to me" })).toHaveAttribute("href", "/issues?query=assigned%3Ame");
     expect(screen.getByRole("link", { name: "Allowed" })).toHaveAttribute("href", "/issues?query=is%3Aallowed");
     expect(screen.getByRole("link", { name: "Verifying" })).toHaveAttribute("href", "/issues?query=is%3Apending_verification");
     expect(screen.getByRole("link", { name: "Skip to main content" })).toHaveAttribute("href", "#main");
@@ -102,13 +102,10 @@ describe("web shell", () => {
     expect(screen.getByText("Search results")).toBeInTheDocument();
   });
 
-  it("toggles the panel, refreshes saved views, and tolerates invalid storage", () => {
-    storage.setItem("telescreen.issueViews", "not-json");
+  it("does not put local saved views in navigation and toggles the panel", () => {
+    storage.setItem("telescreen.issueViews", JSON.stringify([{ id: "v1", name: "My view", query: "is:unresolved", sort: "last_seen" }]));
     render(() => <MemoryRouter root={AppShell}><AppRoutes /></MemoryRouter>);
     expect(screen.queryByText("My view")).not.toBeInTheDocument();
-    storage.setItem("telescreen.issueViews", JSON.stringify([{ id: "v1", name: "My view", query: "is:unresolved", sort: "last_seen" }]));
-    window.dispatchEvent(new Event("telescreen:issue-views"));
-    expect(screen.getByText("My view")).toBeInTheDocument();
     fireEvent.keyDown(window, { key: "b", ctrlKey: true });
     expect(storage.getItem("telescreen.panelCollapsed")).toBe("true");
   });

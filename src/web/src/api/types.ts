@@ -38,7 +38,16 @@ export type SelfToken = Readonly<{ id: string; label: string; scopes: readonly s
 export type DashboardResponse = Readonly<{ period: string; open_issues: number; new_issues: number; resolved_issues: number; findings: number; trend: Readonly<{ start: string; count: number }>[] }>;
 export type IntegrationStatus = Readonly<{ kind: string; configured: boolean; status: string }>;
 export type OwnershipRule = Readonly<{ id: string; source: string | null; pattern: string; team_ref: string; position: number }>;
-export type BulkResult = Readonly<{ succeeded: string[]; failed: Readonly<{ issue_id: string; code: string }>[]; truncated: boolean }>;
+export type BulkParams = Readonly<{
+  status?: IssueStatus;
+  assignee_ref?: string | null;
+  priority?: IssuePriority;
+  archive?: Readonly<{ kind: string; duration_minutes?: number; count?: number }>;
+  reason?: string;
+  note?: string;
+  verification?: Readonly<{ action: string; include_linked: boolean }>;
+}>;
+export type BulkResult = Readonly<{ matched?: number; processed?: number; succeeded: string[]; failed: Readonly<{ issue_id: string; code: string }>[]; truncated: boolean }>;
 export type Severity = "critical" | "high" | "medium";
 export type Visibility = "public" | "anyone_with_link" | "external_shared" | "domain" | "internal" | "private" | "unknown";
 export type CoverageState = "scanned" | "partial" | "unsupported" | "fetch_failed";

@@ -1,6 +1,6 @@
 # V13-P01 Foundation: Vocabulary, Permissions, Settings, Ports, Issues Router Split
 
-**Status**: In Progress
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-3-sentry-parity.md sections 1 (D1, D2, D5, D16, D22), 2, 15; design-docs/specs/design-api-and-ui.md "v1.3 endpoints"
 **Created**: 2026-10-12
 **Last Updated**: 2026-10-12
@@ -293,7 +293,7 @@ Expected:
 
 - [x] Deliverables 1-7 are implemented, and new values match design section 2.
 - [x] `wc -l src/telescreen/api/routers/issues*.py` shows every file under 1000 lines.
-- [ ] New tests pass; the full suite passes.
+- [x] New tests pass; the full suite passes.
 - [x] The Progress Log has hashes and command evidence.
 
 ## Progress Log
@@ -311,3 +311,11 @@ Expected:
 
 ### Owner note: 2026-10-12 (before run 2)
 Owner resolution (2026-10-12, run-1 blockers): the owner applied the out-of-scope test updates serially: tests/notifications/v12/test_template_validation.py now expects 30 variables, and the route walk passes because src/telescreen/api/routers/issues.py copies the sub-router APIRoute objects (FastAPI 0.142 keeps include_router entries as lazy _IncludedRouter objects that the walk cannot see) instead of nesting them. The p02 migration failure is fixed (see p02). Full offline suite on the owner tree: 857 passed, 8 skipped. Do not rewrite passing code. Re-run this plan's Verification on the committed tree; list only the final passing commands in `verification`, leave `priorVerification` empty, report nothing fixed in `findings`/`risks` (conventions 7a), tick the remaining Completion Criteria and set Status to Completed when every gate passes.
+
+### Session: 2026-10-12 run-1 re-verification (e2)
+**Tasks Completed**: Re-verified the p01 foundation contracts on the shared committed tree; no source rewrite or behavioral adjustment was needed. All completion criteria are checked.
+**Tasks In Progress**: None for p01. Formal review, integration, shared documentation/index changes, staging and commit remain downstream workflow steps.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: Plan pre-edit SHA-256 is in `tmp/telescreen-v13-20261012-e2/p01/edit-01-before.sha256`; intended update is in `tmp/telescreen-v13-20261012-e2/p01/edit-01-intent.md`. Post-edit SHA-256 is recorded in `tmp/telescreen-v13-20261012-e2/p01/edit-01-after.sha256`.
+**Verification**: Final-source scoped format check exit 0 (`/tmp/telescreen-v13-p01-format-check-e2.log`); scoped ruff exit 0 (`/tmp/telescreen-v13-p01-ruff-e2.log`); scoped ty exit 0 (`/tmp/telescreen-v13-p01-ty-e2.log`); whole-repository typelint plus owned-path filter exit 0 with no p01 diagnostics (`/tmp/telescreen-v13-p01-typelint.log`); focused pytest exit 0, 118 passed (`/tmp/telescreen-v13-p01-pytest.log`); full offline pytest exit 0, 857 passed and 8 skipped (`/tmp/telescreen-v13-p01-pytest-all.log`); issue-router line-count gate exit 0, largest module 272 lines (`/tmp/telescreen-v13-p01-wc.log`); dependency/tooling-file unchanged gate exit 0. The exact commands and exit codes are also recorded in `tmp/telescreen-v13-20261012-e2/p01/verification-commands.md`.

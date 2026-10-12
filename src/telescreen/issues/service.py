@@ -20,20 +20,36 @@ from telescreen.core.vocabulary import (
     ErrorCode,
     IssueEventKind,
     IssueHistoryKind,
+    IssuePriority,
     IssueResolution,
     IssueStatus,
     RuleClass,
     Severity,
     Visibility,
+    priority_for_severity,
     severity_for,
 )
 from telescreen.db.models import FindingRow, IssueExceptionRow, IssueHistoryRow, IssueRow
+from telescreen.issues.archive import (
+    ArchivePolicy,
+    clear_archive,
+    evaluate_after_ingest,
+)
 from telescreen.issues.exposure import (
     effective_severity,
     exposure_json,
     merge_visibility,
     severity_floor,
 )
+from telescreen.issues.groups import (
+    GroupAction,
+    GroupChange,
+    cascade_to_children,
+    primary_of,
+    propagate_child_open,
+    recompute_group_counters,
+)
+from telescreen.issues.ingest_transitions import apply_post_insert_transitions, resolve_auto
 from telescreen.issues.keys import grouping_key, short_id
 from telescreen.issues.recording import (
     decide_policy,
@@ -52,10 +68,16 @@ from telescreen.ports.audit import AuditEntry, AuditLog
 from telescreen.ports.directory import AssigneeIds, OwnerDirectory, RecipientResolver
 from telescreen.ports.findings import ExternalScan, MaskedFinding, RecordOutcome, ResourceScan
 from telescreen.ports.issues import (
+    FindingsObserver,
+    FindingsRecorded,
+    IssueActivity,
+    IssueActivityNotifier,
     IssueEvent,
     IssueEventSink,
     IssueHistoryEntry,
     IssueSnapshot,
+    NoopFindingsObserver,
+    NoopIssueActivityNotifier,
     OpenResourceRef,
     ResourceIssueRef,
 )
@@ -82,6 +104,9 @@ class IssueService:
     owners: OwnerDirectory | None = None
     owner_routing: bool = False
     default_team: str | None = None
+    findings_observer: FindingsObserver = field(default_factory=NoopFindingsObserver)
+    activity: IssueActivityNotifier = field(default_factory=NoopIssueActivityNotifier)
+    archive_policy: ArchivePolicy = field(default_factory=ArchivePolicy)
 
     async def record_scan(self, session: AsyncSession, scan: ResourceScan) -> RecordOutcome:
         """Persist one resource scan and reconcile absent classes when complete."""
@@ -186,6 +211,8 @@ class IssueService:
                         if decision.effect.value == "allow"
                         else IssueStatus.UNRESOLVED
                     ).value,
+                    priority=priority_for_severity(current_severity).value,
+                    needs_review=decision.effect.value != "allow",
                     first_seen=scan.observed_at,
                     last_seen=scan.observed_at,
                     last_checked_at=scan.observed_at,
@@ -300,155 +327,58 @@ class IssueService:
                 issue.distinct_fingerprints = await self.repository.distinct_fingerprints(
                     session, issue.id
                 )
+                regressed += await apply_post_insert_transitions(
+                    self,
+                    session,
+                    issue,
+                    created,
+                    previous_status,
+                    decision,
+                    previous_policy,
+                    regressed_fingerprint,
+                    current_severity,
+                    rule_class,
+                    scan.observed_at,
+                )
                 if (
-                    not created
-                    and previous_status is IssueStatus.RESOLVED
-                    and decision.effect.value == "violate"
+                    issue.merged_into_id is not None
+                    and previous_status in (IssueStatus.RESOLVED, IssueStatus.PENDING_VERIFICATION)
+                    and IssueStatus(issue.status) in (IssueStatus.REGRESSED, IssueStatus.UNRESOLVED)
                 ):
-                    issue.status = IssueStatus.REGRESSED.value
-                    issue.resolved_at = None
-                    issue.resolution = None
-                    issue.regression_count += 1
-                    regressed += 1
-                    await self._history(
-                        session,
-                        issue.id,
-                        IssueHistoryKind.REGRESSED,
-                        "system:scanner",
-                        scan.observed_at,
-                        from_value=IssueStatus.RESOLVED.value,
-                        to_value=IssueStatus.REGRESSED.value,
-                    )
-                    await self._audit(
-                        session, "issue.regressed", "issue", issue.id, "Issue regressed", 1, 0
-                    )
-                    await self.events.on_issue_event(
-                        session,
-                        IssueEvent(
-                            IssueEventKind.ISSUE_REGRESSED,
-                            new_id(),
-                            issue.id,
-                            issue.source,
-                            rule_class,
-                            Severity(issue.severity),
-                            scan.observed_at,
-                        ),
-                    )
-                elif (
-                    not created and previous_status is IssueStatus.IGNORED and regressed_fingerprint
-                ):
-                    exception: (
-                        IssueExceptionRow | None
-                    ) = await self.repository.active_until_regressed_exception(session, issue.id)
-                    if exception is not None:
-                        exception.status = "expired"
-                        exception.decided_by = "system"
-                        exception.decided_at = scan.observed_at
-                        issue.status = IssueStatus.REGRESSED.value
-                        issue.regression_count += 1
-                        regressed += 1
-                        await self._history(
-                            session,
-                            issue.id,
-                            IssueHistoryKind.EXCEPTION_EXPIRED,
-                            "system:scanner",
-                            scan.observed_at,
-                            from_value="active",
-                            to_value="expired",
-                        )
-                        await self._history(
-                            session,
-                            issue.id,
-                            IssueHistoryKind.REGRESSED,
-                            "system:scanner",
-                            scan.observed_at,
-                            from_value=IssueStatus.IGNORED.value,
-                            to_value=IssueStatus.REGRESSED.value,
-                        )
-                        await self.events.on_issue_event(
-                            session,
-                            IssueEvent(
-                                IssueEventKind.ISSUE_REGRESSED,
-                                new_id(),
-                                issue.id,
-                                issue.source,
-                                rule_class,
-                                current_severity,
-                                scan.observed_at,
-                            ),
-                        )
-                elif (
-                    not created
-                    and previous_status is IssueStatus.PENDING_VERIFICATION
-                    and decision.effect.value == "violate"
-                ):
-                    issue.status = IssueStatus.UNRESOLVED.value
-                    issue.resolution = None
-                    issue.resolved_at = None
-                    await self._history(
-                        session,
-                        issue.id,
-                        IssueHistoryKind.VERIFICATION_FAILED,
-                        "system:scanner",
-                        scan.observed_at,
-                        from_value=previous_status.value,
-                        to_value=IssueStatus.UNRESOLVED.value,
-                    )
-                elif (
-                    not created
-                    and previous_status is IssueStatus.ALLOWED
-                    and decision.effect.value == "violate"
-                ):
-                    issue.status = IssueStatus.UNRESOLVED.value
-                    issue.resolution = None
-                    await self._history(
-                        session,
-                        issue.id,
-                        IssueHistoryKind.POLICY_REEVALUATED,
-                        "system:policy",
-                        scan.observed_at,
-                        from_value=IssueStatus.ALLOWED.value,
-                        to_value=IssueStatus.UNRESOLVED.value,
-                    )
-                    await self.events.on_issue_event(
-                        session,
-                        IssueEvent(
-                            IssueEventKind.ISSUE_CREATED,
-                            new_id(),
-                            issue.id,
-                            issue.source,
-                            rule_class,
-                            current_severity,
-                            scan.observed_at,
-                        ),
-                    )
-                    await self._route_owner(session, issue, decision, scan.observed_at)
-                elif decision.effect.value == "allow" and previous_status in OPEN_STATUSES:
-                    issue.status = IssueStatus.ALLOWED.value
-                    issue.resolution = (
-                        IssueResolution.POLICY_CHANGED.value
-                        if previous_policy != (decision.policy_name, decision.policy_version)
-                        else IssueResolution.EXPOSURE_REDUCED.value
-                    )
-                    issue.resolved_at = scan.observed_at
-                    await self._reject_requested_exceptions(session, issue.id, scan.observed_at)
-                elif (
-                    not created
-                    and previous_status is IssueStatus.ALLOWED
-                    and decision.effect.value == "allow"
-                ):
-                    issue.status = IssueStatus.ALLOWED.value
-                elif (
-                    not created
-                    and previous_status is IssueStatus.RESOLVED
-                    and decision.effect.value == "allow"
-                ):
-                    issue.status = IssueStatus.ALLOWED.value
-                    issue.resolution = IssueResolution.POLICY_CHANGED.value
-                    issue.resolved_at = scan.observed_at
-                    await self._reject_requested_exceptions(session, issue.id, scan.observed_at)
+                    await propagate_child_open(session, issue, scan.observed_at, self.events)
                 if created and issue.status != IssueStatus.ALLOWED.value:
                     await self._route_owner(session, issue, decision, scan.observed_at)
+            primary: IssueRow = await primary_of(session, issue)
+            await recompute_group_counters(session, primary)
+            if primary.status == IssueStatus.ARCHIVED.value:
+                previous_visibility: Visibility = Visibility(
+                    next(
+                        (
+                            value
+                            for issue_id, value in prior_visibility_pairs
+                            if issue_id == primary.id
+                        ),
+                        primary.exposure_visibility,
+                    )
+                )
+                await evaluate_after_ingest(
+                    session,
+                    primary,
+                    previous_visibility,
+                    scan.observed_at,
+                    self.archive_policy,
+                    self.audit,
+                    self.events,
+                    self.activity,
+                )
+            if not issue.priority_manual:
+                issue.priority = priority_for_severity(Severity(issue.severity)).value
+            inserted_for_issue: int = inserted_total - issue_ids_before
+            if inserted_for_issue > 0:
+                await self.findings_observer.on_findings_recorded(
+                    session,
+                    FindingsRecorded(issue.id, inserted_for_issue, scan.observed_at),
+                )
             if created and issue.status != IssueStatus.ALLOWED.value:
                 await self.events.on_issue_event(
                     session,
@@ -475,7 +405,7 @@ class IssueService:
                         if scan.removed
                         else IssueResolution.VERIFIED_REMOVED
                     )
-                    await self._resolve_auto(session, issue, scan.observed_at, resolution)
+                    await resolve_auto(self, session, issue, scan.observed_at, resolution)
                     if issue.id not in affected:
                         affected.append(issue.id)
                     resolved += 1
@@ -528,6 +458,9 @@ class IssueService:
                 current_status: IssueStatus = IssueStatus(issue.status)
                 if current_status in OPEN_STATUSES and policy.effect.value == "allow":
                     issue.status = IssueStatus.ALLOWED.value
+                    if current_status is IssueStatus.ARCHIVED:
+                        clear_archive(issue)
+                    issue.needs_review = False
                     issue.resolution = (
                         IssueResolution.POLICY_CHANGED.value
                         if prior_policy != (policy.policy_name, policy.policy_version)
@@ -688,6 +621,12 @@ class IssueService:
         if current is IssueStatus.RESOLVED and target is IssueStatus.UNRESOLVED:
             issue.resolution = None
             issue.resolved_at = None
+        if current is IssueStatus.ARCHIVED:
+            clear_archive(issue)
+        issue.needs_review = False
+        await cascade_to_children(
+            session, issue, GroupChange(GroupAction.STATUS, actor_ref, now, status=target)
+        )
         await self._history(
             session,
             issue.id,
@@ -708,6 +647,9 @@ class IssueService:
             actor_ref,
             self._actor_kind(actor_ref),
         )
+        await self.activity.on_activity(
+            session, IssueActivity(IssueHistoryKind.STATUS_CHANGED, issue.id, actor_ref, now)
+        )
         return issue
 
     async def assign(
@@ -718,13 +660,26 @@ class IssueService:
         ids: AssigneeIds = await self.resolver.assignee_of(session, assignee_ref)
         issue.assignee_member_id = ids.member_id
         issue.assignee_team_id = ids.team_id
-        issue.updated_at = self.clock.now()
+        now: datetime = self.clock.now()
+        issue.updated_at = now
+        issue.needs_review = False
+        await cascade_to_children(
+            session,
+            issue,
+            GroupChange(
+                GroupAction.ASSIGN,
+                actor_ref,
+                now,
+                assignee_member_id=ids.member_id,
+                assignee_team_id=ids.team_id,
+            ),
+        )
         await self._history(
             session,
             issue.id,
             IssueHistoryKind.ASSIGNED,
             actor_ref,
-            issue.updated_at,
+            now,
             to_value=assignee_ref,
         )
         await self._audit(
@@ -733,6 +688,69 @@ class IssueService:
             "issue",
             issue.id,
             "Issue assigned",
+            0,
+            0,
+            actor_ref,
+            self._actor_kind(actor_ref),
+        )
+        await self.activity.on_activity(
+            session,
+            IssueActivity(
+                IssueHistoryKind.ASSIGNED,
+                issue.id,
+                actor_ref,
+                now,
+                assignee_member_id=ids.member_id,
+            ),
+        )
+        return issue
+
+    async def set_priority(
+        self, session: AsyncSession, issue_id: str, priority: IssuePriority, actor_ref: str
+    ) -> IssueRow:
+        """Set a manual priority and append history and audit."""
+        issue: IssueRow = await self._required(session, issue_id)
+        now: datetime = self.clock.now()
+        previous: str = issue.priority
+        issue.priority = priority.value
+        issue.priority_manual = True
+        issue.needs_review = False
+        issue.updated_at = now
+        await self._history(
+            session,
+            issue.id,
+            IssueHistoryKind.PRIORITY_CHANGED,
+            actor_ref,
+            now,
+            from_value=previous,
+            to_value=priority.value,
+        )
+        await self._audit(
+            session,
+            "issue.priority_changed",
+            "issue",
+            issue.id,
+            "Issue priority changed",
+            0,
+            0,
+            actor_ref,
+            self._actor_kind(actor_ref),
+        )
+        return issue
+
+    async def mark_reviewed(self, session: AsyncSession, issue_id: str, actor_ref: str) -> IssueRow:
+        """Clear the review flag and record the human triage action."""
+        issue: IssueRow = await self._required(session, issue_id)
+        now: datetime = self.clock.now()
+        issue.needs_review = False
+        issue.updated_at = now
+        await self._history(session, issue.id, IssueHistoryKind.REVIEWED, actor_ref, now)
+        await self._audit(
+            session,
+            "issue.reviewed",
+            "issue",
+            issue.id,
+            "Issue reviewed",
             0,
             0,
             actor_ref,
@@ -769,7 +787,7 @@ class IssueService:
         for issue in await self.repository.unchecked_open(
             session, collector_config_id, ensure_utc(checked_before)
         ):
-            await self._resolve_auto(session, issue, now, IssueResolution.RESOURCE_DELETED)
+            await resolve_auto(self, session, issue, now, IssueResolution.RESOURCE_DELETED)
             resolved += 1
         return resolved
 
@@ -779,10 +797,13 @@ class IssueService:
         if issue is None:
             return None
         assignee_ref: str | None = None
+        assignee_team_slug: str | None = None
         if self.owners is not None and issue.assignee_member_id is not None:
             assignee_ref = await self.owners.member_ref(session, issue.assignee_member_id)
         elif self.owners is not None and issue.assignee_team_id is not None:
             assignee_ref = await self.owners.team_ref(session, issue.assignee_team_id)
+            if assignee_ref is not None and assignee_ref.startswith("team:"):
+                assignee_team_slug = assignee_ref.removeprefix("team:")
         masked_excerpt: str | None = await session.scalar(
             select(FindingRow.masked_snippet)
             .where(FindingRow.issue_id == issue.id)
@@ -790,24 +811,26 @@ class IssueService:
             .limit(1)
         )
         return IssueSnapshot(
-            issue.id,
-            issue.number,
-            short_id(issue.number),
-            issue.display_title,
-            IssueStatus(issue.status),
-            issue.source,
-            RuleClass(issue.rule_class),
-            Severity(issue.severity),
-            issue.display_locator,
-            issue.times_seen,
-            ensure_utc(issue.first_seen),
-            ensure_utc(issue.last_seen),
-            issue.collector_config_id,
-            issue.resource_ref_json,
-            assignee_ref,
-            issue.risk_score,
-            Visibility(issue.exposure_visibility),
-            masked_excerpt,
+            id=issue.id,
+            number=issue.number,
+            short_id=short_id(issue.number),
+            display_title=issue.display_title,
+            status=IssueStatus(issue.status),
+            source=issue.source,
+            rule_class=RuleClass(issue.rule_class),
+            severity=Severity(issue.severity),
+            display_locator=issue.display_locator,
+            times_seen=issue.times_seen,
+            first_seen=ensure_utc(issue.first_seen),
+            last_seen=ensure_utc(issue.last_seen),
+            collector_config_id=issue.collector_config_id,
+            ref_json=issue.resource_ref_json,
+            assignee_ref=assignee_ref,
+            risk_score=issue.risk_score,
+            visibility=Visibility(issue.exposure_visibility),
+            masked_excerpt=masked_excerpt,
+            priority=IssuePriority(issue.priority),
+            assignee_team_slug=assignee_team_slug,
         )
 
     async def open_resource_refs(
@@ -886,33 +909,6 @@ class IssueService:
             request.status = "rejected"
             request.decided_by = "system"
             request.decided_at = at
-
-    async def _resolve_auto(
-        self,
-        session: AsyncSession,
-        issue: IssueRow,
-        at: datetime,
-        resolution: IssueResolution = IssueResolution.VERIFIED_REMOVED,
-    ) -> None:
-        """Apply the automatic resolution transition and audit it."""
-        previous: str = issue.status
-        issue.status = IssueStatus.RESOLVED.value
-        issue.resolution = resolution.value
-        issue.resolved_at = at
-        issue.updated_at = at
-        await self._history(
-            session,
-            issue.id,
-            IssueHistoryKind.AUTO_RESOLVED,
-            "system:scanner",
-            at,
-            from_value=previous,
-            to_value=IssueStatus.RESOLVED.value,
-        )
-        await self._audit(
-            session, "issue.auto_resolved", "issue", issue.id, "Issue auto-resolved", 1, 0
-        )
-        await self._reject_requested_exceptions(session, issue.id, at)
 
     async def _history(
         self,

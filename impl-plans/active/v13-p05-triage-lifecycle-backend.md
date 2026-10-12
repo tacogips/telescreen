@@ -1,6 +1,6 @@
 # V13-P05 Triage Lifecycle Backend: Archive and Escalating, Priority, For Review, Group Coordination, Ingest Hooks
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-3-sentry-parity.md sections 1 (D1-D6, D12, D13), 2, 6.2 (rebase_archive), 6.3, 7 (safety rules 1-5), 8.1, 8.4 (activity emitters), 15
 **Created**: 2026-10-12
 **Last Updated**: 2026-10-12
@@ -273,11 +273,124 @@ Expected: the scoped checks exit 0, the typelint grep prints nothing, and every 
 
 ## Completion Criteria
 
-- [ ] Safety rules 1-5 each have a named test.
-- [ ] The `groups.py` and `archive.py` contracts match the signatures above (used by p06).
-- [ ] `service.py` is under 1000 lines, with no behavior change in the existing tests.
-- [ ] The Progress Log has hashes and command evidence.
+- [x] Safety rules 1-5 have named tests across `tests/issues/v13_lifecycle`; rebase behavior
+  is tested here, while merge/unmerge endpoint behavior is owned by downstream v13-p06.
+- [x] The `groups.py` and `archive.py` contracts match the signatures above (used by p06).
+- [x] `service.py` is under 1000 lines (974); existing and new issue tests pass.
+- [x] The Progress Log has hashes and command evidence.
 
 ## Progress Log
 
-(append sessions per conventions section 8)
+### Session 1 — Implementation and final source verification (2026-10-12)
+
+- Implemented bounded archive/escalating state, archive clearing on all supported exits,
+  group helpers/cascades, priority and `needs_review` behavior, ingest observers and
+  activity notifications, the p05 triage router, and DB/history-based regression tests.
+- Initial Step 6 coverage was incomplete and overstated: test-integrity findings
+  P05-TIC-01/02/03 identified missing exit-path, route-guard, group, priority, review,
+  and activity assertions. The retry evidence below corrects that gap. `service.py` is
+  974 lines.
+- Per-edit evidence for implementation edits is in
+  `tmp/telescreen-v13-20261012-e2/p05/edit-001..034-*`. The final plan update intent and
+  pre-edit hash are in `edit-035-intent.md` and `edit-035-before.sha256`.
+- Final source hashes before this plan update:
+  - `src/telescreen/issues/service.py`: `b37c9aa79922bf50710201c13ae0cb9c1eca9b54c2005033b665f6ecaddfdf43`
+  - `src/telescreen/issues/ingest_transitions.py`: `3cba11dacbc9453c7616c2b03e4ec658eee54c2ee08fc016452c098fe0558f0f`
+  - `src/telescreen/issues/lifecycle.py`: `5de7c57a83fcf4adb55b52ceac3fac84a64b56ca0ee97e1826e8f84474b89d7e`
+  - `src/telescreen/issues/exceptions.py`: `a2d5e1f78b605c5b404ac0446504f2147c75c5911fad70d1bcac3e446158769d`
+  - `src/telescreen/issues/policy_apply.py`: `60ab3765dd9f9b71e9df7c83a5b4957708557e3cedead846be6f09a1ffe1a834`
+  - `src/telescreen/issues/archive.py`: `959d57bfeea1296d3985f3927290fc22546d28e897a036acddcf2b8131622384`
+  - `src/telescreen/issues/groups.py`: `199b376a8fd036a5b625c7b889f4d55b3b94528953b2681e1f9cac5db5e4d67a`
+  - `src/telescreen/api/routers/issues_actions.py`: `7aeb23ebbe9b51de62818fb73e399e91e11867407c66fb9934d0a230aefff367`
+  - `src/telescreen/api/routers/issue_triage.py`: `a9e692a360347f756d197496dc3e14789958800e358cc21b6c954603b1aac027`
+  - `tests/issues/v13_lifecycle/test_archive.py`: `f1197782dec830be03528409facfece25506ad2ee7a1ea6bc7dd73a8ea2311a2`
+- Final verification (all exit 0):
+  - `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/issues/service.py src/telescreen/issues/ingest_transitions.py src/telescreen/issues/lifecycle.py src/telescreen/issues/exceptions.py src/telescreen/issues/policy_apply.py src/telescreen/issues/archive.py src/telescreen/issues/groups.py src/telescreen/api/routers/issues_actions.py src/telescreen/api/routers/issue_triage.py tests/issues/v13_lifecycle` — exit 0, 10 files already formatted; `/tmp/telescreen-v13-p05-format-final.log`.
+  - `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/issues/service.py src/telescreen/issues/ingest_transitions.py src/telescreen/issues/lifecycle.py src/telescreen/issues/exceptions.py src/telescreen/issues/policy_apply.py src/telescreen/issues/archive.py src/telescreen/issues/groups.py src/telescreen/api/routers/issues_actions.py src/telescreen/api/routers/issue_triage.py tests/issues/v13_lifecycle` — exit 0, all checks passed; `/tmp/telescreen-v13-p05-ruff-final.log`.
+  - `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/issues/service.py src/telescreen/issues/ingest_transitions.py src/telescreen/issues/lifecycle.py src/telescreen/issues/exceptions.py src/telescreen/issues/policy_apply.py src/telescreen/issues/archive.py src/telescreen/issues/groups.py src/telescreen/api/routers/issues_actions.py src/telescreen/api/routers/issue_triage.py tests/issues/v13_lifecycle` — exit 0, all checks passed; `/tmp/telescreen-v13-p05-ty-final.log`.
+  - `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p05-typelint-final.log 2>&1; ! grep -E '^(src/telescreen/issues/(service|ingest_transitions|lifecycle|repository|exceptions|policy_apply|archive|groups)[.]py|src/telescreen/api/routers/(issues_actions|issue_triage)[.]py|tests/issues/v13_lifecycle/)' /tmp/telescreen-v13-p05-typelint-final.log` — no p05 diagnostics.
+  - `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/issues/v13_lifecycle -ra` — 18 passed; `/tmp/telescreen-v13-p05-lifecycle-final-r2.log`.
+  - `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/issues tests/api/v11_issues --ignore=tests/issues/v13_query -ra` — 102 passed; `/tmp/telescreen-v13-p05-issues-final-r2.log`.
+  - `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/e2e/test_flow_ingest.py tests/e2e/test_flow_v11_policy.py tests/e2e/test_flow_v11_owner_health.py tests/e2e/test_flow_v11_remediation.py tests/leak/test_leak_matrix.py tests/leak/test_leak_matrix_v11.py tests/assistant/test_assistant.py tests/evidence/test_evidence.py -ra` — 32 passed; `/tmp/telescreen-v13-p05-shared-final-r4.log`.
+  - `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider -ra` — 902 passed, 8 skipped; exit 0; `/tmp/telescreen-v13-p05-pytest-all-final-r2.log`.
+  - `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; wc -l src/telescreen/issues/service.py src/telescreen/issues/ingest_transitions.py src/telescreen/issues/lifecycle.py src/telescreen/issues/exceptions.py src/telescreen/issues/policy_apply.py src/telescreen/issues/archive.py src/telescreen/issues/groups.py src/telescreen/api/routers/issues_actions.py src/telescreen/api/routers/issue_triage.py tests/issues/v13_lifecycle/test_archive.py > /tmp/telescreen-v13-p05-lines-final.log; ! awk '$1 >= 1000 { found=1 } END { exit found }' /tmp/telescreen-v13-p05-lines-final.log` — exit 0; `service.py` is 974 lines and all touched Python files are below 1000 lines.
+- An earlier full-suite attempt on the same implementation found three TL003 missing
+  annotations in the new route test (901 passed, 1 failed, 8 skipped; exit 1;
+  `/tmp/telescreen-v13-p05-pytest-all-final.log`). The response locals are now explicitly
+  typed as `httpx.Response`; the final whole-repository suite above passes.
+- Formal test-integrity/adversarial review, serial integration review, plan archival,
+  staging, commit, and push remain downstream workflow steps.
+
+### Session 2 — Test-integrity repairs (2026-10-12)
+
+- Addressed `P05-TIC-01` with new DB-row/history tests in
+  `tests/issues/v13_lifecycle/test_archive_exits.py`:
+  `test_exception_approval_paths_clear_archive` covers admin request and request-plus-
+  approval; `test_verification_request_clears_archive`,
+  `test_policy_allow_clears_archive_without_exception_row`, and
+  `test_reasoned_resolve_and_change_status_clear_archive` assert all five archive
+  columns cleared. Existing `test_until_findings_escalates_and_clears_bounded_archive`,
+  `test_unarchive_and_expiry_clear_metadata_and_mark_review`, and
+  `test_automatic_resolution_clears_archive_metadata` cover escalation, unarchive,
+  expiry and auto-resolve. `test_group_rebase_preserves_archive_window_then_escalates_on_fifth`
+  builds 40 child findings, verifies group baseline 40 and unchanged archive window/no
+  event, then checks four findings stay archived and the fifth escalates. Added the
+  missing archived-status assertion after the four-finding evaluation.
+- Addressed `P05-TIC-02` in `test_triage_routes.py`:
+  `test_patch_rejects_dedicated_status_transitions_without_mutating_row` covers all four
+  forbidden statuses and unchanged DB rows; `test_patch_priority_persists_manual_flag_and_one_history_row`
+  checks persisted low/manual priority and exactly one history row;
+  `test_archive_route_requires_issues_write_permission` uses a read-only token and
+  checks 403 with unchanged archive state.
+- Addressed `P05-TIC-03` in `test_groups_priority.py`:
+  `test_reopened_merged_child_regresses_resolved_primary`,
+  `test_group_counters_equal_union_of_primary_and_child_findings`,
+  `test_priority_follows_severity_until_manual_override`, and
+  `test_triage_clears_review_flag_and_emits_activity_payloads` cover the requested
+  regression, union counters, automatic/manual priority, review clearing, and activity
+  payloads including the member id.
+- Completion mapping: rule 1 uses `test_archive_never_writes_suppression_or_exception_state`
+  and `test_exception_approval_paths_clear_archive`; rule 2 uses
+  `test_until_findings_escalates_and_clears_bounded_archive` plus bounded-kind checks;
+  rule 3 uses the escalation, expiry/unarchive, auto-resolve and four new exit tests
+  above; rule 4 uses `test_group_rebase_preserves_archive_window_then_escalates_on_fifth`
+  (merge/unmerge endpoint behavior remains owned by p06); rule 5 uses the recorded
+  `service.py` line-count check (974). Existing route-structure test
+  `test_triage_routes_have_one_issues_write_dependency_each` remains in place.
+- Test files and plan edits follow the local intent/hash records `edit-037..046-*` in
+  `tmp/telescreen-v13-20261012-e2/p05`. Latest test hashes:
+  `test_archive.py` `2058bfbdbd54c395da2576aafaafa448ade65efeb2a9135239edd9328482fdb7`;
+  `test_archive_exits.py` `00b0e0dfb05cb46487ad413fe9f4d12c45859c60dc317e965324679429c3b88a`;
+  `test_groups_priority.py` `23d3ce04f2bb4051ab20cc1f9a559f60e6555685347f66c4f0d8b7697add73f6`;
+  `test_triage_routes.py` `10df800077cd26a90c1bbb8ecc889c07bc8d459bfe54316705f5539ff1591d88`.
+- Final-source verification: scoped Ruff format/check and `ty check` passed on p05
+  source/shared/test paths; filtered typelint passed with no p05 diagnostics in
+  `/tmp/telescreen-v13-p05-typelint-final.log`. Lifecycle suite: 34 passed;
+  `/tmp/telescreen-v13-p05-tic-lifecycle-r3.log`. Issues/API suite: 118 passed;
+  `/tmp/telescreen-v13-p05-tic-issues-final.log`. Shared e2e/leak/assistant/evidence and
+  route-permission suite: 33 passed; `/tmp/telescreen-v13-p05-tic-shared-final.log`.
+  Whole suite: 920 passed, 8 environment-gated skips, exit 0;
+  `/tmp/telescreen-v13-p05-tic-full-final-r2.log`.
+- A first whole-suite retry after adding the tests failed only at repository typelint
+  self-test (`53` TL003 annotations, `919` passed / `8` skipped; exit 1;
+  `/tmp/telescreen-v13-p05-tic-full-final.log`). Added explicit local annotations in the
+  three new test modules; the filtered typelint and final whole-suite rerun now pass.
+
+### Session 3 — Adversarial threshold repair (2026-10-12)
+
+- Addressed `P05-ADV-01`: extracted pure `_rate_threshold(rows, now, policy)` and reused
+  it from `escalation_threshold` and `rebase_archive`'s `UNTIL_ESCALATING` branch. Scope,
+  public signatures, other branches, archive window/status and event behavior are intact.
+- `test_until_escalating_rebase_uses_the_seven_day_rate_window` covers 40 findings at
+  `NOW-30d` -> 10 and mixed 4-at-`NOW-2d`/3-at-`NOW-1h` -> 12; both assert archived
+  status, unchanged `archived_at`/`archive_until`, and zero events.
+- Per-edit records: `edit-047..050-*` under `tmp/telescreen-v13-20261012-e2/p05`.
+  Final SHA-256: `archive.py` `db3712542fb49855a0a54bba9fedf9e1cb8b2e83ca7c542e26d5b07f9099ef80`;
+  `test_archive_exits.py` `97ff5a068c74a3175954c5f788dbcdf0dfbe9270c13041f0558b2f9a696f943e`.
+- Initial lifecycle attempt failed 1/36 from duplicate fixture indexes (`/tmp/telescreen-v13-p05-adv1-lifecycle.log`); monotonic test indexes fixed it. Final `uv run --frozen pytest -p no:cacheprovider tests/issues/v13_lifecycle -ra`: 36 passed, exit 0 (`/tmp/telescreen-v13-p05-adv1-lifecycle-r2.log`).
+- Final `uv run --frozen pytest -p no:cacheprovider tests/issues tests/api/v11_issues --ignore=tests/issues/v13_query -ra`: 120 passed, exit 0 (`/tmp/telescreen-v13-p05-adv1-pytest.log`); shared e2e/leak/assistant/evidence command: 32 passed, exit 0 (`/tmp/telescreen-v13-p05-adv1-shared.log`).
+- Final `uv run --frozen pytest -p no:cacheprovider -ra`: 922 passed, 8 offline skips, exit 0 (`/tmp/telescreen-v13-p05-adv1-full.log`).
+- `uv run --frozen ruff format --check --no-cache src/telescreen/issues/archive.py tests/issues/v13_lifecycle` exited 0 (`/tmp/telescreen-v13-p05-adv1-format.log`).
+- `uv run --frozen ruff check --no-cache src/telescreen/issues/archive.py tests/issues/v13_lifecycle` and `uv run --frozen ty check src/telescreen/issues/archive.py tests/issues/v13_lifecycle` exited 0 (`/tmp/telescreen-v13-p05-adv1-ruff.log`, `/tmp/telescreen-v13-p05-adv1-ty.log`).
+- `uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p05-adv1-typelint.log 2>&1; ! grep -E '^(src/telescreen/issues/archive[.]py|tests/issues/v13_lifecycle/)' /tmp/telescreen-v13-p05-adv1-typelint.log` exited 0 with no matching diagnostics.
+- Formal independent re-review and serial integration remain downstream workflow gates.

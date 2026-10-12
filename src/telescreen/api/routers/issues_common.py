@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from fastapi.responses import Response
+from sqlalchemy import func, select
+from sqlalchemy.engine import Result
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.api.common.context import ApiContext
 from telescreen.api.common.pagination import decode_cursor
@@ -11,6 +14,7 @@ from telescreen.core.clock import ensure_utc
 from telescreen.core.json import (
     JsonValue,
     dump_json,
+    json_array,
     json_bool,
     json_float,
     json_int,
@@ -19,7 +23,14 @@ from telescreen.core.json import (
     json_str,
     parse_json,
 )
-from telescreen.db.models import FindingRow, IssueExceptionRow, IssueHistoryRow, IssueRow
+from telescreen.core.vocabulary import ActorDisplayKind
+from telescreen.db.models import (
+    FindingRow,
+    IssueBookmarkRow,
+    IssueExceptionRow,
+    IssueHistoryRow,
+    IssueRow,
+)
 from telescreen.issues.exceptions import ExceptionService
 from telescreen.issues.lifecycle import IssueRemediationService
 from telescreen.issues.service import IssueService
@@ -57,6 +68,7 @@ class IssueItemExtras:
     assignee: ActorDisplay | None
     merged_count: int
     bookmarked: bool
+    trend: tuple[int, ...] = ()
 
 
 def _cursor(cursor: str | None) -> tuple[str, ...]:
@@ -78,10 +90,45 @@ def _optional_string(value: str | None) -> JsonValue:
 
 def _issue_json(issue: IssueRow, extras: IssueItemExtras | None = None) -> JsonValue:
     """Serialize only safe issue columns."""
-    del extras
     resolved_at: str | None = (
         ensure_utc(issue.resolved_at).isoformat() if issue.resolved_at else None
     )
+    assignee_json: JsonValue = json_null()
+    merged_count: int = 0
+    bookmarked: bool = False
+    trend: tuple[int, ...] = ()
+    if extras is not None:
+        merged_count = extras.merged_count
+        bookmarked = extras.bookmarked
+        trend = extras.trend
+        if extras.assignee is not None:
+            assignee_json = json_object(
+                (
+                    ("kind", json_str(extras.assignee.kind.value)),
+                    ("ref", json_str(extras.assignee.ref)),
+                    ("display_name", json_str(extras.assignee.display_name)),
+                )
+            )
+    archive_json: JsonValue = json_null()
+    if issue.archive_kind is not None:
+        archive_json = json_object(
+            (
+                ("kind", json_str(issue.archive_kind)),
+                ("until", _timestamp(issue.archive_until)),
+                (
+                    "threshold",
+                    json_int(issue.archive_threshold)
+                    if issue.archive_threshold is not None
+                    else json_null(),
+                ),
+                (
+                    "baseline",
+                    json_int(issue.archive_baseline)
+                    if issue.archive_baseline is not None
+                    else json_null(),
+                ),
+            )
+        )
     return json_object(
         (
             ("id", json_str(issue.id)),
@@ -105,8 +152,15 @@ def _issue_json(issue: IssueRow, extras: IssueItemExtras | None = None) -> JsonV
                 json_int(issue.policy_version) if issue.policy_version is not None else json_null(),
             ),
             ("status", json_str(issue.status)),
-            ("assignee_member_id", _optional_string(issue.assignee_member_id)),
-            ("assignee_team_id", _optional_string(issue.assignee_team_id)),
+            ("assignee", assignee_json),
+            ("priority", json_str(issue.priority)),
+            ("priority_manual", json_bool(issue.priority_manual)),
+            ("needs_review", json_bool(issue.needs_review)),
+            ("archive", archive_json),
+            ("updated_at", json_str(ensure_utc(issue.updated_at).isoformat())),
+            ("merged_count", json_int(merged_count)),
+            ("bookmarked", json_bool(bookmarked)),
+            ("trend", json_array(tuple(json_int(value) for value in trend))),
             ("first_seen", json_str(ensure_utc(issue.first_seen).isoformat())),
             ("last_seen", json_str(ensure_utc(issue.last_seen).isoformat())),
             ("last_checked_at", json_str(ensure_utc(issue.last_checked_at).isoformat())),
@@ -118,6 +172,66 @@ def _issue_json(issue: IssueRow, extras: IssueItemExtras | None = None) -> JsonV
             ("resolution", _optional_string(issue.resolution)),
         )
     )
+
+
+async def issue_item_extras(
+    session: AsyncSession,
+    issues: tuple[IssueRow, ...],
+    member_id: str | None,
+    actors: ActorDirectory | None,
+) -> tuple[IssueItemExtras, ...]:
+    """Batch safe assignee display, merged-child counts and bookmark state."""
+    refs: list[str] = []
+    issue_refs: list[str | None] = []
+    for issue in issues:
+        ref: str | None = (
+            f"member:{issue.assignee_member_id}"
+            if issue.assignee_member_id is not None
+            else f"team:{issue.assignee_team_id}"
+            if issue.assignee_team_id is not None
+            else None
+        )
+        issue_refs.append(ref)
+        if ref is not None and ref not in refs:
+            refs.append(ref)
+    displays: tuple[ActorDisplay, ...] = (
+        await actors.display(session, tuple(refs)) if actors is not None and refs else ()
+    )
+    merged_rows: list[tuple[str, int]] = []
+    if issues:
+        merged_result: Result[tuple[str | None, int]] = await session.execute(
+            select(IssueRow.merged_into_id, func.count(IssueRow.id))
+            .where(IssueRow.merged_into_id.in_(tuple(issue.id for issue in issues)))
+            .group_by(IssueRow.merged_into_id)
+        )
+        merged_rows = [(row[0], row[1]) for row in merged_result.all() if row[0] is not None]
+    bookmarked_ids: set[str] = set()
+    if member_id is not None and issues:
+        bookmarked_ids = set(
+            (
+                await session.scalars(
+                    select(IssueBookmarkRow.issue_id).where(
+                        IssueBookmarkRow.member_id == member_id,
+                        IssueBookmarkRow.issue_id.in_(tuple(issue.id for issue in issues)),
+                    )
+                )
+            ).all()
+        )
+    result: list[IssueItemExtras] = []
+    for issue, ref in zip(issues, issue_refs, strict=True):
+        display: ActorDisplay | None = None
+        if ref is not None:
+            display = next((item for item in displays if item.ref == ref), None)
+            if display is None:
+                kind: ActorDisplayKind = (
+                    ActorDisplayKind.MEMBER if ref.startswith("member:") else ActorDisplayKind.TEAM
+                )
+                display = ActorDisplay(ref, kind, ref, None, False)
+        child_count: int = next(
+            (count for parent_id, count in merged_rows if parent_id == issue.id), 0
+        )
+        result.append(IssueItemExtras(display, child_count, issue.id in bookmarked_ids))
+    return tuple(result)
 
 
 def _issue_detail_json(

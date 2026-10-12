@@ -20,6 +20,7 @@ from telescreen.core.vocabulary import (
     Visibility,
 )
 from telescreen.db.models import IssueRow
+from telescreen.issues.archive import clear_archive
 from telescreen.issues.recording import decide_policy, placement_keys, score_risk
 from telescreen.issues.repository import IssueRepository
 from telescreen.issues.service import IssueService
@@ -102,6 +103,9 @@ class PolicyReevaluateHandler(TaskHandler):
                     )
                     if before in OPEN_STATUSES and decision.effect is PolicyEffect.ALLOW:
                         issue.status = IssueStatus.ALLOWED.value
+                        if before is IssueStatus.ARCHIVED:
+                            clear_archive(issue)
+                        issue.needs_review = False
                         issue.resolution = "policy_changed"
                         issue.resolved_at = self.clock.now()
                         was_changed = True

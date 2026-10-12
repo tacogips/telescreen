@@ -25,6 +25,8 @@ from telescreen.core.vocabulary import (
     Visibility,
 )
 from telescreen.db.models import IssueExceptionRow, IssueHistoryRow, IssueRow
+from telescreen.issues.archive import clear_archive
+from telescreen.issues.groups import active_children
 from telescreen.issues.recipient_channel import issue_context, preferred_channel
 from telescreen.masking.redact import Redactor
 from telescreen.ports.audit import AuditEntry, AuditLog
@@ -65,6 +67,8 @@ class ExceptionService:
         """Request an exception and notify its configured approver safely."""
         issue: IssueRow = await self._required(session, issue_id)
         self._require_open(issue)
+        if issue.merged_into_id is not None or await active_children(session, issue.id):
+            raise TelescreenError(ErrorCode.MERGED_GROUP, "unmerge the issue group first")
         if duration is ExceptionDuration.FOREVER and not is_admin:
             raise TelescreenError(ErrorCode.FORBIDDEN, "administrator permission required")
         safe_reason: str = self.redactor.redact(reason).text[:2000]
@@ -103,6 +107,8 @@ class ExceptionService:
         )
         if is_admin:
             issue.status = IssueStatus.IGNORED.value
+            clear_archive(issue)
+            issue.needs_review = False
             issue.resolution = IssueResolution.ACCEPTED_RISK.value
             issue.resolved_at = None
             issue.updated_at = now
@@ -143,6 +149,8 @@ class ExceptionService:
         row.decided_at = now
         row.expires_at = _expires_at(ExceptionDuration(row.duration), now)
         issue.status = IssueStatus.IGNORED.value
+        clear_archive(issue)
+        issue.needs_review = False
         issue.resolution = IssueResolution.ACCEPTED_RISK.value
         issue.resolved_at = None
         issue.updated_at = now

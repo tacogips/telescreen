@@ -4,6 +4,7 @@ import { auditFixtures, collectorFixtures, escalationFixtures, evidenceFixtures,
 import { memberFixtures, teamFixtures } from "./fixtures/directory";
 import { coverageResourceFixtures, exceptionFixtures, occurrenceFixtures, policyFixtures, policyVersionFixtures, v11Issues } from "./fixtures/v11";
 import { v13AlertFires, v13AlertRules, v13Integrations, v13Issues, v13OwnershipRules, v13Settings, v13Tokens } from "./fixtures/v13";
+import { state } from "./state";
 
 function luhnValid(value: string): boolean {
   const digits = [...value].map(Number);
@@ -51,6 +52,20 @@ describe("masked fixture corpus", () => {
     expect(new Set(v13Issues.map((issue) => issue.priority)).size).toBe(3);
     expect(new Set(v13Issues.map((issue) => issue.exposure_visibility)).size).toBe(7);
     expect(v13Issues.filter((issue) => issue.merged_into_id === "v13-iss-01")).toHaveLength(2);
+    expect(new Set(v13Issues.flatMap((issue) => issue.assignee?.ref ?? [])).size).toBeGreaterThanOrEqual(5);
+    expect(new Set(v13Issues.map((issue) => issue.source))).toEqual(new Set(["slack", "gdrive", "gdocs", "gsheets", "github", "custom", "police", "onedrive"]));
+    expect(state.comments).toHaveLength(1);
+    expect(state.comments[0]?.display_text).toContain("@alice");
+    expect(state.externalLinks).toHaveLength(1);
+    expect(v13AlertRules).toHaveLength(3);
+    expect(v13AlertFires).toHaveLength(3);
+    expect(new Set(v13AlertFires.map((fire) => fire.outcome))).toEqual(new Set(["delivered", "suppressed_interval", "muted"]));
+    expect(v13Settings).toHaveLength(6);
+    expect(v13Tokens.length).toBeGreaterThanOrEqual(1);
+    expect(v13Tokens.every((token) => token.preview.includes("••••"))).toBe(true);
+    expect(v13OwnershipRules).toHaveLength(4);
+    expect(v13Integrations.map((integration) => integration.kind)).toEqual(["slack", "email", "github_issues", "oidc"]);
+    expect(v13Integrations.find((integration) => integration.kind === "github_issues")?.configured).toBe(false);
   });
 
   it("includes approved masked examples for every fixture kind", () => {
