@@ -71,7 +71,12 @@ Dispatch runs (at most 8 plans each; later runs record accepted plans as
   mock router and `IssueList*`; p07 for the four existing issue tests it may break.
   Inventory tests (`tests/db/test_models.py`, `tests/notifications/**`, `tests/leak/**`,
   the route walk) are read-only;
-- run 3: p12 (wave 4), p17 (wave 5).
+- run 3: p07 (wave 3, re-verify), p12 (wave 4), p17 (wave 5), then serial finalization.
+  Manifest `active/telescreen-v13-20261013-e4-dispatch.json` (base ca818c3) records p01-p06,
+  p08-p11 and p13-p16 as `acceptedDependencies`. Waves A (p07), B (p12) and C (p17) run
+  serially with one plan each, so every shared file a plan's change can break is in that
+  plan's writePaths (design section 15 "Run 3" notes). The finalization moves the v13
+  plans to `completed/` and the e1-e4 manifests to `completed/dispatch/`.
 
 Every plan's wave is greater than the waves of its dependencies.
 

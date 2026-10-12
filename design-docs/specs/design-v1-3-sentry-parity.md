@@ -9,7 +9,8 @@ section 7.
 Status: design accepted as the baseline for the `v13-pNN` plans (2026-10-12). On 2026-10-13
 (run 2) section 6.1 was revised: the bulk `start`/`end`, the `params` keys and the
 `issue_id` failure key now match the accepted client contract. Section 15 also gained the
-run-2 shared-file ownership notes. It extends the
+run-2 shared-file ownership notes. On 2026-10-13 (run 3, base `ca818c3`) section 15 gained
+the run-3 and finalization notes, and section 16 the live-check command. It extends the
 implemented v1, v1.1 and v1.2 designs and replaces none of their decisions except those in
 section 1. The summary tables are in `design-data-model.md` ("v1.3 additions"),
 `design-api-and-ui.md` ("v1.3 endpoints"), `design-ui-sentry.md` section 11 and
@@ -835,8 +836,8 @@ No plan changes `pyproject.toml`, `uv.lock`, `src/web/package.json` or `bun.lock
 | 2 | v13-p15-ui-alerts-profile | new `src/web/src/pages/{alerts,profile}/**` | p03 |
 | 2 | v13-p16-ui-dashboard-org | new `src/web/src/pages/dashboard/**`, `src/web/src/pages/{settings,workflows}/**` | p03 |
 | 3 | v13-p06-bulk-merge-backend | new `src/telescreen/issues/{bulk,merge}.py`, new `src/telescreen/api/routers/issue_bulk.py`, `tests/issues/v13_bulk/**` (S3); the run-1 carry-over UI side of the bulk contract (6.1): `src/web/src/api/client.ts` (`bulk` signature only), `src/web/src/api/mock/{router,mock.test}.ts` (bulk handler only), `src/web/src/pages/issues/IssueList{,.test}.tsx` | p03, p04, p05, p13 |
-| 4 | v13-p12-wiring | `src/telescreen/wiring.py`, new `src/telescreen/wiring_v13.py`, `src/telescreen/api/app.py`, `tests/e2e/{test_api_routes,test_route_permissions}.py`, new `tests/e2e/test_wiring_v13.py` | p04-p11 |
-| 5 | v13-p17-verification-docs | `tests/leak/**` (new v13 files), new `tests/e2e/test_flow_v13_*.py`, new `tests/live/v13/**`, `README.md`, `impl-plans/README.md`, status lines of the design documents, archiving v13 plans | all |
+| 4 | v13-p12-wiring | `src/telescreen/wiring.py`, new `src/telescreen/wiring_v13.py`, `src/telescreen/api/app.py`, `tests/e2e/{test_api_routes,test_route_permissions}.py`, new `tests/e2e/{test_wiring_v13,test_route_permissions_v13}.py` | p04-p11 |
+| 5 | v13-p17-verification-docs | `tests/leak/**` (new v13 files), new `tests/e2e/test_flow_v13_*.py`, new `tests/live/v13/**`, `src/web/scripts/screenshots.ts` (strict-run fixes only), `README.md`, `impl-plans/README.md`, status lines of the design documents. Archiving is the serial finalization, not p17 | all |
 
 Plan-to-file notes:
 
@@ -892,7 +893,7 @@ order:
 |-----|-------|
 | 1 | p01, p02, p03 (wave 1); p04, p05, p09, p13 (wave 2) |
 | 2 | p08, p11, p15, p16 (wave 2); p06, p07, p10, p14 (wave 3) |
-| 3 | p12 (wave 4), p17 (wave 5) |
+| 3 | p07 (wave 3, re-verify), p12 (wave 4), p17 (wave 5), then serial finalization |
 
 Run 1 was dispatched twice: manifest `telescreen-v13-20261012-e1` (blocked on write paths;
 the owner reconciled at `d8073b1`) and `telescreen-v13-20261012-e2` (same scope; p01 and
@@ -951,6 +952,45 @@ against the plans and the tree at `9accc07`:
   one plan owns it and the other declares `dependsOn` on the owner and runs after it
   inside the wave. This audit found no such file.
 
+Run 3 (session 14, base `ca818c3`, manifest `telescreen-v13-20261013-e4`): p01-p06, p08-p11
+and p13-p16 are accepted dependencies and are not redispatched. Each wave holds one plan,
+and the waves run serially: A (p07) -> B (p12) -> C (p17) -> finalization. So no two plans
+ever share a file, and each plan owns every shared file its change can break:
+
+- **Wave A, p07 re-verify.** The code is complete at `ca818c3`. The plan reruns its
+  verification on the committed tree and edits only its own plan file; a failing check is
+  fixed inside the p07 writePaths. Its result follows the owner note in its Progress Log
+  and conventions 7a: INT-E3-P07-01 (fixed by p10) appears only in `addressedFeedback`, and
+  `findings`, `risks`, `priorVerification` and the self-check findings and residual risks
+  are empty.
+- **Wave B, p12.** It owns `wiring.py`, `wiring_v13.py`, `api/app.py`, the route walk
+  (`tests/e2e/test_route_permissions.py`, `tests/e2e/test_api_routes.py`), the new
+  `tests/e2e/test_wiring_v13.py` and `test_route_permissions_v13.py`. Every v1.3 router
+  listed in section 15 is registered through `container.routers`, before the issues
+  router; composition copies `APIRoute` objects, never `include_router` (FastAPI 0.142).
+  The `build_container` signature is unchanged, so every existing caller (e2e harness,
+  `tests/api/v12_rbac/rbac_world.py`) keeps working. Read-only and expected to pass
+  unchanged: `tests/api/v12_rbac/**` (its inventory filters to a fixed `MODULES` tuple, so the
+  new v1.3 modules do not enter it), `tests/db/test_models.py`, `tests/leak/**`,
+  `tests/notifications/**` and `tests/examples/**`, since p12 adds no table, flow,
+  template or example.
+- **Wave C, p17.** It owns the new `tests/leak/{flows_v13,test_leak_matrix_v13}.py`, the
+  `tests/e2e/test_flow_v13_*.py` flows, `tests/live/v13/**`, `src/web/scripts/screenshots.ts`
+  (it is the only run-3 screenshot runner; edit only when the strict run fails because a
+  state targets a name that differs from the accepted page, and record the reason),
+  `README.md`, `impl-plans/README.md` and the v1.3 status lines of this document,
+  `design-v1-3-sentry-parity-review.md`, `design-ui-sentry.md` (11, 11.4),
+  `design-api-and-ui.md` ("v1.3 endpoints"), `design-data-model.md` ("v1.3 additions") and
+  `architecture.md` (section 4 "v1.3 additions"). Existing leak flows, `tests/leak/harness.py`,
+  `sinks.py`, `tests/db/test_models.py`, `tests/examples/**`, `src/web/src/**` and feature
+  code stay read-only; a defect there is a reconciliation request naming the owning plan.
+- **Finalization (serial, after p17 is integration-accepted).** On `main`:
+  - move `impl-plans/active/v13-p*.md` to `impl-plans/completed/`, and the e1, e2, e3 and
+    e4 manifests to `impl-plans/completed/dispatch/` (the v1-v1.2 convention);
+  - move the v1.3 rows of `impl-plans/README.md` to its completed section;
+  - rerun `mise run ci` and the UI gates of section 16 on the final tree;
+  - only when every gate passes, commit and push to `origin/main`.
+
 ### 16. Verification
 
 - **Python**: `uv run ruff format --check . && uv run ruff check . && uv run python
@@ -980,6 +1020,13 @@ against the plans and the tree at `9accc07`:
   - an alert rule fires on a synthetic leak and notifies Slack
     (`TELESCREEN_TEST_SLACK_CHANNEL`) and Mailpit exactly once within the action interval;
   - a mention notifies the mentioned user by email according to their settings.
+  - The dev-stack check of review section 6 (Keycloak, Mailpit, Slack test channel) is
+    `uv run --frozen pytest -m live tests/live -p no:cacheprovider`. It runs the existing
+    Keycloak sign-in and role-mapping test (`tests/live/test_keycloak_oidc.py`,
+    `TELESCREEN_TEST_KEYCLOAK_URL`), the existing v1.2 Mailpit and Slack delivery tests and
+    the two v1.3 tests above. Live tests skip
+    when their variables are unset; a skipped live test is reported as "not run", never as
+    passed, and it is not a pass gate for the offline CI.
 
 ### 17. Author self-check against the request
 
