@@ -4,13 +4,15 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.core.errors import TelescreenError
 from telescreen.core.ids import new_id
 from telescreen.core.json import json_int, json_object
 from telescreen.core.vocabulary import ActorKind, IssueHistoryKind
-from telescreen.db.models import IssueHistoryRow, IssueRow
+from telescreen.db.models import IssueHistoryRow, IssueRow, OwnershipRuleRow, TeamRow
+from telescreen.issues.ownership import match_rule
 from telescreen.ports.audit import AuditEntry, AuditLog
 from telescreen.ports.directory import AssigneeIds, OwnerDirectory, RecipientResolver
 from telescreen.ports.policy import PolicyDecision
@@ -45,6 +47,24 @@ class IssueOwnerRouter:
             )
             if owner_member_ref is not None:
                 recipients.append(owner_member_ref)
+        rule_rows: tuple[OwnershipRuleRow, ...] = tuple(
+            (
+                await session.scalars(
+                    select(OwnershipRuleRow).order_by(
+                        OwnershipRuleRow.position, OwnershipRuleRow.id
+                    )
+                )
+            ).all()
+        )
+        for rule in rule_rows:
+            if match_rule((rule,), issue.source, issue.display_locator) is None:
+                continue
+            rule_team: TeamRow | None = await session.get(TeamRow, rule.team_id)
+            if rule_team is None:
+                logger.warning("issue owner routing skipped: ownership_team_missing")
+                continue
+            recipients.append(f"team:{rule_team.slug}")
+            break
         if decision.owner_team is not None:
             recipients.append(f"team:{decision.owner_team}")
         if default_team is not None:

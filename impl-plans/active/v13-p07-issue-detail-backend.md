@@ -1,9 +1,9 @@
 # V13-P07 Issue Detail Backend: Event Navigation, Tags, Stats, Activity, Comments, Mentions, Subscriptions, Bookmarks, External Issues
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-3-sentry-parity.md sections 1 (D14-D17), 3 (B1, B4, B6, B7), 8.1-8.5, 10.3, 14
 **Created**: 2026-10-12
-**Last Updated**: 2026-10-12
+**Last Updated**: 2026-10-13
 
 ## Plan Metadata
 
@@ -296,12 +296,53 @@ key set.
 
 ## Completion Criteria
 
-- [ ] B1, B4, B6 and B7 regression tests pass; each docstring names the defect.
-- [ ] Every new route declares exactly one permission.
-- [ ] `SubscriptionActivityNotifier` satisfies the `IssueActivityNotifier` port (ty
+- [x] B1, B4, B6 and B7 regression tests pass; each docstring names the defect.
+- [x] Every new route declares exactly one permission.
+- [x] `SubscriptionActivityNotifier` satisfies the `IssueActivityNotifier` port (ty
   check).
-- [ ] The Progress Log has hashes and command evidence.
+- [x] The Progress Log has hashes and command evidence.
 
 ## Progress Log
 
-(append sessions per conventions section 8)
+### Session 1 — 2026-10-13
+
+- Implemented B1 event order/navigation, B4 directory-backed assignee display, B6 persisted
+  actor activity/comments, B7 full tag/stat counts, comment edits/deletes and mentions,
+  subscriptions/bookmarks, external links and guarded GitHub issue creation. New event,
+  activity and external routers remain unregistered for p12. `issues_detail.py` suppresses
+  raw assignee refs when the optional actor directory is unavailable.
+- Added tests under `tests/issues/v13_detail` and `tests/api/v13_detail`; the API test
+  directly builds the new routers and checks one permission dependency per route.
+- Final SHA-256 inventory: `tmp/telescreen-v13-20261013-e3/p07/final-hashes.txt`.
+  Per-edit intent records 01–21 are in the same directory. No model, migration, dependency,
+  `issues_common.py`, `issues/service.py`, or router-wiring changes.
+- Final verification (all exit 0):
+  - `uv run --frozen ruff format --check --no-cache src/telescreen/issues/detail src/telescreen/issues/activity src/telescreen/issues/external src/telescreen/api/routers/issues_detail.py src/telescreen/api/routers/issues_comments.py src/telescreen/api/routers/issue_events.py src/telescreen/api/routers/issue_activity.py src/telescreen/api/routers/issue_external.py tests/issues/v13_detail tests/api/v13_detail tests/issues/test_issues.py tests/issues/test_issues_api.py tests/api/v11_issues/test_issues_router.py tests/e2e/test_flow_ingest.py` — `/tmp/telescreen-v13-p07-format-final.log`.
+  - `uv run --frozen ruff check --no-cache src/telescreen/issues/detail src/telescreen/issues/activity src/telescreen/issues/external src/telescreen/api/routers/issues_detail.py src/telescreen/api/routers/issues_comments.py src/telescreen/api/routers/issue_events.py src/telescreen/api/routers/issue_activity.py src/telescreen/api/routers/issue_external.py tests/issues/v13_detail tests/api/v13_detail tests/issues/test_issues.py tests/issues/test_issues_api.py tests/api/v11_issues/test_issues_router.py tests/e2e/test_flow_ingest.py` — `/tmp/telescreen-v13-p07-ruff-final.log`.
+  - `uv run --frozen ty check src/telescreen/issues/detail src/telescreen/issues/activity src/telescreen/issues/external src/telescreen/api/routers/issues_detail.py src/telescreen/api/routers/issues_comments.py src/telescreen/api/routers/issue_events.py src/telescreen/api/routers/issue_activity.py src/telescreen/api/routers/issue_external.py tests/issues/v13_detail tests/api/v13_detail tests/issues/test_issues.py tests/issues/test_issues_api.py tests/api/v11_issues/test_issues_router.py tests/e2e/test_flow_ingest.py` — `/tmp/telescreen-v13-p07-ty-final.log`.
+  - `uv run --frozen python tools/typelint.py` with p07-path filter — `/tmp/telescreen-v13-p07-typelint.log` (`523 file(s) clean`).
+  - `uv run --frozen pytest -p no:cacheprovider tests/issues/v13_detail tests/api/v13_detail tests/api/v11_issues tests/issues/test_issues_api.py tests/issues/test_issues.py tests/e2e/test_flow_ingest.py` — `/tmp/telescreen-v13-p07-pytest.log` (21 passed).
+  - `uv run --frozen pytest -p no:cacheprovider tests/e2e/test_route_permissions.py tests/e2e/test_api_routes.py tests/api/v12_rbac tests/leak` — `/tmp/telescreen-v13-p07-pytest-shared.log` (18 passed).
+  - `wc -l` over p07 detail/activity/external sources and routers, with `<1000` assertion — `/tmp/telescreen-v13-p07-wc.log` (pass).
+- Formal independent reviews and combined-tree integration gates remain downstream workflow steps.
+- Redispatch verification (2026-10-13): confirmed p10's corrected
+  `tests/issues/v13_dashboard/test_dashboard.py` hash is
+  `7af83123405f9c6c68c05acbffeb31a2c034c18327e6dc69cb98a75567362f7a`. A first full
+  pytest run completed with 988 passed and 8 skipped, but its wrapper exited 1 because
+  zsh reserves the variable name `status`; `/tmp/telescreen-v13-p07-pytest-all.log`
+  preserves that attempt. Reran with `result_code`; the full suite exited 0 with 988
+  passed and 8 skipped at `/tmp/telescreen-v13-p07-pytest-all-rerun.log`.
+- Current-tree p07 verification: scoped format, Ruff, and ty passed at
+  `/tmp/telescreen-v13-p07-format-rerun.log`,
+  `/tmp/telescreen-v13-p07-ruff-rerun.log`, and
+  `/tmp/telescreen-v13-p07-ty-rerun.log`; unfiltered typelint reported 525 clean files
+  at `/tmp/telescreen-v13-p07-typelint-rerun.log`; owned tests passed 21 at
+  `/tmp/telescreen-v13-p07-pytest-rerun.log`; shared tests passed 18 at
+  `/tmp/telescreen-v13-p07-pytest-shared-rerun.log`; all p07 Python files remain under
+  1000 lines (`/tmp/telescreen-v13-p07-wc-rerun.log`). Out-of-scope guards and the
+  completion-box check passed.
+- Independent test-integrity, adversarial, and branch-evidence reviews remain downstream
+  workflow steps; no review approval is claimed here.
+
+### Owner note: 2026-10-13 (session 13, progress-gate block)
+The p07 implementation is complete and its gates pass; the full-suite failure INT-E3-P07-01 was in p10's tests/issues/v13_dashboard and p10 fixed it. The progress gate blocked p07 only because the step result listed the resolved INT-E3-P07-01 under `findings` with severity "mid", added review-pending notes to `risks`/`authorSelfCheck.residualRisks`, and kept the superseded failing full-suite run in `priorVerification`. On the next dispatch: do not change code unless a check fails; re-run this plan's Verification on the current tree; report INT-E3-P07-01 ONLY in `addressedFeedback` (changed paths: none in p07; verification: the passing full-suite command); leave `findings`, `risks`, `authorSelfCheck.findings`, `authorSelfCheck.residualRisks` and `priorVerification` EMPTY (pending downstream reviews are not risks; conventions 7a); list only final passing commands in `verification`.

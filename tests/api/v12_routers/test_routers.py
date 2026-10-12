@@ -434,7 +434,7 @@ async def test_router_routes_declare_one_permission_or_external_auth() -> None:
             for route in router.routes
             if isinstance(route, APIRoute)
         )
-        assert len(routes) == 16
+        assert len(routes) == 19
         for route in routes:
             markers: list[Permission | str] = []
             for dependency in route.dependant.dependencies:

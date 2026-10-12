@@ -12,6 +12,7 @@ import {
   ScanSearch,
 } from "lucide-solid";
 import type { IssueEvent } from "../../../api/types";
+import { PeriodPicker, type Period } from "../../../components/PeriodPicker";
 import { StatusBadge } from "../../../components/StatusBadge";
 import { RelativeTime } from "../../../components/RelativeTime";
 import {
@@ -24,43 +25,6 @@ import {
   Timeline,
 } from "../../../components/ui";
 import { historyLabel, type DetailData } from "./types";
-
-function eventDate(event: IssueEvent): string {
-  return new Date(event.observed_at).toISOString().slice(0, 10);
-}
-
-function eventGraph(events: readonly IssueEvent[]): number[] {
-  const days: string[] = [];
-  const now = new Date();
-  for (let offset = 13; offset >= 0; offset -= 1) {
-    const day = new Date(
-      Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        now.getUTCDate() - offset,
-      ),
-    );
-    days.push(day.toISOString().slice(0, 10));
-  }
-  return days.map(
-    (day) => events.filter((event) => eventDate(event) === day).length,
-  );
-}
-
-function tagCounts(
-  events: readonly IssueEvent[],
-  select: (event: IssueEvent) => string,
-): readonly Readonly<{ label: string; count: number }>[] {
-  const counts = new Map<string, number>();
-  for (const event of events) {
-    const label = select(event);
-    counts.set(label, (counts.get(label) ?? 0) + 1);
-  }
-  return [...counts.entries()]
-    .sort((left, right) => right[1] - left[1])
-    .slice(0, 4)
-    .map(([label, count]) => ({ label, count }));
-}
 
 function jumpTo(id: string): void {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
@@ -84,27 +48,18 @@ export function IssueDetailSections(
   props: Readonly<{
     detail: DetailData;
     selectedEvent: IssueEvent | undefined;
-    selectedEventId: string | null;
+    selection: DetailData["selection"];
     activeTab: string;
+    period: string;
+    onPeriod(value: string): void;
+    onNavigate(selector: string): void;
+    onUnmerge(ids?: readonly string[]): void;
+    onUnmergeChild(primaryId: string, childId: string): void;
+    onDeleteExternal(linkId: string): void;
     onUpload(event: Event & { currentTarget: HTMLInputElement }): void;
-    onSelectEvent(id: string | null): void;
     onActiveTab(tab: string): void;
   }>,
 ): JSX.Element {
-  const recommendedEvent = (): IssueEvent | undefined =>
-    [...props.detail.events].sort(
-      (left, right) =>
-        (right.confidence ?? 0) - (left.confidence ?? 0) ||
-        right.observed_at.localeCompare(left.observed_at),
-    )[0];
-  const moveEvent = (delta: number): void => {
-    const events = props.detail.events;
-    const index = events.findIndex(
-      (event) => event.id === props.selectedEventId,
-    );
-    const nextIndex = Math.min(events.length - 1, Math.max(0, index + delta));
-    props.onSelectEvent(events[nextIndex]?.id ?? null);
-  };
   const location = (): string =>
     props.selectedEvent?.location ?? props.detail.issue.display_locator;
   const frames = (): string[] =>
@@ -118,29 +73,18 @@ export function IssueDetailSections(
   return (
     <main class="issue-detail-main">
       <section class="finding-chart-block">
-        <h3>Loaded findings, last 14 days</h3>
+        <h3>Findings over time</h3>
+        <PeriodPicker value={props.period as Period} onChange={(value) => props.onPeriod(value)} />
         <MiniBarChart
-          values={eventGraph(props.detail.events)}
-          label="Loaded findings, last 14 days"
+          values={props.detail.stats.buckets.map((bucket) => bucket.count)}
+          label="Findings over selected period"
           height={48}
         />
         <div class="finding-tags">
-          <For each={tagCounts(props.detail.events, (event) => event.detector)}>
+          <For each={props.detail.tags.items}>
             {(item) => (
-              <Tag variant="muted">
-                {item.label} · {item.count}
-              </Tag>
-            )}
-          </For>
-          <For
-            each={tagCounts(
-              props.detail.events,
-              (event) => event.location.split(/[ >/:]/)[0] ?? "unknown",
-            )}
-          >
-            {(item) => (
-              <Tag variant="info">
-                {item.label} · {item.count}
+              <Tag variant={item.key === "detector" ? "muted" : "info"}>
+                {item.key}: {item.value} · {item.percent.toFixed(1)}%
               </Tag>
             )}
           </For>
@@ -166,32 +110,24 @@ export function IssueDetailSections(
         <div class="finding-nav-controls">
           <Button
             size="xs"
-            onClick={() => props.onSelectEvent(recommendedEvent()?.id ?? null)}
+            onClick={() => props.onNavigate("recommended")}
           >
             Recommended
           </Button>
+          <Button size="xs" onClick={() => props.onNavigate("oldest")}>Oldest</Button>
           <Button
             size="xs"
-            onClick={() =>
-              props.onSelectEvent(props.detail.events[0]?.id ?? null)
-            }
-          >
-            First
-          </Button>
-          <Button
-            size="xs"
-            onClick={() =>
-              props.onSelectEvent(props.detail.events.at(-1)?.id ?? null)
-            }
+            onClick={() => props.onNavigate("latest")}
           >
             Latest
           </Button>
-          <Button size="xs" onClick={() => moveEvent(-1)}>
+          <Button size="xs" onClick={() => { const id = props.selection?.previous_id; if (id !== null && id !== undefined) props.onNavigate(id); }}>
             Previous
           </Button>
-          <Button size="xs" onClick={() => moveEvent(1)}>
+          <Button size="xs" onClick={() => { const id = props.selection?.next_id; if (id !== null && id !== undefined) props.onNavigate(id); }}>
             Next
           </Button>
+          <span aria-live="polite">{props.selection === null ? "0 of 0" : `${props.selection.position} of ${props.selection.total}`}</span>
         </div>
       </nav>
       <nav class="issue-jump-links" aria-label="Jump to">
@@ -270,7 +206,7 @@ export function IssueDetailSections(
         </Show>
         <For each={props.detail.events}>
           {(event) => (
-            <button type="button" onClick={() => props.onSelectEvent(event.id)}>
+            <button type="button" onClick={() => props.onNavigate(event.id)}>
               {event.rule_id} · <RelativeTime iso={event.observed_at} />
             </button>
           )}
@@ -300,6 +236,20 @@ export function IssueDetailSections(
           </ul>
         </FoldSection>
       </Show>
+      <Show when={props.detail.mergedInto}>
+        {(primary) => <div class="merged-issue-banner">Merged into <A href={`/issues/${encodeURIComponent(primary().id)}`}>{primary().short_id}</A><Button size="xs" onClick={() => props.onUnmergeChild(primary().id, props.detail.issue.id)}>Unmerge</Button></div>}
+      </Show>
+      <Show when={props.detail.mergedChildren.length > 0}>
+        <FoldSection id="merged-issues" title={`Merged issues (${props.detail.mergedChildren.length})`}>
+          <ul>{props.detail.mergedChildren.map((child) => <li><A href={`/issues/${encodeURIComponent(child.id)}`}>{child.short_id} · {child.source} · {child.display_locator}</A><span>{child.status}</span><Button size="xs" onClick={() => props.onUnmerge([child.id])}>Unmerge</Button></li>)}</ul>
+          <Button size="sm" onClick={() => props.onUnmerge()}>Unmerge all</Button>
+        </FoldSection>
+      </Show>
+      <FoldSection id="external-issues" title={`External issues (${props.detail.externalIssues.length})`}>
+        <ul>{props.detail.externalIssues.map((link) => <li><a href={link.url} target="_blank" rel="noreferrer">{link.title ?? link.url}</a><Button size="xs" onClick={() => props.onDeleteExternal(link.id)}>Remove link</Button></li>)}</ul>
+        <Show when={props.detail.externalIssues.length === 0}><p>No external issues linked.</p></Show>
+        <p>Use More to link an issue or create a GitHub issue.</p>
+      </FoldSection>
       <FoldSection id="timeline" title="Timeline">
         <Timeline>
           <For each={props.detail.history}>

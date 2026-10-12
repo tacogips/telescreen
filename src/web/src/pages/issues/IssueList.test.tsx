@@ -154,13 +154,28 @@ describe("IssueList stream", () => {
     expect(await lastBulkBody(fetchMock)).toEqual({ query: "is:unresolved", period: "all", action: "resolve", params: { reason: "false_positive", note: "Confirmed benign" } });
   });
 
-  it("keeps remediation selection-only when all matching issues are selected", async () => {
+  it("INT-W2-05: marks all matching issues remediated through one bulk verification request", async () => {
     stubStorage(); const fetchMock = installFetch([issue("iss-1", "TELE-1")]); render(root);
     fireEvent.click(await screen.findByLabelText("Select TELE-1"));
     fireEvent.click(await screen.findByRole("button", { name: "Select all 57 matching" }));
     fireEvent.click(screen.getByRole("button", { name: "Mark remediated" }));
-    expect(await screen.findByText("Remediation requires a finite selected set")).toBeTruthy();
-    expect(fetchMock.mock.calls.some(([input]) => String(input) === "/api/issues/bulk")).toBe(false);
+    expect(await lastBulkBody(fetchMock)).toEqual({ query: "is:unresolved", period: "all", action: "request_verification", params: { verification: { action: "remove", include_linked: false } } });
+  });
+
+  it("INT-W2-04: sends custom start and end with all-matching bulk requests", async () => {
+    stubStorage(); const fetchMock = installFetch([issue("iss-1", "TELE-1")]); render(root);
+    fireEvent.change(await screen.findByLabelText("Period"), { target: { value: "custom" } });
+    const starts = await screen.findAllByLabelText("Start date");
+    const ends = screen.getAllByLabelText("End date");
+    fireEvent.change(starts[starts.length - 1] as HTMLElement, { target: { value: "2026-10-01" } });
+    fireEvent.change(ends[ends.length - 1] as HTMLElement, { target: { value: "2026-10-12" } });
+    fireEvent.click(await screen.findByLabelText("Select TELE-1"));
+    fireEvent.click(await screen.findByRole("button", { name: "Select all 57 matching" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Resolve selected issues" }));
+    fireEvent.change(screen.getByLabelText("Resolve reason"), { target: { value: "false_positive" } });
+    fireEvent.input(screen.getByLabelText("Resolution note"), { target: { value: "Confirmed benign" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm resolve" }));
+    expect(await lastBulkBody(fetchMock)).toEqual({ query: "is:unresolved", period: "custom", start: "2026-10-01", end: "2026-10-12", action: "resolve", params: { reason: "false_positive", note: "Confirmed benign" } });
   });
 
   it("archives selected issues with the chosen bounded condition", async () => {

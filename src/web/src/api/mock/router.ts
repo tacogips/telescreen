@@ -84,11 +84,29 @@ async function routeV13(url: URL, request: Request, method: string): Promise<Res
   }
   if (path === "/api/issues/bulk" && method === "POST") {
     const value = await body(request);
+    const hasIds = Array.isArray(value.ids);
+    const hasQuery = typeof value.query === "string";
+    if (hasIds === hasQuery || hasIds && (value.ids as unknown[]).length < 1 || hasIds && (value.ids as unknown[]).length > 1000) return error("validation_error", "Invalid bulk selection.", 422);
     const bulkPeriod = new URLSearchParams();
     bulkPeriod.set("period", String(value.period ?? "all"));
+    const hasStart = typeof value.start === "string";
+    const hasEnd = typeof value.end === "string";
+    if (hasStart !== hasEnd || value.period === "custom" && !hasStart || hasStart && value.period !== undefined && value.period !== "custom") return error("validation_error", "Invalid period.", 422);
+    if (typeof value.start === "string") bulkPeriod.set("start", value.start);
+    if (typeof value.end === "string") bulkPeriod.set("end", value.end);
     const params = record(value.params);
     const archive = record(params.archive);
     const verification = record(params.verification);
+    if (value.action === "archive") {
+      const kind = archive.kind;
+      const duration = archive.duration_minutes;
+      const count = archive.count;
+      if (typeof kind !== "string" || !["for_duration", "until_findings", "until_values", "until_escalating"].includes(kind)) return error("validation_error", "Invalid archive condition.", 422);
+      const invalidDuration = kind === "for_duration" && (typeof duration !== "number" || !Number.isInteger(duration) || Number(duration) < 30 || Number(duration) > 129600 || count !== undefined);
+      const invalidCount = (kind === "until_findings" || kind === "until_values") && (typeof count !== "number" || !Number.isInteger(count) || Number(count) < 1 || Number(count) > 100000 || duration !== undefined);
+      const invalidEscalation = kind === "until_escalating" && (duration !== undefined || count !== undefined);
+      if (invalidDuration || invalidCount || invalidEscalation) return error("validation_error", "Invalid archive condition.", 422);
+    }
     const requested = Array.isArray(value.ids) ? value.ids.filter((id): id is string => typeof id === "string") : state.issues.filter((item) => item.merged_into_id == null && inPeriod(item, new URL(`http://mock.local/api/issues?${bulkPeriod}`)) && evaluateIssueQuery(item, tokenizeIssueQuery(String(value.query ?? "")), Date.now())).map((item) => item.id);
     const succeeded: string[] = [];
     const failed: { issue_id: string; code: string }[] = [];
@@ -101,7 +119,8 @@ async function routeV13(url: URL, request: Request, method: string): Promise<Res
       const assigneeRef = typeof params.assignee_ref === "string" ? params.assignee_ref : null;
       const assigneeMemberId = assigneeRef?.startsWith("member:") ? assigneeRef.slice("member:".length) : params.assignee_ref === null ? null : target.assignee_member_id;
       const assigneeTeamId = assigneeRef?.startsWith("team:") ? assigneeRef.slice("team:".length) : params.assignee_ref === null ? null : target.assignee_team_id;
-      const archiveState = action === "archive" ? { kind: String(archive.kind ?? "for_duration"), until: new Date(Date.now() + Number(archive.duration_minutes ?? 1440) * 60_000).toISOString(), threshold: typeof archive.count === "number" ? archive.count : null, baseline: null } : target.archive;
+      const archiveKind = typeof archive.kind === "string" ? archive.kind : "for_duration";
+      const archiveState = action === "archive" ? { kind: archiveKind, until: new Date(Date.now() + (archiveKind === "for_duration" ? Number(archive.duration_minutes) : 90 * 24 * 60) * 60_000).toISOString(), threshold: archiveKind === "until_findings" || archiveKind === "until_values" ? Number(archive.count) : null, baseline: null } : target.archive;
       const updated: Issue = action === "priority" ? { ...target, priority: priority ?? "medium", priority_manual: true } : action === "assign" ? { ...target, assignee_member_id: assigneeMemberId, assignee_team_id: assigneeTeamId } : action === "mark_reviewed" ? { ...target, needs_review: false } : action === "archive" ? { ...target, status: "archived", archive: archiveState } : action === "unarchive" ? { ...target, status: "unresolved", archive: null } : action === "status" ? { ...target, status } : action === "resolve" ? { ...target, status: "resolved", resolution: typeof params.reason === "string" ? params.reason : "manual_unverified" } : action === "request_verification" ? { ...target, status: "pending_verification", resolution: typeof verification.action === "string" ? verification.action : target.resolution } : target;
       state.issues[state.issues.findIndex((item) => item.id === id)] = updated;
       succeeded.push(id);

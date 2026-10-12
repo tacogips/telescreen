@@ -21,7 +21,7 @@ it("renders built-in and custom rows from the API", async () => {
   expect(screen.getByText("workflow.review").closest("a")).toHaveAttribute("href", "/settings/templates/workflow.review");
   expect(screen.getByText("Built-in")).toBeInTheDocument();
   expect(screen.getByText("Custom")).toBeInTheDocument();
-  expect(screen.getByText("Notification templates")).toBeInTheDocument();
+  expect(screen.getAllByText("Notification templates")).toHaveLength(2);
   expect(await screen.findByRole("button", { name: "New template" })).toBeInTheDocument();
 });
 

@@ -108,6 +108,23 @@ describe("mock API mode", () => {
     await client.membersApi.reactivate("alex");
   });
 
+  it("INT-W2-04 and archive parsing: scopes bulk and requires an explicit archive kind", async () => {
+    const client = await mockClient();
+    const selected = await client.issuesApi.listQuery({ query: "", period: "custom", start: "2026-10-01", end: "2026-10-12" });
+    const result = await client.issuesApi.bulk({ query: "", period: "custom", start: "2026-10-01", end: "2026-10-12", action: "mark_reviewed" });
+    expect(result.succeeded.sort()).toEqual(selected.items.map((issue) => issue.id).sort());
+
+    const before = await client.issuesApi.get("v13-iss-01");
+    await expect(client.apiFetch("/api/issues/bulk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: ["v13-iss-01"], action: "archive", params: { archive: {} } }) })).rejects.toMatchObject({ status: 422, code: "validation_error" });
+    expect((await client.issuesApi.get("v13-iss-01")).status).toBe(before.status);
+    const archived = await client.issuesApi.bulk({ ids: ["v13-iss-01"], action: "archive", params: { archive: { kind: "until_escalating" } } });
+    expect(archived.succeeded).toContain("v13-iss-01");
+    const issue = await client.issuesApi.get("v13-iss-01");
+    expect(issue.archive?.kind).toBe("until_escalating");
+    expect(Date.parse(issue.archive?.until ?? "") - Date.now()).toBeGreaterThan(89 * 86_400_000);
+    expect(Date.parse(issue.archive?.until ?? "") - Date.now()).toBeLessThanOrEqual(90 * 86_400_000);
+  });
+
   it("returns 404 for unknown v1.1 API paths", async () => {
     const client = await mockClient();
     await expect(client.apiFetch("/api/policies/unknown/undeclared")).rejects.toMatchObject({ status: 404, code: "not_found" });

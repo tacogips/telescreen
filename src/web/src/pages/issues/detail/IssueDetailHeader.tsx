@@ -1,11 +1,12 @@
 import { createSignal, For, Show, type JSX } from "solid-js";
 import { A } from "@solidjs/router";
-import type { ExceptionDuration, IssueStatus } from "../../../api/types";
+import type { ExceptionDuration, IssuePriority, IssueStatus } from "../../../api/types";
+import { Avatar } from "../../../components/Avatar";
 import { StatusBadge } from "../../../components/StatusBadge";
 import { TopBar } from "../../../components/shell/TopBar";
+import { ArchiveMenu, type ArchiveRequest } from "../ArchiveMenu";
 import {
   Button,
-  PriorityBadge,
   Redacted,
   Select,
   SeverityBar,
@@ -45,14 +46,41 @@ export function IssueDetailHeader(
     onAssignee(value: string): void;
     onStartWorkflow(name: string): void;
     onCopyMarkdown(): void;
+    onPriority(value: IssuePriority): void;
+    onArchive(request: ArchiveRequest): void;
+    onUnarchive(): void;
+    onBookmark(bookmarked: boolean): void;
+    onSubscribe(subscribed: boolean): void;
+    onUnmerge(): void;
+    onUnmergeChild(primaryId: string): void;
+    onMerge(childId: string): void;
+    onLinkExternal(url: string, title: string): void;
+    onCreateExternal(repo: string, title: string): void;
+    onDeleteExternal(linkId: string): void;
+    onUpload(event: Event & { currentTarget: HTMLInputElement }): void;
   }>,
 ): JSX.Element {
   const issue = (): DetailData["issue"] => props.detail.issue;
-  const [dialog, setDialog] = createSignal<"remediation" | "false_positive" | "manual_unverified" | "exception" | null>(null);
+  const [dialog, setDialog] = createSignal<"remediation" | "false_positive" | "manual_unverified" | "exception" | "merge" | "link" | "github" | null>(null);
   const [note, setNote] = createSignal("");
   const [action, setAction] = createSignal<"remove" | "restrict">("remove");
   const [includeLinked, setIncludeLinked] = createSignal(false);
   const [duration, setDuration] = createSignal<ExceptionDuration>("30d");
+  const [moreOpen, setMoreOpen] = createSignal(false);
+  const [externalUrl, setExternalUrl] = createSignal("");
+  const [externalTitle, setExternalTitle] = createSignal("");
+  const [githubRepo, setGithubRepo] = createSignal("");
+  const [githubTitle, setGithubTitle] = createSignal(issue().display_title);
+  const [mergeId, setMergeId] = createSignal("");
+  const [permalinkCopied, setPermalinkCopied] = createSignal(false);
+  const currentAssignee = (): string => {
+    const display = issue().assignee;
+    if (display !== undefined && display !== null) return display.display_name;
+    const member = props.detail.members.find((entry) => entry.id === issue().assignee_member_id || entry.handle === issue().assignee_ref?.replace(/^member:/, ""));
+    if (member !== undefined) return member.display_name;
+    const team = props.detail.teams.find((entry) => entry.id === issue().assignee_team_id || entry.slug === issue().assignee_ref?.replace(/^team:/, ""));
+    return team?.name ?? "Unassigned";
+  };
   const credential = (): boolean => ["credential", "token", "private_key", "password"].includes(issue().rule_class);
   const exceptionMessage = (): string => {
     const exception = issue().active_exception;
@@ -66,11 +94,14 @@ export function IssueDetailHeader(
   const submitDialog = (event: SubmitEvent): void => {
     event.preventDefault();
     const reason = note().trim();
-    if (dialog() !== "remediation" && reason === "") return;
+    if (["false_positive", "manual_unverified", "exception"].includes(dialog() ?? "") && reason === "") return;
     if (dialog() === "remediation") props.onRemediation(action(), includeLinked());
     if (dialog() === "false_positive") props.onResolve("false_positive", reason);
     if (dialog() === "manual_unverified") props.onResolve("manual_unverified", reason);
     if (dialog() === "exception") props.onRequestException(reason, duration());
+    if (dialog() === "link" && externalUrl().trim() !== "") props.onLinkExternal(externalUrl().trim(), externalTitle());
+    if (dialog() === "github" && githubRepo() !== "" && githubTitle().trim() !== "") props.onCreateExternal(githubRepo(), githubTitle().trim());
+    if (dialog() === "merge" && mergeId().trim() !== "") props.onMerge(mergeId().trim());
     setDialog(null);
     setNote("");
   };
@@ -79,9 +110,9 @@ export function IssueDetailHeader(
       <TopBar.Slot name="title">
         <A href="/issues">Issues</A>
         <span aria-hidden="true"> / </span>
-        <span>
+        <A href={`/issues/${encodeURIComponent(issue().id)}`}>
           {issue().source} · {issue().short_id}
-        </span>
+        </A>
       </TopBar.Slot>
       <div class="issue-detail-header">
         <div class="issue-detail-heading">
@@ -142,6 +173,12 @@ export function IssueDetailHeader(
           </SplitButton>
           <Button size="sm" onClick={() => setDialog("exception")}>Request exception...</Button>
         </Show>
+        <Show when={issue().status === "archived"}>
+          <Button size="sm" onClick={props.onUnarchive}>Unarchive</Button>
+        </Show>
+        <Show when={issue().status !== "archived"}>
+          <ArchiveMenu onArchive={props.onArchive} />
+        </Show>
         <For
           each={ALLOWED_TRANSITIONS[issue().status].filter(
             (status) => status !== "unresolved",
@@ -183,41 +220,57 @@ export function IssueDetailHeader(
             </For>
           </Select>
         </label>
-        <SplitButton
-          menuLabel="Issue options"
-          menu={
-            <div role="none">
-              <button
-                type="button"
-                role="menuitem"
-                onClick={props.onCopyMarkdown}
-              >
-                Copy issue as Markdown
-              </button>
-            </div>
-          }
-        >
-          More
-        </SplitButton>
+        <Button size="sm" aria-expanded={moreOpen()} onClick={() => setMoreOpen(!moreOpen())}>More</Button>
+        <Show when={moreOpen()}>
+          <div class="issue-more-menu" role="menu" aria-label="More issue actions">
+            <button type="button" role="menuitem" onClick={() => void navigator.clipboard?.writeText(`${location.origin}/issues/${encodeURIComponent(issue().id)}`).then(() => setPermalinkCopied(true))}>Copy permalink</button>
+            <button type="button" role="menuitem" onClick={props.onCopyMarkdown}>Copy masked Markdown</button>
+            <button type="button" role="menuitem" onClick={() => setDialog("exception")}>Request exception</button>
+            <button type="button" role="menuitem" onClick={() => document.querySelector<HTMLSelectElement>('select[aria-label="Start workflow"]')?.focus()}>Start workflow</button>
+            <label role="menuitem">Upload evidence<input aria-label="Upload evidence" type="file" onChange={props.onUpload} /></label>
+            <button type="button" role="menuitem" onClick={() => setDialog("link")}>Link external issue</button>
+            <button type="button" role="menuitem" onClick={() => setDialog("github")}>Create GitHub issue</button>
+            <button type="button" role="menuitem" onClick={() => setDialog("merge")}>Merge with…</button>
+            <Show when={props.detail.mergedChildren.length > 0}><button type="button" role="menuitem" onClick={props.onUnmerge}>Unmerge</button></Show>
+            <Show when={props.detail.mergedInto}><button type="button" role="menuitem" onClick={() => props.onUnmergeChild(props.detail.mergedInto!.id)}>Unmerge from primary</button></Show>
+            <Show when={permalinkCopied()}><span role="status">Permalink copied</span></Show>
+          </div>
+        </Show>
         <span class="issue-action-spacer" />
-        <PriorityBadge level={severity(issue().severity)} />
+        <label>Priority
+          <Select aria-label="Priority" value={issue().priority ?? "medium"} onChange={(event) => props.onPriority(event.currentTarget.value as IssuePriority)}>
+            <option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option>
+          </Select>
+        </label>
+        <Button size="sm" aria-pressed={issue().bookmarked === true} onClick={() => props.onBookmark(issue().bookmarked !== true)}>{issue().bookmarked ? "Bookmarked" : "Bookmark"}</Button>
+        <Button size="sm" aria-pressed={props.detail.subscription.subscribed} onClick={() => props.onSubscribe(!props.detail.subscription.subscribed)}>{props.detail.subscription.subscribed ? "Following" : "Subscribe"}</Button>
         <label>
           Assignee
+          <div class="assignee-current">
+            <Show when={issue().assignee}>
+              {(person) => Avatar({ name: person().display_name, ref: person().ref })}
+            </Show>
+            <span>{currentAssignee()}</span>
+          </div>
+          <div class="assignee-suggestions" aria-label="Suggested assignees">
+            <For each={props.detail.suggestions}>
+              {(suggestion) => <button type="button" onClick={() => props.onAssignee(suggestion.ref)}>{Avatar({ name: suggestion.display_name, ref: suggestion.ref, size: 20 })} {suggestion.display_name} <Tag variant="muted">{suggestion.reason.replaceAll("_", " ")}</Tag></button>}
+            </For>
+          </div>
           <Select
             aria-label="Assignee"
             value={props.assignee}
             onChange={(event) => props.onAssignee(event.currentTarget.value)}
           >
             <option value="">
-              {issue().assignee_member_id ??
-                issue().assignee_team_id ??
-                "Unassigned"}
+              {currentAssignee()}
             </option>
+            <For each={props.detail.suggestions}>
+              {(suggestion) => <option value={suggestion.ref}>★ {suggestion.display_name} · {suggestion.reason.replaceAll("_", " ")}</option>}
+            </For>
             <For each={props.detail.members}>
               {(member) => (
-                <option value={`member:${member.handle}`}>
-                  {member.display_name}
-                </option>
+                <option value={`member:${member.handle}`}>{member.display_name}</option>
               )}
             </For>
             <For each={props.detail.teams}>
@@ -242,7 +295,7 @@ export function IssueDetailHeader(
       </Show>
       <Show when={dialog()}>
         <form class="issue-action-dialog" role="dialog" aria-modal="true" onSubmit={submitDialog}>
-          <h3>{dialog() === "remediation" ? "Mark remediated" : dialog() === "exception" ? "Request exception" : "Resolve issue"}</h3>
+          <h3>{dialog() === "remediation" ? "Mark remediated" : dialog() === "exception" ? "Request exception" : dialog() === "merge" ? "Merge issue" : dialog() === "link" ? "Link external issue" : dialog() === "github" ? "Create GitHub issue" : "Resolve issue"}</h3>
           <Show when={dialog() === "remediation"}>
             <label>Action
               <Select aria-label="Remediation action" value={action()} onChange={(event) => setAction(event.currentTarget.value as "remove" | "restrict")}>
@@ -260,10 +313,24 @@ export function IssueDetailHeader(
               </Select>
             </label>
           </Show>
+          <Show when={dialog() === "link"}>
+            <label>Issue URL<input aria-label="External issue URL" type="url" value={externalUrl()} onInput={(event) => setExternalUrl(event.currentTarget.value)} required /></label>
+            <label>Title<input aria-label="External issue title" value={externalTitle()} onInput={(event) => setExternalTitle(event.currentTarget.value)} /></label>
+          </Show>
+          <Show when={dialog() === "github"}>
+            <label>Repository<Select aria-label="GitHub repository" value={githubRepo()} onChange={(event) => setGithubRepo(event.currentTarget.value)}>
+              <option value="">Select repository</option><For each={props.detail.githubRepos}>{(repo) => <option value={repo}>{repo}</option>}</For>
+            </Select></label>
+            <label>Title<input aria-label="GitHub issue title" value={githubTitle()} onInput={(event) => setGithubTitle(event.currentTarget.value)} /></label>
+            <Show when={props.detail.githubRepos.length === 0}><p>Configure GitHub integration to create an issue.</p></Show>
+          </Show>
+          <Show when={dialog() === "merge"}>
+            <label>Issue ID to merge<input aria-label="Issue to merge" value={mergeId()} onInput={(event) => setMergeId(event.currentTarget.value)} /></label>
+          </Show>
           <Show when={dialog() !== "remediation"}>
             <label>Reason<textarea aria-label="Reason" value={note()} onInput={(event) => setNote(event.currentTarget.value)} required /></label>
           </Show>
-          <Button type="submit" size="sm" disabled={dialog() !== "remediation" && note().trim() === ""}>Submit</Button>
+          <Button type="submit" size="sm" disabled={(["false_positive", "manual_unverified", "exception"].includes(dialog() ?? "") && note().trim() === "") || (dialog() === "github" && (githubRepo() === "" || githubTitle().trim() === "")) || (dialog() === "link" && externalUrl().trim() === "") || (dialog() === "merge" && mergeId().trim() === "")}>Submit</Button>
           <Button type="button" size="sm" onClick={() => setDialog(null)}>Cancel</Button>
         </form>
       </Show>

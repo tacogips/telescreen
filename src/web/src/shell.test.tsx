@@ -34,6 +34,21 @@ describe("web shell", () => {
     await waitFor(() => expect(screen.getByRole("link", { name: "Notification templates" })).toBeInTheDocument());
     expect(screen.queryByRole("link", { name: "Users and roles" })).toBeNull();
   });
+  it("shows the v1.3 Settings links in the secondary panel by permission", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ kind: "token", member: { handle: "sam", display_name: "Sam Lee" }, role: "viewer", permissions: ["templates.read", "profile.self", "ownership.read"] })));
+    const viewer = render(() => <MemoryRouter><Route path="/" component={() => <SecondaryPanel area="settings" collapsed={false} onToggle={() => undefined}/>} /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute("href", "/settings/profile"));
+    expect(screen.getByRole("link", { name: "Ownership rules" })).toHaveAttribute("href", "/settings/ownership");
+    expect(screen.queryByRole("link", { name: "Integrations" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Tokens" })).toBeNull();
+    viewer.unmount();
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ kind: "token", member: { handle: "ada", display_name: "Ada Admin" }, role: "admin", permissions: ["templates.read", "users.read", "profile.self", "integrations.read", "tokens.read", "ownership.read"] })));
+    render(() => <MemoryRouter><Route path="/" component={() => <SecondaryPanel area="settings" collapsed={false} onToggle={() => undefined}/>} /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByRole("link", { name: "Integrations" })).toHaveAttribute("href", "/settings/integrations"));
+    expect(screen.getByRole("link", { name: "Tokens" })).toHaveAttribute("href", "/settings/tokens");
+    expect(screen.getByRole("link", { name: "Profile" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ownership rules" })).toBeInTheDocument();
+  });
   it("renders the rail labels in order and the skip link", () => {
     render(() => <MemoryRouter root={AppShell}><AppRoutes /></MemoryRouter>);
     const rail = within(screen.getByRole("navigation", { name: "Primary navigation" }));

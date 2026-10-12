@@ -13,7 +13,7 @@ from telescreen.core.clock import Clock
 from telescreen.core.errors import TelescreenError
 from telescreen.core.ids import new_id
 from telescreen.core.json import json_object, json_str
-from telescreen.core.vocabulary import ApiScope, ErrorCode
+from telescreen.core.vocabulary import ApiScope, ErrorCode, Role
 from telescreen.db.models import ApiTokenRow, MemberRow
 from telescreen.directory.actors import actor_kind_for
 from telescreen.directory.repository import DirectoryRepository
@@ -131,6 +131,58 @@ class TokenService:
             )
             for row in tokens
         )
+
+    async def create_for_member(
+        self,
+        session: AsyncSession,
+        member_id: str,
+        role: Role,
+        label: str,
+        scopes: frozenset[ApiScope],
+        caller_token_id: str | None = None,
+    ) -> CreatedToken:
+        """Create a caller-bound token restricted to the caller's effective scopes."""
+        allowed: frozenset[ApiScope] = {
+            Role.VIEWER: frozenset((ApiScope.READ,)),
+            Role.RESPONDER: frozenset((ApiScope.READ, ApiScope.WRITE)),
+            Role.ADMIN: frozenset((ApiScope.READ, ApiScope.WRITE, ApiScope.ADMIN)),
+        }[role]
+        if caller_token_id is not None:
+            caller: ApiTokenRow | None = await self.repository.api_token_by_id(
+                session, caller_token_id
+            )
+            if caller is None or caller.revoked_at is not None or caller.member_id != member_id:
+                raise TelescreenError(ErrorCode.FORBIDDEN, "caller token is not active")
+            caller_scopes: frozenset[ApiScope] = frozenset(
+                ApiScope(scope) for scope in caller.scopes.split(",") if scope
+            )
+            allowed = allowed.intersection(caller_scopes)
+        if not scopes or not scopes.issubset(allowed):
+            raise TelescreenError(ErrorCode.VALIDATION_ERROR, "token scopes exceed member role")
+        return await self.create(session, label, scopes, member_id, f"member:{member_id}")
+
+    async def list_for_member(self, session: AsyncSession, member_id: str) -> tuple[TokenView, ...]:
+        """List only the caller's own token metadata."""
+        tokens: Sequence[ApiTokenRow] = await self.repository.list_api_tokens(session)
+        return tuple(
+            TokenView(
+                id=row.id,
+                label=row.label,
+                scopes=tuple(scope for scope in row.scopes.split(",") if scope),
+                member_handle=None,
+                created_at=row.created_at,
+                revoked_at=row.revoked_at,
+            )
+            for row in tokens
+            if row.member_id == member_id
+        )
+
+    async def revoke_for_member(self, session: AsyncSession, member_id: str, token_id: str) -> None:
+        """Revoke only a token owned by the caller, hiding other token ids."""
+        row: ApiTokenRow | None = await self.repository.api_token_by_id(session, token_id)
+        if row is None or row.member_id != member_id:
+            raise TelescreenError(ErrorCode.NOT_FOUND, "token not found")
+        await self.revoke(session, token_id, f"member:{member_id}")
 
     async def member_id_for_handle(self, session: AsyncSession, handle: str) -> str:
         """Resolve a member handle for token binding."""

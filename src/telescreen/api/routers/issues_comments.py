@@ -11,8 +11,12 @@ from telescreen.api.routers.issues_common import (
     IssuesRouterDeps,
     _response,
 )
-from telescreen.core.json import json_bool, json_object
+from telescreen.core.clock import ensure_utc
+from telescreen.core.json import JsonValue, json_bool, json_object, json_str
 from telescreen.core.permissions import Permission
+from telescreen.db.models import IssueCommentRow
+from telescreen.issues.activity.comments import CommentService
+from telescreen.ports.directory import RecipientResolver
 
 
 @pydantic.dataclasses.dataclass
@@ -36,7 +40,28 @@ def build_issues_comments_router(deps: IssuesRouterDeps) -> APIRouter:
     ) -> Response:
         """Add a comment that the service redacts before persistence."""
         async with deps.ctx.sessions.begin() as session:
-            await deps.service.comment(session, issue_id, body.body, principal.actor_ref())
-        return _response(json_object((("accepted", json_bool(True)),)), status_code=201)
+            resolver: RecipientResolver = deps.resolver or deps.service.resolver
+            service: CommentService = CommentService(
+                deps.service.redactor,
+                deps.ctx.audit,
+                deps.ctx.clock,
+                deps.member_notifier,
+                resolver,
+                deps.actors,
+                deps.service.activity,
+            )
+            comment: IssueCommentRow = await service.create(
+                session, issue_id, body.body, principal.actor_ref()
+            )
+        deleted: bool = comment.deleted_at is not None
+        comment_json: JsonValue = json_object(
+            (
+                ("id", json_str(comment.id)),
+                ("body", json_str("" if deleted else comment.body)),
+                ("created_at", json_str(ensure_utc(comment.created_at).isoformat())),
+                ("deleted", json_bool(deleted)),
+            )
+        )
+        return _response(comment_json, status_code=201)
 
     return router

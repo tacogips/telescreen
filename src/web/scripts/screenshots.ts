@@ -24,7 +24,7 @@ const v13States: ScreenshotState[] = [
   { name: "integrations", path: "/settings/integrations", actions: [] },
   { name: "tokens", path: "/settings/tokens", actions: [] },
   { name: "ownership-rules", path: "/settings/ownership", actions: [] },
-  { name: "member-edit", path: "/settings/users", actions: [{ kind: "click", role: "button", name: "Edit Alex" }] },
+  { name: "member-edit", path: "/settings/users", actions: [{ kind: "click", role: "button", name: "Edit Alex Morgan" }] },
   { name: "workflows-list", path: "/workflows", actions: [] },
   { name: "palette-open", path: "/issues", actions: [{ kind: "press", key: "Control+k" }] },
   { name: "shortcut-help", path: "/issues", actions: [{ kind: "press", key: "?" }] },

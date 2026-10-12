@@ -14,3 +14,4 @@
 .permission-group th{text-align:left;color:var(--text-secondary);font-size:12px;text-transform:uppercase}
 .permission-cell{text-align:center;color:var(--accent)}
 @media(max-width:992px){.template-editor-columns{grid-template-columns:1fr}}
+.settings-page-nav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;padding:6px;border-bottom:1px solid var(--border-primary)}.settings-page-nav a{padding:6px 10px;border-radius:6px;color:var(--text-secondary);text-decoration:none}.settings-page-nav a:hover,.settings-page-nav a.active{background:var(--selected-bg);color:var(--accent-content)}.member-edit-form{min-width:240px}

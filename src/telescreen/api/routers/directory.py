@@ -22,6 +22,7 @@ from telescreen.core.permissions import Permission
 from telescreen.core.vocabulary import ErrorCode, IdentityKind
 from telescreen.db.models import MemberIdentityRow, MemberRow, TeamRow
 from telescreen.directory.identities import IdentityService, IdentityView
+from telescreen.directory.members import MemberAdminService
 from telescreen.directory.service import DirectoryService
 
 
@@ -31,6 +32,15 @@ class MemberBody:
 
     handle: str
     display_name: str
+    email: str | None = None
+    slack_user_id: str | None = None
+
+
+@pydantic.dataclasses.dataclass(frozen=True)
+class MemberEditBody:
+    """Validated member edit fields; null leaves optional fields unchanged."""
+
+    display_name: str | None = None
     email: str | None = None
     slack_user_id: str | None = None
 
@@ -75,11 +85,71 @@ class DirectoryRouterDeps:
     ctx: ApiContext
     directory: DirectoryService
     identities: IdentityService | None = None
+    member_admin: MemberAdminService | None = None
 
 
 def build_directory_router(deps: DirectoryRouterDeps) -> APIRouter:
     """Build authenticated directory endpoints."""
     router: APIRouter = APIRouter()
+
+    @router.patch("/api/members/{handle}")
+    async def update_member(
+        handle: str,
+        body: MemberEditBody,
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.DIRECTORY_WRITE))
+        ],
+    ) -> JSONResponse:
+        """Update safe member profile fields and audit field names only."""
+        if deps.member_admin is None:
+            raise HTTPException(status_code=503, detail="member administration unavailable")
+        async with deps.ctx.sessions.begin() as session:
+            row: MemberRow = await deps.member_admin.update(
+                session,
+                handle,
+                body.display_name,
+                body.email,
+                body.slack_user_id,
+                principal.actor_ref(),
+            )
+        return JSONResponse(
+            content={
+                "id": row.id,
+                "handle": row.handle,
+                "display_name": row.display_name,
+                "email": row.email,
+                "slack_user_id": row.slack_user_id,
+                "active": row.active,
+            }
+        )
+
+    @router.post("/api/members/{handle}/deactivate", status_code=204)
+    async def deactivate_member(
+        handle: str,
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.USERS_WRITE))
+        ],
+    ) -> Response:
+        """Deactivate a member and release their open issues."""
+        if deps.member_admin is None:
+            raise HTTPException(status_code=503, detail="member administration unavailable")
+        async with deps.ctx.sessions.begin() as session:
+            await deps.member_admin.deactivate(session, handle, principal.actor_ref())
+        return Response(status_code=204)
+
+    @router.post("/api/members/{handle}/reactivate", status_code=204)
+    async def reactivate_member(
+        handle: str,
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.USERS_WRITE))
+        ],
+    ) -> Response:
+        """Reactivate a previously deactivated member."""
+        if deps.member_admin is None:
+            raise HTTPException(status_code=503, detail="member administration unavailable")
+        async with deps.ctx.sessions.begin() as session:
+            await deps.member_admin.reactivate(session, handle, principal.actor_ref())
+        return Response(status_code=204)
 
     @router.get("/api/members")
     async def list_members(

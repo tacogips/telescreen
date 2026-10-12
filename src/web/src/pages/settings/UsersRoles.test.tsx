@@ -15,6 +15,9 @@ const write = ["users.read", "users.write"];
 function handler(url: string, init: RequestInit | undefined): Response | undefined {
   if (url === "/api/users") return Response.json({ items: users });
   if (url === "/api/roles") return Response.json(matrix);
+  if (url === "/api/members") return Response.json({ items: [{ id: "mem-01", handle: "alex", display_name: "Alex Morgan", email: null, slack_user_id: "U-01", active: true }] });
+  if (url === "/api/members/alex" && init?.method === "PATCH") return Response.json({ id: "mem-01", handle: "alex", display_name: "Alex Prime", email: null, slack_user_id: "U-01", active: true });
+  if (url === "/api/members/alex/deactivate" && init?.method === "POST") return Response.json({ error: { code: "last_admin", detail: "At least one administrator must remain." } }, { status: 409 });
   if (url === "/api/users/sam/role" && init?.method === "PUT") return Response.json({ ...users[2], role: "responder" });
   if (url === "/api/users/alex/role" && init?.method === "PUT") return Response.json({ error: { code: "last_admin", detail: "At least one administrator must remain." } }, { status: 409 });
   return undefined;
@@ -30,7 +33,7 @@ it("changes a role through setRole", async () => {
   renderSettings("/settings/users");
   fireEvent.change(await enabledSelect("sam"), { target: { value: "responder" } });
   await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/users/sam/role", expect.objectContaining({ method: "PUT", body: JSON.stringify({ role: "responder" }) })));
-  expect(screen.getByText("Users and roles")).toBeInTheDocument();
+  expect(screen.getAllByText("Users and roles")).toHaveLength(2);
 });
 
 it("shows the inline last_admin error and restores the role", async () => {
@@ -71,4 +74,21 @@ it("shows a forbidden banner instead of loading forever when users cannot be rea
   renderSettings("/settings/users");
   await waitFor(() => expect(screen.getAllByText("permission is not granted").length).toBeGreaterThan(0));
   expect(screen.queryByText("Loading users…")).toBeNull();
+});
+
+it("edits a member through the display-name accessible action and sends only changed fields", async () => {
+  const fetchMock = mockApi([...write, "directory.write"], handler);
+  renderSettings("/settings/users");
+  fireEvent.click(await screen.findByRole("button", { name: "Edit Alex Morgan" }));
+  fireEvent.input(await screen.findByLabelText("Display name"), { target: { value: "Alex Prime" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save member" }));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/members/alex", expect.objectContaining({ method: "PATCH", body: JSON.stringify({ display_name: "Alex Prime" }) })));
+});
+
+it("shows a last_admin response inline when deactivation is rejected", async () => {
+  mockApi(write, handler);
+  renderSettings("/settings/users");
+  const alexRow = await screen.findByRole("row", { name: /@alex/ });
+  fireEvent.click(within(alexRow).getByRole("button", { name: "Deactivate" }));
+  expect(await screen.findByText("At least one administrator must remain.")).toBeInTheDocument();
 });

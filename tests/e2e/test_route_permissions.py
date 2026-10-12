@@ -83,6 +83,11 @@ V1_SCOPE_TABLE: tuple[tuple[Permission, frozenset[ApiScope]], ...] = (
     (Permission.MAP_JOBS_WRITE, frozenset((ApiScope.ADMIN,))),
     (Permission.POLICE_WRITE, frozenset((ApiScope.ADMIN,))),
     (Permission.INGEST_PUSH, frozenset((ApiScope.INGEST, ApiScope.ADMIN))),
+    (Permission.USERS_READ, frozenset((ApiScope.ADMIN,))),
+    (Permission.USERS_WRITE, frozenset((ApiScope.ADMIN,))),
+    (Permission.TOKENS_READ, frozenset((ApiScope.ADMIN,))),
+    (Permission.TOKENS_WRITE, frozenset((ApiScope.ADMIN,))),
+    (Permission.PROFILE_SELF, frozenset((ApiScope.READ, ApiScope.WRITE, ApiScope.ADMIN))),
 )
 
 

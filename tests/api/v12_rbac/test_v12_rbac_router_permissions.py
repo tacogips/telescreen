@@ -184,6 +184,23 @@ TABLE: tuple[RouteRule, ...] = (
     RouteRule("ingest", "POST", "/api/ingest/v1/scan", Permission.INGEST_PUSH),
     RouteRule("ingest", "POST", "/api/ingest/v1/findings", Permission.INGEST_PUSH),
     RouteRule("ingest", "GET", "/api/ingest/v1/sources/{name}/config", Permission.INGEST_PUSH),
+    RouteRule("directory", "PATCH", "/api/members/{handle}", Permission.DIRECTORY_WRITE),
+    RouteRule("directory", "POST", "/api/members/{handle}/deactivate", Permission.USERS_WRITE),
+    RouteRule("directory", "POST", "/api/members/{handle}/reactivate", Permission.USERS_WRITE),
+    RouteRule("users", "GET", "/api/users", Permission.USERS_READ),
+    RouteRule("users", "GET", "/api/roles", Permission.USERS_READ),
+    RouteRule("users", "PUT", "/api/users/{handle}/role", Permission.USERS_WRITE),
+    RouteRule("users", "GET", "/api/tokens", Permission.TOKENS_READ),
+    RouteRule("users", "POST", "/api/tokens", Permission.TOKENS_WRITE),
+    RouteRule("users", "POST", "/api/tokens/{token_id}/revoke", Permission.TOKENS_WRITE),
+    RouteRule("users", "GET", "/api/auth/me/tokens", Permission.PROFILE_SELF),
+    RouteRule("users", "POST", "/api/auth/me/tokens", Permission.PROFILE_SELF),
+    RouteRule(
+        "users",
+        "POST",
+        "/api/auth/me/tokens/{token_id}/revoke",
+        Permission.PROFILE_SELF,
+    ),
 )
 MODULES: tuple[str, ...] = (
     "audit",
@@ -206,6 +223,7 @@ MODULES: tuple[str, ...] = (
     "runs",
     "search",
     "workflows",
+    "users",
 )
 ROUTER_PACKAGE: str = "telescreen.api.routers."
 

@@ -21,7 +21,7 @@ from telescreen.core.json import (
     json_str,
 )
 from telescreen.core.permissions import ROLE_PERMISSIONS, SCOPE_PERMISSIONS, Permission, parse_role
-from telescreen.core.vocabulary import ApiScope, ErrorCode, Role, RoleChangeSource
+from telescreen.core.vocabulary import ApiScope, ErrorCode, PrincipalKind, Role, RoleChangeSource
 from telescreen.db.models import MemberRow
 from telescreen.directory.roles import RoleService, UserView
 from telescreen.directory.tokens import CreatedToken, TokenService, TokenView
@@ -242,6 +242,82 @@ def build_users_router(deps: UsersRouterDeps) -> APIRouter:
         """Revoke an API token without returning any credential data."""
         async with deps.ctx.sessions.begin() as session:
             await deps.tokens.revoke(session, token_id, principal.actor_ref())
+        return Response(status_code=204)
+
+    @router.get("/api/auth/me/tokens")
+    async def list_self_tokens(
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.PROFILE_SELF))
+        ],
+    ) -> Response:
+        """List only token metadata belonging to the authenticated member."""
+        if principal.member_id is None:
+            raise TelescreenError(ErrorCode.FORBIDDEN, "member principal required")
+        async with deps.ctx.sessions() as session:
+            tokens: tuple[TokenView, ...] = await deps.tokens.list_for_member(
+                session, principal.member_id
+            )
+        return Response(
+            content=dump_json(
+                json_object(
+                    (
+                        ("items", json_array(tuple(_token_json(token) for token in tokens))),
+                        ("next_cursor", json_null()),
+                    )
+                )
+            ),
+            media_type="application/json",
+        )
+
+    @router.post("/api/auth/me/tokens", status_code=201)
+    async def create_self_token(
+        body: TokenCreateBody,
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.PROFILE_SELF))
+        ],
+    ) -> JSONResponse:
+        """Create a role-limited token bound to the authenticated member."""
+        if principal.member_id is None or principal.role is None:
+            raise TelescreenError(ErrorCode.FORBIDDEN, "member principal required")
+        if not body.scopes:
+            raise TelescreenError(ErrorCode.VALIDATION_ERROR, "at least one scope is required")
+        scopes: set[ApiScope] = set()
+        try:
+            scopes.update(ApiScope(scope) for scope in body.scopes)
+        except ValueError:
+            raise TelescreenError(ErrorCode.VALIDATION_ERROR, "unknown API scope") from None
+        if len(scopes) != len(body.scopes):
+            raise TelescreenError(ErrorCode.VALIDATION_ERROR, "duplicate API scope")
+        caller_token_id: str | None = None
+        if principal.kind is PrincipalKind.TOKEN:
+            if principal.token_id is None:
+                raise TelescreenError(ErrorCode.FORBIDDEN, "active caller token required")
+            caller_token_id = principal.token_id
+        async with deps.ctx.sessions.begin() as session:
+            created: CreatedToken = await deps.tokens.create_for_member(
+                session,
+                principal.member_id,
+                principal.role,
+                body.label,
+                frozenset(scopes),
+                caller_token_id,
+            )
+        return JSONResponse(
+            status_code=201, content={"id": created.token_id, "token": created.token}
+        )
+
+    @router.post("/api/auth/me/tokens/{token_id}/revoke", status_code=204)
+    async def revoke_self_token(
+        token_id: str,
+        principal: Annotated[
+            Principal, Depends(require_permission(deps.ctx, Permission.PROFILE_SELF))
+        ],
+    ) -> Response:
+        """Revoke one of the authenticated member's own tokens."""
+        if principal.member_id is None:
+            raise TelescreenError(ErrorCode.FORBIDDEN, "member principal required")
+        async with deps.ctx.sessions.begin() as session:
+            await deps.tokens.revoke_for_member(session, principal.member_id, token_id)
         return Response(status_code=204)
 
     return router

@@ -40,6 +40,7 @@ const issue = {
   exposure_changed_at: null,
   asset_tier: "high",
   assignee_ref: null,
+  assignee: null,
   owner: { present: false, member_ref: null },
   active_exception: null,
   times_seen: 4,
@@ -76,6 +77,12 @@ const event = (id: string, observedAt: string) => ({
 });
 const events = [event("event-new", eventAt(1)), event("event-old", eventAt(2))];
 let issueStatus = "resolved";
+let commentPosted = false;
+let activityReads = 0;
+let mergedInto: Readonly<{ id: string; short_id: string }> | null = null;
+let mergedChildren: readonly Readonly<{ id: string; short_id: string; source: string; display_locator: string; status: string }>[] = [];
+let assignedPerson: Readonly<{ kind: "member"; ref: string; display_name: string }> | null = null;
+let canEditComment = true;
 const history = [
   {
     id: "history-1",
@@ -93,9 +100,31 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   issueStatus = "resolved";
+  commentPosted = false;
+  activityReads = 0;
+  mergedInto = null;
+  mergedChildren = [];
+  assignedPerson = null;
+  canEditComment = true;
 });
 
 function response(url: string, method = "GET"): Response {
+  const selected = /\/api\/issues\/issue-1\/events\/([^/?]+)$/.exec(url);
+  if (selected !== null) {
+    const selector = decodeURIComponent(selected[1]!);
+    const index = selector === "oldest" ? 1 : selector === "latest" || selector === "recommended" ? 0 : events.findIndex((item) => item.id === selector);
+    const eventValue = events[index] ?? events[0]!;
+    return new Response(JSON.stringify({ event: eventValue, previous_id: index === 0 ? events[1]!.id : null, next_id: index === 1 ? events[0]!.id : null, position: index === 1 ? 1 : 2, total: 120 }), { status: 200 });
+  }
+  if (url.includes("/api/issues/issue-1/stats")) return new Response(JSON.stringify({ buckets: [{ start: "2026-10-01T00:00:00Z", count: 12 }, { start: "2026-10-02T00:00:00Z", count: 8 }] }), { status: 200 });
+  if (url.includes("/api/issues/issue-1/tags")) return new Response(JSON.stringify({ items: [{ key: "detector", value: "rule", count: 83 }, { key: "source", value: "github", count: 17 }], total: 200 }), { status: 200 });
+  if (url.includes("/api/issues/issue-1/activity")) {
+    activityReads += 1;
+    const items = commentPosted ? [{ id: "activity-comment", kind: "commented", actor: { kind: "member", ref: "member:alice", display_name: "Alice Example" }, body: "Remediation reviewed", at: "2026-10-08T00:00:00Z", comment: { id: "comment-1", body: "Remediation reviewed", edited_at: null, deleted: false, can_edit: canEditComment } }] : [];
+    return new Response(JSON.stringify({ items }), { status: 200 });
+  }
+  if (url.includes("/api/issues/issue-1/external-issues")) return new Response(JSON.stringify({ items: [] }), { status: 200 });
+  if (url.includes("/api/external-issues/github/repos")) return new Response(JSON.stringify({ items: [] }), { status: 200 });
   if (url.includes("/api/issues/issue-1/events"))
     return new Response(JSON.stringify({ items: events, next_cursor: null }), {
       status: 200,
@@ -119,10 +148,22 @@ function response(url: string, method = "GET"): Response {
     url.includes("/api/teams") ||
     url.includes("/api/workflows")
   )
-    return new Response(JSON.stringify({ items: [] }), { status: 200 });
-  if (url.includes("/api/issues/issue-1/comments") && method === "POST")
+    return new Response(JSON.stringify({ items: url.includes("/api/members") ? [{ id: "member-1", handle: "alice", display_name: "Alice Example", email: null, slack_user_id: null, active: true }] : [] }), { status: 200 });
+  if (url.endsWith("/api/issues/issue-1/archive") && method === "POST") {
+    issueStatus = "archived";
+    return new Response(JSON.stringify({ ...issue, status: issueStatus }), { status: 200 });
+  }
+  if (url.endsWith("/api/issues/issue-1/unarchive") && method === "POST") {
+    issueStatus = "unresolved";
+    return new Response(JSON.stringify({ ...issue, status: issueStatus }), { status: 200 });
+  }
+  if (url.includes("/api/issues/issue-1/comments") && method === "POST") {
+    commentPosted = true;
     return new Response(JSON.stringify({ accepted: true }), { status: 200 });
-  return new Response(JSON.stringify({ ...issue, status: issueStatus }), { status: 200 });
+  }
+  if (url.includes("/api/issues/issue-1/comments/comment-1") && method === "PATCH") return new Response(JSON.stringify({ id: "comment-1" }), { status: 200 });
+  if (url.includes("/api/issues/issue-1/comments/comment-1") && method === "DELETE") return new Response(null, { status: 204 });
+  return new Response(JSON.stringify({ ...issue, status: issueStatus, assignee: assignedPerson, merged_into: mergedInto, merged_children: mergedChildren, subscription: { subscribed: false, reason: null }, suggested_assignees: [] }), { status: 200 });
 }
 
 function renderDetail(): void {
@@ -141,6 +182,54 @@ function renderDetail(): void {
 }
 
 describe("IssueDetail", () => {
+  it("archives for 24h with the server duration_minutes contract", async () => {
+    issueStatus = "unresolved";
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+      response(String(input), init?.method),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    renderDetail();
+    await screen.findByRole("heading", { name: "Credential finding" });
+    fireEvent.click(screen.getByText("Archive"));
+    fireEvent.click(screen.getByRole("button", { name: "For 24h" }));
+
+    let archiveCall: (typeof fetchMock.mock.calls)[number] | undefined;
+    await waitFor(() => {
+      archiveCall = fetchMock.mock.calls.find(
+        ([input, init]) =>
+          String(input).endsWith("/api/issues/issue-1/archive") &&
+          init?.method === "POST",
+      );
+      expect(archiveCall).toBeDefined();
+    });
+    const body: Readonly<Record<string, unknown>> = JSON.parse(
+      String(archiveCall?.[1]?.body),
+    );
+    expect(body.kind).toBe("for_duration");
+    expect(body.duration_minutes).toBe(1440);
+    expect(body).not.toHaveProperty("duration_days");
+  });
+
+  it("shows Unarchive for an archived issue and sends POST /unarchive", async () => {
+    issueStatus = "archived";
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+      response(String(input), init?.method),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    renderDetail();
+    await screen.findByRole("heading", { name: "Credential finding" });
+    fireEvent.click(screen.getByRole("button", { name: "Unarchive" }));
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([input, init]) =>
+            String(input).endsWith("/api/issues/issue-1/unarchive") &&
+            init?.method === "POST",
+        ),
+      ).toBe(true),
+    );
+  });
+
   it("shows only allowed resolved transitions and PATCHes a reopen", async () => {
     const fetchMock = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) =>
@@ -167,7 +256,7 @@ describe("IssueDetail", () => {
     );
   });
 
-  it("renders the loaded two-day graph, history transition, and masked snippet", async () => {
+  it("renders endpoint stats and tag percentages, history transition, and masked snippet", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
@@ -177,14 +266,51 @@ describe("IssueDetail", () => {
     renderDetail();
     await screen.findByRole("heading", { name: "Credential finding" });
     const graph = screen.getByRole("img", {
-      name: "Loaded findings, last 14 days",
+      name: "Findings over selected period",
     });
     const nonzeroBars = [
       ...graph.querySelectorAll('rect[fill="var(--chart-matching)"]'),
     ].filter((bar) => Number(bar.getAttribute("height")) > 0);
     expect(nonzeroBars.length).toBe(2);
+    expect(screen.getByText("detector: rule · 41.5%")).toBeTruthy();
     expect(screen.getByText("in_progress → resolved")).toBeTruthy();
     expect(screen.getByText("***[4]").className).toContain("redacted-mask");
+  });
+
+  it("renders /stats and /tags in the server contract shape", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/api/issues/issue-1/stats")) {
+        return new Response(JSON.stringify({
+          items: [
+            { at: "2026-10-01T00:00:00+00:00", count: 12 },
+            { at: "2026-10-02T00:00:00+00:00", count: 8 },
+          ],
+          total: 20,
+        }), { status: 200 });
+      }
+      if (url.includes("/api/issues/issue-1/tags")) {
+        return new Response(JSON.stringify({
+          total: 200,
+          tags: [{
+            key: "detector",
+            values: [{ value: "rule", count: 83, percent: 41.5 }],
+            other_count: 0,
+          }],
+        }), { status: 200 });
+      }
+      return response(url, init?.method);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderDetail();
+
+    expect(
+      await screen.findByRole("heading", { name: "Credential finding" }),
+    ).toBeTruthy();
+    expect(screen.getByText("detector: rule · 41.5%")).toBeTruthy();
+    expect(fetchMock.mock.calls.some(([input]) =>
+      String(input).includes("/api/issues/issue-1/stats"),
+    )).toBe(true);
   });
 
   it("shows evidence rejection rule classes from the contract-shaped 422", async () => {
@@ -266,7 +392,7 @@ describe("IssueDetail", () => {
     }
   });
 
-  it("posts a comment and appends it to activity", async () => {
+  it("posts a comment then refetches activity with the actor", async () => {
     const fetchMock = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) =>
         response(String(input), init?.method),
@@ -279,12 +405,90 @@ describe("IssueDetail", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Add a comment" }));
     expect(await screen.findByText("Remediation reviewed")).toBeTruthy();
+    expect(screen.getAllByText("Remediation reviewed").length).toBe(1);
+    expect(screen.getAllByText("Alice Example").length).toBeGreaterThan(1);
+    expect(activityReads).toBeGreaterThan(1);
     expect(
       fetchMock.mock.calls.some(
         ([input, init]) =>
           String(input).endsWith("/comments") && init?.method === "POST",
       ),
     ).toBe(true);
+  });
+
+  it("uses selector endpoint ids for Oldest and Previous and shows group position", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => response(String(input), init?.method));
+    vi.stubGlobal("fetch", fetchMock);
+    renderDetail();
+    await screen.findByRole("heading", { name: "Credential finding" });
+    expect(screen.getByText("2 of 120")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Previous" }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/events/event-old"))).toBe(true));
+    fireEvent.click(screen.getByRole("button", { name: "Oldest" }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/events/oldest"))).toBe(true));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/events/event-new"))).toBe(true));
+  });
+
+  it("renders a display-name assignee and an exactly named More button", async () => {
+    assignedPerson = { kind: "member", ref: "member:alice", display_name: "Alice Example" };
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => response(String(input), init?.method)));
+    renderDetail();
+    await screen.findByRole("heading", { name: "Credential finding" });
+    expect(screen.getByLabelText("Alice Example")).toBeTruthy();
+    expect(screen.getAllByText("Alice Example").length).toBeGreaterThan(1);
+    expect(screen.getByRole("button", { name: /^More$/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /^More$/ }));
+    expect(screen.getByRole("menuitem", { name: "Copy permalink" })).toBeTruthy();
+  });
+
+  it("shows merged child navigation and unmerge actions", async () => {
+    mergedInto = { id: "issue-primary", short_id: "T-9" };
+    mergedChildren = [{ id: "issue-child", short_id: "T-10", source: "github", display_locator: "repo/child", status: "unresolved" }];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => response(String(input), init?.method)));
+    renderDetail();
+    await screen.findByRole("heading", { name: "Credential finding" });
+    expect(screen.getByRole("link", { name: "T-9" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Unmerge all" })).toBeTruthy();
+  });
+
+  it("shows comment edit/delete only when allowed and suggests @ mentions", async () => {
+    commentPosted = true;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => response(String(input), init?.method)));
+    renderDetail();
+    await screen.findByRole("heading", { name: "Credential finding" });
+    expect(await screen.findByRole("button", { name: "Edit" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeTruthy();
+    fireEvent.input(screen.getByLabelText("Add a comment"), { target: { value: "@al" } });
+    expect(await screen.findByRole("option", { name: /@alice/ })).toBeTruthy();
+  });
+
+  it("hides comment edit/delete when the activity item is not editable", async () => {
+    commentPosted = true;
+    canEditComment = false;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => response(String(input), init?.method)));
+    renderDetail();
+    await screen.findByRole("heading", { name: "Credential finding" });
+    expect(await screen.findByText("Remediation reviewed")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+  });
+
+  it("submits an external link and keeps GitHub create disabled without repositories", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => response(String(input), init?.method));
+    vi.stubGlobal("fetch", fetchMock);
+    renderDetail();
+    await screen.findByRole("heading", { name: "Credential finding" });
+    fireEvent.click(screen.getByRole("button", { name: /^More$/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Link external issue" }));
+    fireEvent.input(screen.getByLabelText("External issue URL"), { target: { value: "https://github.example.test/org/repo/issues/9" } });
+    fireEvent.input(screen.getByLabelText("External issue title"), { target: { value: "Tracking issue" } });
+    const submitLink = screen.getByRole("button", { name: "Submit" }) as HTMLButtonElement;
+    expect(submitLink.disabled).toBe(false);
+    fireEvent.submit(screen.getByRole("dialog"));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input, init]) => String(input).endsWith("/external-issues") && init?.method === "POST" && JSON.parse(String(init.body)).title === "Tracking issue")).toBe(true));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Create GitHub issue" }));
+    expect((screen.getByRole("button", { name: "Submit" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("requires an exception reason and posts its duration", async () => {

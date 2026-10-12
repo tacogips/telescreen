@@ -13,7 +13,7 @@ export function SecondaryPanel(props: Readonly<{ area: AreaKey; collapsed: boole
   const location = useLocation();
   const auth = useAuth();
   const panelEntries = () => props.area === "settings"
-    ? [{ label: "General", href: "/settings" }, { label: "Notification templates", href: "/settings/templates" }, ...(auth.can("users.read") ? [{ label: "Users and roles", href: "/settings/users" }] : [])]
+    ? [{ label: "General", href: "/settings" }, { label: "Notification templates", href: "/settings/templates" }, ...(auth.can("users.read") ? [{ label: "Users and roles", href: "/settings/users" }] : []), ...(auth.can("profile.self") ? [{ label: "Profile", href: "/settings/profile" }] : []), ...(auth.can("integrations.read") ? [{ label: "Integrations", href: "/settings/integrations" }] : []), ...(auth.can("tokens.read") ? [{ label: "Tokens", href: "/settings/tokens" }] : []), ...(auth.can("ownership.read") ? [{ label: "Ownership rules", href: "/settings/ownership" }] : [])]
     : entriesFor(props.area);
   const title = (): string => AREAS.find((area) => area.key === props.area)?.label ?? "Issues";
   const resize = (event: PointerEvent): void => { const next = Math.min(450, Math.max(150, event.clientX - 74)); setWidth(next); writeStorage("telescreen.panelWidth", String(next)); };

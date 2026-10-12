@@ -123,7 +123,7 @@ export function IssueList(): JSX.Element {
   };
   const runBulk = async (action: string, params?: BulkParams): Promise<void> => {
     try {
-      const result = allMatching() ? await issuesApi.bulk({ query: query(), period: period(), action, params }) : await issuesApi.bulk({ ids: selectedIssues().map((issue) => issue.id), action, params });
+      const result = allMatching() ? await issuesApi.bulk({ query: query(), period: period(), ...(period() === "custom" && start() ? { start: start() } : {}), ...(period() === "custom" && end() ? { end: end() } : {}), action, params }) : await issuesApi.bulk({ ids: selectedIssues().map((issue) => issue.id), action, params });
       showBulkResult(result); setSelected(new Set<string>()); setAllMatching(false); refresh();
     } catch (caught) { showToast(errorValue(caught).code, "warning"); }
   };
@@ -208,7 +208,7 @@ export function IssueList(): JSX.Element {
     void runSelected("Started workflow", (issue) => workflowsApi.startRun(name, issue.id));
   };
   const remediate = (): void => {
-    if (allMatching()) { showToast("Remediation requires a finite selected set", "warning"); return; }
+    if (allMatching()) { void runBulk("request_verification", { verification: { action: "remove", include_linked: false } }); return; }
     void runSelected("Marked remediated", (issue) => issuesApi.remediation(issue.id, { action: "remove", include_linked: false }));
   };
   const currentIssue = (): Issue[] => allMatching() ? allIssues() : selectedIssues();

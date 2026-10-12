@@ -1,5 +1,7 @@
 import type {
   Evidence,
+  ActivityItem,
+  ExternalIssueLink,
   IssueDetail,
   IssueEvent,
   IssueHistory,
@@ -10,6 +12,19 @@ import type {
   Team,
   WorkflowVersionRef,
 } from "../../../api/types";
+
+export type DetailStatsBucket = Readonly<{ start: string; count: number }>;
+export type DetailStats = Readonly<{ buckets: readonly DetailStatsBucket[] }>;
+export type DetailTagItem = Readonly<{
+  key: string;
+  value: string;
+  count: number;
+  percent: number;
+}>;
+export type DetailTags = Readonly<{
+  total: number;
+  items: readonly DetailTagItem[];
+}>;
 
 export type DetailData = Readonly<{
   issue: IssueDetail;
@@ -22,6 +37,25 @@ export type DetailData = Readonly<{
   teams: Team[];
   workflows: WorkflowVersionRef[];
   activeRun: RunDetail | null;
+  selection: Readonly<{ event: IssueEvent; previous_id: string | null; next_id: string | null; position: number; total: number }> | null;
+  stats: DetailStats;
+  tags: DetailTags;
+  activity: readonly DetailActivity[];
+  externalIssues: readonly ExternalIssueLink[];
+  githubRepos: readonly string[];
+  subscription: Readonly<{ subscribed: boolean; reason: string | null }>;
+  mergedInto: Readonly<{ id: string; short_id: string }> | null;
+  mergedChildren: readonly Readonly<{ id: string; short_id: string; source: string; display_locator: string; status: string }>[];
+  suggestions: readonly Readonly<{ ref: string; display_name: string; reason: string }>[];
+}>;
+
+export type DetailActivity = Readonly<{
+  id: string;
+  kind: string;
+  actor: ActivityItem["actor"];
+  body: string | null;
+  at: string;
+  comment: Readonly<{ id: string; body: string; edited_at: string | null; deleted: boolean; can_edit: boolean }> | null;
 }>;
 
 const HISTORY_LABELS: Readonly<Record<string, string>> = {
