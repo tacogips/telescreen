@@ -287,7 +287,9 @@ Alembic revisions remain the runtime mechanism, and
 `tests/db/test_diagra_schema.py` requires that the models match the document
 exactly (types, nullability, defaults, primary keys, identity columns, unique
 keys, index names) and that the SQLite export builds the same structure as
-`alembic upgrade head`. Triggers and seed rows are outside Diagra's ERD model
+`alembic upgrade head`. Table-to-table references are drawn field to field as
+Diagra logical relations (dashed, no database constraint); the test checks
+that each joins same-typed columns to a primary or unique key. Triggers and seed rows are outside Diagra's ERD model
 and stay in Alembic code. The change workflow is in `db/schema/README.md`.
 
 ## References

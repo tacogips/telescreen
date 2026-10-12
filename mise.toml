@@ -107,6 +107,14 @@ command -v "$cli" >/dev/null 2>&1 || { echo "diagra-cli not found: brew install 
 "$cli" ddl db/schema/telescreen.diagra.jsonl --dialect sqlite --strict --output db/schema/telescreen.sqlite.sql
 """
 
+[tasks.ddl-arrange]
+description = "Tidy the Diagra schema layout (the app's Arrange > Tidy layout) with diagra-cli"
+run = """
+cli="${DIAGRA_CLI:-diagra-cli}"
+command -v "$cli" >/dev/null 2>&1 || { echo "diagra-cli not found: brew install --cask tacogips/tap/diagra (or set DIAGRA_CLI)" >&2; exit 2; }
+"$cli" arrange db/schema/telescreen.diagra.jsonl --write
+"""
+
 [tasks.ddl-check]
 description = "Check the Diagra schema document is canonical, its SQL exports are current and the models match it"
 run = """

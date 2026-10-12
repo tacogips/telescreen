@@ -28,7 +28,10 @@ brew install --cask tacogips/tap/diagra
 
 1. `mise run ddl-edit` opens the document in Diagra. Add or change tables,
    columns, types, nullability, defaults, unique keys and indexes there, and
-   save. Diagra's inspector shows the resulting DDL under Database DDL.
+   draw a relation for every new reference column (see below). Arrange >
+   Tidy layout (Cmd/Ctrl+Option+L) re-flows the tables and frames without
+   overlaps; `mise run ddl-arrange` does the same headlessly. Save.
+   Diagra's inspector shows the resulting DDL under Database DDL.
 2. `mise run ddl-export` canonicalizes the document and regenerates both
    `.sql` exports. Review the SQL diff.
 3. Update the SQLAlchemy models to match and add an Alembic revision that
@@ -47,9 +50,16 @@ Conventions in the document:
   leave the name empty for unnamed SQLAlchemy `unique=True` columns and set it
   for named `UniqueConstraint`s.
 - Defaults are SQL literals (`0`, `'medium'`, `false`).
-- Tables are grouped into frames by model module. Telescreen uses no foreign
-  keys; a relation drawn in Diagra becomes a foreign key in the exports and in
-  the drift check.
+- Tables are grouped into frames by model module.
+- References are drawn field to field. Telescreen enforces no foreign keys,
+  so every relation is a *logical reference* (inspector: Constraint > Logical
+  reference): drawn dashed from the referencing column to the referenced key,
+  with no constraint in the DDL exports. The drift check requires matching
+  column types and a primary or unique key on the referenced side. Polymorphic
+  columns (`engine_tasks.ref_id`, `audit_records.target_id`) and textual actor
+  references (`*_ref`) have no single target table and are not drawn. An
+  enforced relation (logical unchecked) would become a real foreign key in the
+  exports and must then exist in the models.
 
 Not expressible in Diagra and therefore kept in Alembic code: the PostgreSQL
 `audit_records` append-only trigger and the seed rows (`counters`,

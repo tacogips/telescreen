@@ -123,13 +123,20 @@ class DiagraEndpoint:
 
 @pydantic.dataclasses.dataclass
 class DiagraRelation:
-    """The semantic payload of an ``erd.relation`` element (a foreign key)."""
+    """The semantic payload of an ``erd.relation`` element.
+
+    An enforced relation is a foreign key. A ``logical`` relation documents a
+    join path the database does not enforce; Diagra draws it dashed and its
+    DDL export emits no constraint for it.
+    """
 
     to: DiagraEndpoint
     cardinality: str
     from_: DiagraEndpoint = Field(alias="from")
     on_delete: str | None = Field(default=None, alias="onDelete")
     on_update: str | None = Field(default=None, alias="onUpdate")
+    logical: bool = False
+    label: str | None = None
 
 
 @pydantic.dataclasses.dataclass
@@ -423,7 +430,7 @@ def diagra_schema(document: DiagraDocument, page_id: str = SCHEMA_PAGE_ID) -> Sc
     foreign_keys: list[tuple[str, ForeignKeySpec]] = [
         _relation_foreign_key(relation.semantic, tables)
         for relation in document.relations
-        if relation.page == page_id
+        if relation.page == page_id and not relation.semantic.logical
     ]
     specs: list[TableSpec] = [_diagra_table(element, foreign_keys) for element in tables]
     return SchemaSpec(tables=tuple(sorted(specs, key=lambda table: table.name)))
@@ -508,3 +515,69 @@ def schema_differences(designed: SchemaSpec, implemented: SchemaSpec) -> list[st
                     f"  only in models: {only_model}"
                 )
     return differences
+
+
+def _key_of(table: DiagraTable, column_ids: list[str]) -> bool:
+    primary: list[str] = [column.id for column in table.columns if column.pk]
+    if sorted(primary) == sorted(column_ids):
+        return True
+    return any(
+        index.unique and sorted(index.columns) == sorted(column_ids) for index in table.indexes
+    )
+
+
+def _table_by_id(tables: list[DiagraTableElement], element_id: str) -> DiagraTable | None:
+    for element in tables:
+        if element.id == element_id:
+            return element.semantic
+    return None
+
+
+def logical_reference_problems(
+    document: DiagraDocument, page_id: str = SCHEMA_PAGE_ID
+) -> list[str]:
+    """Check every logical relation joins existing, type-compatible columns to a key."""
+    tables: list[DiagraTableElement] = [t for t in document.tables if t.page == page_id]
+    problems: list[str] = []
+    for relation in document.relations:
+        semantic: DiagraRelation = relation.semantic
+        if relation.page != page_id or not semantic.logical:
+            continue
+        # *:1 points from the referencing table to the referenced one;
+        # 1:* and 1:1 name the referenced table first.
+        local_end: DiagraEndpoint = semantic.from_ if semantic.cardinality == "*:1" else semantic.to
+        remote_end: DiagraEndpoint = (
+            semantic.to if semantic.cardinality == "*:1" else semantic.from_
+        )
+        local: DiagraTable | None = _table_by_id(tables, local_end.table)
+        remote: DiagraTable | None = _table_by_id(tables, remote_end.table)
+        if local is None or remote is None:
+            problems.append(f"{relation.id}: endpoint table is missing from the schema page")
+            continue
+        local_ids: list[str] = local_end.column_ids()
+        remote_ids: list[str] = remote_end.column_ids()
+        if not local_ids or len(local_ids) != len(remote_ids):
+            problems.append(f"{relation.id}: endpoints must name the same number of columns")
+            continue
+        local_columns: list[DiagraColumn] = [
+            c for i in local_ids for c in local.columns if c.id == i
+        ]
+        remote_columns: list[DiagraColumn] = [
+            c for i in remote_ids for c in remote.columns if c.id == i
+        ]
+        if len(local_columns) != len(local_ids) or len(remote_columns) != len(remote_ids):
+            problems.append(f"{relation.id}: endpoint column is missing")
+            continue
+        for referencing, referenced in zip(local_columns, remote_columns, strict=True):
+            if referencing.data_type != referenced.data_type:
+                problems.append(
+                    f"{relation.id}: {local.table_name}.{referencing.name} "
+                    f"({referencing.data_type}) does not match {remote.table_name}."
+                    f"{referenced.name} ({referenced.data_type})"
+                )
+        if not _key_of(remote, remote_ids):
+            problems.append(
+                f"{relation.id}: {remote.table_name}"
+                f"({', '.join(c.name for c in remote_columns)}) is not a primary or unique key"
+            )
+    return problems

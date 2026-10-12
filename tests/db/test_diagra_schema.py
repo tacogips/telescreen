@@ -25,9 +25,11 @@ from tests.db.diagra_schema import (
     REPOSITORY_ROOT,
     SQLITE_DDL,
     DiagraDocument,
+    DiagraTableElement,
     SchemaSpec,
     diagra_schema,
     load_diagra_document,
+    logical_reference_problems,
     model_schema,
     schema_differences,
 )
@@ -110,6 +112,26 @@ def test_diagra_document_matches_sqlalchemy_models() -> None:
         "schema in the Diagra app first, then update the models and add an Alembic "
         "migration:\n" + "\n".join(differences)
     )
+
+
+def test_logical_references_join_compatible_keys() -> None:
+    """Every drawn reference joins same-typed columns to a primary or unique key."""
+    document: DiagraDocument = load_diagra_document()
+    assert document.relations, "the schema documents its references as relations"
+    assert all(relation.semantic.logical for relation in document.relations), (
+        "Telescreen enforces no foreign keys; draw references as logical relations"
+    )
+    problems: list[str] = logical_reference_problems(document)
+    assert not problems, "\n".join(problems)
+
+
+def test_logical_reference_check_reports_a_type_mismatch() -> None:
+    """A reference between columns of different types is reported."""
+    document: DiagraDocument = load_diagra_document()
+    issues: DiagraTableElement = next(t for t in document.tables if t.id == "t-issues")
+    issues.semantic.columns[0].data_type = "integer"
+    problems: list[str] = logical_reference_problems(document)
+    assert any("does not match issues.id (integer)" in problem for problem in problems)
 
 
 def test_schema_document_has_one_erd_page() -> None:
