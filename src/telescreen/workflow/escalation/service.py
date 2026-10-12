@@ -19,7 +19,7 @@ from telescreen.ports.audit import AuditEntry, AuditLog
 from telescreen.workflow.dsl.escalation import (
     EscalationPolicySpec,
     escalation_to_json,
-    load_escalation_policy,
+    load_new_escalation_policy,
 )
 from telescreen.workflow.dsl.raw_scan import source_has_raw_values
 
@@ -41,7 +41,7 @@ class EscalationPolicyService:
     ) -> EscalationPolicyRow:
         """Create a policy after validating its source document."""
         self._reject_sensitive_text(text)
-        spec: EscalationPolicySpec = load_escalation_policy(text, source_format)
+        spec: EscalationPolicySpec = load_new_escalation_policy(text, source_format)
         row: EscalationPolicyRow = EscalationPolicyRow(
             id=new_id(),
             name=spec.name,
@@ -64,7 +64,7 @@ class EscalationPolicyService:
     ) -> EscalationPolicyRow:
         """Replace the tiers of an existing policy."""
         self._reject_sensitive_text(text)
-        spec: EscalationPolicySpec = load_escalation_policy(text, source_format)
+        spec: EscalationPolicySpec = load_new_escalation_policy(text, source_format)
         row: EscalationPolicyRow | None = await session.scalar(
             select(EscalationPolicyRow).where(EscalationPolicyRow.name == name)
         )

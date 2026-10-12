@@ -15,11 +15,13 @@ from telescreen.workflow.dsl.escalation import (
     escalation_from_json,
     escalation_to_json,
     load_escalation_policy,
+    load_new_escalation_policy,
 )
 from telescreen.workflow.dsl.loader import (
     WorkflowValidationError,
     compiled_from_json,
     compiled_to_json,
+    load_new_workflow,
     load_workflow,
 )
 from telescreen.workflow.dsl.model import (
@@ -146,18 +148,6 @@ steps:
         (
             "slack_channel:C0123ABCDE",
             "slack_channel:general",
-            "invalid_recipient",
-            "/notification_sets/0/targets/0/recipients/1",
-        ),
-        (
-            "slack_channel:C0123ABCDE",
-            "slack_channel:U0123ABCDE",
-            "invalid_recipient",
-            "/notification_sets/0/targets/0/recipients/1",
-        ),
-        (
-            "slack_channel:C0123ABCDE",
-            "slack_channel:D0123ABCDE",
             "invalid_recipient",
             "/notification_sets/0/targets/0/recipients/1",
         ),
@@ -326,11 +316,6 @@ tiers:
             "/tiers/0/targets/0/recipients/0",
         ),
         ("    notification_set: Bad Set\n", "invalid_value", "/tiers/0/notification_set"),
-        (
-            "    notify: [slack_channel:U0123ABCDE]\n    channels: [slack]\n",
-            "invalid_value",
-            "/tiers/0/notify/0",
-        ),
     ],
 )
 def test_invalid_tiers_report_codes(tier: str, code: str, path: str) -> None:
@@ -339,3 +324,39 @@ def test_invalid_tiers_report_codes(tier: str, code: str, path: str) -> None:
     with pytest.raises(WorkflowValidationError) as caught:
         load_escalation_policy(source, SourceFormat.YAML)
     assert _has(caught.value.issues, code, path), caught.value.issues
+
+
+@pytest.mark.parametrize("personal", ["U0123ABCDE", "W0123ABCDE", "D0123ABCDE"])
+def test_new_workflows_reject_user_and_dm_ids_but_stored_ones_still_load(personal: str) -> None:
+    """slack_channel: must name a channel in new sources; stored definitions keep loading.
+
+    Stored definitions written before the channel-only rule must still list, activate and
+    run (the resolver refuses non-channel ids at send time); rejecting them on load broke
+    GET /api/workflows with HTTP 500.
+    """
+    source: str = V2_WORKFLOW.replace("slack_channel:C0123ABCDE", f"slack_channel:{personal}")
+    with pytest.raises(WorkflowValidationError) as caught:
+        load_new_workflow(source, SourceFormat.YAML)
+    assert _has(
+        caught.value.issues, "invalid_recipient", "/notification_sets/0/targets/0/recipients/1"
+    )
+    stored: CompiledWorkflow = load_workflow(source, SourceFormat.YAML)
+    assert compiled_from_json(compiled_to_json(stored)) == stored
+    assert load_new_workflow(V2_WORKFLOW, SourceFormat.YAML) == load_workflow(
+        V2_WORKFLOW, SourceFormat.YAML
+    )
+
+
+def test_new_escalation_policies_reject_user_ids_but_stored_ones_still_load() -> None:
+    """Escalation tiers follow the same channel-only rule for new sources only."""
+    source: str = (
+        "name: security\ntiers:\n  - after: PT5M\n    assign_to: team:on-call\n"
+        "    notify: [slack_channel:U0123ABCDE]\n    channels: [slack]\n"
+        "    targets: [{recipients: ['slack_channel:D0123ABCDE'], channels: [slack]}]\n"
+    )
+    with pytest.raises(WorkflowValidationError) as caught:
+        load_new_escalation_policy(source, SourceFormat.YAML)
+    assert _has(caught.value.issues, "invalid_value", "/tiers/0/notify/0")
+    assert _has(caught.value.issues, "invalid_recipient", "/tiers/0/targets/0/recipients/0")
+    stored: EscalationPolicySpec = load_escalation_policy(source, SourceFormat.YAML)
+    assert escalation_from_json(escalation_to_json(stored)) == stored

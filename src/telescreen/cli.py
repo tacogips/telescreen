@@ -24,7 +24,7 @@ from telescreen.masking.redact import Redactor
 from telescreen.ports.collectors import CollectorConfig
 from telescreen.search.reindex import ReindexCounts, reindex_all
 from telescreen.wiring import Container, build_container, close_container
-from telescreen.workflow.dsl.loader import WorkflowValidationError, load_workflow
+from telescreen.workflow.dsl.loader import WorkflowValidationError, load_new_workflow
 from telescreen.workflow.dsl.raw_scan import source_has_raw_values
 
 
@@ -112,7 +112,7 @@ def _validate_files(paths: Sequence[str], redactor: Redactor) -> int:
             SourceFormat.JSON if path.suffix.lower() == ".json" else SourceFormat.YAML
         )
         try:
-            load_workflow(source, source_format)
+            load_new_workflow(source, source_format)
         except WorkflowValidationError as error:
             for issue in error.issues:
                 print(f"{name}{issue.path} {issue.code}")

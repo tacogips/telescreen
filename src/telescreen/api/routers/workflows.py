@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from telescreen.api.common.auth import Principal, require_permission
 from telescreen.api.common.context import ApiContext
 from telescreen.core.clock import ensure_utc
+from telescreen.core.errors import TelescreenError
 from telescreen.core.json import parse_json
 from telescreen.core.permissions import Permission
 from telescreen.core.vocabulary import RunStatus, RunTrigger, SourceFormat
@@ -115,7 +116,13 @@ def build_workflows_router(deps: WorkflowsRouterDeps) -> APIRouter:
             rows: tuple[WorkflowDefinitionRow, ...] = tuple(await deps.service.list(session))
             items: list[_WorkflowListResponse] = []
             for row in rows:
-                workflow: CompiledWorkflow = compiled_from_json(parse_json(row.compiled_json))
+                # A stored row that no longer decodes must not fail the whole list.
+                try:
+                    workflow: CompiledWorkflow | None = compiled_from_json(
+                        parse_json(row.compiled_json)
+                    )
+                except TelescreenError:
+                    workflow = None
                 since: datetime = deps.ctx.clock.now() - timedelta(days=30)
                 running: int = await _run_count(session, row.name, since, RunStatus.RUNNING)
                 waiting: int = await _run_count(session, row.name, since, RunStatus.WAITING)
@@ -140,7 +147,7 @@ def build_workflows_router(deps: WorkflowsRouterDeps) -> APIRouter:
                         row.version,
                         row.active,
                         tuple(event.value for event in workflow.trigger.on)
-                        if workflow.trigger
+                        if workflow is not None and workflow.trigger
                         else (),
                         last_run_at,
                         _RunCounts(running, waiting, succeeded, failed, cancelled),

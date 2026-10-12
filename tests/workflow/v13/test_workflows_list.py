@@ -47,6 +47,20 @@ steps:
                     rig.clock.now() - timedelta(days=31),
                 )
             )
+            # A stored definition that no longer decodes must not break the whole list.
+            session.add(
+                WorkflowDefinitionRow(
+                    id="undecodable",
+                    name="legacy-undecodable",
+                    version=1,
+                    source_format=SourceFormat.YAML.value,
+                    source_text="legacy",
+                    compiled_json='{"apiVersion": "telescreen.workflow/v2"}',
+                    active=True,
+                    created_at=rig.clock.now(),
+                    created_by="member:test",
+                )
+            )
             session.add(
                 ApiTokenRow(
                     id="workflow-admin",
@@ -74,8 +88,13 @@ steps:
         assert response.status_code == 200
         document: JsonValue = parse_json(response.text)
         items: JsonValue | None = document.get("items")
-        assert items is not None and len(items.items) == 1
-        item: JsonValue = items.items[0]
+        assert items is not None and len(items.items) == 2
+        legacy: JsonValue = next(
+            entry for entry in items.items if _name(entry) == "legacy-undecodable"
+        )
+        legacy_triggers: JsonValue | None = legacy.get("trigger_events")
+        assert legacy_triggers is not None and legacy_triggers.items == ()
+        item: JsonValue = next(entry for entry in items.items if _name(entry) == "list-workflow")
         active: JsonValue | None = item.get("active")
         assert active is not None and active.as_bool() is True
         triggers: JsonValue | None = item.get("trigger_events")
@@ -111,3 +130,9 @@ def _run(
         started_at=started_at,
         finished_at=None,
     )
+
+
+def _name(entry: JsonValue) -> str | None:
+    """Return a list item's workflow name."""
+    value: JsonValue | None = entry.get("name")
+    return value.as_str() if value is not None else None

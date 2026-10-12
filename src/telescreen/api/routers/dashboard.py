@@ -78,6 +78,7 @@ def _dashboard_json(data: DashboardData) -> JsonValue:
                     )
                 ),
             ),
+            ("open_issues", json_int(data.open_issues)),
             ("open_by_exposure", _counts(data.open_by_exposure)),
             ("open_by_source", _counts(data.open_by_source)),
             ("archived_count", json_int(data.archived_count)),

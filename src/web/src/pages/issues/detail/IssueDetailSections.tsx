@@ -71,7 +71,7 @@ export function IssueDetailSections(
       props.detail.issue.rule_class,
     );
   return (
-    <main class="issue-detail-main">
+    <div class="issue-detail-main">
       <section class="finding-chart-block">
         <h3>Findings over time</h3>
         <PeriodPicker value={props.period as Period} onChange={(value) => props.onPeriod(value)} />
@@ -320,6 +320,6 @@ export function IssueDetailSections(
           </dd>
         </dl>
       </FoldSection>
-    </main>
+    </div>
   );
 }

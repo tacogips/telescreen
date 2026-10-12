@@ -83,6 +83,7 @@ let mergedInto: Readonly<{ id: string; short_id: string }> | null = null;
 let mergedChildren: readonly Readonly<{ id: string; short_id: string; source: string; display_locator: string; status: string }>[] = [];
 let assignedPerson: Readonly<{ kind: "member"; ref: string; display_name: string }> | null = null;
 let canEditComment = true;
+let exposureMissing = false;
 const history = [
   {
     id: "history-1",
@@ -106,6 +107,7 @@ afterEach(() => {
   mergedChildren = [];
   assignedPerson = null;
   canEditComment = true;
+  exposureMissing = false;
 });
 
 function response(url: string, method = "GET"): Response {
@@ -163,7 +165,7 @@ function response(url: string, method = "GET"): Response {
   }
   if (url.includes("/api/issues/issue-1/comments/comment-1") && method === "PATCH") return new Response(JSON.stringify({ id: "comment-1" }), { status: 200 });
   if (url.includes("/api/issues/issue-1/comments/comment-1") && method === "DELETE") return new Response(null, { status: 204 });
-  return new Response(JSON.stringify({ ...issue, status: issueStatus, assignee: assignedPerson, merged_into: mergedInto, merged_children: mergedChildren, subscription: { subscribed: false, reason: null }, suggested_assignees: [] }), { status: 200 });
+  return new Response(JSON.stringify({ ...issue, ...(exposureMissing ? { exposure: null } : {}), status: issueStatus, assignee: assignedPerson, merged_into: mergedInto, merged_children: mergedChildren, subscription: { subscribed: false, reason: null }, suggested_assignees: [] }), { status: 200 });
 }
 
 function renderDetail(): void {
@@ -275,6 +277,19 @@ describe("IssueDetail", () => {
     expect(screen.getByText("detector: rule · 41.5%")).toBeTruthy();
     expect(screen.getByText("in_progress → resolved")).toBeTruthy();
     expect(screen.getByText("***[4]").className).toContain("redacted-mask");
+  });
+
+  it("renders an issue whose source reported no exposure instead of crashing", async () => {
+    exposureMissing = true;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+        response(String(input), init?.method),
+      ),
+    );
+    renderDetail();
+    await screen.findByRole("heading", { name: "Credential finding" });
+    expect(screen.getByText("Exposure unknown: the source reported no sharing data.")).toBeTruthy();
   });
 
   it("renders /stats and /tags in the server contract shape", async () => {

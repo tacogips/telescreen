@@ -23,6 +23,7 @@ from telescreen.workflow.dsl.loader import (
     CompiledWorkflow,
     WorkflowValidationError,
     compiled_to_json,
+    load_new_workflow,
     load_workflow,
 )
 from telescreen.workflow.dsl.model import (
@@ -54,7 +55,7 @@ class WorkflowService:
         if source_has_raw_values(self.redactor, text):
             return [ValidationIssue("", "raw_value_detected")]
         try:
-            load_workflow(text, source_format)
+            load_new_workflow(text, source_format)
         except WorkflowValidationError as error:
             return list(error.issues)
         return []
@@ -69,7 +70,7 @@ class WorkflowService:
         """Validate and store a new inactive workflow version."""
         if source_has_raw_values(self.redactor, text):
             raise WorkflowValidationError((ValidationIssue("", "raw_value_detected"),))
-        workflow: CompiledWorkflow = load_workflow(text, source_format)
+        workflow: CompiledWorkflow = load_new_workflow(text, source_format)
         for step in workflow.steps:
             if isinstance(step, SubWorkflowStep):
                 target: WorkflowDefinitionRow | None = await self.repository.definition_by_name(

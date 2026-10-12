@@ -34,6 +34,7 @@ V2_ONLY_STEP_FIELDS: tuple[str, ...] = (
 
 _SET_NAME: re.Pattern[str] = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
 _TEMPLATE_NAME: re.Pattern[str] = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,63}$")
+_SLACK_ID: re.Pattern[str] = re.compile(r"^[CDGUW][A-Z0-9]{8,}$")
 _EMAIL_FORBIDDEN: re.Pattern[str] = re.compile(r"[\s,;<>\x00-\x1f\x7f]")
 _EMAIL_MAX_LENGTH: int = 254
 
@@ -154,7 +155,7 @@ def validate_recipient_for_channels(
         elif NotificationChannel.SLACK in channels:
             issues.append(ValidationIssue(path, "undeliverable_combination"))
         return
-    if kind == "slack_channel" and SLACK_CHANNEL_ID.fullmatch(value) is None:
+    if kind == "slack_channel" and _SLACK_ID.fullmatch(value) is None:
         issues.append(ValidationIssue(path, "invalid_recipient"))
         return
     if kind in ("slack_channel", "slack"):
@@ -294,3 +295,48 @@ def _valid_email(address: str) -> bool:
     local: str = address.split("@", 1)[0]
     domain: str = address.split("@", 1)[1]
     return bool(local) and bool(domain)
+
+
+def channel_only_issues(workflow: CompiledWorkflow) -> list[ValidationIssue]:
+    """Return ``slack_channel:`` recipients of a new definition that are not channel ids.
+
+    Only newly uploaded or validated sources are checked: stored definitions keep loading,
+    and the recipient resolver refuses user and DM ids when a notification is sent.
+    """
+    issues: list[ValidationIssue] = []
+    for index, notification_set in enumerate(workflow.notification_sets):
+        _channel_only_targets(
+            notification_set.targets, f"/notification_sets/{index}/targets", issues
+        )
+    for index, step in enumerate(workflow.steps):
+        path: str = f"/steps/{index}"
+        if isinstance(step, NotifyStep):
+            _channel_only_targets(step.targets, f"{path}/targets", issues)
+            for to_index, ref in enumerate(step.to):
+                _channel_only_ref(ref, f"{path}/to/{to_index}", issues)
+        if isinstance(step, (HumanTaskStep, EvidenceUploadStep)):
+            _channel_only_targets(step.notify_targets, f"{path}/notify_targets", issues)
+    return issues
+
+
+def channel_only_target_issues(
+    targets: tuple[NotificationTargetSpec, ...], path: str
+) -> list[ValidationIssue]:
+    """Return channel-only issues for inline targets, such as escalation tiers."""
+    issues: list[ValidationIssue] = []
+    _channel_only_targets(targets, path, issues)
+    return issues
+
+
+def _channel_only_targets(
+    targets: tuple[NotificationTargetSpec, ...], path: str, issues: list[ValidationIssue]
+) -> None:
+    for target_index, target in enumerate(targets):
+        for recipient_index, ref in enumerate(target.recipients):
+            _channel_only_ref(ref, f"{path}/{target_index}/recipients/{recipient_index}", issues)
+
+
+def _channel_only_ref(ref: str, path: str, issues: list[ValidationIssue]) -> None:
+    parts: tuple[str, str, str] = ref.partition(":")
+    if parts[0] == "slack_channel" and SLACK_CHANNEL_ID.fullmatch(parts[2]) is None:
+        issues.append(ValidationIssue(path, "invalid_recipient"))

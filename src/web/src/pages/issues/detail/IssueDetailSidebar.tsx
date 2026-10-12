@@ -71,12 +71,14 @@ export function IssueDetailSidebar(
       </section>
       <section>
         <h3>Exposure</h3>
-        <p><ExposureBadge visibility={props.detail.issue.exposure.visibility} externalPrincipalCount={props.detail.issue.exposure.external_principal_count} /></p>
-        <p>External principals: {props.detail.issue.exposure.external_principal_count}</p>
-        <p>Shared drive: {props.detail.issue.exposure.shared_drive ? "Yes" : "No"}</p>
-        <Show when={props.detail.issue.exposure.channel_kind}><p>Channel: {props.detail.issue.exposure.channel_kind}</p></Show>
-        <Show when={props.detail.issue.exposure.repo_visibility}><p>Repository: {props.detail.issue.exposure.repo_visibility}</p></Show>
-        <Show when={props.detail.issue.exposure.is_fork !== null}><p>Fork: {props.detail.issue.exposure.is_fork ? "Yes" : "No"}</p></Show>
+        <Show when={props.detail.issue.exposure} keyed fallback={<p>Exposure unknown: the source reported no sharing data.</p>}>{(exposure) => <>
+          <p><ExposureBadge visibility={exposure.visibility} externalPrincipalCount={exposure.external_principal_count} /></p>
+          <p>External principals: {exposure.external_principal_count ?? 0}</p>
+          <p>Shared drive: {exposure.shared_drive ? "Yes" : "No"}</p>
+          <Show when={exposure.channel_kind}><p>Channel: {exposure.channel_kind}</p></Show>
+          <Show when={exposure.repo_visibility}><p>Repository: {exposure.repo_visibility}</p></Show>
+          <Show when={exposure.is_fork !== null && exposure.is_fork !== undefined}><p>Fork: {exposure.is_fork ? "Yes" : "No"}</p></Show>
+        </>}</Show>
         <Show when={props.detail.issue.exposure_changed_at}><p>Changed <RelativeTime iso={props.detail.issue.exposure_changed_at ?? ""} /></p></Show>
       </section>
       <section>

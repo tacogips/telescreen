@@ -83,6 +83,8 @@ async def test_dashboard_excludes_merged_children_and_averages_human_response() 
         assigned: int = await IssueReportSourceImpl().assigned_open_count(session, "missing-member")
     assert result.archived_count == 1
     assert result.escalating_count == 1
+    # The UI's Open issues tile reads this total; merged children and archived are excluded.
+    assert result.open_issues == 2
     assert result.unassigned_high_priority == 1
     assert result.mtta_seconds == 3600
     assert sum(bucket.critical + bucket.high + bucket.medium for bucket in result.buckets) == 1
@@ -107,6 +109,7 @@ async def test_empty_dashboard_means_are_null_and_counts_zero() -> None:
     assert result.mtta_seconds is None
     assert result.archived_count == 0
     assert result.escalating_count == 0
+    assert result.open_issues == 0
     assert result.top_issues == ()
     await harness.close()
 

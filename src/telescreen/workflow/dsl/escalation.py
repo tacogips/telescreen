@@ -23,7 +23,12 @@ from telescreen.ports.directory import SLACK_CHANNEL_ID
 from telescreen.workflow.dsl._iso import format_duration
 from telescreen.workflow.dsl.loader import ValidationIssue, WorkflowValidationError
 from telescreen.workflow.dsl.model import NotificationTargetSpec
-from telescreen.workflow.dsl.notification_sets import read_targets, targets_json, validate_targets
+from telescreen.workflow.dsl.notification_sets import (
+    channel_only_target_issues,
+    read_targets,
+    targets_json,
+    validate_targets,
+)
 
 
 @dataclass(frozen=True)
@@ -113,7 +118,7 @@ def _tier(value: JsonValue, index: int, issues: list[ValidationIssue]) -> Escala
         else ()
     )
     for notify_index, recipient in enumerate(notify):
-        if _RECIPIENT.fullmatch(recipient) is None or not _valid_slack_channel(recipient):
+        if _RECIPIENT.fullmatch(recipient) is None:
             issues.append(ValidationIssue(f"{path}/notify/{notify_index}", "invalid_value"))
     channels_value: JsonValue | None = value.get("channels")
     if notify and channels_value is None:
@@ -201,6 +206,24 @@ def escalation_from_json(value: JsonValue) -> EscalationPolicySpec:
         return load_escalation_policy(dump_json(value), SourceFormat.JSON)
     except WorkflowValidationError:
         raise TelescreenError(ErrorCode.WORKFLOW_INVALID, "invalid escalation policy") from None
+
+
+def load_new_escalation_policy(text: str, source_format: SourceFormat) -> EscalationPolicySpec:
+    """Load a newly submitted policy; ``slack_channel:`` recipients must be channel ids.
+
+    ``load_escalation_policy`` keeps accepting stored policies written before that rule.
+    """
+    policy: EscalationPolicySpec = load_escalation_policy(text, source_format)
+    issues: list[ValidationIssue] = []
+    for index, tier in enumerate(policy.tiers):
+        path: str = f"/tiers/{index}"
+        for notify_index, recipient in enumerate(tier.notify):
+            if not _valid_slack_channel(recipient):
+                issues.append(ValidationIssue(f"{path}/notify/{notify_index}", "invalid_value"))
+        issues.extend(channel_only_target_issues(tier.targets, f"{path}/targets"))
+    if issues:
+        raise WorkflowValidationError(tuple(issues))
+    return policy
 
 
 def _valid_slack_channel(recipient: str) -> bool:

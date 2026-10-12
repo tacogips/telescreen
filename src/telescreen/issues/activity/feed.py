@@ -158,7 +158,11 @@ async def activity_feed(
     selected: list[_RawActivity] = page[:limit]
     refs_list: list[str] = []
     for item in selected:
-        for ref in (item.actor_ref, item.from_value, item.to_value):
+        # Every actor is resolved (system and token actors too); history values only when
+        # they are member or team references.
+        if item.actor_ref not in refs_list:
+            refs_list.append(item.actor_ref)
+        for ref in (item.from_value, item.to_value):
             if ref is not None and ref.startswith(("member:", "team:")) and ref not in refs_list:
                 refs_list.append(ref)
     refs: tuple[str, ...] = tuple(refs_list)

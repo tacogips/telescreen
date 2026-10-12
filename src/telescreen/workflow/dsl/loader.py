@@ -75,6 +75,7 @@ from telescreen.workflow.dsl.model import (
 from telescreen.workflow.dsl.notification_sets import (
     V2_ONLY_STEP_FIELDS,
     V2_ONLY_TOP_LEVEL,
+    channel_only_issues,
     read_notification_sets,
     read_targets,
     read_template_name,
@@ -134,6 +135,19 @@ class _Reader:
             else:
                 result.append(text)
         return tuple(result)
+
+
+def load_new_workflow(text: str, source_format: SourceFormat) -> CompiledWorkflow:
+    """Load a newly submitted source and apply rules that only new definitions must meet.
+
+    ``slack_channel:`` recipients must be channel ids here; ``load_workflow`` keeps accepting
+    stored definitions written before that rule so they still list, activate and run.
+    """
+    workflow: CompiledWorkflow = load_workflow(text, source_format)
+    issues: list[ValidationIssue] = channel_only_issues(workflow)
+    if issues:
+        raise WorkflowValidationError(tuple(issues))
+    return workflow
 
 
 def load_workflow(text: str, source_format: SourceFormat) -> CompiledWorkflow:

@@ -97,7 +97,7 @@ export type Issue = Readonly<{
   priority?: IssuePriority; priority_manual?: boolean; needs_review?: boolean; assignee?: AssigneeDisplay | null; archive?: ArchiveState | null;
   merged_into_id?: string | null; merged_count?: number; bookmarked?: boolean; updated_at?: string; trend?: readonly number[];
 }>;
-export type IssueDetail = Issue & Readonly<{ exposure: Exposure; exposure_changed_at: string | null; asset_tier: string | null; assignee_ref: string | null; owner: Readonly<{ present: boolean; member_ref: string | null }>; active_exception: ActiveException | null; assignee?: AssigneeDisplay | null }>;
+export type IssueDetail = Issue & Readonly<{ exposure: Exposure | null; exposure_changed_at: string | null; asset_tier: string | null; assignee_ref: string | null; owner: Readonly<{ present: boolean; member_ref: string | null }>; active_exception: ActiveException | null; assignee?: AssigneeDisplay | null }>;
 export type IssueEvent = Readonly<{
   id: string; issue_id: string; scan_job_id: string | null; source: string; resource_key: string; display_locator: string;
   location: string; rule_id: string; rule_class: string; detector: string; confidence: number | null;

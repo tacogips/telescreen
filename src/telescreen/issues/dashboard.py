@@ -49,6 +49,7 @@ class DashboardData:
     mttr_seconds: int | None
     mtta_seconds: int | None
     unassigned_high_priority: int
+    open_issues: int = 0
 
 
 @dataclass(frozen=True)
@@ -138,6 +139,7 @@ class DashboardService:
             mttr,
             mtta,
             unassigned,
+            sum(count for _, count in open_rows),
         )
 
     async def _buckets(

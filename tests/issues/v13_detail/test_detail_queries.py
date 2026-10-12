@@ -11,6 +11,7 @@ from telescreen.api.routers.issues_common import IssueItemExtras, issue_item_ext
 from telescreen.core.vocabulary import ActorDisplayKind, RuleClass
 from telescreen.db.models import FindingRow, IssueCommentRow, IssueRow
 from telescreen.directory import DirectoryRecipientResolver
+from telescreen.directory.actors import DirectoryActorDirectory
 from telescreen.issues.activity.comments import CommentService
 from telescreen.issues.activity.feed import ActivityItem, ActivityPage, activity_feed
 from telescreen.issues.detail.navigation import EventSelection, select_event
@@ -205,5 +206,31 @@ async def test_b6_comment_is_redacted_persisted_and_has_actor_display() -> None:
         assert sample.value not in activity.comment.body
         assert activity.actor.display_name == "Alice Example"
         assert activity.kind == "commented"
+    finally:
+        await harness.close()
+
+
+@pytest.mark.asyncio
+async def test_system_actors_are_named_instead_of_unknown() -> None:
+    """Scanner and workflow history rows show the system actor name, not "Unknown"."""
+    harness: IssueHarness = await make_issue_harness()
+    try:
+        finding: MaskedFinding = masked_finding(harness, RuleClass.CREDENTIAL, "sys-actor")
+        async with harness.db.sessions.begin() as session:
+            outcome: RecordOutcome = await harness.service.record_scan(
+                session, resource_scan(harness, (finding,), "sys-actor-scan")
+            )
+        issue_id: str = outcome.issue_ids[0]
+        async with harness.db.sessions() as session:
+            page: ActivityPage = await activity_feed(
+                session, issue_id, None, 50, DirectoryActorDirectory(), "member:alice", False
+            )
+        assert page.items
+        system_items: tuple[ActivityItem, ...] = tuple(
+            item for item in page.items if item.actor.ref.startswith("system:")
+        )
+        assert system_items
+        assert all(item.actor.display_name == "Telescreen" for item in system_items)
+        assert all(item.actor.kind is ActorDisplayKind.SYSTEM for item in system_items)
     finally:
         await harness.close()
