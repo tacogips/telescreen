@@ -93,6 +93,31 @@ run = "rm -rf build dist htmlcov .coverage .pytest_cache .ruff_cache src/*.egg-i
 description = "Run the standard CI checks"
 run = "mise run fmt-check && mise run lint && mise run typelint && mise run typecheck && mise run test && mise run build"
 
+[tasks.ddl-edit]
+description = "Open the database schema (db/schema/telescreen.diagra.jsonl) in the Diagra app"
+run = 'open -a diagra db/schema/telescreen.diagra.jsonl'
+
+[tasks.ddl-export]
+description = "Regenerate db/schema/*.sql from the Diagra schema document with diagra-cli"
+run = """
+cli="${DIAGRA_CLI:-diagra-cli}"
+command -v "$cli" >/dev/null 2>&1 || { echo "diagra-cli not found: brew install --cask tacogips/tap/diagra (or set DIAGRA_CLI)" >&2; exit 2; }
+"$cli" format db/schema/telescreen.diagra.jsonl --write
+"$cli" ddl db/schema/telescreen.diagra.jsonl --dialect postgresql --strict --output db/schema/telescreen.postgresql.sql
+"$cli" ddl db/schema/telescreen.diagra.jsonl --dialect sqlite --strict --output db/schema/telescreen.sqlite.sql
+"""
+
+[tasks.ddl-check]
+description = "Check the Diagra schema document is canonical, its SQL exports are current and the models match it"
+run = """
+cli="${DIAGRA_CLI:-diagra-cli}"
+command -v "$cli" >/dev/null 2>&1 || { echo "diagra-cli not found: brew install --cask tacogips/tap/diagra (or set DIAGRA_CLI)" >&2; exit 2; }
+"$cli" format db/schema/telescreen.diagra.jsonl --check
+"$cli" ddl db/schema/telescreen.diagra.jsonl --dialect postgresql --strict --check db/schema/telescreen.postgresql.sql
+"$cli" ddl db/schema/telescreen.diagra.jsonl --dialect sqlite --strict --check db/schema/telescreen.sqlite.sql
+uv run pytest tests/db/test_diagra_schema.py -q
+"""
+
 [tasks.web-install]
 description = "Install web dependencies from the frozen lockfile"
 run = "cd src/web && bun install --frozen-lockfile"

@@ -277,6 +277,19 @@ Audited actions added:
 
 Details hold ids, enums, counts and field names only.
 
+### Schema source of truth (Diagra)
+
+Since v1.3 the DDL is designed in the Diagra desktop app. The ERD document
+`db/schema/telescreen.diagra.jsonl` (one page, tables grouped into frames by
+model module) is authoritative; `db/schema/telescreen.postgresql.sql` and
+`telescreen.sqlite.sql` are its `diagra-cli ddl` exports. SQLAlchemy models and
+Alembic revisions remain the runtime mechanism, and
+`tests/db/test_diagra_schema.py` requires that the models match the document
+exactly (types, nullability, defaults, primary keys, identity columns, unique
+keys, index names) and that the SQLite export builds the same structure as
+`alembic upgrade head`. Triggers and seed rows are outside Diagra's ERD model
+and stay in Alembic code. The change workflow is in `db/schema/README.md`.
+
 ## References
 
 See `design-docs/references/README.md`.
