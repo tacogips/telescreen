@@ -158,6 +158,24 @@ The v1.2 OIDC settings (`TELESCREEN_OIDC_ISSUER`, `TELESCREEN_OIDC_CLIENT_ID`,
 `TELESCREEN_UI_TOKEN_LOGIN` are also in `command.md`. Without a mapped role and without a
 default role, an SSO user gets HTTP 403 (`no_role`).
 
+### Slack app
+
+The Slack notification bot is registered from [`examples/slack-app`](examples/slack-app),
+a Slack CLI project whose `manifest.json` requests only `chat:write` and
+`chat:write.public`. The Slack CLI is pinned in `mise.toml`:
+
+```sh
+mise run slack-login                                # paste /slackauthticket into Slack
+SLACK_TEAM=<team id> mise run slack-app-install     # create or update and install
+SLACK_TEAM=<team id> mise run slack-app-settings    # copy the bot token (xoxb-...)
+```
+
+Invite the bot into the target channel with `/invite @telescreen`, set
+`TELESCREEN_SLACK_BOT_TOKEN=env:SLACK_BOT_TOKEN`, and address the channel in a workflow
+as `slack_channel:<C or G channel id>`. User and DM ids are rejected. Check delivery with
+`telescreen notify test --channel slack --to slack_channel:<id>`. The full procedure is
+the `slack-app-setup` agent skill (`.claude/skills/slack-app-setup/SKILL.md`).
+
 ## Police workers
 
 Police can use pull mode to register, claim tasks, heartbeat, and submit results, or push

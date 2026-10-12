@@ -17,6 +17,7 @@ fi
 '''
 
 [tools]
+"aqua:slackapi/slack-cli" = "4.9.0"
 bun = "1.4.2"
 gitleaks = "latest"
 node = "22"
@@ -130,3 +131,22 @@ else
   echo "Using existing custom Git hooks path: $hooks_path"
 fi
 '''
+
+[tasks.slack-login]
+description = "Log the Slack CLI in to a workspace (paste the printed /slackauthticket command into Slack, then enter the challenge code)"
+run = "slack login"
+
+[tasks.slack-app-validate]
+description = "Validate the Telescreen Slack app manifest against a workspace (SLACK_TEAM=<team id or name>)"
+dir = "examples/slack-app"
+run = 'slack manifest validate --app deployed --team "${SLACK_TEAM:?set SLACK_TEAM to the Slack team id or name}"'
+
+[tasks.slack-app-install]
+description = "Create or update and install the Telescreen Slack app from examples/slack-app/manifest.json (SLACK_TEAM=<team id or name>)"
+dir = "examples/slack-app"
+run = 'slack app install --environment deployed --team "${SLACK_TEAM:?set SLACK_TEAM to the Slack team id or name}"'
+
+[tasks.slack-app-settings]
+description = "Open the installed Telescreen Slack app settings page (bot token, signing secret)"
+dir = "examples/slack-app"
+run = 'slack app settings --app deployed --team "${SLACK_TEAM:?set SLACK_TEAM to the Slack team id or name}"'

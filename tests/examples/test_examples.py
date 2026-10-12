@@ -35,6 +35,7 @@ from tests.support.samples import find_leaks
 _ROOT: Path = Path(__file__).resolve().parents[2]
 _COMPOSE: Path = _ROOT / "examples" / "compose"
 _WORKFLOWS: Path = _ROOT / "examples" / "workflows"
+_SLACK_APP: Path = _ROOT / "examples" / "slack-app"
 
 
 def _workflow_paths() -> tuple[Path, ...]:
@@ -43,8 +44,10 @@ def _workflow_paths() -> tuple[Path, ...]:
 
 
 def _example_files() -> tuple[Path, ...]:
-    """Return all authored compose and workflow example files."""
-    return tuple(sorted(path for root in (_COMPOSE, _WORKFLOWS) for path in root.rglob("*")))
+    """Return all authored compose, workflow and Slack app example files."""
+    return tuple(
+        sorted(path for root in (_COMPOSE, _WORKFLOWS, _SLACK_APP) for path in root.rglob("*"))
+    )
 
 
 def test_all_workflows_load_and_contain_no_detected_sensitive_values() -> None:

@@ -81,6 +81,7 @@ Use these specialized skills when relevant:
 1. `.claude/skills/python-coding-standards/SKILL.md` (Codex: `.codex/skills/python-coding-standards/SKILL.md`)
 2. `.claude/skills/design-doc/SKILL.md` (Codex: `.codex/skills/design-doc/SKILL.md`)
 3. `.claude/skills/impl-plan/SKILL.md` (Codex: `.codex/skills/impl-plan/SKILL.md`)
+4. `.claude/skills/slack-app-setup/SKILL.md` (Codex: `.codex/skills/slack-app-setup/SKILL.md`): register or update the Telescreen Slack app with the Slack CLI and connect it to a channel
 
 ## Coding Standards
 
