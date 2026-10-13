@@ -344,12 +344,12 @@ notifications is in the "Local test services" section of `examples/compose/READM
 
 ## Database schema
 
-The DDL is designed in the Diagra desktop app: `db/schema/telescreen.diagra.jsonl`
+The DDL is designed in the Nodetto desktop app: `db/schema/telescreen.nodetto.jsonl`
 is the source of truth and `db/schema/*.sql` are its PostgreSQL and SQLite exports.
-Change the schema in Diagra first (`mise run ddl-edit`, then `mise run ddl-export`),
+Change the schema in Nodetto first (`mise run ddl-edit`, then `mise run ddl-export`),
 then update the models and add an Alembic revision; `mise run ddl-check` and the test
-suite reject models that drift from the design. Install Diagra and `diagra-cli` with
-`brew install --cask tacogips/tap/diagra`. Details: `db/schema/README.md`.
+suite reject models that drift from the design. Install Nodetto and `nodetto-cli` with
+`brew install --cask tacogips/tap/nodetto`. Details: `db/schema/README.md`.
 
 ## Testing and checks
 

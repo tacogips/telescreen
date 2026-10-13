@@ -58,7 +58,7 @@
       "R5-R6: admin field schema (types, options, required, order, archive, roles purpose/owner/deletion_due, immutable keys, type change only without values); validated values; incomplete flag; metadata_changed events and audit; values with detected secrets rejected 422 without echo.",
       "R7: overdue tab, dashboard tile and one owner notification per due date (system.data_overdue).",
       "R8-R9: Data UI (list with tabs and counts, filters, detail, metadata form, timeline, item-count chart, items, related issues), schema editor, registration, issue-to-asset link, masked CSV export; every member write audited; events append-only (PostgreSQL trigger).",
-      "Diagra document changed first, exports regenerated, models and exactly one Alembic revision 0005_v1_4 match; mise run ddl-check passes.",
+      "Nodetto document changed first, exports regenerated, models and exactly one Alembic revision 0005_v1_4 match; mise run ddl-check passes.",
       "Every new route declares exactly one permission (22 routes, test_route_permissions_v14.py); leak flows 1-7 cover assets, events, items, field values, export and overdue notifications; E2E E1-E7 pass offline.",
       "mise run ci passes offline; src/web typecheck, vitest, build and strict screenshots (0 state-skipped, 0 browser errors, light and dark) pass; README v1.4 features, design status lines and impl-plans index updated; v14 plans archived."
     ],
@@ -209,7 +209,7 @@
       "dependsOn": [],
       "writePaths": [
         "impl-plans/active/v14-p02-db.md",
-        "db/schema/telescreen.diagra.jsonl",
+        "db/schema/telescreen.nodetto.jsonl",
         "db/schema/telescreen.postgresql.sql",
         "db/schema/telescreen.sqlite.sql",
         "src/telescreen/db/models",
@@ -218,17 +218,17 @@
       ],
       "sharedPaths": [],
       "sharedPathNotes": [
-        {"path": "db/schema/telescreen.diagra.jsonl", "intendedEdit": "Source of truth edited first: frame f-data-inventory, five erd.table elements, collector_configs.inventory_mode column and six logical erd.relation elements; then diagra-cli validate, diagra-cli arrange --write and mise run ddl-export regenerate the two SQL exports."},
-        {"path": "tests/db", "intendedEdit": "tests/db/test_models.py EXPECTED_TABLES 48 -> 53 plus minimal-row inserts; new tests/db/test_v14_migration.py; tests/db/test_diagra_schema.py passes unchanged."}
+        {"path": "db/schema/telescreen.nodetto.jsonl", "intendedEdit": "Source of truth edited first: frame f-data-inventory, five erd.table elements, collector_configs.inventory_mode column and six logical erd.relation elements; then nodetto-cli validate, nodetto-cli arrange --write and mise run ddl-export regenerate the two SQL exports."},
+        {"path": "tests/db", "intendedEdit": "tests/db/test_models.py EXPECTED_TABLES 48 -> 53 plus minimal-row inserts; new tests/db/test_v14_migration.py; tests/db/test_nodetto_schema.py passes unchanged."}
       ],
       "artifactRoots": [],
       "acceptanceCriteria": [
-        "Diagra document has the frame, the 5 tables, the inventory_mode column and the 6 logical relations with exact index names; exports regenerated; mise run ddl-check exits 0.",
+        "Nodetto document has the frame, the 5 tables, the inventory_mode column and the 6 logical relations with exact index names; exports regenerated; mise run ddl-check exits 0.",
         "53 tables in metadata; 0005_v1_4 (down_revision 0004_v1_3) is idempotent, seeds counter data_asset_number, installs the PostgreSQL append-only trigger and downgrades cleanly.",
         "Alembic 0001-0004 unchanged; model files under 1000 lines; every Completion Criteria box ticked; Progress Log with hashes and command evidence."
       ],
       "verification": [
-        "diagra-cli validate db/schema/telescreen.diagra.jsonl > /tmp/telescreen-v14-p02-validate.log 2>&1",
+        "nodetto-cli validate db/schema/telescreen.nodetto.jsonl > /tmp/telescreen-v14-p02-validate.log 2>&1",
         "mise run ddl-check > /tmp/telescreen-v14-p02-ddl-check.log 2>&1",
         "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/db tests/db 2>&1 | tee /tmp/telescreen-v14-p02-format.log",
         "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/db tests/db 2>&1 | tee /tmp/telescreen-v14-p02-ruff.log",

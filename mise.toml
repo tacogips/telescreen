@@ -94,36 +94,36 @@ description = "Run the standard CI checks"
 run = "mise run fmt-check && mise run lint && mise run typelint && mise run typecheck && mise run test && mise run build"
 
 [tasks.ddl-edit]
-description = "Open the database schema (db/schema/telescreen.diagra.jsonl) in the Diagra app"
-run = 'open -a diagra db/schema/telescreen.diagra.jsonl'
+description = "Open the database schema (db/schema/telescreen.nodetto.jsonl) in the Nodetto app"
+run = 'open -a nodetto db/schema/telescreen.nodetto.jsonl'
 
 [tasks.ddl-export]
-description = "Regenerate db/schema/*.sql from the Diagra schema document with diagra-cli"
+description = "Regenerate db/schema/*.sql from the Nodetto schema document with nodetto-cli"
 run = """
-cli="${DIAGRA_CLI:-diagra-cli}"
-command -v "$cli" >/dev/null 2>&1 || { echo "diagra-cli not found: brew install --cask tacogips/tap/diagra (or set DIAGRA_CLI)" >&2; exit 2; }
-"$cli" format db/schema/telescreen.diagra.jsonl --write
-"$cli" ddl db/schema/telescreen.diagra.jsonl --dialect postgresql --strict --output db/schema/telescreen.postgresql.sql
-"$cli" ddl db/schema/telescreen.diagra.jsonl --dialect sqlite --strict --output db/schema/telescreen.sqlite.sql
+cli="${NODETTO_CLI:-nodetto-cli}"
+command -v "$cli" >/dev/null 2>&1 || { echo "nodetto-cli not found: brew install --cask tacogips/tap/nodetto (or set NODETTO_CLI)" >&2; exit 2; }
+"$cli" format db/schema/telescreen.nodetto.jsonl --write
+"$cli" ddl db/schema/telescreen.nodetto.jsonl --dialect postgresql --strict --output db/schema/telescreen.postgresql.sql
+"$cli" ddl db/schema/telescreen.nodetto.jsonl --dialect sqlite --strict --output db/schema/telescreen.sqlite.sql
 """
 
 [tasks.ddl-arrange]
-description = "Tidy the Diagra schema layout (the app's Arrange > Tidy layout) with diagra-cli"
+description = "Tidy the Nodetto schema layout (the app's Arrange > Tidy layout) with nodetto-cli"
 run = """
-cli="${DIAGRA_CLI:-diagra-cli}"
-command -v "$cli" >/dev/null 2>&1 || { echo "diagra-cli not found: brew install --cask tacogips/tap/diagra (or set DIAGRA_CLI)" >&2; exit 2; }
-"$cli" arrange db/schema/telescreen.diagra.jsonl --write
+cli="${NODETTO_CLI:-nodetto-cli}"
+command -v "$cli" >/dev/null 2>&1 || { echo "nodetto-cli not found: brew install --cask tacogips/tap/nodetto (or set NODETTO_CLI)" >&2; exit 2; }
+"$cli" arrange db/schema/telescreen.nodetto.jsonl --write
 """
 
 [tasks.ddl-check]
-description = "Check the Diagra schema document is canonical, its SQL exports are current and the models match it"
+description = "Check the Nodetto schema document is canonical, its SQL exports are current and the models match it"
 run = """
-cli="${DIAGRA_CLI:-diagra-cli}"
-command -v "$cli" >/dev/null 2>&1 || { echo "diagra-cli not found: brew install --cask tacogips/tap/diagra (or set DIAGRA_CLI)" >&2; exit 2; }
-"$cli" format db/schema/telescreen.diagra.jsonl --check
-"$cli" ddl db/schema/telescreen.diagra.jsonl --dialect postgresql --strict --check db/schema/telescreen.postgresql.sql
-"$cli" ddl db/schema/telescreen.diagra.jsonl --dialect sqlite --strict --check db/schema/telescreen.sqlite.sql
-uv run pytest tests/db/test_diagra_schema.py -q
+cli="${NODETTO_CLI:-nodetto-cli}"
+command -v "$cli" >/dev/null 2>&1 || { echo "nodetto-cli not found: brew install --cask tacogips/tap/nodetto (or set NODETTO_CLI)" >&2; exit 2; }
+"$cli" format db/schema/telescreen.nodetto.jsonl --check
+"$cli" ddl db/schema/telescreen.nodetto.jsonl --dialect postgresql --strict --check db/schema/telescreen.postgresql.sql
+"$cli" ddl db/schema/telescreen.nodetto.jsonl --dialect sqlite --strict --check db/schema/telescreen.sqlite.sql
+uv run pytest tests/db/test_nodetto_schema.py -q
 """
 
 [tasks.web-install]

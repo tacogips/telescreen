@@ -64,13 +64,13 @@ Any touched Python source or test file at **1000+ lines** must be split accordin
 
 ## Database Schema (DDL)
 
-The database schema is designed in the Diagra app. `db/schema/telescreen.diagra.jsonl`
+The database schema is designed in the Nodetto app. `db/schema/telescreen.nodetto.jsonl`
 is the source of truth for every table, column, key and index; `db/schema/*.sql` are
-Diagra exports. Never change the DDL only in the SQLAlchemy models or Alembic: edit the
-Diagra document first (`mise run ddl-edit`), regenerate the exports (`mise run ddl-export`),
+Nodetto exports. Never change the DDL only in the SQLAlchemy models or Alembic: edit the
+Nodetto document first (`mise run ddl-edit`), regenerate the exports (`mise run ddl-export`),
 then update the models and add an Alembic revision. Draw every new reference column as a
 logical relation (field to field) and keep the layout tidy with Arrange > Tidy layout
-(`mise run ddl-arrange`). `tests/db/test_diagra_schema.py` and
+(`mise run ddl-arrange`). `tests/db/test_nodetto_schema.py` and
 `mise run ddl-check` enforce the match. See `db/schema/README.md`.
 
 ## Design Documentation

@@ -195,9 +195,9 @@ follows the v1.2 template rules.
 
 DDL order (AGENTS.md "Database Schema (DDL)"):
 
-1. Edit `db/schema/telescreen.diagra.jsonl` directly.
-2. Run `diagra-cli validate`.
-3. Run `diagra-cli arrange db/schema/telescreen.diagra.jsonl --write`.
+1. Edit `db/schema/telescreen.nodetto.jsonl` directly.
+2. Run `nodetto-cli validate`.
+3. Run `nodetto-cli arrange db/schema/telescreen.nodetto.jsonl --write`.
 4. Run `mise run ddl-export`.
 5. Update the models.
 6. Add one Alembic revision, `0005_v1_4` (`down_revision = "0004_v1_3"`).
@@ -216,7 +216,7 @@ The JSONL edit adds:
   - `data_field_values.field_id -> data_fields.id`.
 
 `*_ref` and `*_by` actor columns are not drawn (README convention). `mise run ddl-check`
-and `tests/db/test_diagra_schema.py` must pass.
+and `tests/db/test_nodetto_schema.py` must pass.
 
 Model module: `src/telescreen/db/models/inventory.py`. Types are portable.
 
@@ -754,7 +754,7 @@ lines and every Python file under 1000. There are 8 plans in one run.
 | Wave | Plan | Owns (writePaths) | Depends on |
 |------|------|-------------------|-----------|
 | 1 | v14-p01-foundation | `src/telescreen/core/{vocabulary,permissions,config}.py`, `src/telescreen/ports/{inventory,collectors,findings,notifications}.py`, `src/telescreen/masking/fingerprint.py`, `src/telescreen/api/common/errors.py` (status mapping of the new codes), `src/telescreen/contracts/validator.py` (schema list), `src/telescreen/notifications/templates/{builtins,variables,synthetic}.py`, `src/telescreen/contracts/police/v1/**`, `src/telescreen_police_sdk/{models,masking}.py`, `examples/compose/.env.example`, `README.md` (v1.4 feature section, written from this design), root files and `src/web/{package.json,bun.lock}` (expected unchanged), `tests/core/v14/**`, `tests/ports/v14/**`, `tests/masking/v14/**`, `tests/contract/**`, `tests/police_sdk/**`, plus each existing permission, vocabulary, template-inventory and examples exact-count test its change breaks (exact paths listed after a grep at the base) | - |
-| 1 | v14-p02-db | `db/schema/telescreen.diagra.jsonl`, `db/schema/telescreen.{postgresql,sqlite}.sql`, `src/telescreen/db/models/**`, `src/telescreen/db/migrations/versions/0005_v1_4.py`, `tests/db/**` | - |
+| 1 | v14-p02-db | `db/schema/telescreen.nodetto.jsonl`, `db/schema/telescreen.{postgresql,sqlite}.sql`, `src/telescreen/db/models/**`, `src/telescreen/db/migrations/versions/0005_v1_4.py`, `tests/db/**` | - |
 | 1 | v14-p03-ui-foundation | `src/web/src/api/**` (types, `dataApi` client, the v14 mock router, `fixtures/v14.ts`, `v14-shapes.json`, `inventory_mode` in the collector types and fixtures, fixture and mock tests), `src/web/src/components/**` (rail icon, nav, `CountTabs`, `ItemCountChart`), `src/web/src/routes.tsx`, `src/web/src/shell.test.tsx`, stub `src/web/src/pages/data/index.tsx`, `src/web/scripts/screenshots.ts`, `tests/leak/test_ui_fixtures.py` (only if the new fixture file needs it) | - |
 | 2 | v14-p04-inventory-core | new `src/telescreen/inventory/{__init__,observer,items,lifecycle,reconcile,repository,queries,queries_series,export,assets}.py`, new `src/telescreen/api/routers/{data_common,data_assets,data_asset_detail}.py` (list, counts, export, lookup, detail, PATCH, events, manual event, mark deleted, restore, items, series), `tests/inventory/core/**`, `tests/api/v14_data_assets/**` | p01, p02 |
 | 2 | v14-p05-scan-hooks | `src/telescreen/issues/{scan,service,ingest}.py`, new `src/telescreen/issues/external_scan.py`, `src/telescreen/api/routers/{ingest,collectors}.py`, `src/telescreen/police/results.py`, `src/telescreen/workflow/mapreduce/reduce.py`, `src/telescreen/collectors/{tasks,service,repository}.py`, `src/telescreen/collectors/google/adapter.py`, `tests/issues/v14_hooks/**`, `tests/collectors/v14/**`, `tests/collectors/core/test_core.py`, `tests/police/v14/**`, `tests/workflow/v14/**`, `tests/api/v14_ingest/**`, plus each existing test that asserts the exact collector response or body keys (exact paths listed after a grep at the base) | p01, p02 |
@@ -827,7 +827,7 @@ Notes:
 | Backward-compatible, versioned ingest change | 6.3, 6.4, C3 |
 | Raw values, keys and content never stored, logged, indexed, notified, exported or returned | D10, D14, 9.2, 12 |
 | Read-only on sources; append-only events; no deletion from incomplete scans | D5, D6, D11, D23 |
-| Diagra first, one Alembic 0005 | 4 |
+| Nodetto first, one Alembic 0005 | 4 |
 | Every route declares a permission | 3, 9, 13 (p08) |
 | At most 8 plans, disjoint writePaths, shared tests owned | 13 |
 | Run 2: live defects L1-L7 with regression tests, run-2 manifest | 17 |
@@ -971,7 +971,7 @@ a drawn chart.
   failures only, the v1.4 surface and the O3 file: wiring, `api/app.py`,
   `src/telescreen/inventory`, `src/telescreen/workflow/queue/sql_queue.py`,
   `src/telescreen_police_sdk`, `tests/{e2e,leak,contract,inventory,db}`, `db/schema`
-  (export drift only; Diagra first, as in section 4), `src/web/src/{pages/data,api,components}`,
+  (export drift only; Nodetto first, as in section 4), `src/web/src/{pages/data,api,components}`,
   `src/web/src/shell.test.tsx` and `src/web/scripts/screenshots.ts`. The whole-tree globs
   would exceed the 512-entry fanout snapshot limit. A failure outside this list, or one
   that needs a dependency, lockfile, model or Alembic change, is a Reconciliation request

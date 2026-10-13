@@ -126,7 +126,7 @@ applies to all assets).
 ## 6. Acceptance
 
 - R1-R9 implemented with unit, API, UI and E2E tests; every new route declares a permission.
-- The DDL is changed in the Diagra document first (`db/schema/telescreen.diagra.jsonl`),
+- The DDL is changed in the Nodetto document first (`db/schema/telescreen.nodetto.jsonl`),
   exports regenerated, models and one Alembic revision (`0005`) match it.
 - Leak matrix covers assets, events, items, field values, export and overdue notifications.
 - Screenshot smoke covers the new pages in light and dark with zero browser errors.

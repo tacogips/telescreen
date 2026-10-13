@@ -280,7 +280,7 @@ Details hold ids, enums, counts and field names only.
 ### v1.4 additions (revision `0005_v1_4`)
 
 Status: implemented 2026-10-14. Behavior is in `design-v1-4-data-inventory.md` (section 4
-lists every column). The Diagra document is changed first. Then one new revision,
+lists every column). The Nodetto document is changed first. Then one new revision,
 `0005_v1_4` (`down_revision = "0004_v1_3"`), adds everything below. It is idempotent in the
 same way as `0004_v1_3`, and earlier revisions are never edited.
 
@@ -306,19 +306,19 @@ Item fingerprints are `HMAC(HMAC(identity key v1, "telescreen:data-item:v1"), re
 - `data_field.created`, `data_field.updated`, `data_field.reordered`;
 - `data_field.archived`, `data_field.unarchived`, `data_field.deleted`.
 
-### Schema source of truth (Diagra)
+### Schema source of truth (Nodetto)
 
-Since v1.3 the DDL is designed in the Diagra desktop app. The ERD document
-`db/schema/telescreen.diagra.jsonl` (one page, tables grouped into frames by
+Since v1.3 the DDL is designed in the Nodetto desktop app. The ERD document
+`db/schema/telescreen.nodetto.jsonl` (one page, tables grouped into frames by
 model module) is authoritative; `db/schema/telescreen.postgresql.sql` and
-`telescreen.sqlite.sql` are its `diagra-cli ddl` exports. SQLAlchemy models and
+`telescreen.sqlite.sql` are its `nodetto-cli ddl` exports. SQLAlchemy models and
 Alembic revisions remain the runtime mechanism, and
-`tests/db/test_diagra_schema.py` requires that the models match the document
+`tests/db/test_nodetto_schema.py` requires that the models match the document
 exactly (types, nullability, defaults, primary keys, identity columns, unique
 keys, index names) and that the SQLite export builds the same structure as
 `alembic upgrade head`. Table-to-table references are drawn field to field as
-Diagra logical relations (dashed, no database constraint); the test checks
-that each joins same-typed columns to a primary or unique key. Triggers and seed rows are outside Diagra's ERD model
+Nodetto logical relations (dashed, no database constraint); the test checks
+that each joins same-typed columns to a primary or unique key. Triggers and seed rows are outside Nodetto's ERD model
 and stay in Alembic code. The change workflow is in `db/schema/README.md`.
 
 ## References

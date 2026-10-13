@@ -1,6 +1,6 @@
-"""The Diagra schema document, its DDL exports and the models must agree.
+"""The Nodetto schema document, its DDL exports and the models must agree.
 
-``db/schema/telescreen.diagra.jsonl`` is edited in the Diagra app and is the
+``db/schema/telescreen.nodetto.jsonl`` is edited in the Nodetto app and is the
 source of truth for Telescreen's DDL. See ``db/schema/README.md`` for the
 change workflow.
 """
@@ -19,18 +19,18 @@ from sqlalchemy.engine import Engine, Inspector
 
 from telescreen.db import models as _models
 from telescreen.db.migrate import upgrade
-from tests.db.diagra_schema import (
-    DIAGRA_DOCUMENT,
+from tests.db.nodetto_schema import (
+    NODETTO_DOCUMENT,
     POSTGRESQL_DDL,
     REPOSITORY_ROOT,
     SQLITE_DDL,
-    DiagraDocument,
-    DiagraTableElement,
+    NodettoDocument,
+    NodettoTableElement,
     SchemaSpec,
-    diagra_schema,
-    load_diagra_document,
+    load_nodetto_document,
     logical_reference_problems,
     model_schema,
+    nodetto_schema,
     schema_differences,
 )
 
@@ -96,27 +96,27 @@ def _reflect(engine: Engine) -> tuple[ReflectedTable, ...]:
     return tuple(tables)
 
 
-def _diagra_cli() -> str | None:
-    configured: str | None = os.environ.get("DIAGRA_CLI")
-    return configured if configured else shutil.which("diagra-cli")
+def _nodetto_cli() -> str | None:
+    configured: str | None = os.environ.get("NODETTO_CLI")
+    return configured if configured else shutil.which("nodetto-cli")
 
 
-def test_diagra_document_matches_sqlalchemy_models() -> None:
-    """Every table, column, key and index in Diagra matches the models exactly."""
-    document: DiagraDocument = load_diagra_document()
-    designed: SchemaSpec = diagra_schema(document)
+def test_nodetto_document_matches_sqlalchemy_models() -> None:
+    """Every table, column, key and index in Nodetto matches the models exactly."""
+    document: NodettoDocument = load_nodetto_document()
+    designed: SchemaSpec = nodetto_schema(document)
     implemented: SchemaSpec = model_schema(_models.AuditRecordRow.metadata)
     differences: list[str] = schema_differences(designed, implemented)
     assert not differences, (
-        "db/schema/telescreen.diagra.jsonl and the SQLAlchemy models disagree. Change the "
-        "schema in the Diagra app first, then update the models and add an Alembic "
+        "db/schema/telescreen.nodetto.jsonl and the SQLAlchemy models disagree. Change the "
+        "schema in the Nodetto app first, then update the models and add an Alembic "
         "migration:\n" + "\n".join(differences)
     )
 
 
 def test_logical_references_join_compatible_keys() -> None:
     """Every drawn reference joins same-typed columns to a primary or unique key."""
-    document: DiagraDocument = load_diagra_document()
+    document: NodettoDocument = load_nodetto_document()
     assert document.relations, "the schema documents its references as relations"
     assert all(relation.semantic.logical for relation in document.relations), (
         "Telescreen enforces no foreign keys; draw references as logical relations"
@@ -127,8 +127,8 @@ def test_logical_references_join_compatible_keys() -> None:
 
 def test_logical_reference_check_reports_a_type_mismatch() -> None:
     """A reference between columns of different types is reported."""
-    document: DiagraDocument = load_diagra_document()
-    issues: DiagraTableElement = next(t for t in document.tables if t.id == "t-issues")
+    document: NodettoDocument = load_nodetto_document()
+    issues: NodettoTableElement = next(t for t in document.tables if t.id == "t-issues")
     issues.semantic.columns[0].data_type = "integer"
     problems: list[str] = logical_reference_problems(document)
     assert any("does not match issues.id (integer)" in problem for problem in problems)
@@ -136,24 +136,24 @@ def test_logical_reference_check_reports_a_type_mismatch() -> None:
 
 def test_schema_document_has_one_erd_page() -> None:
     """All tables live on the single page the DDL exports are generated from."""
-    document: DiagraDocument = load_diagra_document()
+    document: NodettoDocument = load_nodetto_document()
     assert document.page_ids == ["schema"]
     assert {table.page for table in document.tables} == {"schema"}
 
 
 def test_schema_differences_reports_a_changed_column() -> None:
     """The comparison catches a model-only change instead of passing silently."""
-    designed: SchemaSpec = diagra_schema(load_diagra_document())
+    designed: SchemaSpec = nodetto_schema(load_nodetto_document())
     implemented: SchemaSpec = model_schema(_models.AuditRecordRow.metadata)
     renamed: SchemaSpec = SchemaSpec(
         tables=tuple(table for table in implemented.tables if table.name != "counters")
     )
     differences: list[str] = schema_differences(designed, renamed)
-    assert differences == ["table counters is in Diagra but not in the models"]
+    assert differences == ["table counters is in Nodetto but not in the models"]
 
 
 def test_sqlite_export_matches_alembic_head(tmp_path: Path) -> None:
-    """The committed Diagra SQLite export builds the schema Alembic migrates to."""
+    """The committed Nodetto SQLite export builds the schema Alembic migrates to."""
     exported_file: Path = tmp_path / "exported.sqlite"
     with sqlite3.connect(exported_file) as connection:
         connection.executescript(SQLITE_DDL.read_text(encoding="utf-8"))
@@ -168,10 +168,10 @@ def test_sqlite_export_matches_alembic_head(tmp_path: Path) -> None:
         migrated_engine.dispose()
 
 
-def test_postgresql_export_is_a_diagra_export() -> None:
-    """The PostgreSQL DDL is the Diagra export, not hand-written SQL."""
+def test_postgresql_export_is_a_nodetto_export() -> None:
+    """The PostgreSQL DDL is the Nodetto export, not hand-written SQL."""
     text: str = POSTGRESQL_DDL.read_text(encoding="utf-8")
-    assert text.startswith("-- Generated by diagra for postgresql.\n")
+    assert text.startswith("-- Generated by nodetto for postgresql.\n")
     assert "-- Warning:" not in text
     assert text.count("CREATE TABLE ") == len(_models.AuditRecordRow.metadata.tables)
 
@@ -180,16 +180,16 @@ def test_postgresql_export_is_a_diagra_export() -> None:
     ("dialect", "export"),
     [("postgresql", POSTGRESQL_DDL), ("sqlite", SQLITE_DDL)],
 )
-def test_exports_are_current_with_diagra_cli(dialect: str, export: Path) -> None:
-    """With diagra-cli installed, the committed exports equal a fresh export."""
-    cli: str | None = _diagra_cli()
+def test_exports_are_current_with_nodetto_cli(dialect: str, export: Path) -> None:
+    """With nodetto-cli installed, the committed exports equal a fresh export."""
+    cli: str | None = _nodetto_cli()
     if cli is None:
-        pytest.skip("requires diagra-cli (brew install --cask tacogips/tap/diagra)")
+        pytest.skip("requires nodetto-cli (brew install --cask tacogips/tap/nodetto)")
     result: subprocess.CompletedProcess[str] = subprocess.run(
         [
             cli,
             "ddl",
-            str(DIAGRA_DOCUMENT),
+            str(NODETTO_DOCUMENT),
             "--dialect",
             dialect,
             "--strict",
@@ -204,13 +204,13 @@ def test_exports_are_current_with_diagra_cli(dialect: str, export: Path) -> None
     assert result.returncode == 0, result.stderr
 
 
-def test_schema_document_is_canonical_with_diagra_cli() -> None:
-    """With diagra-cli installed, the document is in Diagra's canonical form."""
-    cli: str | None = _diagra_cli()
+def test_schema_document_is_canonical_with_nodetto_cli() -> None:
+    """With nodetto-cli installed, the document is in Nodetto's canonical form."""
+    cli: str | None = _nodetto_cli()
     if cli is None:
-        pytest.skip("requires diagra-cli (brew install --cask tacogips/tap/diagra)")
+        pytest.skip("requires nodetto-cli (brew install --cask tacogips/tap/nodetto)")
     result: subprocess.CompletedProcess[str] = subprocess.run(
-        [cli, "format", str(DIAGRA_DOCUMENT), "--check"],
+        [cli, "format", str(NODETTO_DOCUMENT), "--check"],
         cwd=REPOSITORY_ROOT,
         capture_output=True,
         text=True,

@@ -1,7 +1,7 @@
-"""Compare the Diagra ERD schema document with the SQLAlchemy models.
+"""Compare the Nodetto ERD schema document with the SQLAlchemy models.
 
-``db/schema/telescreen.diagra.jsonl`` is the source of truth for Telescreen's
-DDL and is edited in the Diagra app. These helpers parse that document and the
+``db/schema/telescreen.nodetto.jsonl`` is the source of truth for Telescreen's
+DDL and is edited in the Nodetto app. These helpers parse that document and the
 SQLAlchemy metadata into one normalized shape so tests can report every
 difference between the designed schema and the implemented models.
 """
@@ -31,7 +31,7 @@ from sqlalchemy.types import TypeEngine
 
 REPOSITORY_ROOT: Path = Path(__file__).resolve().parents[2]
 SCHEMA_DIRECTORY: Path = REPOSITORY_ROOT / "db" / "schema"
-DIAGRA_DOCUMENT: Path = SCHEMA_DIRECTORY / "telescreen.diagra.jsonl"
+NODETTO_DOCUMENT: Path = SCHEMA_DIRECTORY / "telescreen.nodetto.jsonl"
 POSTGRESQL_DDL: Path = SCHEMA_DIRECTORY / "telescreen.postgresql.sql"
 SQLITE_DDL: Path = SCHEMA_DIRECTORY / "telescreen.sqlite.sql"
 SCHEMA_PAGE_ID: str = "schema"
@@ -45,8 +45,8 @@ BOOLEAN_DEFAULTS: tuple[tuple[str, str], ...] = (
 
 
 @pydantic.dataclasses.dataclass
-class DiagraRecordHeader:
-    """The fields every Diagra JSONL record shares."""
+class NodettoRecordHeader:
+    """The fields every Nodetto JSONL record shares."""
 
     kind: str
     id: str | None = None
@@ -55,8 +55,8 @@ class DiagraRecordHeader:
 
 
 @pydantic.dataclasses.dataclass
-class DiagraColumn:
-    """One ERD column; an omitted ``nullable`` means NOT NULL in Diagra."""
+class NodettoColumn:
+    """One ERD column; an omitted ``nullable`` means NOT NULL in Nodetto."""
 
     id: str
     name: str
@@ -69,7 +69,7 @@ class DiagraColumn:
 
 
 @pydantic.dataclasses.dataclass
-class DiagraIndex:
+class NodettoIndex:
     """An ordered (unique) index over stable column ids."""
 
     id: str
@@ -79,7 +79,7 @@ class DiagraIndex:
 
 
 @pydantic.dataclasses.dataclass
-class DiagraCheck:
+class NodettoCheck:
     """A table check constraint predicate."""
 
     id: str
@@ -88,26 +88,26 @@ class DiagraCheck:
 
 
 @pydantic.dataclasses.dataclass
-class DiagraTable:
+class NodettoTable:
     """The semantic payload of an ``erd.table`` element."""
 
     table_name: str = Field(alias="tableName")
-    columns: list[DiagraColumn] = Field(default_factory=list)
-    indexes: list[DiagraIndex] = Field(default_factory=list)
-    checks: list[DiagraCheck] = Field(default_factory=list)
+    columns: list[NodettoColumn] = Field(default_factory=list)
+    indexes: list[NodettoIndex] = Field(default_factory=list)
+    checks: list[NodettoCheck] = Field(default_factory=list)
 
 
 @pydantic.dataclasses.dataclass
-class DiagraTableElement:
+class NodettoTableElement:
     """An ``erd.table`` element record."""
 
     id: str
     page: str
-    semantic: DiagraTable
+    semantic: NodettoTable
 
 
 @pydantic.dataclasses.dataclass
-class DiagraEndpoint:
+class NodettoEndpoint:
     """A relation endpoint anchored to one or more table columns."""
 
     table: str
@@ -122,17 +122,17 @@ class DiagraEndpoint:
 
 
 @pydantic.dataclasses.dataclass
-class DiagraRelation:
+class NodettoRelation:
     """The semantic payload of an ``erd.relation`` element.
 
     An enforced relation is a foreign key. A ``logical`` relation documents a
-    join path the database does not enforce; Diagra draws it dashed and its
+    join path the database does not enforce; Nodetto draws it dashed and its
     DDL export emits no constraint for it.
     """
 
-    to: DiagraEndpoint
+    to: NodettoEndpoint
     cardinality: str
-    from_: DiagraEndpoint = Field(alias="from")
+    from_: NodettoEndpoint = Field(alias="from")
     on_delete: str | None = Field(default=None, alias="onDelete")
     on_update: str | None = Field(default=None, alias="onUpdate")
     logical: bool = False
@@ -140,22 +140,22 @@ class DiagraRelation:
 
 
 @pydantic.dataclasses.dataclass
-class DiagraRelationElement:
+class NodettoRelationElement:
     """An ``erd.relation`` element record."""
 
     id: str
     page: str
-    semantic: DiagraRelation
+    semantic: NodettoRelation
 
 
-HEADER_ADAPTER: TypeAdapter[DiagraRecordHeader] = TypeAdapter(DiagraRecordHeader)
-TABLE_ADAPTER: TypeAdapter[DiagraTableElement] = TypeAdapter(DiagraTableElement)
-RELATION_ADAPTER: TypeAdapter[DiagraRelationElement] = TypeAdapter(DiagraRelationElement)
+HEADER_ADAPTER: TypeAdapter[NodettoRecordHeader] = TypeAdapter(NodettoRecordHeader)
+TABLE_ADAPTER: TypeAdapter[NodettoTableElement] = TypeAdapter(NodettoTableElement)
+RELATION_ADAPTER: TypeAdapter[NodettoRelationElement] = TypeAdapter(NodettoRelationElement)
 
 
 @dataclass(frozen=True)
 class ColumnSpec:
-    """A column normalized to Diagra's type spelling and default literals."""
+    """A column normalized to Nodetto's type spelling and default literals."""
 
     name: str
     data_type: str
@@ -223,21 +223,21 @@ class SchemaSpec:
 
 
 @dataclass
-class DiagraDocument:
+class NodettoDocument:
     """The ERD content of the schema document's schema page."""
 
-    tables: list[DiagraTableElement] = field(default_factory=list)
-    relations: list[DiagraRelationElement] = field(default_factory=list)
+    tables: list[NodettoTableElement] = field(default_factory=list)
+    relations: list[NodettoRelationElement] = field(default_factory=list)
     page_ids: list[str] = field(default_factory=list)
 
 
-def load_diagra_document(path: Path = DIAGRA_DOCUMENT) -> DiagraDocument:
-    """Parse the ERD tables and relations from a Diagra JSONL document."""
-    document: DiagraDocument = DiagraDocument()
+def load_nodetto_document(path: Path = NODETTO_DOCUMENT) -> NodettoDocument:
+    """Parse the ERD tables and relations from a Nodetto JSONL document."""
+    document: NodettoDocument = NodettoDocument()
     for line in path.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
-        header: DiagraRecordHeader = HEADER_ADAPTER.validate_json(line)
+        header: NodettoRecordHeader = HEADER_ADAPTER.validate_json(line)
         if header.kind == "page" and header.id is not None:
             document.page_ids.append(header.id)
         if header.kind != "element":
@@ -249,8 +249,8 @@ def load_diagra_document(path: Path = DIAGRA_DOCUMENT) -> DiagraDocument:
     return document
 
 
-def diagra_type(sql_type: TypeEngine[int] | TypeEngine[str] | TypeEngine[bool]) -> str:
-    """Spell a SQLAlchemy column type the way the Diagra document does."""
+def nodetto_type(sql_type: TypeEngine[int] | TypeEngine[str] | TypeEngine[bool]) -> str:
+    """Spell a SQLAlchemy column type the way the Nodetto document does."""
     if isinstance(sql_type, Boolean):
         return "boolean"
     if isinstance(sql_type, DateTime):
@@ -264,8 +264,8 @@ def diagra_type(sql_type: TypeEngine[int] | TypeEngine[str] | TypeEngine[bool]) 
     if isinstance(sql_type, String):
         return f"varchar({sql_type.length})" if sql_type.length is not None else "text"
     message: str = (
-        f"SQLAlchemy type {sql_type!r} has no Diagra spelling; extend diagra_type() "
-        "together with the Diagra document."
+        f"SQLAlchemy type {sql_type!r} has no Nodetto spelling; extend nodetto_type() "
+        "together with the Nodetto document."
     )
     raise AssertionError(message)
 
@@ -293,7 +293,7 @@ def _model_default(column: Column[int] | Column[str] | Column[bool]) -> str | No
     return f"'{escaped}'"
 
 
-def _diagra_default(column: DiagraColumn) -> str | None:
+def _nodetto_default(column: NodettoColumn) -> str | None:
     if column.default_expression is None:
         return None
     if column.data_type == "boolean":
@@ -305,7 +305,7 @@ def _model_table(table: Table) -> TableSpec:
     columns: tuple[ColumnSpec, ...] = tuple(
         ColumnSpec(
             name=column.name,
-            data_type=diagra_type(column.type),
+            data_type=nodetto_type(column.type),
             nullable=bool(column.nullable) and not column.primary_key,
             autoincrement=table.autoincrement_column is column,
             default=_model_default(column),
@@ -357,7 +357,7 @@ def model_schema(metadata: MetaData) -> SchemaSpec:
     return SchemaSpec(tables=tuple(sorted(tables, key=lambda table: table.name)))
 
 
-def _column_names(table: DiagraTable, column_ids: list[str]) -> tuple[str, ...]:
+def _column_names(table: NodettoTable, column_ids: list[str]) -> tuple[str, ...]:
     names: list[str] = []
     for column_id in column_ids:
         match: list[str] = [column.name for column in table.columns if column.id == column_id]
@@ -366,12 +366,12 @@ def _column_names(table: DiagraTable, column_ids: list[str]) -> tuple[str, ...]:
 
 
 def _relation_foreign_key(
-    relation: DiagraRelation, tables: list[DiagraTableElement]
+    relation: NodettoRelation, tables: list[NodettoTableElement]
 ) -> tuple[str, ForeignKeySpec]:
-    local_end: DiagraEndpoint = relation.from_ if relation.cardinality == "*:1" else relation.to
-    remote_end: DiagraEndpoint = relation.to if relation.cardinality == "*:1" else relation.from_
-    local: list[DiagraTable] = [t.semantic for t in tables if t.id == local_end.table]
-    remote: list[DiagraTable] = [t.semantic for t in tables if t.id == remote_end.table]
+    local_end: NodettoEndpoint = relation.from_ if relation.cardinality == "*:1" else relation.to
+    remote_end: NodettoEndpoint = relation.to if relation.cardinality == "*:1" else relation.from_
+    local: list[NodettoTable] = [t.semantic for t in tables if t.id == local_end.table]
+    remote: list[NodettoTable] = [t.semantic for t in tables if t.id == remote_end.table]
     if not local or not remote or relation.cardinality == "*:*":
         message: str = f"Relation {relation} cannot be expressed as a foreign key."
         raise AssertionError(message)
@@ -385,23 +385,23 @@ def _relation_foreign_key(
 
 
 def _referential_action(action: str | None) -> str | None:
-    """Spell a Diagra action (``set-null``) the way SQLAlchemy stores it."""
+    """Spell a Nodetto action (``set-null``) the way SQLAlchemy stores it."""
     if action is None or action == "no-action":
         return None
     return action.replace("-", " ").upper()
 
 
-def _diagra_table(
-    element: DiagraTableElement, foreign_keys: list[tuple[str, ForeignKeySpec]]
+def _nodetto_table(
+    element: NodettoTableElement, foreign_keys: list[tuple[str, ForeignKeySpec]]
 ) -> TableSpec:
-    table: DiagraTable = element.semantic
+    table: NodettoTable = element.semantic
     columns: tuple[ColumnSpec, ...] = tuple(
         ColumnSpec(
             name=column.name,
             data_type=column.data_type,
             nullable=column.nullable and not column.pk,
             autoincrement=column.auto_increment,
-            default=_diagra_default(column),
+            default=_nodetto_default(column),
         )
         for column in table.columns
     )
@@ -424,15 +424,15 @@ def _diagra_table(
     )
 
 
-def diagra_schema(document: DiagraDocument, page_id: str = SCHEMA_PAGE_ID) -> SchemaSpec:
-    """Normalize the ERD tables and relations of one Diagra page."""
-    tables: list[DiagraTableElement] = [t for t in document.tables if t.page == page_id]
+def nodetto_schema(document: NodettoDocument, page_id: str = SCHEMA_PAGE_ID) -> SchemaSpec:
+    """Normalize the ERD tables and relations of one Nodetto page."""
+    tables: list[NodettoTableElement] = [t for t in document.tables if t.page == page_id]
     foreign_keys: list[tuple[str, ForeignKeySpec]] = [
         _relation_foreign_key(relation.semantic, tables)
         for relation in document.relations
         if relation.page == page_id and not relation.semantic.logical
     ]
-    specs: list[TableSpec] = [_diagra_table(element, foreign_keys) for element in tables]
+    specs: list[TableSpec] = [_nodetto_table(element, foreign_keys) for element in tables]
     return SchemaSpec(tables=tuple(sorted(specs, key=lambda table: table.name)))
 
 
@@ -448,12 +448,12 @@ def _column_differences(
     for column in designed:
         matches: list[ColumnSpec] = [c for c in model_columns if c.name == column.name]
         if not matches:
-            differences.append(f"{table}.{column.name}: only in Diagra")
+            differences.append(f"{table}.{column.name}: only in Nodetto")
         elif matches[0] != column:
             design_text: str = _describe(column)
             model_text: str = _describe(matches[0])
             differences.append(
-                f"{table}.{column.name}: Diagra {design_text} != models {model_text}"
+                f"{table}.{column.name}: Nodetto {design_text} != models {model_text}"
             )
     designed_names: set[str] = {column.name for column in designed}
     differences.extend(
@@ -465,22 +465,22 @@ def _column_differences(
     model_order: list[str] = [column.name for column in implemented]
     if not differences and design_order != model_order:
         differences.append(
-            f"{table}: column order {design_order} in Diagra, {model_order} in models"
+            f"{table}: column order {design_order} in Nodetto, {model_order} in models"
         )
     return differences
 
 
 def schema_differences(designed: SchemaSpec, implemented: SchemaSpec) -> list[str]:
-    """List every difference between the Diagra design and the models."""
+    """List every difference between the Nodetto design and the models."""
     differences: list[str] = []
     designed_names: set[str] = set(designed.table_names())
     implemented_names: set[str] = set(implemented.table_names())
     differences.extend(
-        f"table {name} is in Diagra but not in the models"
+        f"table {name} is in Nodetto but not in the models"
         for name in sorted(designed_names - implemented_names)
     )
     differences.extend(
-        f"table {name} is in the models but not in Diagra"
+        f"table {name} is in the models but not in Nodetto"
         for name in sorted(implemented_names - designed_names)
     )
     for name in sorted(designed_names & implemented_names):
@@ -491,7 +491,8 @@ def schema_differences(designed: SchemaSpec, implemented: SchemaSpec) -> list[st
         differences.extend(_column_differences(name, design.columns, model.columns))
         if design.primary_key != model.primary_key:
             differences.append(
-                f"{name}: primary key {design.primary_key} in Diagra, {model.primary_key} in models"
+                f"{name}: primary key {design.primary_key} in Nodetto, "
+                f"{model.primary_key} in models"
             )
         comparisons: tuple[
             tuple[
@@ -511,13 +512,13 @@ def schema_differences(designed: SchemaSpec, implemented: SchemaSpec) -> list[st
             only_model: list[str] = sorted(_describe(item) for item in model_items - design_items)
             if only_design or only_model:
                 differences.append(
-                    f"{name}: {label} differ\n  only in Diagra: {only_design}\n"
+                    f"{name}: {label} differ\n  only in Nodetto: {only_design}\n"
                     f"  only in models: {only_model}"
                 )
     return differences
 
 
-def _key_of(table: DiagraTable, column_ids: list[str]) -> bool:
+def _key_of(table: NodettoTable, column_ids: list[str]) -> bool:
     primary: list[str] = [column.id for column in table.columns if column.pk]
     if sorted(primary) == sorted(column_ids):
         return True
@@ -526,7 +527,7 @@ def _key_of(table: DiagraTable, column_ids: list[str]) -> bool:
     )
 
 
-def _table_by_id(tables: list[DiagraTableElement], element_id: str) -> DiagraTable | None:
+def _table_by_id(tables: list[NodettoTableElement], element_id: str) -> NodettoTable | None:
     for element in tables:
         if element.id == element_id:
             return element.semantic
@@ -534,23 +535,25 @@ def _table_by_id(tables: list[DiagraTableElement], element_id: str) -> DiagraTab
 
 
 def logical_reference_problems(
-    document: DiagraDocument, page_id: str = SCHEMA_PAGE_ID
+    document: NodettoDocument, page_id: str = SCHEMA_PAGE_ID
 ) -> list[str]:
     """Check every logical relation joins existing, type-compatible columns to a key."""
-    tables: list[DiagraTableElement] = [t for t in document.tables if t.page == page_id]
+    tables: list[NodettoTableElement] = [t for t in document.tables if t.page == page_id]
     problems: list[str] = []
     for relation in document.relations:
-        semantic: DiagraRelation = relation.semantic
+        semantic: NodettoRelation = relation.semantic
         if relation.page != page_id or not semantic.logical:
             continue
         # *:1 points from the referencing table to the referenced one;
         # 1:* and 1:1 name the referenced table first.
-        local_end: DiagraEndpoint = semantic.from_ if semantic.cardinality == "*:1" else semantic.to
-        remote_end: DiagraEndpoint = (
+        local_end: NodettoEndpoint = (
+            semantic.from_ if semantic.cardinality == "*:1" else semantic.to
+        )
+        remote_end: NodettoEndpoint = (
             semantic.to if semantic.cardinality == "*:1" else semantic.from_
         )
-        local: DiagraTable | None = _table_by_id(tables, local_end.table)
-        remote: DiagraTable | None = _table_by_id(tables, remote_end.table)
+        local: NodettoTable | None = _table_by_id(tables, local_end.table)
+        remote: NodettoTable | None = _table_by_id(tables, remote_end.table)
         if local is None or remote is None:
             problems.append(f"{relation.id}: endpoint table is missing from the schema page")
             continue
@@ -559,10 +562,10 @@ def logical_reference_problems(
         if not local_ids or len(local_ids) != len(remote_ids):
             problems.append(f"{relation.id}: endpoints must name the same number of columns")
             continue
-        local_columns: list[DiagraColumn] = [
+        local_columns: list[NodettoColumn] = [
             c for i in local_ids for c in local.columns if c.id == i
         ]
-        remote_columns: list[DiagraColumn] = [
+        remote_columns: list[NodettoColumn] = [
             c for i in remote_ids for c in remote.columns if c.id == i
         ]
         if len(local_columns) != len(local_ids) or len(remote_columns) != len(remote_ids):
