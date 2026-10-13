@@ -9,9 +9,12 @@
 
 - planId: `v14-p08-wiring-verification`
 - planPath: `impl-plans/active/v14-p08-wiring-verification.md`
-- wave: 4
-- dependsOn: `v14-p04-inventory-core`, `v14-p05-scan-hooks`, `v14-p06-ui-pages`, `v14-p07-fields-retention`
-- writePaths:
+- run 2 (manifest `telescreen-v14-20261014-f2`): wave B, mode `re-verify`, dependsOn
+  `v14-p09-live-fixes`. The run-2 writePaths are listed in "Run 2 scope" below and
+  replace the run-1 list for run 2.
+- wave (run 1): 4
+- dependsOn (run 1): `v14-p04-inventory-core`, `v14-p05-scan-hooks`, `v14-p06-ui-pages`, `v14-p07-fields-retention`
+- writePaths (run 1):
   - `impl-plans/active/v14-p08-wiring-verification.md`
   - `src/telescreen/wiring.py`
   - `src/telescreen/wiring_v14.py`
@@ -39,6 +42,41 @@
 - artifactRoots: none
 
 Read `impl-plans/conventions.md` first.
+
+## Run 2 scope (re-verify, design 17.6)
+
+- Code is complete. Follow the "Owner resolution" section of the Progress Log. Change code
+  only if a check fails, and then only inside the run-2 writePaths:
+  - `impl-plans/active/v14-p08-wiring-verification.md`
+  - `src/telescreen/wiring.py`
+  - `src/telescreen/api/app.py`
+  - `tests/e2e/test_api_routes.py`, `tests/e2e/test_route_permissions.py`
+  - `tests/e2e/test_wiring_v14.py`, `tests/e2e/test_route_permissions_v14.py`
+  - `tests/e2e/test_flow_v14_inventory.py`, `tests/e2e/test_flow_v14_fields.py`
+  - `tests/leak/flows_v14.py`, `tests/leak/test_leak_matrix_v14.py`
+  - `tests/contract/test_data_api_shapes.py`
+- Moved out for run 2:
+  - `src/telescreen/wiring_v14.py` and `src/web/scripts/screenshots.ts` belong to
+    `v14-p09-live-fixes`;
+  - `impl-plans/README.md` and the design status lines (deliverable 9) belong to the
+    serial finalization.
+
+  A failure in one of these is a Reconciliation request naming its owner.
+- Wave B runs after p09, so the gates cover the integrated tree including the L1-L7
+  fixes. p09's new files (`src/telescreen/inventory/actors.py`,
+  `tests/inventory/actors/**`, `tests/e2e/test_flow_v14_live_fixes.py`, its web changes)
+  are read-only here.
+- Run every command in the Verification section (strict screenshots included). Append a
+  run-2 Progress Log session with each command, its exit status and its log path. Tick
+  the E1-E7 box when the scoped and full pytest pass, and the gates box when every
+  command exits 0. The doc-status part of the gates box is done by the finalization;
+  note that in the log. Set Status to Completed.
+- Step result (conventions 7a): `verification` lists only the final passing commands;
+  `priorVerification`, `findings`, `risks`, `authorSelfCheck.findings` and
+  `authorSelfCheck.residualRisks` are empty; skipped live and integration tests are not
+  listed. The run-1 E3 blocker, resolved by the owner (O2), goes only in
+  `addressedFeedback`, with changed paths "none in p08 (owner test
+  tests/e2e/test_flow_v14_inventory.py)" and the passing scoped pytest command.
 
 ## Intent and Context
 

@@ -56,10 +56,15 @@ disjoint write paths.
 | 2 | [v14-p06-ui-pages](./active/v14-p06-ui-pages.md) | p03 | Ready |
 | 3 | [v14-p07-fields-retention](./active/v14-p07-fields-retention.md) | p04 | Ready |
 | 4 | [v14-p08-wiring-verification](./active/v14-p08-wiring-verification.md) | p04, p05, p06, p07 | Ready |
+| run 2, A | [v14-p09-live-fixes](./active/v14-p09-live-fixes.md) | p01, p03, p04, p06, p07 | Ready |
+
+Run 2 (2026-10-14, base `3c5c1dd`, manifest `telescreen-v14-20261014-f2-dispatch.json`,
+design section 17): p01-p07 are accepted dependencies. Wave A is p09 (live fixes
+L1-L7). Wave B is p08 in mode re-verify.
 
 The serial finalization runs after p08 is accepted. It moves the v14 plans to
-`completed/` and the dispatch manifest to `completed/dispatch/`, moves these rows to the
-completed section, reruns the gates, and commits and pushes to `feat/data-inventory`.
+`completed/` and both dispatch manifests to `completed/dispatch/`, moves these rows to
+the completed section, reruns the gates, and commits and pushes to `feat/data-inventory`.
 
 Telescreen v1 is complete (all 32 plans integration-accepted, final commit 7a8c600).
 Telescreen v1.1 (F1-F10 of `design-docs/specs/design-v1-1-dspm-adoption.md`) is complete:

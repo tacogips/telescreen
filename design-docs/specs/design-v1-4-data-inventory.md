@@ -11,7 +11,9 @@ corrections are in section 1 here and in its section 7.
 
 Status: design for the `v14-pNN` plans, written 2026-10-13 on `feat/data-inventory` at
 `07c975f`. It extends the implemented v1-v1.3 designs and replaces none of their
-decisions. The summaries are in:
+decisions. Run 2 (2026-10-13, base `3c5c1dd`) adds section 17: the owner fixes O1 and O2
+and the live defects L1-L7, with plan `v14-p09-live-fixes`. D1-D24 are unchanged. The
+summaries are in:
 
 - `design-data-model.md` ("v1.4 additions");
 - `design-api-and-ui.md` ("v1.4 endpoints");
@@ -826,6 +828,135 @@ Notes:
 | Diagra first, one Alembic 0005 | 4 |
 | Every route declares a permission | 3, 9, 13 (p08) |
 | At most 8 plans, disjoint writePaths, shared tests owned | 13 |
+| Run 2: live defects L1-L7 with regression tests, run-2 manifest | 17 |
+
+### 17. Run 2: live fixes (2026-10-13)
+
+The owner ran the live stack after run 1 (requirements section 8). Run 2 keeps D1-D24
+and the run-1 plans p01-p07 (accepted dependencies, not redispatched). It records the
+owner fixes and specifies the fixes for the live defects. No DDL, API route, permission,
+response key or dependency changes.
+
+#### 17.1 Owner fixes already in `3c5c1dd`
+
+- **O1**: `DataOverdueProvider` now uses `data-overdue:<epoch minute>` as
+  `engine_tasks.ref_id` (under `varchar(36)`; the ISO idempotency key is unchanged).
+  `SqlTaskQueue.enqueue` rejects a `ref_id` over 36 or an idempotency key over 256
+  characters, so SQLite tests catch this class.
+- **O2**: the integrated E3 full-listing flow
+  (`tests/e2e/test_flow_v14_inventory.py::test_e3_full_listing_deletes_absent_asset_only_when_authoritative`)
+  resolves the p08 blocker. p08 runs in mode re-verify and follows its "Owner resolution"
+  section.
+
+#### 17.2 Defects, causes and fixes
+
+| Id | Cause at `3c5c1dd` | Fix |
+|----|--------------------|-----|
+| L1 | `DataDetailSections.tsx` passes `event.occurred_at` to `RelativeTime`. The API returns `occurred_at: null` for every scan and system event (it is set only when a person supplies it), and `new Date(null)` is the epoch. The UI type declares `DataEvent.occurred_at: string`, so the type checker and the mock (which always set it) hid the null. The same mismatch exists for `DataAsset.last_seen_at` (the API model `AssetView.last_seen_at` is `datetime or None`; 9.1 says "string or null") | The UI types follow 9.1: `DataEvent.occurred_at: string \| null` and `DataAsset.last_seen_at: string \| null`. The timeline shows `occurred_at ?? recorded_at`. A null `last_seen_at` renders as "—" in the list and the detail |
+| L2 | The observer and the reconciler write `collector:<config id>` as `actor_ref` (`inventory/observer.py:53-57`, `inventory/reconcile.py`). `DirectoryActorDirectory` resolves only `member:`, `team:`, `token:` and `system:` refs, so these become `{kind: "unknown", display_name: "Unknown"}`. Issue activity never hits this because it writes `system:scanner` | Read-time resolution (the stored refs are append-only and stay as they are; see 17.3) |
+| L3 | `MetadataForm.tsx` renders the reference `<select value=...>` before the member and team options load (`createResource` on the directory). The value is applied while no option matches, and the options added later do not reselect it, so the control shows "Choose..." while the form state still holds `"member:alice"` | Each option of the reference select sets `selected` from the current value, so the selection follows options that arrive later. When the stored value matches no loaded option (an inactive member, a deleted team), a first option with that exact value and the label "Current value (not in directory)" keeps it selectable. Saving an unchanged form sends the stored value unchanged; the server already writes no `metadata_changed` event for an unchanged canonical value (`inventory/values.py`) |
+| L4 | `ItemCountChart.tsx` returns early from the component body when `props.points` is empty. A Solid component body runs once, and the series resource is still loading at that moment, so the empty state stays after the points arrive | The chart is reactive (a `Show` over the points with derived coordinates). No points shows "No item count history". One point draws a flat line. Two or more draw the step line |
+| L5 | The new markup puts adjacent text in inline elements with no separator and no styles: `.count-tabs` and `.count-badge`, the timeline row (avatar initials, name, label, time), the list name cell (`<strong>` then `<small>`), and the breadcrumb (two inline children of `.row-actions`). None of these classes has a CSS rule | Explicit separators in the DOM: a space between tab label and count badge; spaces between avatar, actor name, event label and time in a timeline row; the locator on its own line under the name (block `<small>` plus a space node); the breadcrumb `Data / DATA-n` with an `aria-hidden` "/" separator. CSS rules for these classes go in `components/ui/ui.css` (count tabs, item chart) and a new `pages/data/data.css` (timeline row, name cell, breadcrumb), using the existing tokens. Accessible names stay the same |
+| L6 | `components/shell/nav.ts` `entriesFor` takes no permission input, so the Data nav has no "Field schema" entry. `SecondaryPanel.tsx` builds the Settings entries inline without it; only the settings tab strip in `pages/settings/index.tsx` has it | `entriesFor(area, can)` receives the permission check. The Data nav adds "Field schema" -> `/settings/data-fields` for `data_fields.admin`, as section 10.1 specifies. The Settings secondary nav adds the same entry under the same check. Other areas are unchanged |
+| L7 | The list State column renders only the state tag and the Incomplete tag; `asset.overdue` only colors the due date | A `danger` "Overdue" tag after the state tag when `asset.overdue` is true |
+
+#### 17.3 L2 actor resolution
+
+- New module `telescreen.inventory.actors` with `InventoryActorDirectory`, an
+  `ActorDirectory` implementation that wraps the bound directory and the
+  `CollectorConfigReader` port (both already in `WiringV14Parts`):
+  - `collector:<id>` resolves to kind `system` with the collector config's current
+    `name` as `display_name`. When the config no longer exists it resolves to
+    `Telescreen`. `ref` stays the stored ref;
+  - every other ref is delegated unchanged and in one batch, so `system:inventory` stays
+    `Telescreen`, and members, teams and tokens keep their v1.3 resolution;
+  - each distinct collector id is read once per call. Length and order of the input are
+    preserved, as the port requires.
+- `wiring_v14.py` passes `InventoryActorDirectory(parts.actors, parts.collector_configs)`
+  to `AssetQueries`. `AssetQueries` and its tests are unchanged, and both the events
+  timeline and `DataAssetDetail.created_by` use the wrapper.
+- The shared `DirectoryActorDirectory` and the issue activity are unchanged; no package
+  outside `collectors` reads `collector_configs` directly.
+- Exposure: every role and scope that holds `data.read` also holds `collectors.read`
+  (`core/permissions.py` `READ_PERMISSIONS`), and `GET /api/collectors` already returns
+  these names. No new data reaches a principal. Collector names are admin-set
+  configuration, not scanned content; the leak matrix (`tests/leak/*v14*`) and the
+  route permission tests stay unchanged and green.
+
+#### 17.4 Mock fixtures and screenshots
+
+The defects passed the run-1 mock because the fixtures never had the live shapes. The
+fixtures (`src/web/src/api/mock/fixtures/v14.ts`) gain these shapes and keep the key sets
+of `v14-shapes.json` and the 9.1 nullability:
+
+- scan and system events with `occurred_at: null` (manual events keep a value);
+- collector actors `{kind: "system", ref: "collector:col-01", display_name: <the col-01
+  name from the operations fixture>}` and a system actor `{kind: "system", ref:
+  "system:inventory", display_name: "Telescreen"}`;
+- `reference` values as `member:<handle>` and `team:<slug>` of directory fixture
+  entries (already present; asserted now);
+- `data-asset-01` with a non-null `item_count` and an `item-series` of at least 3 points.
+
+`fixtures.test.ts` asserts each of these states exists. The strict screenshots of
+`/data` and `/data/data-asset-01` (light and dark, zero browser errors) then show the
+Overdue badge, separated text, actor names, a recorded-at time, the preselected owner and
+a drawn chart.
+
+#### 17.5 Regression tests (each fails on `3c5c1dd`)
+
+| Id | Test |
+|----|------|
+| L1 | vitest: a timeline event with `occurred_at: null` and a `recorded_at` two hours ago renders "2 hours ago", never a day count; a list row with `last_seen_at: null` renders "—" |
+| L2 | pytest, offline: `InventoryActorDirectory` over SQLite with a real collector repository resolves `collector:<id>` to the config name with kind `system`, a missing config to `Telescreen`, `system:inventory` to `Telescreen`, and delegates a `member:` ref in order. An integrated test through `build_container` (new `tests/e2e/test_flow_v14_live_fixes.py`) pushes a scan for a configured collector and asserts that `GET /api/data/assets/{id}/events` shows the collector name, not "Unknown" |
+| L3 | vitest: the directory response resolves after the first render; the owner select then shows the stored `member:<handle>` option as selected; submitting the form unchanged sends the same `value_json`; a stored value missing from the directory stays selected |
+| L4 | vitest: `ItemCountChart` rendered with an empty points signal that later receives 3 points draws a path with 3 steps; the detail page with a 3-point mock series shows no "No item count history" |
+| L5 | vitest: normalized `textContent` reads "All 3" for a count tab, "<name> restored" in a timeline row, "<name> <locator>" in a list name cell, and "Data / DATA-1" in the breadcrumb |
+| L6 | vitest (`shell.test.tsx`): an admin sees "Field schema" in the Data and Settings secondary navs; a member sees it in neither |
+| L7 | vitest: an overdue list row shows the "Overdue" tag in the State column; a row that is not overdue does not |
+
+#### 17.6 Run-2 plans and manifest
+
+- One plan, `v14-p09-live-fixes` (under 400 lines). The backend part (L2) is one new
+  module, one line of wiring and its tests, so no backend/UI split is needed.
+- `v14-p09-live-fixes` writePaths:
+  - `src/telescreen/inventory/actors.py` (new), `src/telescreen/wiring_v14.py`,
+    `tests/inventory/actors/**` (new), `tests/e2e/test_flow_v14_live_fixes.py` (new);
+  - `src/web/src/pages/data/**` (including the new `data.css`),
+    `src/web/src/components/{CountTabs,ItemCountChart}.tsx` and their existing tests
+    `{CountTabs,ItemCountChart}.test.tsx`,
+    `src/web/src/components/ui/ui.css`, `src/web/src/components/shell/{nav.ts,SecondaryPanel.tsx}`,
+    `src/web/src/shell.test.tsx`;
+  - `src/web/src/api/types.ts`, `src/web/src/api/mock/fixtures/v14.ts`,
+    `src/web/src/api/mock/v14.ts`, `src/web/src/api/mock/fixtures.test.ts`,
+    `src/web/src/api/mock/mock.test.ts` (only assertions broken by the fixture changes),
+    `src/web/scripts/screenshots.ts`;
+  - nothing else: at `3c5c1dd` only `api/types.ts`, the v14 mock files and
+    `pages/data/**` read `occurred_at` or `last_seen_at` of these types (`api/client.ts`
+    uses `occurred_at` only in a request body and is unchanged).
+- `v14-p08-wiring-verification` (mode re-verify) run-2 writePaths: its plan file,
+  `src/telescreen/wiring.py`, `src/telescreen/api/app.py`, its `tests/e2e` files
+  (`test_api_routes.py`, `test_route_permissions.py`, `test_wiring_v14.py`,
+  `test_route_permissions_v14.py`, `test_flow_v14_inventory.py`,
+  `test_flow_v14_fields.py`), `tests/leak/{flows_v14,test_leak_matrix_v14}.py` and
+  `tests/contract/test_data_api_shapes.py`. It gives up `wiring_v14.py` and
+  `screenshots.ts` to p09. The design status lines and `impl-plans/README.md` move to the
+  serial finalization. The two plans' writePaths are disjoint.
+- Waves: wave A = p09, wave B = p08 re-verify. The writePaths are disjoint, but workers
+  share one working directory, so a concurrent p08 would run its whole-tree gates (full
+  pytest, leak matrix, strict screenshots) on p09's partial edits. Run serially, p08's
+  final passing commands verify the integrated tree, including the p09 fixes (conventions
+  7a). p01-p07 are `acceptedDependencies` in the run-2 manifest.
+- Serial finalization after p08 is accepted:
+  - `git mv impl-plans/active/v14-p*.md impl-plans/completed/` (p01-p09);
+  - move `telescreen-v14-20261013-f1-dispatch.json` and the run-2 manifest to
+    `impl-plans/completed/dispatch/`;
+  - move the v1.4 rows of `impl-plans/README.md` to its completed section;
+  - set the v1.4 status lines of this document, the requirements document and the
+    summary docs (architecture, data model, API and UI, collectors and ingestion, police
+    contract, masking, UI sentry) to implemented;
+  - check the README v1.4 feature section against sections 9, 10 and 17;
+  - rerun the section 14 gates on the final tree, then commit and push to
+    `feat/data-inventory` only.
 
 ## References
 
