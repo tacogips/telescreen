@@ -3,15 +3,17 @@
 **Status**: In Progress
 **Design Reference**: design-docs/specs/design-v1-4-data-inventory.md sections 9, 12, 13, 14; design-docs/specs/design-masking.md "v1.4 additions"
 **Created**: 2026-10-13
-**Last Updated**: 2026-10-13
+**Last Updated**: 2026-10-14
 
 ## Plan Metadata
 
 - planId: `v14-p08-wiring-verification`
 - planPath: `impl-plans/active/v14-p08-wiring-verification.md`
-- run 2 (manifest `telescreen-v14-20261014-f2`): wave B, mode `re-verify`, dependsOn
-  `v14-p09-live-fixes`. The run-2 writePaths are listed in "Run 2 scope" below and
-  replace the run-1 list for run 2.
+- run 3 (manifest `telescreen-v14-20261014-f3`, design 17.7): the only wave, mode
+  `re-verify`, no in-run dependencies (p01-p07 and p09 are accepted). The run-3
+  writePaths are listed in "Run 3 scope" below and replace the earlier lists.
+- run 2 (manifest `telescreen-v14-20261014-f2`): wave B, re-verify; not reached, because
+  the run-2 integration review stopped on O3 (requirements 8.1).
 - wave (run 1): 4
 - dependsOn (run 1): `v14-p04-inventory-core`, `v14-p05-scan-hooks`, `v14-p06-ui-pages`, `v14-p07-fields-retention`
 - writePaths (run 1):
@@ -43,37 +45,41 @@
 
 Read `impl-plans/conventions.md` first.
 
-## Run 2 scope (re-verify, design 17.6)
+## Run 3 scope (re-verify, design 17.7)
 
-- Code is complete. Follow the "Owner resolution" section of the Progress Log. Change code
-  only if a check fails, and then only inside the run-2 writePaths:
-  - `impl-plans/active/v14-p08-wiring-verification.md`
-  - `src/telescreen/wiring.py`
-  - `src/telescreen/api/app.py`
-  - `tests/e2e/test_api_routes.py`, `tests/e2e/test_route_permissions.py`
-  - `tests/e2e/test_wiring_v14.py`, `tests/e2e/test_route_permissions_v14.py`
-  - `tests/e2e/test_flow_v14_inventory.py`, `tests/e2e/test_flow_v14_fields.py`
-  - `tests/leak/flows_v14.py`, `tests/leak/test_leak_matrix_v14.py`
-  - `tests/contract/test_data_api_shapes.py`
-- Moved out for run 2:
-  - `src/telescreen/wiring_v14.py` and `src/web/scripts/screenshots.ts` belong to
-    `v14-p09-live-fixes`;
-  - `impl-plans/README.md` and the design status lines (deliverable 9) belong to the
-    serial finalization.
-
-  A failure in one of these is a Reconciliation request naming its owner.
-- Wave B runs after p09, so the gates cover the integrated tree including the L1-L7
-  fixes. p09's new files (`src/telescreen/inventory/actors.py`,
-  `tests/inventory/actors/**`, `tests/e2e/test_flow_v14_live_fixes.py`, its web changes)
-  are read-only here.
-- Run every command in the Verification section (strict screenshots included). Append a
-  run-2 Progress Log session with each command, its exit status and its log path. Tick
-  the E1-E7 box when the scoped and full pytest pass, and the gates box when every
-  command exits 0. The doc-status part of the gates box is done by the finalization;
-  note that in the log. Set Status to Completed.
-- Step result (conventions 7a): `verification` lists only the final passing commands;
+- Code is complete at the run-3 base (`42864aa` plus the run-3 design/plan commit).
+  Follow both "Owner resolution" sections of the Progress Log. The expected outcome is
+  zero source edits: only this plan file changes.
+- Run-3 writePaths, for gate-failure fixes only (each fix logged with the failing
+  command, cause and pre/post SHA-256):
+  - `impl-plans/active/v14-p08-wiring-verification.md` (always)
+  - `src/telescreen/wiring.py`, `src/telescreen/wiring_v14.py`, `src/telescreen/api/app.py`
+  - `src/telescreen/inventory`, `src/telescreen/workflow/queue/sql_queue.py` (O3 file)
+  - `src/telescreen_police_sdk`
+  - `tests/e2e`, `tests/leak`, `tests/contract`, `tests/inventory`, `tests/db`
+  - `db/schema` (only `mise run ddl-export` drift; never hand-edit DDL semantics)
+  - `src/web/src/pages/data`, `src/web/src/api`, `src/web/src/components`,
+    `src/web/src/shell.test.tsx`, `src/web/scripts/screenshots.ts`
+- Never touch (a failure that needs one is a Reconciliation request for the serial
+  finalization, reported, never hidden): `pyproject.toml`, `uv.lock`,
+  `src/web/package.json`, `src/web/bun.lock`, `src/telescreen/db/models`,
+  `src/telescreen/db/migrations`, `tools/typelint.py`, ruff/ty config, `README.md`,
+  `impl-plans/README.md`, `design-docs/**`, every other plan file and manifest.
+- Do not weaken a test, a lint rule or strict screenshot mode to make a gate pass. No
+  `# type: ignore` / `# ty: ignore`. No git commands except read-only `git diff` and
+  `git status`.
+- Flake rule: if `bun run test` fails, rerun it alone once. Log both runs. If it fails
+  twice, it is a real failure. Never drop a failing test.
+- Owner baseline to match or exceed: typelint 603 files clean; full pytest 1111 passed /
+  11 skipped, 0 failed; vitest 262 passed; strict screenshots with 0 state-skipped and 0
+  browser errors.
+- Append a run-3 Progress Log session: each command, its exit status, its log path and
+  the counts above. Tick the E1-E7 box when the scoped and full pytest pass, and the gates
+  box when every command exits 0. Note that the doc status lines and the index are done
+  by the serial finalization. Set Status to Completed.
+- Step result (conventions 7a): `verification` lists only the final passing commands.
   `priorVerification`, `findings`, `risks`, `authorSelfCheck.findings` and
-  `authorSelfCheck.residualRisks` are empty; skipped live and integration tests are not
+  `authorSelfCheck.residualRisks` are empty. Skipped live and integration tests are not
   listed. The run-1 E3 blocker, resolved by the owner (O2), goes only in
   `addressedFeedback`, with changed paths "none in p08 (owner test
   tests/e2e/test_flow_v14_inventory.py)" and the passing scoped pytest command.
@@ -237,6 +243,8 @@ mise run ddl-check > /tmp/telescreen-v14-p08-ddl-check.log 2>&1; echo "exit=$?"
 (cd src/web && bun install --frozen-lockfile > /tmp/telescreen-v14-p08-web-install.log 2>&1 && bun run typecheck > /tmp/telescreen-v14-p08-web-typecheck.log 2>&1 && bun run test > /tmp/telescreen-v14-p08-web-test.log 2>&1 && bun run build --outDir /tmp/telescreen-v14-p08-web --emptyOutDir > /tmp/telescreen-v14-p08-web-build.log 2>&1 && TELESCREEN_SCREENSHOTS_STRICT=1 bun run screenshots > /tmp/telescreen-v14-p08-screenshots.log 2>&1); echo "exit=$?"
 test "$(grep -c 'state-skipped' /tmp/telescreen-v14-p08-screenshots.log)" -eq 0; echo "exit=$?"
 wc -l src/telescreen/wiring.py src/telescreen/wiring_v14.py
+git diff --quiet HEAD -- pyproject.toml uv.lock src/web/package.json src/web/bun.lock src/telescreen/db/models src/telescreen/db/migrations tools/typelint.py README.md impl-plans/README.md design-docs; echo "exit=$?"
+git diff --name-only HEAD  # run 3: expected only this plan file, unless a logged gate fix
 ```
 
 Expected:

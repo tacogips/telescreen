@@ -12,8 +12,9 @@ corrections are in section 1 here and in its section 7.
 Status: design for the `v14-pNN` plans, written 2026-10-13 on `feat/data-inventory` at
 `07c975f`. It extends the implemented v1-v1.3 designs and replaces none of their
 decisions. Run 2 (2026-10-13, base `3c5c1dd`) adds section 17: the owner fixes O1 and O2
-and the live defects L1-L7, with plan `v14-p09-live-fixes`. D1-D24 are unchanged. The
-summaries are in:
+and the live defects L1-L7, with plan `v14-p09-live-fixes`. Run 3 (2026-10-14, base
+`42864aa`) adds section 17.7: p08 re-verify and the finalization. D1-D24 are unchanged.
+The summaries are in:
 
 - `design-data-model.md` ("v1.4 additions");
 - `design-api-and-ui.md` ("v1.4 endpoints");
@@ -957,6 +958,27 @@ a drawn chart.
   - check the README v1.4 feature section against sections 9, 10 and 17;
   - rerun the section 14 gates on the final tree, then commit and push to
     `feat/data-inventory` only.
+
+#### 17.7 Run 3: re-verify and finalize (2026-10-14, base `42864aa`)
+
+- Run 2 accepted p09. The owner fixes O3 (`sql_queue.py` rewrap) and O4 (item-count chart
+  height) are in requirements section 8.1. D1-D24 and sections 1-17.6 are unchanged.
+- Manifest `telescreen-v14-20261014-f3`: one wave, `v14-p08-wiring-verification` in mode
+  re-verify. p01-p07 and p09 are `acceptedDependencies`. No new plans.
+- p08 code is complete. It changes code only if a section 14 gate fails on the combined
+  tree. Run 2 stopped on a file that no plan owned (O3), so in run 3 p08 owns, for gate
+  failures only, the v1.4 surface and the O3 file: wiring, `api/app.py`,
+  `src/telescreen/inventory`, `src/telescreen/workflow/queue/sql_queue.py`,
+  `src/telescreen_police_sdk`, `tests/{e2e,leak,contract,inventory,db}`, `db/schema`
+  (export drift only; Diagra first, as in section 4), `src/web/src/{pages/data,api,components}`,
+  `src/web/src/shell.test.tsx` and `src/web/scripts/screenshots.ts`. The whole-tree globs
+  would exceed the 512-entry fanout snapshot limit. A failure outside this list, or one
+  that needs a dependency, lockfile, model or Alembic change, is a Reconciliation request
+  fixed in the serial finalization. Existing Alembic revisions stay untouched. Nothing
+  else runs concurrently.
+- The serial finalization follows 17.6. It also moves the f2 and f3 manifests to
+  `impl-plans/completed/dispatch/`. `design-docs/user-qa/pending-custom-push-resource-identity.md`
+  stays pending (owner decision).
 
 ## References
 

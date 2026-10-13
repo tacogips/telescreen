@@ -62,8 +62,13 @@ Run 2 (2026-10-14, base `3c5c1dd`, manifest `telescreen-v14-20261014-f2-dispatch
 design section 17): p01-p07 are accepted dependencies. Wave A is p09 (live fixes
 L1-L7). Wave B is p08 in mode re-verify.
 
+Run 3 (2026-10-14, base `42864aa`, manifest `telescreen-v14-20261014-f3-dispatch.json`,
+design section 17.7): p01-p07 and p09 are accepted dependencies. The only wave is p08 in
+mode re-verify. The serial finalization archives all 9 plans and the f1, f2 and f3
+manifests.
+
 The serial finalization runs after p08 is accepted. It moves the v14 plans to
-`completed/` and both dispatch manifests to `completed/dispatch/`, moves these rows to
+`completed/` and the three dispatch manifests to `completed/dispatch/`, moves these rows to
 the completed section, reruns the gates, and commits and pushes to `feat/data-inventory`.
 
 Telescreen v1 is complete (all 32 plans integration-accepted, final commit 7a8c600).
