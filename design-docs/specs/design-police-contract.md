@@ -126,7 +126,7 @@ Rules:
 
 ### Contract 1.2 (v1.4, data inventory)
 
-Status: designed 2026-10-13 (`design-v1-4-data-inventory.md` section 6.4). Minor version
+Status: implemented 2026-10-14 (`design-v1-4-data-inventory.md` section 6.4). Minor version
 `1.2` adds one optional member to `result-envelope.schema.json`, `resource_inventories`
 (at most 1000 entries). Its items are `$ref`s to a new closed schema,
 `resource-inventory.schema.json`:

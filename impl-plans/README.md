@@ -40,36 +40,7 @@ Large features are split into multiple related plans with cross-references.
 All plans share `impl-plans/conventions.md` (ownership, typing, verification and
 progress-log rules).
 
-### v1.4 (data inventory: R1-R9 of `design-docs/specs/design-v1-4-data-inventory-requirements.md`)
-
-Created 2026-10-13 on `feat/data-inventory` from `design-docs/specs/design-v1-4-data-inventory.md`
-section 13. There are 8 plans in one run. Waves run in order, and the plans of a wave have
-disjoint write paths.
-
-| Wave | Plan | Depends on | Status |
-|------|------|-----------|--------|
-| 1 | [v14-p01-foundation](./active/v14-p01-foundation.md) | - | Ready |
-| 1 | [v14-p02-db](./active/v14-p02-db.md) | - | Ready |
-| 1 | [v14-p03-ui-foundation](./active/v14-p03-ui-foundation.md) | - | Ready |
-| 2 | [v14-p04-inventory-core](./active/v14-p04-inventory-core.md) | p01, p02 | Ready |
-| 2 | [v14-p05-scan-hooks](./active/v14-p05-scan-hooks.md) | p01, p02 | Ready |
-| 2 | [v14-p06-ui-pages](./active/v14-p06-ui-pages.md) | p03 | Ready |
-| 3 | [v14-p07-fields-retention](./active/v14-p07-fields-retention.md) | p04 | Ready |
-| 4 | [v14-p08-wiring-verification](./active/v14-p08-wiring-verification.md) | p04, p05, p06, p07 | Ready |
-| run 2, A | [v14-p09-live-fixes](./active/v14-p09-live-fixes.md) | p01, p03, p04, p06, p07 | Ready |
-
-Run 2 (2026-10-14, base `3c5c1dd`, manifest `telescreen-v14-20261014-f2-dispatch.json`,
-design section 17): p01-p07 are accepted dependencies. Wave A is p09 (live fixes
-L1-L7). Wave B is p08 in mode re-verify.
-
-Run 3 (2026-10-14, base `42864aa`, manifest `telescreen-v14-20261014-f3-dispatch.json`,
-design section 17.7): p01-p07 and p09 are accepted dependencies. The only wave is p08 in
-mode re-verify. The serial finalization archives all 9 plans and the f1, f2 and f3
-manifests.
-
-The serial finalization runs after p08 is accepted. It moves the v14 plans to
-`completed/` and the three dispatch manifests to `completed/dispatch/`, moves these rows to
-the completed section, reruns the gates, and commits and pushes to `feat/data-inventory`.
+There are no active plans.
 
 Telescreen v1 is complete (all 32 plans integration-accepted, final commit 7a8c600).
 Telescreen v1.1 (F1-F10 of `design-docs/specs/design-v1-1-dspm-adoption.md`) is complete:
@@ -79,12 +50,51 @@ Telescreen v1.2 (N1-N3, R1, R2 of
 plans are integration-accepted and archived under `completed/` (2026-10-12).
 Telescreen v1.3 (S0-S10 of `design-docs/specs/design-v1-3-sentry-parity.md`) is complete:
 all 17 v13 plans are accepted and archived under `completed/` (2026-10-13).
+Telescreen v1.4 (R1-R9 of `design-docs/specs/design-v1-4-data-inventory-requirements.md`)
+is complete: all 9 v14 plans are accepted and archived under `completed/` (2026-10-14).
 Run dispatch manifests, including the v1.1 manifests `telescreen-v11-20261010-c1` to `-c4`,
-the v1.2 manifests `telescreen-v12-20261011-d1` to `-d4` and the v1.3 manifests
-`telescreen-v13-20261012-e1`, `-e2`, `telescreen-v13-20261013-e3` and `-e4`, are archived
-under `completed/dispatch/`.
+the v1.2 manifests `telescreen-v12-20261011-d1` to `-d4`, the v1.3 manifests
+`telescreen-v13-20261012-e1`, `-e2`, `telescreen-v13-20261013-e3` and `-e4`, and the v1.4
+manifests `telescreen-v14-20261013-f1`, `telescreen-v14-20261014-f2` and `-f3`, are
+archived under `completed/dispatch/`.
 
 ## Completed Plans
+
+### v1.4 (data inventory: R1-R9 of `design-docs/specs/design-v1-4-data-inventory-requirements.md`)
+
+Created 2026-10-13 on `feat/data-inventory` from `design-docs/specs/design-v1-4-data-inventory.md`
+section 13. Waves ran in order, and the plans of a wave had disjoint write paths. All 9
+plans were archived to `completed/` (and the f1-f3 manifests to `completed/dispatch/`) by
+the serial finalization on 2026-10-14, after p08 passed test integrity and adversarial
+review in run 3.
+
+Dispatch runs (later runs record accepted plans as `acceptedDependencies`):
+
+- run 1 (session 15, manifest `completed/dispatch/telescreen-v14-20261013-f1-dispatch.json`):
+  p01-p08 in waves 1-4. p01-p07 were accepted; the owner's live verification then fixed O1
+  and added the E3 full-listing flow (O2) (requirements section 8);
+- run 2 (session 16, base `3c5c1dd`, manifest
+  `completed/dispatch/telescreen-v14-20261014-f2-dispatch.json`, design section 17): wave A
+  p09 (live fixes L1-L7), wave B p08 re-verify. p09 was integration-accepted; the run
+  stopped in integration review on an unowned ruff E501 line. The owner fixed it (O3) and
+  the item-count chart height (O4) (requirements section 8.1);
+- run 3 (session 17, base `42864aa`, manifest
+  `completed/dispatch/telescreen-v14-20261014-f3-dispatch.json`, design section 17.7): p08
+  re-verify only, with no source change. ruff, typelint (603 files), ty, pytest (1111
+  passed, 11 skipped), uv build, ddl-check, web typecheck, vitest (262 passed), build and
+  strict screenshots (0 skipped states, 0 browser errors) passed.
+
+| Plan | Wave | Depends On | Design Reference |
+|------|------|------------|------------------|
+| `completed/v14-p01-foundation.md` | 1 | - | v1.4 s3, s6.3, s6.4, s8.1, s13; Contract 1.2 |
+| `completed/v14-p02-db.md` | 1 | - | v1.4 s4, D23; design-data-model.md v1.4 additions |
+| `completed/v14-p03-ui-foundation.md` | 1 | - | v1.4 s9, s10; design-ui-sentry.md s12 |
+| `completed/v14-p04-inventory-core.md` | 2 | p01, p02 | v1.4 s2, s5, s6, s9, s11, s12 |
+| `completed/v14-p05-scan-hooks.md` | 2 | p01, p02 | v1.4 s5.1, s5.4, s6.3, s6.4; v1.4 inventory hooks |
+| `completed/v14-p06-ui-pages.md` | 2 | p03 | v1.4 s7.2, s9, s10; design-ui-sentry.md s12 |
+| `completed/v14-p07-fields-retention.md` | 3 | p04 | v1.4 s2 (D14-D18), s7, s8, s9, s11, s12 |
+| `completed/v14-p09-live-fixes.md` | run 2, A | p01, p03, p04, p06, p07 | v1.4 s17; requirements s8 |
+| `completed/v14-p08-wiring-verification.md` | 4 (re-verified in runs 2 and 3) | p04, p05, p06, p07, p09 | v1.4 s9, s12-s14, s17.7; design-masking.md v1.4 |
 
 ### v1.3 (Sentry parity: S0-S10 of `design-docs/specs/design-v1-3-sentry-parity.md`)
 
@@ -279,6 +289,11 @@ Only plans from eligible phases should be read to minimize context loading.
 | 20 (v1.3 wave W3) | COMPLETED | Phase 19 (per-plan dependencies) |
 | 21 (v1.3 wave W4) | COMPLETED | Phase 20 |
 | 22 (v1.3 wave W5) | COMPLETED | Phase 21 |
+| 23 (v1.4 wave 1) | COMPLETED | Phase 22 |
+| 24 (v1.4 wave 2) | COMPLETED | Phase 23 (per-plan dependencies) |
+| 25 (v1.4 wave 3) | COMPLETED | Phase 24 |
+| 26 (v1.4 run 2 wave A) | COMPLETED | Phase 25 |
+| 27 (v1.4 wave 4) | COMPLETED | Phase 26 |
 
 Run B added `p30-ui-design-system.md` and `p31-ui-mock-api.md` (wave B1, before the
 reworked p12, p13 and p14), split the end-to-end and leak tests into p28b and p28c after
@@ -322,7 +337,12 @@ PHASE_TO_PLANS = {
   20: ["v13-p06-bulk-merge-backend.md", "v13-p07-issue-detail-backend.md",
        "v13-p10-dashboard-integrations-backend.md", "v13-p14-ui-detail.md"],
   21: ["v13-p12-wiring.md"],
-  22: ["v13-p17-verification-docs.md"]
+  22: ["v13-p17-verification-docs.md"],
+  23: ["v14-p01-foundation.md", "v14-p02-db.md", "v14-p03-ui-foundation.md"],
+  24: ["v14-p04-inventory-core.md", "v14-p05-scan-hooks.md", "v14-p06-ui-pages.md"],
+  25: ["v14-p07-fields-retention.md"],
+  26: ["v14-p09-live-fixes.md"],
+  27: ["v14-p08-wiring-verification.md"]
 }
 ```
 

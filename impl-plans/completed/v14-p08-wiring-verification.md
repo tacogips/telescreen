@@ -1,6 +1,6 @@
 # V14-P08 Wiring, Route Permissions, E2E Flows, Leak Matrix, Shape Contract and Doc Status
 
-**Status**: In Progress
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-4-data-inventory.md sections 9, 12, 13, 14; design-docs/specs/design-masking.md "v1.4 additions"
 **Created**: 2026-10-13
 **Last Updated**: 2026-10-14
@@ -260,9 +260,9 @@ Expected:
 - [x] Wiring binds every v1.4 port, provider, handler and router, with the wiring tests
   green.
 - [x] `test_route_permissions_v14.py` covers all 22 routes.
-- [ ] E1-E7 and leak flows 1-7 pass.
+- [x] E1-E7 and leak flows 1-7 pass.
 - [x] The shape contract test passes.
-- [ ] Every gate above exits 0. The doc status lines are updated only after that.
+- [x] Every gate above exits 0. The doc status lines are updated only after that.
 - [x] The Progress Log has hashes, and every command with its exit status and log path.
 
 ## Progress Log
@@ -349,3 +349,29 @@ requirements section 8.1. Owner gates on the combined tree, all exit 0:
 
 p08 now needs only re-verification on this tree. Follow the first owner resolution
 above and conventions 7a.
+
+### Session: 2026-10-14 01:07
+**Tasks Completed**: Re-verified run 3 on the shared tree. The owner-resolved E3 full-listing test is present and passed with the scoped E1-E7, leak, and contract suite. No source files required changes.
+**Tasks In Progress**: None in p08. Serial finalization owns plan/manifest archival, index and design status updates, and commit/push.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `src/telescreen/wiring.py` before=cf80c5078a89dc4571568b839e4a01b445e21b1a669abbc3bd2dc14cdc27f241 after=cf80c5078a89dc4571568b839e4a01b445e21b1a669abbc3bd2dc14cdc27f241; `src/telescreen/wiring_v14.py` before=554c955b00b6818cef80b8f9598e43d081ab868f93704e48c44a1aea92191630 after=554c955b00b6818cef80b8f9598e43d081ab868f93704e48c44a1aea92191630; `tests/e2e/test_flow_v14_inventory.py` before=61adfabf543ab7af78fff4f8cde6cc58aaed1cc24bf7376b5d827d9fc95e1e8c after=61adfabf543ab7af78fff4f8cde6cc58aaed1cc24bf7376b5d827d9fc95e1e8c; `src/telescreen/workflow/queue/sql_queue.py` before=5558a1c3adac00bf53599165b9b98344e283abf9777196a44f79ac8c8e733e14 after=5558a1c3adac00bf53599165b9b98344e283abf9777196a44f79ac8c8e733e14; plan before=835dbb29e6f5d47f5d9da5fa912e1b042b5c829b587c7599bfad642d67445346 after=bba4630b62d5d15f28ef6ead5e7d57eed76cd46e014751e2280a5f2e59d26200.
+**Verification**:
+- `uv run --frozen ruff format --check .` -> exit 0 (log: `/tmp/telescreen-v14-p08-format.log`).
+- `uv run --frozen ruff check .` -> exit 0 (log: `/tmp/telescreen-v14-p08-ruff.log`).
+- `uv run --frozen python tools/typelint.py` -> exit 0, 603 files clean (log: `/tmp/telescreen-v14-p08-typelint.log`).
+- `uv run --frozen ty check` -> exit 0 (log: `/tmp/telescreen-v14-p08-ty.log`).
+- `uv run --frozen pytest -p no:cacheprovider tests/e2e tests/leak tests/contract` -> exit 0, 86 passed (log: `/tmp/telescreen-v14-p08-pytest-scoped.log`).
+- `uv run --frozen pytest -p no:cacheprovider` -> exit 0, 1111 passed, 11 expected offline/live skips, 0 failed (log: `/tmp/telescreen-v14-p08-pytest-all.log`).
+- `uv build --out-dir /tmp/telescreen-v14-p08-dist` -> exit 0 (log: `/tmp/telescreen-v14-p08-build.log`).
+- `mise run ddl-check` -> exit 0, 10 passed (log: `/tmp/telescreen-v14-p08-ddl-check.log`).
+- `cd src/web && bun install --frozen-lockfile` -> exit 0 (log: `/tmp/telescreen-v14-p08-web-install.log`).
+- `cd src/web && bun run typecheck` -> exit 0 (log: `/tmp/telescreen-v14-p08-web-typecheck.log`).
+- `cd src/web && bun run test` -> exit 0, 262 passed across 49 files (log: `/tmp/telescreen-v14-p08-web-test.log`).
+- `cd src/web && bun run build --outDir /tmp/telescreen-v14-p08-web --emptyOutDir` -> exit 0 (log: `/tmp/telescreen-v14-p08-web-build.log`).
+- `cd src/web && TELESCREEN_SCREENSHOTS_STRICT=1 bun run screenshots` -> exit 0, zero state-skipped and no browser-error marker (log: `/tmp/telescreen-v14-p08-screenshots.log`).
+- Wiring limits and route composition: `test "$(wc -l < src/telescreen/wiring.py)" -lt 1000 && test "$(wc -l < src/telescreen/wiring_v14.py)" -lt 1000` -> exit 0 (808 and 145 lines); `! grep -n include_router src/telescreen/wiring.py src/telescreen/wiring_v14.py` -> exit 0.
+- Read-only paths: `git diff --quiet HEAD -- pyproject.toml uv.lock src/web/package.json src/web/bun.lock src/telescreen/db/models src/telescreen/db/migrations tools/typelint.py README.md impl-plans/README.md design-docs` -> exit 0.
+- Run-3 diff boundary: `git diff --name-only HEAD` before this plan update was empty; p08 changed only its plan after the log update. No implementation source changes.
+- Plan completion boxes: `test "$(grep -c '^- \[ \]' impl-plans/active/v14-p08-wiring-verification.md)" -eq 0` -> exit 0 after this update.
+**Notes**: The strict screenshot log contains no `state-skipped` or browser-error entries. Live and integration tests are expected to skip offline and are not listed as verification risks. Per run-3 scope, design status lines and index updates remain serial-finalization work.

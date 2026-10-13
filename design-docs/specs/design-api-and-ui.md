@@ -165,7 +165,7 @@ text.
 
 ### v1.4 endpoints
 
-Status: designed 2026-10-13. Behavior, query parameters and response shapes are in
+Status: implemented 2026-10-14. Behavior, query parameters and response shapes are in
 `design-v1-4-data-inventory.md` section 9. There is no literal segment under
 `/api/data/assets/`.
 

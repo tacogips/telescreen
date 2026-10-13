@@ -235,7 +235,7 @@ Status: implemented 2026-10-13.
 
 v1.4 additions (`design-v1-4-data-inventory.md` sections 3 and 13):
 
-Status: designed 2026-10-13.
+Status: implemented 2026-10-14.
 
 - New L3 package `telescreen.inventory` owns `data_assets`, `data_asset_events`,
   `data_asset_items`, `data_fields` and `data_field_values`. It reads issue, directory and

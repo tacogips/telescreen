@@ -9,8 +9,9 @@ person, planned deletion date). The accepted requirements are
 acceptance). Its evidence was re-verified against the code for this design; the
 corrections are in section 1 here and in its section 7.
 
-Status: design for the `v14-pNN` plans, written 2026-10-13 on `feat/data-inventory` at
-`07c975f`. It extends the implemented v1-v1.3 designs and replaces none of their
+Status: implemented 2026-10-14 on `feat/data-inventory`; the 9 `v14-pNN` plans and the
+f1-f3 dispatch manifests are archived under `impl-plans/completed/`. Written 2026-10-13 at
+`07c975f` as the design for the `v14-pNN` plans. It extends the implemented v1-v1.3 designs and replaces none of their
 decisions. Run 2 (2026-10-13, base `3c5c1dd`) adds section 17: the owner fixes O1 and O2
 and the live defects L1-L7, with plan `v14-p09-live-fixes`. Run 3 (2026-10-14, base
 `42864aa`) adds section 17.7: p08 re-verify and the finalization. D1-D24 are unchanged.

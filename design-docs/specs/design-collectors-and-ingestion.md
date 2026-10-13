@@ -191,7 +191,7 @@ collectors-core owns `src/telescreen/collectors/sweep.py`:
 
 ### v1.4 inventory hooks
 
-Status: designed 2026-10-13 (`design-v1-4-data-inventory.md` sections 5 and 6). Issue
+Status: implemented 2026-10-14 (`design-v1-4-data-inventory.md` sections 5 and 6). Issue
 behavior is unchanged.
 
 - Each collector config has `inventory_mode`:

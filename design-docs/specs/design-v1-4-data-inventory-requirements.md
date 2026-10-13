@@ -1,6 +1,8 @@
 # Telescreen v1.4: Data Inventory Requirements
 
-Status: accepted requirements, owner request of 2026-10-13. Input to the v1.4 design and plans.
+Status: implemented 2026-10-14 (`design-v1-4-data-inventory.md`, plans `v14-p01` to
+`v14-p09` archived under `impl-plans/completed/`). Accepted requirements, owner request of
+2026-10-13. Input to the v1.4 design and plans.
 Verified against the code at `d328fbb` (branch `feat/diagra-ddl`) on 2026-10-13, and
 re-checked at `07c975f` by the v1.4 design author (corrections in section 7).
 

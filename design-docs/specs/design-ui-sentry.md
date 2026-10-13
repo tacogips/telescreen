@@ -665,7 +665,7 @@ is no new dependency; charts are hand-rendered SVG (`Sparkline`, `MiniBarChart`)
 
 ### 12. v1.4 additions (data inventory)
 
-Status: designed 2026-10-13. `design-v1-4-data-inventory.md` section 10 is binding.
+Status: implemented 2026-10-14. `design-v1-4-data-inventory.md` section 10 is binding.
 
 - A new "Data" area (`/data`, `/data/new`, `/data/:id`) with the lucide `Database` rail
   icon, and Settings > Field schema (`/settings/data-fields`).

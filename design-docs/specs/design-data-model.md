@@ -279,7 +279,7 @@ Details hold ids, enums, counts and field names only.
 
 ### v1.4 additions (revision `0005_v1_4`)
 
-Status: designed 2026-10-13. Behavior is in `design-v1-4-data-inventory.md` (section 4
+Status: implemented 2026-10-14. Behavior is in `design-v1-4-data-inventory.md` (section 4
 lists every column). The Diagra document is changed first. Then one new revision,
 `0005_v1_4` (`down_revision = "0004_v1_3"`), adds everything below. It is idempotent in the
 same way as `0004_v1_3`, and earlier revisions are never edited.
