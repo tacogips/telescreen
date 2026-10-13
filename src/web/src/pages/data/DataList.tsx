@@ -102,8 +102,8 @@ export default function DataList(): JSX.Element {
       <Show when={loadedRows().length > 0} fallback={<EmptyState title="No data assets"><p>Data assets appear here when discovered or registered.</p></EmptyState>}>
         <Table><thead><tr><th>Name</th><th>Source</th><th>State</th><th>Items</th><th>Open issues</th><th>Owner</th><th>Deletion due</th><th>Last seen</th></tr></thead><tbody>
           <For each={loadedRows()}>{(asset) => <tr>
-            <td><A href={`/data/${encodeURIComponent(asset.id)}`}><strong>{asset.name}</strong></A><small>{asset.display_locator}</small></td><td>{asset.source}</td><td><Tag variant={stateVariant(asset.state)}>{asset.state}</Tag><Show when={asset.incomplete}><Tag variant="warning">Incomplete</Tag></Show></td>
-            <td>{asset.item_count ?? "—"}<Show when={asset.item_trend.length > 1}><Sparkline values={[...asset.item_trend]} /></Show></td><td>{asset.open_issue_count}</td><td>{asset.owner ? <>{Avatar({ name: asset.owner.display_name, ref: asset.owner.ref, size: 22 })} {asset.owner.display_name}</> : "—"}</td><td classList={{ "text-danger": asset.overdue }}>{asset.deletion_due ?? "—"}</td><td>{new Date(asset.last_seen_at).toLocaleString()}</td>
+            <td><A href={`/data/${encodeURIComponent(asset.id)}`}><strong>{asset.name}</strong>{" "}<small class="data-locator">{asset.display_locator}</small></A></td><td>{asset.source}</td><td><Tag variant={stateVariant(asset.state)}>{asset.state}</Tag><Show when={asset.overdue}><Tag variant="danger">Overdue</Tag></Show><Show when={asset.incomplete}><Tag variant="warning">Incomplete</Tag></Show></td>
+            <td>{asset.item_count ?? "—"}<Show when={asset.item_trend.length > 1}><Sparkline values={[...asset.item_trend]} /></Show></td><td>{asset.open_issue_count}</td><td>{asset.owner ? <>{Avatar({ name: asset.owner.display_name, ref: asset.owner.ref, size: 22 })} {asset.owner.display_name}</> : "—"}</td><td classList={{ "text-danger": asset.overdue }}>{asset.deletion_due ?? "—"}</td><td>{asset.last_seen_at === null ? "—" : new Date(asset.last_seen_at).toLocaleString()}</td>
           </tr>}</For>
         </tbody></Table>
       </Show>

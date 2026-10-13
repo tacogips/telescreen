@@ -184,3 +184,20 @@ of them):
 
 The mock fixtures must also cover null `occurred_at`, collector actors, `reference`
 values and a multi-point item series, so the strict screenshots show these states.
+
+### 8.1 After run 2 (session 16)
+
+Run 2 integrated and accepted v14-p09-live-fixes (L1-L7). Its integration review stopped
+because owner fix O1 left one 101-character line in `src/telescreen/workflow/queue/sql_queue.py`
+(ruff E501), a file no v14 plan owns. Owner fixes in the run-3 checkpoint:
+
+| Id | Defect | Fix |
+|----|--------|-----|
+| O3 | `sql_queue.py` line over 100 characters broke repo-wide `ruff format --check` and `ruff check` | `ruff format` rewrap only; no behavior change |
+| O4 | Live UI: after the L4 fix the item-count SVG had `width: 100%` and a viewBox but no height, so a 3-point series (viewBox 48x72) rendered about 1500 px tall | `ItemCountChart` sets the `height` attribute (CSS `max-height: 160px`); vitest `has a fixed pixel height so a few points cannot stretch it to the viewBox ratio` |
+
+Owner live re-check on the run-2 tree: the scripted API flow passed 31 of 31 checks,
+including the overdue email to the owner in Mailpit with no raw values. The SSO browser
+smoke as alice showed L1-L7 fixed and no page, console or API errors on the Data list,
+tabs, registration, both detail pages, the field schema, the dashboard, collectors and
+issues.

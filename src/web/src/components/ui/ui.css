@@ -488,3 +488,24 @@ select {
 .priority-signal.medium rect:nth-child(1) {
   opacity: 0.25;
 }
+.count-tabs {
+  display: flex;
+  gap: var(--space-md);
+}
+.count-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+.count-badge {
+  padding: var(--space-2xs) var(--space-sm);
+  border-radius: var(--radius-full);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+.item-count-chart {
+  display: block;
+  width: 100%;
+  /* The height attribute fixes the size; without it the viewBox ratio sets it. */
+  max-height: 160px;
+}

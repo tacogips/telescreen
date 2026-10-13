@@ -5,6 +5,7 @@ import { Unavailable } from "../../components/Unavailable";
 import DataDetail from "./DataDetail";
 import DataList from "./DataList";
 import DataRegister from "./DataRegister";
+import "./data.css";
 
 /** Routes the Data area to its list, registration form, or asset detail. */
 export default function DataPage(): JSX.Element {

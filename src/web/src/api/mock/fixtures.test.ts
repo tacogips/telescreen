@@ -93,6 +93,13 @@ describe("masked fixture corpus", () => {
     expect(v14Assets.filter((asset) => asset.overdue).length).toBeGreaterThanOrEqual(3);
     expect(v14Assets.filter((asset) => asset.incomplete).length).toBeGreaterThanOrEqual(3);
     expect(new Set(v14Events.map((item) => item.kind)).size).toBe(10);
+    expect(v14Events.some((item) => item.occurred_at === null)).toBe(true);
+    expect(v14Events.some((item) => item.actor.ref.startsWith("collector:"))).toBe(true);
+    expect(v14Events.some((item) => item.actor.ref === "system:inventory")).toBe(true);
+    const first = v14AssetDetails.find((asset) => asset.id === "data-asset-01");
+    const owner = first?.fields.find((slot) => slot.key === "owner")?.value_json;
+    expect(owner).toBe(JSON.stringify(`member:${memberFixtures.find((member) => member.active)?.handle}`));
+    expect(v14Assets.find((asset) => asset.id === "data-asset-01")?.item_trend.length).toBeGreaterThanOrEqual(3);
     expect(v14Items.some((item) => item.removed_at !== null)).toBe(true);
   });
 

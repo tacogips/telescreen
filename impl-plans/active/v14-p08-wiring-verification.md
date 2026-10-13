@@ -326,3 +326,18 @@ the final passing commands in `verification`; leave `priorVerification` empty
 ran the live stack and recorded it in section 8 of the requirements. Tick the E1-E7 box
 when the scoped and full pytest pass. The run-1 evidence fingerprint is superseded by
 this resolution.
+
+### Owner resolution 2 (2026-10-14, before run 3)
+
+Run 2 accepted v14-p09-live-fixes. Its integration review (IR-F2-SQLQUEUE-FORMAT-OWNERSHIP)
+found that `src/telescreen/workflow/queue/sql_queue.py` failed ruff E501. The owner
+rewrapped it with `ruff format` (O3) and fixed the item-count chart height (O4); see
+requirements section 8.1. Owner gates on the combined tree, all exit 0:
+- ruff format and check, typelint (603 files), ty, full pytest 1111 passed / 11 skipped,
+  uv build, `mise run ddl-check`;
+- web typecheck, vitest 262 passed (49 files; one earlier run failed under heavy
+  concurrent load and passed on three reruns), build, and strict screenshots with 0
+  skipped states.
+
+p08 now needs only re-verification on this tree. Follow the first owner resolution
+above and conventions 7a.

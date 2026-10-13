@@ -33,7 +33,9 @@ class SqlTaskQueue:
         if len(spec.ref_id) > REF_ID_MAX_LENGTH:
             raise ValueError(f"task ref_id exceeds {REF_ID_MAX_LENGTH} characters")
         if len(spec.idempotency_key) > IDEMPOTENCY_KEY_MAX_LENGTH:
-            raise ValueError(f"task idempotency_key exceeds {IDEMPOTENCY_KEY_MAX_LENGTH} characters")
+            raise ValueError(
+                f"task idempotency_key exceeds {IDEMPOTENCY_KEY_MAX_LENGTH} characters"
+            )
         existing: str | None = await session.scalar(
             select(EngineTaskRow.id).where(EngineTaskRow.idempotency_key == spec.idempotency_key)
         )

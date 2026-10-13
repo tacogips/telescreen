@@ -18,6 +18,7 @@ from telescreen.api.routers.data_assets import DataAssetsRouterDeps, build_data_
 from telescreen.api.routers.data_fields import DataFieldsRouterDeps, build_data_fields_router
 from telescreen.core.clock import Clock
 from telescreen.core.config import TelescreenSettings
+from telescreen.inventory.actors import InventoryActorDirectory
 from telescreen.inventory.assets import AssetService
 from telescreen.inventory.export import AssetExporter
 from telescreen.inventory.fields import FieldService
@@ -88,7 +89,9 @@ def build_v14(parts: WiringV14Parts) -> WiringV14:
     reconciler: InventoryReconcilerImpl = InventoryReconcilerImpl(
         parts.collector_configs, repository, parts.clock
     )
-    queries: AssetQueries = AssetQueries(parts.issue_reader, parts.actors)
+    queries: AssetQueries = AssetQueries(
+        parts.issue_reader, InventoryActorDirectory(parts.actors, parts.collector_configs)
+    )
     assets: AssetService = AssetService(repository, parts.audit, parts.redactor, parts.clock)
     fields: FieldService = FieldService(parts.audit, parts.redactor, parts.clock)
     validator: ValueValidator = ValueValidator(parts.recipients, parts.redactor)

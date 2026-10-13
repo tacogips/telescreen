@@ -1,6 +1,6 @@
 # V14-P09 Live Fixes L1-L7 (Timeline Time, Collector Actors, Reference Select, Chart, Text, Nav, Overdue)
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-4-data-inventory.md section 17 (17.2-17.6); design-docs/specs/design-v1-4-data-inventory-requirements.md section 8
 **Created**: 2026-10-14
 **Last Updated**: 2026-10-14
@@ -311,14 +311,34 @@ Expected:
 
 ## Completion Criteria
 
-- [ ] D1: `InventoryActorDirectory` and the one-line `wiring_v14.py` change; unit and e2e
+- [x] D1: `InventoryActorDirectory` and the one-line `wiring_v14.py` change; unit and e2e
   tests pass and were red on the base.
-- [ ] D2-D7: each L1 and L3-L7 vitest passes and was red on the base (Progress Log).
-- [ ] D8: fixture states asserted in `fixtures.test.ts`; `tests/leak/test_ui_fixtures.py`
+- [x] D2-D7: each L1 and L3-L7 vitest passes and was red on the base (Progress Log).
+- [x] D8: fixture states asserted in `fixtures.test.ts`; `tests/leak/test_ui_fixtures.py`
   passes.
-- [ ] Every Verification command exits 0; Progress Log has pre/post SHA-256 per file,
+- [x] Every Verification command exits 0; Progress Log has pre/post SHA-256 per file,
   each command with its exit status and log path, and the red evidence per defect.
 
 ## Progress Log
 
-(append one entry per session, conventions section 8)
+### Session: 2026-10-14 00:30
+**Tasks Completed**: D1-D9. Added inventory actor resolution and its push-flow regression; fixed L1-L7; updated live-shaped fixtures and regression coverage.
+**Tasks In Progress**: None.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: Per-file before/after SHA-256 values are in `tmp/telescreen-v14-20261014-f2/p09-evidence/final-file-hashes.txt` (base `3c5c1dd`; new files marked absent). The plan's final hash is recorded there after this update.
+**Verification**:
+- `uv run --frozen ruff format --check --no-cache src/telescreen/inventory/actors.py src/telescreen/wiring_v14.py tests/inventory/actors tests/e2e/test_flow_v14_live_fixes.py` -> exit 0 (log: `/tmp/telescreen-v14-p09-format-final.log`).
+- `uv run --frozen ruff check --no-cache src/telescreen/inventory/actors.py src/telescreen/wiring_v14.py tests/inventory/actors tests/e2e/test_flow_v14_live_fixes.py` -> exit 0 (log: `/tmp/telescreen-v14-p09-ruff-final.log`).
+- `uv run --frozen python tools/typelint.py` and p09-path filter -> exit 0, zero p09 findings (log: `/tmp/telescreen-v14-p09-typelint-final.log`).
+- `uv run --frozen ty check` -> exit 0 (log: `/tmp/telescreen-v14-p09-ty-final.log`).
+- `uv run --frozen pytest -p no:cacheprovider tests/inventory tests/e2e/test_flow_v14_live_fixes.py tests/e2e/test_wiring_v14.py tests/leak` -> exit 0, 51 passed (log: `/tmp/telescreen-v14-p09-pytest-scoped-final.log`).
+- `uv run --frozen pytest -p no:cacheprovider` -> exit 0, 1,111 passed and 11 environment-dependent skips (log: `/tmp/telescreen-v14-p09-pytest-all-final.log`).
+- `cd src/web && bun install --frozen-lockfile && bun run typecheck && bun run test && bun run build --outDir /tmp/telescreen-v14-p09-web --emptyOutDir && TELESCREEN_SCREENSHOTS_STRICT=1 bun run screenshots` -> exit 0; Vitest 261 passed (49 files). Logs: `/tmp/telescreen-v14-p09-web-install.log`, `/tmp/telescreen-v14-p09-web-typecheck.log`, `/tmp/telescreen-v14-p09-web-test.log`, `/tmp/telescreen-v14-p09-web-build.log`, `/tmp/telescreen-v14-p09-screenshots.log`.
+- Strict screenshot state-skipped and browser-error checks -> exit 0, both counts zero (screenshot log above).
+- Forbidden-path `git diff --quiet 3c5c1dd -- ...` -> exit 0; `v14-shapes.json` unchanged (logless assertion, exit 0).
+**Notes**:
+- Red evidence before fixes: L1-L2 and L4-L6/D8 in `/tmp/telescreen-v14-p09-red-web.log` and `/tmp/telescreen-v14-p09-red-e2e.log`; the old timeline rendered null as 20,740 days ago, the e2e actor was `unknown`, count text normalized as `All8`, list name and locator ran together, schema nav was absent, chart did not update, and fixtures lacked null event times.
+- Targeted baseline mutations confirmed L3 and L7: `/tmp/telescreen-v14-p09-red-l3-mutation.log` failed both reference selection/current-value cases; `/tmp/telescreen-v14-p09-red-l7-mutation.log` failed the isolated overdue-tag assertion. These expected failures are evidence only, not passing verification.
+- Superseded setup/check attempts and their final reruns: `/tmp/telescreen-v14-p09-red-python.log` first exposed the missing actor module plus an invalid positional e2e fixture; the corrected e2e regression then failed specifically on `unknown` in `/tmp/telescreen-v14-p09-red-e2e.log`, and both tests now pass in the scoped pytest log. `/tmp/telescreen-v14-p09-format.log` found formatting differences, corrected by targeted formatting and confirmed by the final format log. `/tmp/telescreen-v14-p09-ruff-final.log` first found import order, and `/tmp/telescreen-v14-p09-ty-final.log` first found an untyped empty JSON fixture; both pass in those final logs after correction. Early web checks `/tmp/telescreen-v14-p09-web-typecheck-2.log`, `/tmp/telescreen-v14-p09-web-typecheck-3.log`, `/tmp/telescreen-v14-p09-web-focused-1.log`, and `/tmp/telescreen-v14-p09-web-focused-2.log` exposed nullable sorting/rendering typing, test harness issues, and a JSX delimiter; final typecheck and full Vitest logs pass.
+- The full pytest skipped only offline integration/live cases requiring external service variables.

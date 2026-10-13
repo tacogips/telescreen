@@ -15,7 +15,7 @@ const fields: DataField[] = [
 const assets: DataAsset[] = Array.from({ length: 24 }, (_, index): DataAsset => {
   const number = index + 1;
   const state = states[index % states.length]!;
-  const itemCount = index % 3 === 0 ? null : 12 + index;
+  const itemCount = index % 3 === 2 ? null : 12 + index;
   const due = index % 5 === 0 ? "2026-10-01" : index % 4 === 0 ? "2026-11-30" : null;
   return {
     id: `data-asset-${String(number).padStart(2, "0")}`, short_id: `DATA-${number}`, number,
@@ -35,7 +35,7 @@ const details: DataAssetDetail[] = assets.map((asset) => ({
   missing_required: asset.incomplete ? ["purpose"] : [], open_issues: asset.open_issue_count > 0 ? [{ issue_id: "v13-iss-01", short_id: "TELE-1" }] : [],
 }));
 const events: DataEvent[] = eventKinds.map((kind, index) => ({
-  id: `data-event-${String(index + 1).padStart(2, "0")}`, kind, occurred_at: `2026-10-${String(index + 1).padStart(2, "0")}T10:00:00Z`, recorded_at: `2026-10-${String(index + 1).padStart(2, "0")}T10:01:00Z`, actor: { kind: "member", ref: "member:alex", display_name: "Alex Morgan" },
+  id: `data-event-${String(index + 1).padStart(2, "0")}`, kind, occurred_at: ["discovered", "items_changed", "values_changed", "deleted", "restored", "tracking_stopped", "tracking_resumed"].includes(kind) ? null : `2026-10-${String(index + 1).padStart(2, "0")}T10:00:00Z`, recorded_at: `2026-10-${String(index + 1).padStart(2, "0")}T10:01:00Z`, actor: kind === "tracking_stopped" || kind === "tracking_resumed" ? { kind: "system", ref: "system:inventory", display_name: "Telescreen" } : ["discovered", "items_changed", "values_changed", "deleted", "restored"].includes(kind) ? { kind: "system", ref: "collector:col-01", display_name: "slack collection" } : { kind: "member", ref: "member:alex", display_name: "Alex Morgan" },
   items_added: kind === "items_changed" ? 3 : null, items_removed: kind === "items_changed" ? 1 : null, item_count_after: kind === "items_changed" ? 12 : null, values_added: kind === "values_changed" ? 1 : null, values_removed: kind === "values_changed" ? 0 : null, value_count_after: kind === "values_changed" ? 2 : null, field_key: kind === "metadata_changed" ? "purpose" : null, old_value: kind === "metadata_changed" ? "Analytics" : null, new_value: kind === "metadata_changed" ? "Operations" : null, note: kind === "manual_change" ? "Masked manual adjustment" : null,
 }));
 const items: DataItem[] = Array.from({ length: 12 }, (_, index) => ({ id: `data-item-${String(index + 1).padStart(2, "0")}`, kind: index < 8 ? "item" : "value", key_prefix: `a${(index + 1).toString(16)}b3c4d5e6f7`, first_seen_at: "2026-10-02T00:00:00Z", removed_at: index === 2 || index === 9 ? "2026-10-12T00:00:00Z" : null }));

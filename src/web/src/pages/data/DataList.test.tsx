@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { createMemoryHistory, MemoryRouter, Route } from "@solidjs/router";
 import { afterEach, expect, it, vi, type MockInstance } from "vitest";
 import { setSession } from "../../auth/session";
@@ -7,7 +7,7 @@ import DataPage from "./index";
 afterEach(() => { cleanup(); sessionStorage.clear(); vi.restoreAllMocks(); });
 
 const assets = [
-  { id: "asset-a", short_id: "DATA-1", number: 1, name: "Active list", source: "github", display_locator: "repo/items", kind: "list", origin: "discovered", state: "present", item_count: 4, item_trend: [2, 3, 4], open_issue_count: 1, owner: null, deletion_due: null, overdue: false, incomplete: false, first_seen_at: "2026-10-01T00:00:00Z", last_seen_at: "2026-10-12T00:00:00Z", deleted_at: null, collector_config_id: "collector-1" },
+  { id: "asset-a", short_id: "DATA-1", number: 1, name: "Active list", source: "github", display_locator: "repo/items", kind: "list", origin: "discovered", state: "present", item_count: 4, item_trend: [2, 3, 4], open_issue_count: 1, owner: null, deletion_due: null, overdue: false, incomplete: false, first_seen_at: "2026-10-01T00:00:00Z", last_seen_at: null, deleted_at: null, collector_config_id: "collector-1" },
   { id: "asset-b", short_id: "DATA-2", number: 2, name: "Expired list", source: "github", display_locator: "repo/expired", kind: "list", origin: "registered", state: "present", item_count: 2, item_trend: [3, 2], open_issue_count: 0, owner: null, deletion_due: "2026-10-01", overdue: true, incomplete: true, first_seen_at: "2026-10-01T00:00:00Z", last_seen_at: "2026-10-12T00:00:00Z", deleted_at: null, collector_config_id: null },
 ];
 
@@ -46,8 +46,14 @@ function renderData(): void {
 it("shows counts, filters overdue rows and narrows a search", async () => {
   setup(["data.read", "data.write"]); renderData();
   expect(await screen.findByText("Active list")).toBeInTheDocument();
+  const activeRow = screen.getByText("Active list").closest("tr") as HTMLTableRowElement;
+  expect(activeRow.textContent?.replace(/\s+/g, " ").trim()).toContain("Active list repo/items");
+  expect(activeRow.cells[7]?.textContent).toBe("—");
+  expect(within(activeRow).queryByText("Overdue")).toBeNull();
   fireEvent.click(screen.getByRole("tab", { name: /Overdue/ }));
   expect(await screen.findByText("Expired list")).toBeInTheDocument();
+  const overdueRow = screen.getByText("Expired list").closest("tr") as HTMLTableRowElement;
+  expect(within(overdueRow).getByText("Overdue")).toBeInTheDocument();
   await waitFor(() => expect(screen.queryByText("Active list")).toBeNull());
   fireEvent.input(screen.getByLabelText("Search data"), { target: { value: "missing" } });
   await waitFor(() => expect(screen.queryByText("Expired list")).toBeNull());
@@ -102,4 +108,13 @@ it("exports a CSV and hides registration from a viewer", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Export CSV" }));
   await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => String(input).startsWith("/api/data/export"))).toBe(true));
   expect(createObjectUrl).toHaveBeenCalledOnce();
+});
+
+it("shows an Overdue tag only for overdue assets", async () => {
+  setup();
+  renderData();
+  const activeRow = (await screen.findByText("Active list")).closest("tr") as HTMLTableRowElement;
+  const overdueRow = screen.getByText("Expired list").closest("tr") as HTMLTableRowElement;
+  expect(within(activeRow).queryByText("Overdue")).toBeNull();
+  expect(within(overdueRow).getByText("Overdue")).toBeInTheDocument();
 });

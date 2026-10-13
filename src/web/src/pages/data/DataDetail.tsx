@@ -12,6 +12,7 @@ import { DataDetailSections } from "./DataDetailSections";
 const kinds: readonly DataAssetKind[] = ["file", "table", "list", "channel", "object", "folder", "other"];
 function safeError(error: unknown): ApiError { return error instanceof ApiError ? error : new ApiError(0, "request_failed", "The request could not be completed."); }
 function localInputValue(date: Date): string { return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16); }
+function lastSeenText(iso: string | null): string { return iso === null ? "—" : new Date(iso).toLocaleString(); }
 
 /** Shows asset metadata, lifecycle actions, timeline, item history, and related issues. */
 export default function DataDetail(props: Readonly<{ id: string }>): JSX.Element {
@@ -63,10 +64,10 @@ export default function DataDetail(props: Readonly<{ id: string }>): JSX.Element
     <TopBar.Slot name="title">{asset()?.name ?? "Data asset"}</TopBar.Slot>
     <Show when={error() ?? (asset.error === undefined ? null : safeError(asset.error))} keyed>{(failure) => <ErrorBanner error={failure} />}</Show>
     <Show when={asset.loading} fallback={<Show when={asset()}>{(current) => <>
-      <nav class="row-actions" aria-label="Breadcrumb"><A href="/data">Data</A><span aria-current="page">{current().short_id}</span></nav>
+      <nav class="data-breadcrumb" aria-label="Breadcrumb"><A href="/data">Data</A><span aria-hidden="true"> / </span><span aria-current="page">{current().short_id}</span></nav>
       <Panel title={current().name}>
         <div class="data-asset-heading"><code>{current().short_id}</code><Tag variant={current().state === "present" ? "success" : current().state === "deleted" ? "muted" : "warning"}>{current().state}</Tag><Tag>{current().origin}</Tag><Tag>{current().kind}</Tag></div>
-        <dl><dt>Source</dt><dd>{current().source}</dd><dt>Locator</dt><dd>{current().display_locator}</dd><dt>First seen</dt><dd>{new Date(current().first_seen_at).toLocaleString()}</dd><dt>Last seen</dt><dd>{new Date(current().last_seen_at).toLocaleString()}</dd></dl>
+        <dl><dt>Source</dt><dd>{current().source}</dd><dt>Locator</dt><dd>{current().display_locator}</dd><dt>First seen</dt><dd>{new Date(current().first_seen_at).toLocaleString()}</dd><dt>Last seen</dt><dd>{lastSeenText(current().last_seen_at)}</dd></dl>
         <Show when={current().incomplete}><div class="notice-warning" role="status">Required information is missing: {current().missing_required.join(", ")}</div></Show>
         <Show when={auth.can("data.write")}><div class="row-actions"><button class="button-secondary" onClick={() => { setEditName(current().name); setEditKind(current().kind); setEditorOpen(true); }}>Edit</button><button class="button-secondary" aria-label="Record event" onClick={() => { setEventAt(localInputValue(new Date())); setEventOpen(true); }}>Record event</button><Show when={current().state === "deleted"} fallback={<button class="button-secondary" onClick={() => void action(() => dataApi.markDeleted(current().id), "Asset marked deleted")}>Mark deleted</button>}><button class="button-secondary" onClick={() => void action(() => dataApi.restore(current().id), "Asset restored")}>Restore</button></Show></div></Show>
       </Panel>
