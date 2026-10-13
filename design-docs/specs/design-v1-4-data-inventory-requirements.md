@@ -1,7 +1,8 @@
 # Telescreen v1.4: Data Inventory Requirements
 
 Status: accepted requirements, owner request of 2026-10-13. Input to the v1.4 design and plans.
-Verified against the code at `d328fbb` (branch `feat/diagra-ddl`) on 2026-10-13.
+Verified against the code at `d328fbb` (branch `feat/diagra-ddl`) on 2026-10-13, and
+re-checked at `07c975f` by the v1.4 design author (corrections in section 7).
 
 The owner asked (translated): "Does Telescreen hold, as a data management list, where data
 lives and its audit history (when it was added, when it was deleted)? If not, design and
@@ -129,3 +130,18 @@ applies to all assets).
 - Screenshot smoke covers the new pages in light and dark with zero browser errors.
 - `mise run ci`, `mise run ddl-check` and the web checks pass; live verification on the dev
   stack shows discovery, list-item removal, deletion and the overdue notification.
+
+## 7. Evidence re-check (v1.4 design author, 2026-10-13, at `07c975f`)
+
+The conclusion of section 1 holds: no register, lifecycle history, item tracking or
+metadata schema exists. Corrections and additions (details in
+`design-v1-4-data-inventory.md` section 1):
+
+| # | Item | Correction |
+|---|------|-----------|
+| C1 | Deletion evidence | `issues/ingest_transitions.py:197` is `resolve_auto`. `resource_deleted` versus `verified_removed` is chosen at `issues/service.py:403-406`. `resource_coverage` holds rows only while a resource is unscannable (`collectors/coverage.py:84-88`) |
+| C2 | Push removal evidence | `ResourceBody` is at `api/routers/ingest.py:38-45`, and `ResourceContent` is built positionally at `ingest.py:109-117` and `issues/ingest.py:68-77`. `/findings`, police results and the police result schema cannot report removal either |
+| C3 | Shared versioned schemas | `/api/ingest/v1` has no JSON Schema; the Bureau-SDK shared schemas are the police contract. v1.4 versions the police contract (1.2) and adds only optional members to the ingest v1 bodies |
+| C4 | "Absence from a complete sweep" | Exists only for issues (`resolve_unchecked` after a `SUCCEEDED` map job; full-listing reconciliation of open-issue refs). v1.4 adds the asset equivalents |
+| C5 | New finding | `/scan` and `/findings` key the same custom locator differently (`issues/service.py:524,558`). Kept in v1.4; owner question in `design-docs/user-qa/pending-custom-push-resource-identity.md` |
+| C6 | R7 owner fallback | "Issue owner rules" means: the resource owner of the asset's open issues, then the ownership rules. The policy team is not used for assets |

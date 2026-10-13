@@ -23,6 +23,10 @@ of section 5.
 The v1.3 Sentry-parity additions are implemented (2026-10-13); their plans are archived
 under `impl-plans/completed/`.
 
+The v1.4 data inventory (asset register, lifecycle events, list-item and value diffs,
+admin field schema, retention) is designed in `design-v1-4-data-inventory.md` (2026-10-13)
+and is the baseline for the `v14-pNN` plans.
+
 ---
 
 ## Sections
@@ -52,6 +56,7 @@ to read. Names are used consistently in Python packages, API paths, UI labels an
 | Notification templates (v1.2) | Notification templates | `telescreen.notifications.templates` | `/api/notification-templates` | Settings > Notification templates |
 | Users, roles, tokens (v1.2) | Users and roles | `telescreen.directory`, `telescreen.core.permissions` | `/api/users`, `/api/roles`, `/api/tokens` | Settings > Users and roles |
 | OIDC sign-in (v1.2) | Identity | `telescreen.identity` | `/api/auth` | Login |
+| Data inventory (v1.4) | Data inventory | `telescreen.inventory` | `/api/data` | Data, Settings > Field schema |
 
 ### 2. Requirement Traceability
 
@@ -85,6 +90,16 @@ v1.2 rows (`design-v1-2-notifications-and-identity.md`):
 | 21 | Live email and Slack verification | `tests/live` (Mailpit, Slack, Keycloak), `telescreen notify test` | 7 |
 | 22 | Users, roles, permission management | `Permission` matrix, `require_permission`, route-walk test, last-admin lock, token intersection | 5 |
 | 23 | OIDC SSO with Keycloak | `telescreen.identity` verifier, `/api/auth/session`, keyed `oidc_subject` identities, claim mapping, UI PKCE | 6 |
+
+v1.4 rows (`design-v1-4-data-inventory.md`; requirements R1-R9 in
+`design-v1-4-data-inventory-requirements.md`):
+
+| # | Requirement | Design element | Section |
+|---|-------------|----------------|---------|
+| 24 | Register of data locations with lifecycle history | `data_assets` and append-only `data_asset_events`; per-collector `inventory_mode`; deletion only from definitive removal signals | 2, 4, 5 |
+| 25 | Partial changes of list-shaped data | Keyed item fingerprints and counts (collector port, ingest v1 additive members, police contract 1.2), value-fingerprint diffs, manual changes | 6 |
+| 26 | Free metadata schema with required fields and values | `data_fields`, `data_field_values`, `Redactor`-checked values, computed `incomplete` | 7 |
+| 27 | Planned deletion date | `deletion_due` role, Overdue view, one notification per due date | 8 |
 
 ### 3. Runtime Processes
 
@@ -217,6 +232,27 @@ Status: implemented 2026-10-13.
 - The issue event sink becomes a fan-out to workflow triggers and the alert evaluator,
   built in `wiring_v13.py`.
 - New tables and columns are listed in `design-data-model.md` ("v1.3 additions").
+
+v1.4 additions (`design-v1-4-data-inventory.md` sections 3 and 13):
+
+Status: designed 2026-10-13.
+
+- New L3 package `telescreen.inventory` owns `data_assets`, `data_asset_events`,
+  `data_asset_items`, `data_fields` and `data_field_values`. It reads issue, directory and
+  collector data only through ports: `ResourceIssueReader`, `ActorDirectory`,
+  `RecipientResolver`, `CollectorConfigReader`, `MemberNotifier` and
+  `NotificationSender`.
+- New `ports/inventory.py`:
+  - `InventoryObserver` (called by `IssueService.record_scan`);
+  - `InventoryReconciler` (called by the map-reduce reduce step, the full-listing path and
+    the collector service);
+  - `AssetOwnerResolver` (implemented in `issues/asset_owner.py`).
+- `ResourceContent`, `ResourceScan`, `ExternalScan`, `CollectorConfig` and
+  `NotificationContext` gain optional fields. `Fingerprinter.item_key` adds the item key
+  domain.
+- `issues/service.py` moves `record_external` to `issues/external_scan.py` to stay under
+  1000 lines. The new `wiring_v14.py` binds the v1.4 services, ports, scheduler provider,
+  task handler and routers.
 
 Repositories live in the feature package that owns the tables: directory tables
 (`members`, `teams`, `team_memberships`, `api_tokens`) in `telescreen.directory`; collectors
@@ -445,6 +481,8 @@ gitleaks pre-commit hook does not flag committed sources.
 | `design-docs/specs/design-v1-2-notifications-and-identity.md` | v1.2: editable notification templates, workflow notification sets, live delivery verification, roles and permission matrix, OIDC SSO, threat model, v1.2 plan shape |
 | `design-docs/specs/design-v1-3-sentry-parity-review.md` | v1.3 Sentry parity self-review: defects B1-B7, gap table, adopted scope S0-S10, deferrals, and its verification against the code |
 | `design-docs/specs/design-v1-3-sentry-parity.md` | v1.3: stream tabs, query language, saved views, bulk and merge, archive and escalating, issue detail, alert rules, notification settings and weekly report, dashboard, organization pages, UX polish, leak matrix, v1.3 plan shape |
+| `design-docs/specs/design-v1-4-data-inventory-requirements.md` | v1.4 accepted requirements R1-R9, safety constraints, out of scope, acceptance, and the design author's evidence re-check (section 7) |
+| `design-docs/specs/design-v1-4-data-inventory.md` | v1.4: data asset register, inventory modes, lifecycle events, item and value diffs, ingest and police 1.2 changes, field schema and values, retention, API, UI, leak matrix, v1.4 plan shape |
 | `design-docs/specs/design-api-and-ui.md` | REST API, auth, Assistant MCP/chat, evidence API, UI |
 | `design-docs/specs/command.md` | CLI, environment variables, exit codes, dependencies |
 | `design-docs/specs/notes.md` | Engine rationale vs Airflow/n8n/Kestra, riela mapping, tooling notes |

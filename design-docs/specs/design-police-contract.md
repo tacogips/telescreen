@@ -124,6 +124,37 @@ Rules:
   returns no tasks. A long-poll claim is a liveness signal, and the `police_silent` health
   condition relies on it (`design-v1-1-dspm-adoption.md` section 8).
 
+### Contract 1.2 (v1.4, data inventory)
+
+Status: designed 2026-10-13 (`design-v1-4-data-inventory.md` section 6.4). Minor version
+`1.2` adds one optional member to `result-envelope.schema.json`, `resource_inventories`
+(at most 1000 entries). Its items are `$ref`s to a new closed schema,
+`resource-inventory.schema.json`:
+
+| Member | Type | Required |
+|--------|------|----------|
+| `locator` | string, max 1024 | yes |
+| `item_fingerprints` | array (max 10000) of `^[0-9a-f]{64}$` | no |
+| `item_count` | integer >= 0 | no |
+| `kind` | enum `file`, `table`, `list`, `channel`, `object`, `folder`, `other` | no |
+
+Rules:
+
+- `item_fingerprints` and `item_count` are mutually exclusive.
+- Accepted on `detect` and `scan_shard`; ignored on other task types.
+- Each locator must be a finding locator or in `complete_locators`. Other entries are
+  dropped, and the count goes in the audit details.
+- The `Redactor` rule applies to every string.
+- The Bureau re-keys each fingerprint with its item key, so workers never send raw item
+  keys.
+- 1.0 and 1.1 workers are unaffected.
+- SDK: `ResourceInventory`, `ResultEnvelope.resource_inventories` (serialized only when
+  non-empty), `masking.item_fingerprint(item_key, key)` (HMAC-SHA256 hex with the worker's stable
+  secret, like `external_fingerprint`) and `CONTRACT_VERSION =
+  "1.2"`.
+- `examples/result-envelope-1.2.json` is added. Contract tests cover the 1.0, 1.1 and 1.2
+  envelopes.
+
 ### Endpoints (`/api/police/v1`)
 
 | Endpoint | Auth | Behavior |

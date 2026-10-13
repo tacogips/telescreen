@@ -177,6 +177,25 @@ Details are in `design-v1-2-notifications-and-identity.md` sections 3 and 8.
   the DLP gate (`OutboundContentGuard`) before egress.
 - The leak matrix extension is `tests/leak/flows_v13.py` and `test_leak_matrix_v13.py`.
 
+### v1.4 additions (data inventory)
+
+`design-v1-4-data-inventory.md` sections 2 (D10, D14) and 12 are binding.
+
+- Item keys are keyed on receipt as `HMAC(HMAC(identity key v1,
+  "telescreen:data-item:v1"), resource_key + "\0" + raw_item_key)`. This is a separate
+  domain from value fingerprints, and per-asset. Raw keys are held only with `repr=False`
+  inside the scan path. Only 12-hex prefixes are returned.
+- The following are checked with `Redactor` and rejected on a hit (422
+  `raw_value_detected`, nothing stored, no echo, no log of the value):
+  - metadata values, field labels and option labels;
+  - registered asset names, sources and locators;
+  - manual event notes;
+  - the register search text.
+- Each CSV export cell passes `Redactor`, and cells that start with a formula character
+  are prefixed with `'`. Overdue notifications use the masked `data_*` context, the
+  template `Redactor` pass and the DLP gate. Assets are not indexed in search.
+- The leak matrix extension is `tests/leak/flows_v14.py` and `test_leak_matrix_v14.py`.
+
 ### Re-scan of inbound masked data
 
 Police results, pushed findings (`/api/ingest/v1/findings`), human task comments, issue

@@ -40,7 +40,26 @@ Large features are split into multiple related plans with cross-references.
 All plans share `impl-plans/conventions.md` (ownership, typing, verification and
 progress-log rules).
 
-No plans are active.
+### v1.4 (data inventory: R1-R9 of `design-docs/specs/design-v1-4-data-inventory-requirements.md`)
+
+Created 2026-10-13 on `feat/data-inventory` from `design-docs/specs/design-v1-4-data-inventory.md`
+section 13. There are 8 plans in one run. Waves run in order, and the plans of a wave have
+disjoint write paths.
+
+| Wave | Plan | Depends on | Status |
+|------|------|-----------|--------|
+| 1 | [v14-p01-foundation](./active/v14-p01-foundation.md) | - | Ready |
+| 1 | [v14-p02-db](./active/v14-p02-db.md) | - | Ready |
+| 1 | [v14-p03-ui-foundation](./active/v14-p03-ui-foundation.md) | - | Ready |
+| 2 | [v14-p04-inventory-core](./active/v14-p04-inventory-core.md) | p01, p02 | Ready |
+| 2 | [v14-p05-scan-hooks](./active/v14-p05-scan-hooks.md) | p01, p02 | Ready |
+| 2 | [v14-p06-ui-pages](./active/v14-p06-ui-pages.md) | p03 | Ready |
+| 3 | [v14-p07-fields-retention](./active/v14-p07-fields-retention.md) | p04 | Ready |
+| 4 | [v14-p08-wiring-verification](./active/v14-p08-wiring-verification.md) | p04, p05, p06, p07 | Ready |
+
+The serial finalization runs after p08 is accepted. It moves the v14 plans to
+`completed/` and the dispatch manifest to `completed/dispatch/`, moves these rows to the
+completed section, reruns the gates, and commits and pushes to `feat/data-inventory`.
 
 Telescreen v1 is complete (all 32 plans integration-accepted, final commit 7a8c600).
 Telescreen v1.1 (F1-F10 of `design-docs/specs/design-v1-1-dspm-adoption.md`) is complete:

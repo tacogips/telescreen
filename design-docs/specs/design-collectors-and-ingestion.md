@@ -189,6 +189,37 @@ collectors-core owns `src/telescreen/collectors/sweep.py`:
   terminal (`conflict`, 409 at the API). This is safe for reconciliation even when sweeps
   overlap, because the watermark is per job.
 
+### v1.4 inventory hooks
+
+Status: designed 2026-10-13 (`design-v1-4-data-inventory.md` sections 5 and 6). Issue
+behavior is unchanged.
+
+- Each collector config has `inventory_mode`:
+  - `sensitive_only` (default) registers a resource as a data asset on its first scan with
+    a finding;
+  - `all` registers every observed resource;
+  - `off` ignores observations and turns the config's present assets `unknown`.
+
+  Push sources follow their `custom` config.
+- `IssueService.record_scan` calls `InventoryObserver.observe` in the same transaction for
+  every scan, including removals, incomplete scans and external scans. Presence comes from
+  any observation with `removed = false`. Deletion comes only from `removed = true`, from
+  the `SUCCEEDED` sweep watermark (next to `resolve_unchecked`), or from a full listing
+  with no skipped ref. Item and value removals are applied only on complete observations.
+- `ResourceContent.items` (`ItemReport`: keys or count) and `asset_kind` are optional.
+  Keys are keyed by `Fingerprinter.item_key` in the scan pipeline and never stored. A
+  complete gsheets fetch reports its non-empty row count.
+- Push ingest v1 additive members ("ingest 1.1"):
+  - `/scan` resources: `removed` (with no segments and `complete`), `item_keys` or
+    `item_count`, and `kind`;
+  - `/findings`: `item_fingerprints` (64 hex) or `item_count`, and `kind`.
+
+  Existing payloads are unchanged. A pushed `removed: true` resolves the resource's open
+  issues as `resource_deleted`, as every other removal does.
+- `/scan` keys a custom resource as `resource_key(source, locator)`, while `/findings` and
+  the custom row of the resource identity table use `source + ":" + locator`. The mismatch
+  is pre-existing and kept in v1.4 (`design-docs/user-qa/pending-custom-push-resource-identity.md`).
+
 ### Assembly bindings (`telescreen.wiring`, run B2)
 
 `build_container` registers every built-in kind in the `CollectorRegistry`, each with its

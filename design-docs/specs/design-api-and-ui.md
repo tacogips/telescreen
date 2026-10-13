@@ -163,6 +163,27 @@ text.
 | Ownership | `GET /api/ownership-rules`, `POST /api/ownership-rules/test` | `ownership.read` |
 | | `POST /api/ownership-rules`, `PUT`/`DELETE /api/ownership-rules/{id}`, `POST /api/ownership-rules/reorder` (12) | `ownership.write` |
 
+### v1.4 endpoints
+
+Status: designed 2026-10-13. Behavior, query parameters and response shapes are in
+`design-v1-4-data-inventory.md` section 9. There is no literal segment under
+`/api/data/assets/`.
+
+| Area | Endpoint | Permission |
+|------|----------|-----------|
+| Register | `GET /api/data/assets`, `GET /api/data/counts`, `GET /api/data/export` (masked CSV), `GET /api/data/resource-assets/{resource_key}` | `data.read` |
+| | `GET /api/data/assets/{id}`, `/events`, `/items`, `/item-series` | `data.read` |
+| | `POST /api/data/assets` (register), `PATCH /api/data/assets/{id}`, `PUT /api/data/assets/{id}/fields`, `POST /api/data/assets/{id}/events`, `/mark-deleted`, `/restore` | `data.write` |
+| Field schema | `GET /api/data/fields` | `data.read` |
+| | `POST /api/data/fields/validate-values` | `data.write` |
+| | `POST /api/data/fields`, `PATCH`/`DELETE /api/data/fields/{id}`, `POST /api/data/fields/{id}/archive\|unarchive`, `POST /api/data/fields/reorder` | `data_fields.admin` |
+| Ingest (changed, additive) | `/scan` resources accept `removed`, `item_keys` or `item_count`, `kind`; `/findings` accepts `item_fingerprints` or `item_count`, `kind` | `ingest.push` |
+| Collectors (changed) | Create, update and list carry `inventory_mode` (`sensitive_only`, `all`, `off`); an update without it keeps the current mode | unchanged |
+
+UI: a "Data" area (`/data`, `/data/new`, `/data/:id`), Settings > Field schema
+(`/settings/data-fields`), the issue detail asset link, the dashboard overdue tile and the
+collector inventory mode (`design-v1-4-data-inventory.md` section 10).
+
 ### Evidence
 
 - Upload is a raw request body (`application/octet-stream`), read in memory up to

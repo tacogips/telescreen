@@ -44,6 +44,7 @@ Bare `telescreen` prints help and exits 2.
 | `TELESCREEN_INTERNAL_DOMAINS` | no (v1.1) | unset | Comma list of internal domains for Drive exposure; unset makes user/group shares `unknown` |
 | `TELESCREEN_OWNER_ROUTING` / `TELESCREEN_DEFAULT_TEAM` | no (v1.1) | `false` / unset | Owner routing when no policy matched; fallback team slug |
 | `TELESCREEN_DIGEST_CRON` | no (v1.1) | `0 9 * * 1` | Weekly owner digest (UTC); empty disables |
+| `TELESCREEN_DATA_OVERDUE_CRON` | no (v1.4) | `0 9 * * *` | Data retention overdue check and owner notification (UTC); empty disables |
 | `TELESCREEN_HEALTH_RECIPIENTS` / `TELESCREEN_HEALTH_FAILURE_THRESHOLD` / `TELESCREEN_ALERT_UNSCANNABLE_PUBLIC` | no (v1.1) | unset / 3 / `true` | Health alert recipient refs (unset: state only, no alerts); consecutive failed scan jobs before alerting; alert on public unscannable resources |
 | `TELESCREEN_RISK_WEIGHTS` | no (v1.1) | built-in defaults | Comma list `<group>.<name>=<value>` (0 < value <= 1) overriding risk weights; unknown keys are a configuration error |
 | `TELESCREEN_POLICE_SIGNING_KEY` | for push police | - | Secret ref; master key deriving push signing secrets |

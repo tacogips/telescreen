@@ -663,6 +663,19 @@ is no new dependency; charts are hand-rendered SVG (`Sparkline`, `MiniBarChart`)
 | v13-p15-ui-alerts-profile | `src/web/src/pages/{alerts,profile}/**` | 2 |
 | v13-p16-ui-dashboard-org | `src/web/src/pages/{dashboard,settings,workflows}/**` | 2 |
 
+### 12. v1.4 additions (data inventory)
+
+Status: designed 2026-10-13. `design-v1-4-data-inventory.md` section 10 is binding.
+
+- A new "Data" area (`/data`, `/data/new`, `/data/:id`) with the lucide `Database` rail
+  icon, and Settings > Field schema (`/settings/data-fields`).
+- New components: `CountTabs` (generic tabs with count badges) and `ItemCountChart`
+  (hand-rendered SVG step line).
+- Mock seed `fixtures/v14.ts`, with key sets pinned by `fixtures/v14-shapes.json`.
+- Plan boundaries: v14-p03 (api, components, routes, shell test, stub, screenshots) in
+  wave 1, then v14-p06 (`pages/data/**`, settings field schema, issue detail sidebar link,
+  dashboard tile, collector inventory mode) in wave 2.
+
 ## Sources
 
 | Topic | Source |
