@@ -81,6 +81,7 @@ CREATE TABLE "collector_configs" (
   "last_scheduled_at" TIMESTAMPTZ,
   "created_at" TIMESTAMPTZ NOT NULL,
   "updated_at" TIMESTAMPTZ NOT NULL,
+  "inventory_mode" VARCHAR(16) NOT NULL DEFAULT 'sensitive_only',
   CONSTRAINT "pk_collector_configs" PRIMARY KEY ("id")
 );
 
@@ -101,6 +102,88 @@ CREATE TABLE "counters" (
   "name" VARCHAR(64) NOT NULL,
   "value" INTEGER NOT NULL,
   CONSTRAINT "pk_counters" PRIMARY KEY ("name")
+);
+
+CREATE TABLE "data_asset_events" (
+  "id" VARCHAR(36) NOT NULL,
+  "asset_id" VARCHAR(36) NOT NULL,
+  "kind" VARCHAR(32) NOT NULL,
+  "occurred_at" TIMESTAMPTZ,
+  "recorded_at" TIMESTAMPTZ NOT NULL,
+  "actor_ref" VARCHAR(256) NOT NULL,
+  "scan_job_id" VARCHAR(36),
+  "items_added" INTEGER,
+  "items_removed" INTEGER,
+  "item_count_after" INTEGER,
+  "values_added" INTEGER,
+  "values_removed" INTEGER,
+  "value_count_after" INTEGER,
+  "field_key" VARCHAR(48),
+  "old_value" TEXT,
+  "new_value" TEXT,
+  "note" TEXT,
+  CONSTRAINT "pk_data_asset_events" PRIMARY KEY ("id")
+);
+
+CREATE TABLE "data_asset_items" (
+  "id" VARCHAR(36) NOT NULL,
+  "asset_id" VARCHAR(36) NOT NULL,
+  "kind" VARCHAR(8) NOT NULL,
+  "fingerprint" VARCHAR(64) NOT NULL,
+  "key_version" INTEGER NOT NULL DEFAULT 1,
+  "first_seen_at" TIMESTAMPTZ NOT NULL,
+  "removed_at" TIMESTAMPTZ,
+  CONSTRAINT "pk_data_asset_items" PRIMARY KEY ("id")
+);
+
+CREATE TABLE "data_assets" (
+  "id" VARCHAR(36) NOT NULL,
+  "number" INTEGER NOT NULL,
+  "resource_key" VARCHAR(64) NOT NULL,
+  "source" VARCHAR(64) NOT NULL,
+  "origin" VARCHAR(16) NOT NULL,
+  "kind" VARCHAR(16) NOT NULL,
+  "state" VARCHAR(16) NOT NULL,
+  "name" VARCHAR(512) NOT NULL,
+  "display_locator" TEXT NOT NULL,
+  "collector_config_id" VARCHAR(36),
+  "sweep_covered" BOOLEAN NOT NULL DEFAULT false,
+  "item_count" INTEGER,
+  "first_seen_at" TIMESTAMPTZ NOT NULL,
+  "last_seen_at" TIMESTAMPTZ,
+  "deleted_at" TIMESTAMPTZ,
+  "overdue_notified_for" VARCHAR(10),
+  "created_by" VARCHAR(256),
+  "created_at" TIMESTAMPTZ NOT NULL,
+  "updated_at" TIMESTAMPTZ NOT NULL,
+  CONSTRAINT "pk_data_assets" PRIMARY KEY ("id")
+);
+
+CREATE TABLE "data_field_values" (
+  "asset_id" VARCHAR(36) NOT NULL,
+  "field_id" VARCHAR(36) NOT NULL,
+  "value_json" TEXT NOT NULL,
+  "value_date" VARCHAR(10),
+  "updated_by" VARCHAR(256) NOT NULL,
+  "updated_at" TIMESTAMPTZ NOT NULL,
+  CONSTRAINT "pk_data_field_values" PRIMARY KEY ("asset_id", "field_id")
+);
+
+CREATE TABLE "data_fields" (
+  "id" VARCHAR(36) NOT NULL,
+  "key" VARCHAR(48) NOT NULL,
+  "label" VARCHAR(80) NOT NULL,
+  "description" VARCHAR(500),
+  "field_type" VARCHAR(16) NOT NULL,
+  "options_json" TEXT,
+  "required" BOOLEAN NOT NULL DEFAULT false,
+  "position" INTEGER NOT NULL,
+  "role" VARCHAR(16),
+  "archived_at" TIMESTAMPTZ,
+  "created_by" VARCHAR(256) NOT NULL,
+  "created_at" TIMESTAMPTZ NOT NULL,
+  "updated_at" TIMESTAMPTZ NOT NULL,
+  CONSTRAINT "pk_data_fields" PRIMARY KEY ("id")
 );
 
 CREATE TABLE "engine_tasks" (
@@ -664,6 +747,16 @@ CREATE INDEX "ix_api_tokens_member_id" ON "api_tokens" ("member_id");
 CREATE UNIQUE INDEX "uq_audit_records_id" ON "audit_records" ("id");
 CREATE INDEX "ix_audit_records_at" ON "audit_records" ("at");
 CREATE UNIQUE INDEX "uq_collector_configs_name" ON "collector_configs" ("name");
+CREATE INDEX "ix_data_asset_events_asset_recorded" ON "data_asset_events" ("asset_id", "recorded_at");
+CREATE INDEX "ix_data_asset_items_asset_state" ON "data_asset_items" ("asset_id", "kind", "removed_at");
+CREATE UNIQUE INDEX "uq_data_asset_items_key" ON "data_asset_items" ("asset_id", "kind", "fingerprint");
+CREATE UNIQUE INDEX "uq_data_assets_number" ON "data_assets" ("number");
+CREATE UNIQUE INDEX "uq_data_assets_resource_key" ON "data_assets" ("resource_key");
+CREATE INDEX "ix_data_assets_config_state" ON "data_assets" ("collector_config_id", "state", "last_seen_at");
+CREATE INDEX "ix_data_assets_source" ON "data_assets" ("source");
+CREATE INDEX "ix_data_assets_state_last_seen" ON "data_assets" ("state", "last_seen_at");
+CREATE INDEX "ix_data_field_values_field_date" ON "data_field_values" ("field_id", "value_date");
+CREATE UNIQUE INDEX "uq_data_fields_key" ON "data_fields" ("key");
 CREATE UNIQUE INDEX "uq_engine_tasks_idempotency_key" ON "engine_tasks" ("idempotency_key");
 CREATE INDEX "ix_engine_tasks_available_at" ON "engine_tasks" ("available_at");
 CREATE INDEX "ix_engine_tasks_ref_id" ON "engine_tasks" ("ref_id");

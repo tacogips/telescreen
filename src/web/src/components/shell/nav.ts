@@ -11,6 +11,7 @@ export const entriesFor = (area: AreaKey): readonly NavEntry[] => {
     ...SOURCE_KEYS.map((source) => ({ label: sourceLabel(source), href: `/issues?query=source:${source}` })),
     ...RULE_KEYS.map((rule) => ({ label: ruleLabel(rule), href: `/issues?query=rule:${rule}` })),
   ];
+  if (area === "data") return [{ label: "All data", href: "/data" }, { label: "Overdue", href: "/data?tab=overdue" }, { label: "Incomplete", href: "/data?tab=incomplete" }, { label: "Register data", href: "/data/new" }];
   if (area === "workflows") return [{ label: "Workflows", href: "/workflows" }, { label: "Runs", href: "/runs" }];
   if (area === "runs") return [{ label: "Runs", href: "/runs" }, { label: "Workflows", href: "/workflows" }];
   return [{ label: area === "escalation" ? "Escalation Policies" : area[0]!.toUpperCase() + area.slice(1), href: area === "chat" ? "/assistant" : area === "tasks" ? "/my-tasks" : `/${area}` }];

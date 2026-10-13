@@ -5,13 +5,14 @@ import { Unavailable } from "./components/Unavailable";
 import { getSession } from "./auth/session";
 const LoginPage = lazy(() => import("./pages/login"));
 const CallbackPage = lazy(() => import("./pages/login/Callback"));
-export type AreaKey = "issues" | "tasks" | "search" | "workflows" | "runs" | "police" | "collectors" | "policies" | "escalation" | "audit" | "chat" | "settings" | "dashboard" | "alerts";
+export type AreaKey = "issues" | "tasks" | "search" | "workflows" | "runs" | "police" | "collectors" | "policies" | "escalation" | "audit" | "chat" | "settings" | "dashboard" | "alerts" | "data";
 export type Area = Readonly<{ key: AreaKey; label: string; path: string; group: AreaKey }>;
 export type PageModule = Readonly<{ default: () => JSX.Element }>;
 export const AREAS: readonly Area[] = [
   { key: "dashboard", label: "Dashboard", path: "/dashboard", group: "dashboard" },
   { key: "issues", label: "Issues", path: "/issues", group: "issues" },
   { key: "alerts", label: "Alerts", path: "/alerts", group: "alerts" },
+  { key: "data", label: "Data", path: "/data", group: "data" },
   { key: "tasks", label: "My tasks", path: "/my-tasks", group: "tasks" },
   { key: "search", label: "Search", path: "/search", group: "search" },
   { key: "workflows", label: "Workflows", path: "/workflows", group: "workflows" },

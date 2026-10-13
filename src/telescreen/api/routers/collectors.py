@@ -25,6 +25,7 @@ from telescreen.core.vocabulary import (
     CoverageState,
     ErrorCode,
     ExternalAuthKind,
+    InventoryMode,
     ScanTrigger,
     TriggerMode,
 )
@@ -105,6 +106,7 @@ class CollectorBody:
     selector_json: str
     credential_ref: str | None
     enabled: bool = True
+    inventory_mode: InventoryMode | None = None
 
 
 @pydantic.dataclasses.dataclass(frozen=True)
@@ -119,6 +121,7 @@ class CollectorListItem:
     sweep_cron: str | None
     credential_ref: str | None
     enabled: bool
+    inventory_mode: InventoryMode
     selector_json: str
     health: CollectorHealth | None
 
@@ -216,6 +219,7 @@ def build_collectors_router(deps: CollectorsRouterDeps) -> APIRouter:
                 config.sweep_cron,
                 config.credential_ref,
                 config.enabled,
+                config.inventory_mode,
                 dump_json(selector_to_json(config.selector)),
                 None,
             )
@@ -243,6 +247,7 @@ def build_collectors_router(deps: CollectorsRouterDeps) -> APIRouter:
                     item.sweep_cron,
                     item.credential_ref,
                     item.enabled,
+                    item.inventory_mode,
                     item.selector_json,
                     _health_for_item(health, item.id),
                 )
@@ -337,6 +342,7 @@ def build_collectors_router(deps: CollectorsRouterDeps) -> APIRouter:
                 selector,
                 body.credential_ref,
                 principal.actor_ref(),
+                body.inventory_mode,
             )
         return ConfigIdBody(config.id)
 
@@ -361,6 +367,7 @@ def build_collectors_router(deps: CollectorsRouterDeps) -> APIRouter:
                 body.credential_ref,
                 body.enabled,
                 principal.actor_ref(),
+                body.inventory_mode,
             )
         return ConfigIdBody(config.id)
 

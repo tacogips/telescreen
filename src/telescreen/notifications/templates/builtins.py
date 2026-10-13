@@ -90,6 +90,12 @@ BUILTIN_TEMPLATES: tuple[BuiltinTemplate, ...] = (
         "Telescreen test notification",
         "Test from {{ health.target }}",
     ),
+    _builtin(
+        NotificationEvent.DATA_OVERDUE,
+        "Data past its deletion date: {{ data.short_id }}",
+        "{{ data.name }}\n{{ data.locator }}\n"
+        "Deletion due: {{ data.deletion_due }}\n{{ data.link }}",
+    ),
 )
 
 

@@ -33,7 +33,7 @@ export const policeFixtures: PoliceWorker[] = [
 export const collectorFixtures: CollectorConfig[] = ["slack", "gdrive", "gdocs", "gsheets", "github", "custom", "police"].map((kind, index) => ({
   id: `col-0${index + 1}`, name: `${kind} collection`, kind, trigger_mode: index % 2 === 0 ? "both" : "schedule",
   cron: index % 2 === 0 ? "0 2 * * *" : null, sweep_cron: "0 3 * * 0", selector_json: "{}",
-  credential_ref: "env:COLLECTOR_TOKEN", enabled: index !== 5,
+  credential_ref: "env:COLLECTOR_TOKEN", enabled: index !== 5, inventory_mode: index % 2 === 0 ? "sensitive_only" : "all",
 }));
 export const mapJobFixtures: MapJob[] = [{ id: "map-01", origin: "collector:col-01", status: "running", collector_config_id: "col-01", counts: { ready: 2, dispatched: 1, succeeded: 4, failed: 0, cancelled: 0 }, partitions_done: 4, partitions_total: 8, findings_so_far: 2, paused_until: null, failed_shards: [], result_json: null }];
 export const mapJobSummaryFixtures: MapJobSummary[] = mapJobFixtures.map(({ id, origin, status, collector_config_id }) => ({ id, origin, status, collector_config_id, created_at: ago(9) }));

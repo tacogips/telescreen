@@ -34,6 +34,9 @@ class Permission(StrEnum):
     DIRECTORY_WRITE = "directory.write"
     COLLECTORS_READ = "collectors.read"
     COLLECTORS_WRITE = "collectors.write"
+    DATA_READ = "data.read"
+    DATA_WRITE = "data.write"
+    DATA_FIELDS_ADMIN = "data_fields.admin"
     MAP_JOBS_READ = "map_jobs.read"
     MAP_JOBS_WRITE = "map_jobs.write"
     POLICE_READ = "police.read"
@@ -91,6 +94,7 @@ WRITE_PERMISSIONS: frozenset[Permission] = READ_PERMISSIONS | frozenset(
         Permission.VIEWS_MANAGE_SHARED,
         Permission.EXTERNAL_ISSUES_WRITE,
         Permission.ALERTS_MUTE,
+        Permission.DATA_WRITE,
     )
 )
 ALL_PERMISSIONS: frozenset[Permission] = frozenset(Permission)

@@ -16,3 +16,8 @@ def mask_value(value: str, keep_prefix: int = 0) -> str:
 def external_fingerprint(value: str, key: bytes) -> str:
     """Return a keyed SHA-256 fingerprint suitable for external deduplication."""
     return hmac.new(key, value.encode(), hashlib.sha256).hexdigest()
+
+
+def item_fingerprint(item_key: str, key: bytes) -> str:
+    """Return a keyed item fingerprint; the key must be stable across scans."""
+    return hmac.new(key, item_key.encode(), hashlib.sha256).hexdigest()

@@ -327,6 +327,7 @@ class NotificationEvent(StrEnum):
     ISSUE_MENTIONED = "issue_mentioned"
     ISSUE_ACTIVITY = "issue_activity"
     WEEKLY_REPORT = "weekly_report"
+    DATA_OVERDUE = "data_overdue"
     INTEGRATION_TEST = "integration_test"
 
 
@@ -475,6 +476,97 @@ class EngineTaskKind(StrEnum):
     POLICY_REEVALUATE = "policy_reevaluate"
     OWNER_DIGEST = "owner_digest"
     WEEKLY_REPORT = "weekly_report"
+    DATA_OVERDUE_CHECK = "data_overdue_check"
+
+
+class InventoryMode(StrEnum):
+    """How a collector contributes resources to the data inventory."""
+
+    SENSITIVE_ONLY = "sensitive_only"
+    ALL = "all"
+    OFF = "off"
+
+
+class DataAssetOrigin(StrEnum):
+    """How a data asset entered the inventory."""
+
+    DISCOVERED = "discovered"
+    REGISTERED = "registered"
+
+
+class DataAssetState(StrEnum):
+    """Known lifecycle state of an inventoried data asset."""
+
+    PRESENT = "present"
+    DELETED = "deleted"
+    UNKNOWN = "unknown"
+
+
+class DataAssetKind(StrEnum):
+    """Broad shape of a data asset."""
+
+    FILE = "file"
+    TABLE = "table"
+    LIST = "list"
+    CHANNEL = "channel"
+    OBJECT = "object"
+    FOLDER = "folder"
+    OTHER = "other"
+
+
+class DataEventKind(StrEnum):
+    """Auditable event kinds in the data asset lifecycle."""
+
+    DISCOVERED = "discovered"
+    REGISTERED = "registered"
+    ITEMS_CHANGED = "items_changed"
+    VALUES_CHANGED = "values_changed"
+    DELETED = "deleted"
+    RESTORED = "restored"
+    METADATA_CHANGED = "metadata_changed"
+    MANUAL_CHANGE = "manual_change"
+    TRACKING_STOPPED = "tracking_stopped"
+    TRACKING_RESUMED = "tracking_resumed"
+
+
+class DataItemKind(StrEnum):
+    """Tracked list-item or finding-value category."""
+
+    ITEM = "item"
+    VALUE = "value"
+
+
+class DataFieldType(StrEnum):
+    """Supported data asset metadata field types."""
+
+    TEXT = "text"
+    LONG_TEXT = "long_text"
+    INTEGER = "integer"
+    DECIMAL = "decimal"
+    BOOLEAN = "boolean"
+    DATE = "date"
+    SINGLE_SELECT = "single_select"
+    MULTI_SELECT = "multi_select"
+    REFERENCE = "reference"
+    URL = "url"
+
+
+class DataFieldRole(StrEnum):
+    """Semantic role for commonly used metadata fields."""
+
+    PURPOSE = "purpose"
+    OWNER = "owner"
+    DELETION_DUE = "deletion_due"
+
+
+class DataAssetTab(StrEnum):
+    """Data inventory list tabs."""
+
+    ALL = "all"
+    PRESENT = "present"
+    DELETED = "deleted"
+    INCOMPLETE = "incomplete"
+    OVERDUE = "overdue"
 
 
 class EngineTaskStatus(StrEnum):
@@ -668,6 +760,9 @@ class ErrorCode(StrEnum):
     CHAIN_BROKEN = "chain_broken"
     INDEX_GUARD_REJECTED = "index_guard_rejected"
     SCAN_INCOMPLETE = "scan_incomplete"
+    FIELD_IN_USE = "field_in_use"
+    REQUIRED_FIELD_MISSING = "required_field_missing"
+    INVALID_FIELD_VALUE = "invalid_field_value"
 
 
 class Visibility(StrEnum):

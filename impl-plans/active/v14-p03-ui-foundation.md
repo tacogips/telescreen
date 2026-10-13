@@ -1,6 +1,6 @@
 # V14-P03 UI Foundation: Types, Client, Mock, Shapes Manifest, Shell, Components, Screenshot States
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-4-data-inventory.md sections 9, 9.1, 10; design-docs/specs/design-ui-sentry.md section 12
 **Created**: 2026-10-13
 **Last Updated**: 2026-10-13
@@ -225,14 +225,21 @@ Expected:
 
 ## Completion Criteria
 
-- [ ] Types, `dataApi`, mock routes, fixtures and `v14-shapes.json` cover every route and
+- [x] Types, `dataApi`, mock routes, fixtures and `v14-shapes.json` cover every route and
   shape of design 9 and 9.1.
-- [ ] `CountTabs`, `ItemCountChart`, the Data area, the rail icon and the nav entries
+- [x] `CountTabs`, `ItemCountChart`, the Data area, the rail icon and the nav entries
   exist, with tests.
-- [ ] `v14States` is added with the binding names above.
-- [ ] typecheck, vitest, build, non-strict screenshots and `test_ui_fixtures.py` pass.
-- [ ] The Progress Log has hashes, and every command with its exit status and log path.
+- [x] `v14States` is added with the binding names above.
+- [x] typecheck, vitest, build, non-strict screenshots and `test_ui_fixtures.py` pass.
+- [x] The Progress Log has hashes, and every command with its exit status and log path.
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-10-13 18:24
+**Tasks Completed**: Added v1.4 API types and `dataApi`, stateful mock routes and fixtures, exact response shape manifest, Data shell area and nav, `CountTabs`, `ItemCountChart`, Data placeholder, and screenshot bindings with regression tests.
+**Tasks In Progress**: None for this plan. The page controls that cause five screenshot action skips are owned by downstream p06.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: `src/web/src/api/client.ts` before=0e12d617240814a0b50d66f6b338cfa4b40d44937f9069f01c0cc183c49a760b after=f0509eded04c1b1a41a31bf6cd3a61d0e8c084b90850ececf766af2403fb77ac; `src/web/src/api/client.test.ts` before=a704d18bb67ab9728e2f447f18d1ef5b34e198eff3088d0af6f8ef350ab09ee0 after=26f231acd08324ef987263ead4e689094903b53b05518421711611b74bee291f; `src/web/src/api/types.ts` before=2e0e3c6f253f0cf4133969854b95d328e6cf499adfda4613d404b7b4c179b8dc after=964ee566282ea5eca3ea432a6fb95f53b31ab3e476e4d2d0f320dfdbea794394; `src/web/src/api/mock/fixtures.test.ts` before=60df0afa5bc71d0f1b69553c8784d193f2fc0f66959efe4141ca529efc299511 after=9383bb26855d383110a0a690a41068262877478327d686acc2f77bc880e3b1c4; `src/web/src/api/mock/fixtures/operations.ts` before=b35cbca3486eebf11fe263d92b45ab8e8e8fa5eef0a74bb48daca9563608ce98 after=e2694bd3218d2d3ede96aaafa532d77f39be8b6d5ed07ea981332931e241e98c; `src/web/src/api/mock/fixtures/v12.ts` before=e67488dcd4e25b7cdd61cfedd724f27d363ee32d8304fee40f78281c3f2f41e5 after=d698c38c7cd42fda8e8ad095a0b687f98b5a57b7933c0a661b16b3ca1b227ebb; `src/web/src/api/mock/mock.test.ts` before=fefa8e60ef39136e5ac967aeae5e3fdf9fb158478b1805da80571d91d52e4dba after=3450645ea166e532ae37ff122ad107ab36f68223ea2108361f56800c672f4f80; `src/web/src/api/mock/router.ts` before=86cd55bba51d5d8498bbfdfc54ed8484c443d2b9bb4dd291bc3d545078262492 after=985c6a74f3e5d1e440ae538019e9a3a4078421e746c28f9be0e9cb25e4bd4e5d; `src/web/src/api/mock/state.ts` before=bcd74bccdf38b1194869a8f2d10a939657a0b0f6a1e2c1e3ccd3bf516ebbe991 after=54f57796b8597b1bf33b572af16c7c4d69d4bac18ead658b7bb48cd97e21fb85; `src/web/src/api/mock/v14.ts` before=absent after=2f5d9835c7133869381aeb4c133c60b8e1d77fd4547091a651269ced5a140ad2; `src/web/src/api/mock/fixtures/v14.ts` before=absent after=888d29e08e3f75dd9bb2763283a4237c6907190f37c0c16e1009a86d560b8880; `src/web/src/api/mock/fixtures/v14-shapes.json` before=absent after=56d5cc1b122586008ffbaabfbef3d6898aae8f4e4c543d584534eff73dee1859; `src/web/src/components/CountTabs.tsx` before=absent after=fe840cb4189e60a8ed214036349919e5f36387b6564f0b83c4f824c315cae4b6; `src/web/src/components/CountTabs.test.tsx` before=absent after=196e4ada38c5e5257378f30d5cdff760910ff4946eb782440dfede856513acb8; `src/web/src/components/ItemCountChart.tsx` before=absent after=4b92265ab0cb9bd528a48480bdd8bbd3945c07576066812445a1b6c5052f3f02; `src/web/src/components/ItemCountChart.test.tsx` before=absent after=f54acfff6e3992b0e15ce5c13ef644d55ca961bf129dec14a32a52c509075b69; `src/web/src/components/shell/PrimaryRail.tsx` before=36457907cdb2a8c5781489507bf73cd94efc3dc631c05f31776efb10088b05ab after=5573d78b5c17fab7455258e354f4a8d4a1cb26086b08c15d0a5f8d0bf953af53; `src/web/src/components/shell/nav.ts` before=e31edc063f33eee20b0c5fc8929a914da0e0c982b49c627a0a6640a015ec6e76 after=e551a01f77549635c8a2c7ce6c0044831e161d6acadd1f6ed3970d9212cf37b4; `src/web/src/pages/data/index.tsx` before=absent after=050c18052726a3f40d1584bdd1003e78bebc3250d8f2b20c18eee63a949a9aae; `src/web/src/routes.tsx` before=32a199532e263affa0769cc40d36043b2911b00392e84bad3cfb20a61b13735b after=a47692fad953cf03a9e61df05e2bcfc77953314f948499c37635dd914cfa476a; `src/web/src/shell.test.tsx` before=66690cfc2a5b10c7b1a615d32ea211e8482507821e34ec57a7264ae2071e10e9 after=4aa0026c14a05fd8fbe59bdf907be25b1415ed1c6b85c17f2bd6bdfcaad1d06a; `src/web/scripts/screenshots.ts` before=622b972b538ac1adffb5dfe5529d58ab9a27d638abfdf8cd15e62c81d44f41f4 after=14778833af715830de5d50cb7fcb358bed1898d61183aecc3de93466c75a7e70.
+`test unchecked boxes = 0 and plan lines < 400` -> exit 0 (log: `/tmp/telescreen-v14-p03-plan-gate.log`).
+**Notes**: Earlier typecheck wrapper exited 1 because zsh reserves variable `status`; rerun with `rc` passed. Earlier Vitest attempts exited 1 (5 failed/242 and then 1 failed/242); fixes are reflected in the final source, and final Vitest passed 242/242. Exact per-edit intentions are preserved under `tmp/telescreen-v14-20261013-f1/v14-p03-ui-foundation/intents/`. Package manifests are unchanged. Other files in the shared worktree belong to sibling plans.

@@ -7,7 +7,7 @@ from enum import StrEnum
 
 from telescreen_police_sdk import _json
 
-CONTRACT_VERSION: str = "1.1"
+CONTRACT_VERSION: str = "1.2"
 
 
 class Mode(StrEnum):
@@ -430,6 +430,51 @@ class ResourceExposure:
 
 
 @dataclass(frozen=True)
+class ResourceInventory:
+    """Safe item inventory reported for one scanned resource."""
+
+    locator: str = field(repr=False)
+    item_fingerprints: tuple[str, ...] = ()
+    item_count: int | None = None
+    kind: str | None = None
+
+    def to_json(self) -> _json.Json:
+        """Serialize item inventory while omitting empty optional members."""
+        return _object(
+            (
+                ("locator", _json.string(self.locator)),
+                (
+                    "item_fingerprints",
+                    _string_array(self.item_fingerprints) if self.item_fingerprints else None,
+                ),
+                (
+                    "item_count",
+                    _json.integer(self.item_count) if self.item_count is not None else None,
+                ),
+                ("kind", _json.string(self.kind) if self.kind is not None else None),
+            )
+        )
+
+    @staticmethod
+    def from_json(value: _json.Json) -> ResourceInventory:
+        """Parse item inventory context."""
+        fingerprints_json: _json.Json | None = _member(value, "item_fingerprints", False)
+        fingerprints: tuple[str, ...] = (
+            _strings(value, "item_fingerprints") if fingerprints_json is not None else ()
+        )
+        count_json: _json.Json | None = _member(value, "item_count", False)
+        count: int | None = count_json.as_int() if count_json is not None else None
+        if count_json is not None and count is None:
+            raise ValueError("invalid contract member")
+        return ResourceInventory(
+            _string(value, "locator") or "",
+            fingerprints,
+            count,
+            _string(value, "kind", False),
+        )
+
+
+@dataclass(frozen=True)
 class ResultError:
     """Static task failure details."""
 
@@ -502,6 +547,7 @@ class ResultEnvelope:
     complete_locators: tuple[str, ...] = field(default=(), repr=False)
     contract_version: str = CONTRACT_VERSION
     resource_exposures: tuple[ResourceExposure, ...] = field(default=(), repr=False)
+    resource_inventories: tuple[ResourceInventory, ...] = field(default=(), repr=False)
 
     def to_json(self) -> _json.Json:
         """Serialize a result envelope."""
@@ -528,6 +574,12 @@ class ResultEnvelope:
                     "resource_exposures",
                     _json.array(tuple(item.to_json() for item in self.resource_exposures))
                     if self.resource_exposures
+                    else None,
+                ),
+                (
+                    "resource_inventories",
+                    _json.array(tuple(item.to_json() for item in self.resource_inventories))
+                    if self.resource_inventories
                     else None,
                 ),
             )
@@ -558,6 +610,12 @@ class ResultEnvelope:
         )
         if exposures_json is not None and exposure_values is None:
             raise ValueError("invalid contract member")
+        inventories_json: _json.Json | None = _member(value, "resource_inventories", False)
+        inventory_values: tuple[_json.Json, ...] | None = (
+            inventories_json.as_list() if inventories_json is not None else None
+        )
+        if inventories_json is not None and inventory_values is None:
+            raise ValueError("invalid contract member")
         return ResultEnvelope(
             _string(value, "task_id") or "",
             ResultStatus(status_text or ""),
@@ -571,6 +629,7 @@ class ResultEnvelope:
             locators,
             _string(value, "contract_version") or "",
             tuple(ResourceExposure.from_json(item) for item in exposure_values or ()),
+            tuple(ResourceInventory.from_json(item) for item in inventory_values or ()),
         )
 
 

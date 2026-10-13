@@ -1,7 +1,7 @@
 """Durable collector scan and watch-renewal task handlers."""
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -37,6 +37,7 @@ from telescreen.ports.collectors import (
     ScanJobStore,
 )
 from telescreen.ports.findings import RecordOutcome, ResourceScan
+from telescreen.ports.inventory import InventoryReconciler, NoopInventoryReconciler
 from telescreen.ports.issues import IssueReader, IssueRecorder, OpenResourceRef, ResourceScanner
 from telescreen.ports.workflow import ClaimedTask, TaskHandler, TaskQueue, TaskResult, TaskSpec
 
@@ -69,6 +70,7 @@ class CollectorScanHandler(TaskHandler):
     kind: EngineTaskKind = EngineTaskKind.COLLECTOR_SCAN
     coverage: CoverageRecorder | None = None
     health: CollectorHealthRecorder | None = None
+    inventory: InventoryReconciler = field(default_factory=NoopInventoryReconciler)
 
     async def handle(self, task: ClaimedTask) -> TaskResult:
         """Handle one collector scan and map transient failures to stable retries."""
@@ -210,6 +212,7 @@ class CollectorScanHandler(TaskHandler):
         listed: set[str] = set()
         pages: int = 0
         full_listing: bool = False
+        ref_skipped: bool = False
         has_more: bool = False
         while True:
             page: ChangePage = await self.registry.adapter(config.kind).list_changed(config, cursor)
@@ -218,6 +221,7 @@ class CollectorScanHandler(TaskHandler):
             for ref in page.changed:
                 if self.redactor.has_hits(ref.ref_json):
                     progress.skipped += 1
+                    ref_skipped = True
                     continue
                 resource_key: str = self.fingerprinter.resource_key(
                     config.kind.value, ref.raw_locator
@@ -264,6 +268,9 @@ class CollectorScanHandler(TaskHandler):
                         open_ref.ref_json
                     )
                     await self._record_empty(config, empty_ref, job_id, True, removed=True)
+            if not ref_skipped:
+                async with self.sessions.begin() as session:
+                    await self.inventory.reconcile_listing(session, config.id, frozenset(listed))
         await self._finish(
             job_id,
             ScanJobStatus.SUCCEEDED,

@@ -19,6 +19,7 @@ from telescreen.core.json import (
 from telescreen.core.vocabulary import (
     ActorKind,
     ChannelKind,
+    DataAssetKind,
     DetectorKind,
     ErrorCode,
     PoliceTaskStatus,
@@ -34,6 +35,7 @@ from telescreen.ports.findings import (
     ExternalFinding,
     ExternalScan,
     LocatorExposure,
+    LocatorInventory,
     RecordOutcome,
 )
 from telescreen.ports.issues import IssueRecorder
@@ -144,6 +146,35 @@ def _resource_exposures(
     return tuple(exposures), dropped
 
 
+def _resource_inventories(
+    value: JsonValue | None, allowed_locators: frozenset[str]
+) -> tuple[tuple[LocatorInventory, ...], int]:
+    """Decode inventory entries only for locators represented by the result."""
+    if value is None or value.kind is not JsonKind.ARRAY:
+        return (), 0
+    inventories: list[LocatorInventory] = []
+    dropped: int = 0
+    for item in value.items:
+        locator: str = _str(_member(item, "locator"))
+        if locator not in allowed_locators:
+            dropped += 1
+            continue
+        fingerprints_value: JsonValue | None = _member(item, "item_fingerprints")
+        fingerprints: tuple[str, ...] | None = (
+            tuple(entry.str_value for entry in fingerprints_value.items)
+            if fingerprints_value is not None and fingerprints_value.kind is JsonKind.ARRAY
+            else None
+        )
+        count_value: JsonValue | None = _member(item, "item_count")
+        count: int | None = count_value.int_value if count_value is not None else None
+        kind_value: JsonValue | None = _member(item, "kind")
+        kind: DataAssetKind | None = (
+            DataAssetKind(_str(kind_value)) if kind_value is not None else None
+        )
+        inventories.append(LocatorInventory(locator, fingerprints, count, kind))
+    return tuple(inventories), dropped
+
+
 @dataclass(frozen=True)
 class ResultService:
     """Accept only schema-valid, redactor-clean worker results."""
@@ -201,6 +232,8 @@ class ResultService:
         findings: tuple[ExternalFinding, ...] = _external_findings(_member(result, "findings"))
         exposures: tuple[LocatorExposure, ...] = ()
         exposures_dropped: int = 0
+        inventories: tuple[LocatorInventory, ...] = ()
+        inventories_dropped: int = 0
         record_outcome: RecordOutcome | None = None
         config_name: str | None = None
         if task.collector_config_id is not None:
@@ -231,6 +264,9 @@ class ResultService:
             exposures, exposures_dropped = _resource_exposures(
                 _member(result, "resource_exposures"), allowed_locators
             )
+            inventories, inventories_dropped = _resource_inventories(
+                _member(result, "resource_inventories"), allowed_locators
+            )
             record_outcome = await self.issues.record_external(
                 session,
                 ExternalScan(
@@ -243,6 +279,7 @@ class ResultService:
                     True,
                     self.clock.now(),
                     exposures,
+                    inventories,
                 ),
             )
             if task.task_type == "scan_shard":
@@ -291,6 +328,11 @@ class ResultService:
             + (
                 (("exposures_dropped", json_int(exposures_dropped)),)
                 if exposures_dropped > 0
+                else ()
+            )
+            + (
+                (("inventories_dropped", json_int(inventories_dropped)),)
+                if inventories_dropped > 0
                 else ()
             )
         )

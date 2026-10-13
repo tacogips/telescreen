@@ -41,6 +41,11 @@
         "$ref": "resource-exposure.schema.json"
       }
     },
+    "resource_inventories": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {"$ref": "resource-inventory.schema.json"}
+    },
     "payload": {
       "type": "object",
       "additionalProperties": true

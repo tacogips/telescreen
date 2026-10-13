@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, WorkflowValidationError, apiFetch, auditApi, collectorsApi, directoryApi, evidenceApi, exceptionsApi, getToken, humanTasksApi, issuesApi, policiesApi, rawFetch, setToken, workflowsApi } from "./client";
+import { ApiError, WorkflowValidationError, apiFetch, auditApi, collectorsApi, dataApi, directoryApi, evidenceApi, exceptionsApi, getToken, humanTasksApi, issuesApi, policiesApi, rawFetch, setToken, workflowsApi } from "./client";
 import { getSession } from "../auth/session";
 
 afterEach(() => { vi.unstubAllGlobals(); sessionStorage.clear(); });
@@ -49,6 +49,24 @@ describe("API wire contract", () => {
     expect(calls[23]?.body).toBe(JSON.stringify({ outcome: "exception", comment: "reviewed", exception_duration: "30d" }));
     expect(calls[22]?.body).toBe(JSON.stringify({ handles: ["alex"], lead: "alex" }));
   });
+  it("builds data filters, authenticates CSV exports, and sends collector inventory mode", async () => {
+    const calls: Readonly<{ path: string; headers: Headers; method: string; body: string | undefined }>[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ path: String(input), headers: new Headers(init?.headers), method: init?.method ?? "GET", body: typeof init?.body === "string" ? init.body : undefined });
+      return String(input).startsWith("/api/data/export") ? new Response("short_id,name\r\nDATA-1,Example", { headers: { "Content-Type": "text/csv" } }) : Response.json({ items: [], next_cursor: null });
+    }));
+    setToken("data-token");
+    await dataApi.list(new URLSearchParams([["tab", "overdue"], ["field", "purpose:operations"]]));
+    const csv = await dataApi.exportCsv(new URLSearchParams([["source", "gdrive"]]));
+    await collectorsApi.create({ name: "Example source", kind: "custom", trigger_mode: "schedule", cron: null, sweep_cron: null, selector_json: "{}", credential_ref: null, enabled: true, inventory_mode: "all" });
+    expect(calls[0]?.path).toBe("/api/data/assets?tab=overdue&field=purpose%3Aoperations");
+    expect(calls[1]?.path).toBe("/api/data/export?source=gdrive");
+    expect(calls[1]?.headers.get("Authorization")).toBe("Bearer data-token");
+    expect(csv.type).toContain("text/csv");
+    expect(csv.size).toBeGreaterThan(0);
+    expect(JSON.parse(calls[2]?.body ?? "{}").inventory_mode).toBe("all");
+  });
+
   it("uses global issue stats and its query parameters", async () => {
     const fetchSpy = vi.fn(async (_input: RequestInfo | URL) => new Response(JSON.stringify({ buckets: [] }), { status: 200 }));
     vi.stubGlobal("fetch", fetchSpy);

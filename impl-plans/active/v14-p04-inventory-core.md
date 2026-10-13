@@ -1,6 +1,6 @@
 # V14-P04 Inventory Core: Observer, Diffs, Lifecycle, Reconciliation, Queries, Export, Asset Routes
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-4-data-inventory.md sections 2 (D2-D13, D15-D16, D20-D24), 5, 6.1, 6.2, 6.5, 9, 9.1, 9.2, 11, 12
 **Created**: 2026-10-13
 **Last Updated**: 2026-10-13
@@ -329,21 +329,62 @@ Start every shell with `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1`. `<sr
 uv run --frozen ruff format --check --no-cache <src> <tests>
 uv run --frozen ruff check --no-cache <src> <tests>
 uv run --frozen ty check <src> <tests>
-uv run --frozen python tools/typelint.py > /tmp/telescreen-v14-p04-typelint.log 2>&1; grep -E '^(src/telescreen/inventory|src/telescreen/api/routers/data_|tests/inventory/core|tests/api/v14_data_assets)' /tmp/telescreen-v14-p04-typelint.log
+uv run --frozen python tools/typelint.py > /tmp/telescreen-v14-p04-typelint.log 2>&1; ! grep -E "^($PWD/)?(src/telescreen/inventory|src/telescreen/api/routers/data_|tests/inventory/core|tests/api/v14_data_assets)" /tmp/telescreen-v14-p04-typelint.log
 uv run --frozen pytest -p no:cacheprovider <tests> 2>&1 | tee /tmp/telescreen-v14-p04-pytest.log; echo "exit=$?"
 uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-v14-p04-pytest-all.log 2>&1; echo "exit=$?"
 ```
 
-Expected: the scoped checks exit 0 and the typelint grep is empty. The full suite is
+Expected: the scoped checks exit 0 and the typelint grep is empty (typelint prints absolute paths). The full suite is
 informational.
 
 ## Completion Criteria
 
-- [ ] Every deliverable is implemented with the pinned contracts unchanged.
-- [ ] Every test case above exists and passes.
-- [ ] No file exceeds 1000 lines (`wc -l` recorded).
-- [ ] The Progress Log has hashes, and every command with its exit status and log path.
+- [x] Every deliverable is implemented with the pinned contracts unchanged.
+- [x] Every test case above exists and passes.
+- [x] No file exceeds 1000 lines (`wc -l` recorded).
+- [x] The Progress Log has hashes, and every command with its exit status and log path.
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-10-13 20:40 JST
+**Tasks Completed**: Added the repository, item/value diff, lifecycle, observer, reconciler, query, export, asset service, common serializers/parser, and 12 standalone asset routes. Added offline observer, value rebaseline, stale-owner/export, route-permission, query-parser, count and CSV safety tests (12 focused tests pass).
+**Tasks In Progress**: The source deliverables are present, but the full listed test matrix is not yet covered. Missing focused cases include reconciler sweep/listing/stop-tracking, full tab/filter/sort/keyset coverage, item series/trend, manual event and mark/restore API audit/error cases, export truncation at 10000, and stale deactivated-member route coverage. p05 hooks and p08 wiring remain downstream plan ownership.
+**Blockers**: None. The assigned predecessors `v14-p01-foundation` and `v14-p02-db` are admitted by dispatch `acceptedPlanIds`.
+**Reconciliation requests**: None.
+**Hashes**: Plan before=8f2a1736ca4099e51351f59e618e25e81a859c59ee7da25742b5e5981eaafc41; post-edit SHA-256 is recorded in `tmp/telescreen-v14-20261013-f1/v14-p04/final-hashes.txt` to avoid a self-referential in-file hash. New source files had boundary state absent; after hashes: `src/telescreen/inventory/__init__.py`=26e326a0d573d2fdf8a9ebef9ab34c5770a40c80ec33ecf3b9b9ed425b51af70; `assets.py`=25e5873407b44af56abcb60dd5958f590b65b5f54dda566732aa6983c21daee4; `export.py`=2acc6caf5c0e83dcb9cd67f99aac8e72618ddda6ee1b4f1fb7e08245dc4b1d7f; `items.py`=0a3dd7de08998d12e1f725aa636cb1f1bbd4a29e4f7d38def98211825f3884c3; `lifecycle.py`=74cf3c66246b321a7d84f747ad024739a87233c51ceb586002395cda1866761f; `observer.py`=eb5232848bb18092ae46afa8d15b5ff090b595316bfb2967456a43a927cd3a5b; `queries.py`=77fb8586e94932466aead7725639e2b8eba05013f4f451c67a17e8b61d4816d1; `reconcile.py`=2e790252788a7a3d3c0819ce0470732467ca42b8da09941ed1388e0b018e70ba; `repository.py`=92e0945d0316d261c98fcec29bce6a93f8da814082a637a73ca4b5151072e59c; `data_common.py`=0fa0e67b581ab93dbb1d6883549a20566d67660aa509c0dad5c2d147fc189c3b; `data_assets.py`=3dc4a415db85e263f808b59a4fb57c35ed1ce08af36a65de7f537cd4dd22fcdb; `data_asset_detail.py`=706f1591f3730e7c7200d1c259b70b10f5ac544a75fbc75a54c742aabc361dfb; `tests/inventory/core/test_items.py`=a6fc39a30e5761ea08d632609546515b96781929956e3e933eb1a91fa927599a; `test_observer.py`=0c7154e675980ec59d74617c4805d5990cc94fd697c38058c6ecccd40034518b; `test_queries.py`=197d31c5a160d3734a44ddafd9af5c28e18cc850e90c51cb16f10aa2acf4ecf1; `tests/api/v14_data_assets/test_data_common.py`=960d8fb9ed4e771d3816fc80b98df634c8c080310cb3be88804d97ee2dee6926; `test_routes.py`=478ce49a9da2adef1fc081b5735f890445548a04cff236da806531cff3ca3604.
+**Verification**:
+- `uv run --frozen ruff format --check --no-cache src/telescreen/inventory src/telescreen/api/routers/data_common.py src/telescreen/api/routers/data_assets.py src/telescreen/api/routers/data_asset_detail.py tests/inventory/core tests/api/v14_data_assets` -> exit 0 (log: `tmp/telescreen-v14-20261013-f1/v14-p04/logs/final-format.log`).
+- `uv run --frozen ruff check --no-cache src/telescreen/inventory src/telescreen/api/routers/data_common.py src/telescreen/api/routers/data_assets.py src/telescreen/api/routers/data_asset_detail.py tests/inventory/core tests/api/v14_data_assets` -> exit 0 (log: `tmp/telescreen-v14-20261013-f1/v14-p04/logs/final-ruff.log`).
+- `uv run --frozen ty check src/telescreen/inventory src/telescreen/api/routers/data_common.py src/telescreen/api/routers/data_assets.py src/telescreen/api/routers/data_asset_detail.py tests/inventory/core tests/api/v14_data_assets` -> exit 0 (log: `tmp/telescreen-v14-20261013-f1/v14-p04/logs/final-ty.log`).
+- `uv run --frozen python tools/typelint.py` plus empty p04-path grep -> exit 0 (log: `tmp/telescreen-v14-20261013-f1/v14-p04/logs/final-typelint.log`; filtered log: `tmp/telescreen-v14-20261013-f1/v14-p04/logs/final-typelint-filtered.log`).
+- `uv run --frozen pytest -p no:cacheprovider tests/inventory/core tests/api/v14_data_assets` -> exit 0, 12 passed, 0 failed (log: `tmp/telescreen-v14-20261013-f1/v14-p04/logs/final-pytest.log`).
+- `wc -l src/telescreen/inventory/*.py src/telescreen/api/routers/data_common.py src/telescreen/api/routers/data_assets.py src/telescreen/api/routers/data_asset_detail.py tests/inventory/core/*.py tests/api/v14_data_assets/*.py` plus `<1000` check -> exit 0 (log: `tmp/telescreen-v14-20261013-f1/v14-p04/logs/final-wc.log`).
+- `grep -rn assignee_of src/telescreen/inventory/queries.py src/telescreen/inventory/export.py src/telescreen/api/routers/data_common.py src/telescreen/api/routers/data_assets.py src/telescreen/api/routers/data_asset_detail.py` -> no matches, exit 0 (log: `tmp/telescreen-v14-20261013-f1/v14-p04/logs/final-assignee-of.log`).
+**Notes**: Earlier test attempts and repairs remain in `tmp/telescreen-v14-20261013-f1/v14-p04/logs/pytest-final2.log` and `pytest-route-test.log`; their failures were resolved by UTC timestamp normalization and the corrected FastAPI route import. The full repository suite was not run during this fanout wave, as this plan marks it informational while sibling plans are changing.
+
+### Continuation: 2026-10-13
+**Tasks Completed**: Completed the assigned observer and reconciler test matrix; added query tab/filter/sort/keyset, computed incomplete/overdue, detail, stale member/team owner, item trend/series coverage; added 10,000-row CSV truncation and API RBAC, status, non-echo, audit, lookup, and response-shape checks. Fixed the required-field EXISTS correlation, SQLite watermark timezone comparison, and datetime keyset cursor comparison exposed by those tests. p05 hooks and p08 wiring remain downstream.
+**Tasks In Progress**: None for p04.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: Plan before=82756c1d76e008ae8c6105900655737307356569713aff35bf4f4059efd2c9f2; final plan SHA-256 is recorded after this edit in `tmp/telescreen-v14-20261013-f1/v14-p04/final-hashes.txt`. Existing source before/after: `src/telescreen/inventory/queries.py` 77fb8586e94932466aead7725639e2b8eba05013f4f451c67a17e8b61d4816d1 -> d2c7eafb1971f299b4fb748b3506a0e7e649555de3945e55e53b4ad37523903b; `src/telescreen/inventory/reconcile.py` 2e790252788a7a3d3c0819ce0470732467ca42b8da09941ed1388e0b018e70ba -> 253568be53ea52bd8ffb79316a8ef80d6f701f700c56d0a0218d9e51acf66033; `tests/inventory/core/test_observer.py` 0c7154e675980ec59d74617c4805d5990cc94fd697c38058c6ecccd40034518b -> b3543732fe227fd901e36335c6ada8ad574d83da44a0f6acb6524472957843ed; `tests/api/v14_data_assets/test_routes.py` 478ce49a9da2adef1fc081b5735f890445548a04cff236da806531cff3ca3604 -> 89ebcd1afe676725046e3585970d4befa0261bf90ab4bed21dfe5c6853e0fc28. New test files were absent at the node boundary; after hashes: `tests/inventory/core/test_reconcile.py`=29600a403071d8ddb4187161bc47c2fd16bfd62735f284382164fee51c797236; `test_query_contract.py`=f98d871d5ee39276fa41892c97ec5c03c23a04a84dc485f5881204f3107d822d; `test_export.py`=c496e9506151298777251b8db42956586d85156d8eda70c843623f9d4413e3e3; `test_asset_service.py`=34db996a14e9ed396726a9aa8f73c08444d2c1761bdd97f0bef761d2d0cb998e.
+**Verification**:
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/inventory src/telescreen/api/routers/data_common.py src/telescreen/api/routers/data_assets.py src/telescreen/api/routers/data_asset_detail.py tests/inventory/core tests/api/v14_data_assets` -> exit 0 (log: `tmp/telescreen-v14-20261013-f1/v14-p04/logs/step6-final-format4.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/inventory src/telescreen/api/routers/data_common.py src/telescreen/api/routers/data_assets.py src/telescreen/api/routers/data_asset_detail.py tests/inventory/core tests/api/v14_data_assets` -> exit 0 (log: `tmp/telescreen-v14-20261013-f1/v14-p04/logs/step6-final-ruff4.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/inventory src/telescreen/api/routers/data_common.py src/telescreen/api/routers/data_assets.py src/telescreen/api/routers/data_asset_detail.py tests/inventory/core tests/api/v14_data_assets` -> exit 0 (log: `tmp/telescreen-v14-20261013-f1/v14-p04/logs/step6-final-ty4.log`).
+- `export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > tmp/telescreen-v14-20261013-f1/v14-p04/logs/step6-final-typelint4.log 2>&1; ! grep -E '^(src/telescreen/inventory|src/telescreen/api/routers/data_|tests/inventory/core|tests/api/v14_data_assets)' tmp/telescreen-v14-20261013-f1/v14-p04/logs/step6-final-typelint4.log > tmp/telescreen-v14-20261013-f1/v14-p04/logs/step6-final-typelint-filtered4.log` -> exit 0; filtered diagnostics empty.
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/inventory/core tests/api/v14_data_assets` -> exit 0, 22 passed, 0 failed (log: `tmp/telescreen-v14-20261013-f1/v14-p04/logs/step6-final-pytest4.log`).
+- `wc -l src/telescreen/inventory/*.py src/telescreen/api/routers/data_common.py src/telescreen/api/routers/data_assets.py src/telescreen/api/routers/data_asset_detail.py tests/inventory/core/*.py tests/api/v14_data_assets/*.py > tmp/telescreen-v14-20261013-f1/v14-p04/logs/step6-final-wc4.log; ! awk '$2 != "total" && $1 >= 1000' tmp/telescreen-v14-20261013-f1/v14-p04/logs/step6-final-wc4.log | grep -q .` -> exit 0; no selected file reached 1000 lines.
+- `! grep -rn assignee_of src/telescreen/inventory/queries.py src/telescreen/inventory/export.py src/telescreen/api/routers/data_common.py src/telescreen/api/routers/data_assets.py src/telescreen/api/routers/data_asset_detail.py > tmp/telescreen-v14-20261013-f1/v14-p04/logs/step6-final-assignee-of4.log` -> exit 0; no matches.
+
+### Adversarial repair: 2026-10-13 (comm-000807)
+**Tasks Completed**: P04-ADV-1 uses timezone-aware cursor binds, naive-cursor normalization, and asyncpg compilation coverage; P04-ADV-2 uses binary-search fingerprint indexes and SQL counts; P04-ADV-3 adds canonical typed filters, escaped multi-select matching, and JSON-safe owner matching. Added 3 tests; p04 focused suite is 25 passed.
+**Review Decision**: All assigned findings corrected; independent Opus re-review is pending. No acceptance is claimed here.
+**Hashes**: Pre-edit hashes and per-edit intents are in `tmp/telescreen-v14-20261013-f1/v14-p04/intents/067-076-*.md`; final source and plan SHA-256 values are in `tmp/telescreen-v14-20261013-f1/v14-p04/logs/review4-final-hashes.log`.
+**Verification**: Review3 focused pytest -> exit 0, 25 passed (`logs/review3-focused-pytest.log`); Ruff format/check, ty, typelint -> exit 0 (`logs/review3-format.log`, `review3-ruff.log`, `review3-ty.log`, `review3-typelint.log`; filtered diagnostics empty). File-size and no-assignee_of checks -> exit 0 (`review3-wc.log`, `review3-assignee-of.log`). `PYTHONPATH=. uv run --frozen python tmp/telescreen-v14-20261013-f1/v14-p04/scripts/review1_item_perf.py` -> exit 0; second passes at 2.5k/5k/10k=0.0106/0.0343/0.0603s (`logs/review5-fingerprint-timing.log`).
+**Notes**: `items.py` has no per-fingerprint row scan; the only remaining `next()` selects the sole key version. Downstream p05 hooks and p08 wiring remain separate ownership.
+
+### Serial reconciliation: 2026-10-13 (P04-BE-1, reconcile attempt-3)
+**Tasks Completed**: Annotated the 13 TL003 locals in `tests/inventory/core/test_query_contract.py` (additive only; no assertion change). The Verification typelint grep now accepts typelint's absolute paths and must find nothing.
+**Hashes**: test_query_contract.py before=a1a1c284b6b188dbec1af1eb8c5a2ecefc3731797c7dec922ab4a716cc9344ab after=b46a48b4ac5f49527d129e63702ce41312bead6d7f3dfb82f5b33cb3d7194fad; plan before=9bef1e414dd5dda4c1c0707e58ae4f6f4739d4af2fa6ca8956a152b7adc3040c (after in `tmp/telescreen-v14-20261013-f1/reconcile/attempt-3/post-sha256.txt`).
+**Verification**: whole-tree typelint exit 0 (578 files clean); p04 ruff format/check, ty exit 0; focused pytest exit 0, 25 passed (logs under `tmp/telescreen-v14-20261013-f1/reconcile/attempt-3/`).

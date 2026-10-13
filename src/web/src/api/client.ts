@@ -5,6 +5,7 @@ import type {
   PoliceHeartbeat, PoliceHeartbeatResponse, PoliceManifest, PoliceResult, PoliceWorker, SearchResponse,
   OccurrencesResponse, PolicySummary, PolicyValidation, PolicyVersion, RemediationReceipt, Team, ValidateResponse, WorkflowVersion, WorkflowVersionRef, RunDetail, RunSummary, RunHumanTask,
   AuthConfig, AuthMe, AuthSession, CreatedToken, RoleMatrix, TemplateDetail, TemplatePreview, TemplateSummary, TemplateValidation, TemplateValidationErrorItem, TemplateVersionText, TokenSummary, UserSummary,
+  DataAsset, DataAssetDetail, DataAssetPatch, DataAssetTab, DataCounts, DataEvent, DataField, DataFieldBody, DataItem, DataItemKind, DataItemSeries, DataManualEventBody, DataRegisterBody, DataValidateResponse, DataValuesBody, InventoryMode,
 } from "./types";
 import type * as V13 from "./types";
 import { clearSession, getSession, setSession } from "../auth/session";
@@ -244,6 +245,45 @@ export const meApi = {
   createToken: (value: Readonly<{ label: string; scopes: readonly string[] }>): Promise<Readonly<{ id: string; token: string }>> => apiFetch("/api/auth/me/tokens", json("POST", { ...value, scopes: [...value.scopes] })),
   revokeToken: (id: string): Promise<void> => apiFetch(`/api/auth/me/tokens/${encodeURIComponent(id)}/revoke`, json("POST")),
 };
+
+
+function dataFieldBodyJson(body: Partial<DataFieldBody>): JsonValue {
+  return {
+    ...(body.key === undefined ? {} : { key: body.key }),
+    ...(body.label === undefined ? {} : { label: body.label }),
+    ...(body.description === undefined ? {} : { description: body.description }),
+    ...(body.field_type === undefined ? {} : { field_type: body.field_type }),
+    ...(body.options === undefined ? {} : { options: body.options.map((option) => ({ value: option.value, label: option.label })) }),
+    ...(body.required === undefined ? {} : { required: body.required }),
+    ...(body.role === undefined ? {} : { role: body.role }),
+  };
+}
+
+export const dataApi = {
+  list: (filters: URLSearchParams = new URLSearchParams()): Promise<Page<DataAsset>> => apiFetch(`/api/data/assets${query(filters)}`),
+  counts: (filters: URLSearchParams = new URLSearchParams()): Promise<DataCounts> => apiFetch(`/api/data/counts${query(filters)}`),
+  exportCsv: async (filters: URLSearchParams = new URLSearchParams()): Promise<Blob> => { const response = await rawFetch(`/api/data/export${query(filters)}`); if (!response.ok) await throwApiError(response); return response.blob(); },
+  resourceAsset: (resourceKey: string): Promise<Readonly<{ asset: DataAsset | null }>> => apiFetch(`/api/data/resource-assets/${encodeURIComponent(resourceKey)}`),
+  get: (id: string): Promise<DataAssetDetail> => apiFetch(`/api/data/assets/${encodeURIComponent(id)}`),
+  events: (id: string, cursor?: string): Promise<Page<DataEvent>> => { const filters = new URLSearchParams(); if (cursor !== undefined) filters.set("cursor", cursor); return apiFetch(`/api/data/assets/${encodeURIComponent(id)}/events${query(filters)}`); },
+  items: (id: string, kind: DataItemKind, state: "present" | "removed", cursor?: string): Promise<Page<DataItem>> => { const filters = new URLSearchParams({ kind, state }); if (cursor !== undefined) filters.set("cursor", cursor); return apiFetch(`/api/data/assets/${encodeURIComponent(id)}/items${query(filters)}`); },
+  itemSeries: (id: string, days = 90): Promise<DataItemSeries> => apiFetch(`/api/data/assets/${encodeURIComponent(id)}/item-series${query(new URLSearchParams({ days: String(days) }))}`),
+  fields: (): Promise<Readonly<{ items: DataField[] }>> => apiFetch("/api/data/fields"),
+  patch: (id: string, body: DataAssetPatch): Promise<DataAssetDetail> => apiFetch(`/api/data/assets/${encodeURIComponent(id)}`, json("PATCH", body)),
+  putFields: (id: string, body: DataValuesBody): Promise<DataAssetDetail> => apiFetch(`/api/data/assets/${encodeURIComponent(id)}/fields`, json("PUT", { values: body.values.map((value) => ({ key: value.key, value_json: value.value_json })) })),
+  recordEvent: (id: string, body: DataManualEventBody): Promise<DataEvent> => apiFetch(`/api/data/assets/${encodeURIComponent(id)}/events`, json("POST", body)),
+  markDeleted: (id: string, body: Readonly<{ occurred_at?: string; note?: string }> = {}): Promise<DataAssetDetail> => apiFetch(`/api/data/assets/${encodeURIComponent(id)}/mark-deleted`, json("POST", body)),
+  restore: (id: string, body: Readonly<{ note?: string }> = {}): Promise<DataAssetDetail> => apiFetch(`/api/data/assets/${encodeURIComponent(id)}/restore`, json("POST", body)),
+  register: (body: DataRegisterBody): Promise<DataAssetDetail> => apiFetch("/api/data/assets", json("POST", body)),
+  createField: (body: DataFieldBody): Promise<DataField> => apiFetch("/api/data/fields", json("POST", dataFieldBodyJson(body))),
+  updateField: (id: string, body: Partial<DataFieldBody>): Promise<DataField> => apiFetch(`/api/data/fields/${encodeURIComponent(id)}`, json("PATCH", dataFieldBodyJson(body))),
+  deleteField: (id: string): Promise<void> => apiFetch(`/api/data/fields/${encodeURIComponent(id)}`, json("DELETE")),
+  archiveField: (id: string): Promise<DataField> => apiFetch(`/api/data/fields/${encodeURIComponent(id)}/archive`, json("POST")),
+  unarchiveField: (id: string): Promise<DataField> => apiFetch(`/api/data/fields/${encodeURIComponent(id)}/unarchive`, json("POST")),
+  reorderFields: (ids: readonly string[]): Promise<Readonly<{ items: DataField[] }>> => apiFetch("/api/data/fields/reorder", json("POST", { ids: [...ids] })),
+  validateValues: (body: Readonly<{ values: Readonly<Record<string, JsonValue>> }>): Promise<DataValidateResponse> => apiFetch("/api/data/fields/validate-values", json("POST", body)),
+};
+
 export const dashboardApi = { get: (period = "14d"): Promise<V13.DashboardResponse> => apiFetch(`/api/dashboard${query(new URLSearchParams({ period }))}`) };
 export const integrationsApi = {
   list: (): Promise<Readonly<{ items: V13.IntegrationStatus[] }>> => apiFetch("/api/integrations"),
@@ -337,7 +377,7 @@ export const directoryApi = {
   setTeamMembers: async (slug: string, handles: string[], lead?: string | null): Promise<void> => { await apiFetch<void>(`/api/teams/${encodeURIComponent(slug)}/members`, json("PUT", { handles, ...(lead === undefined ? {} : { lead }) })); },
 };
 
-type CollectorBody = Readonly<{ name: string; kind: string; trigger_mode: string; cron: string | null; sweep_cron: string | null; selector_json: string; credential_ref: string | null; enabled: boolean }>;
+type CollectorBody = Readonly<{ name: string; kind: string; trigger_mode: string; cron: string | null; sweep_cron: string | null; selector_json: string; credential_ref: string | null; enabled: boolean; inventory_mode?: InventoryMode }>;
 export const collectorsApi = {
   list: async (): Promise<Page<CollectorConfig>> => normalizePage(await apiFetch<{ items: CollectorConfig[] }>("/api/collectors")),
   create: (value: CollectorBody): Promise<Readonly<{ id: string }>> => apiFetch("/api/collectors", json("POST", value)),

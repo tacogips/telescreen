@@ -125,6 +125,27 @@ describe("mock API mode", () => {
     expect(Date.parse(issue.archive?.until ?? "") - Date.now()).toBeLessThanOrEqual(90 * 86_400_000);
   });
 
+  it("implements v1.4 inventory list, mutations, export, lookup, and permissions", async () => {
+    const client = await mockClient();
+    const overdue = await client.dataApi.list(new URLSearchParams({ tab: "overdue" }));
+    expect(overdue.items.length).toBeGreaterThanOrEqual(3);
+    expect(overdue.items.every((asset) => asset.overdue)).toBe(true);
+    expect((await client.dataApi.counts()).overdue).toBeGreaterThanOrEqual(3);
+    await expect(client.dataApi.putFields("data-asset-01", { values: [{ key: "purpose", value_json: null }, { key: "owner", value_json: null }] })).rejects.toMatchObject({ status: 422, code: "required_field_missing" });
+    await expect(client.dataApi.updateField("data-field-01", { field_type: "text" })).rejects.toMatchObject({ status: 409, code: "field_in_use" });
+    const registered = await client.dataApi.register({ name: "Example registration", source: "custom", locator: "example.test/new", kind: "file", values: { purpose: "operations", owner: "member:alex" } });
+    expect(registered.short_id).toBe("DATA-25");
+    const csv = await client.rawFetch("/api/data/export");
+    expect(csv.headers.get("Content-Type")).toContain("text/csv");
+    expect((await csv.text()).split("\r\n")[0]).toContain("short_id");
+    expect(await client.dataApi.resourceAsset("a".repeat(64))).toEqual({ asset: null });
+    expect((await client.authApi.me()).permissions).toEqual(expect.arrayContaining(["data.read", "data.write", "data_fields.admin"]));
+    expect((await client.authApi.session()).permissions).toEqual(expect.arrayContaining(["data.read", "data.write", "data_fields.admin"]));
+    const viewer = (await client.usersApi.roles()).roles.find((role) => role.role === "viewer");
+    expect(viewer?.permissions).toContain("data.read");
+    expect(viewer?.permissions).not.toContain("data.write");
+  });
+
   it("returns 404 for unknown v1.1 API paths", async () => {
     const client = await mockClient();
     await expect(client.apiFetch("/api/policies/unknown/undeclared")).rejects.toMatchObject({ status: 404, code: "not_found" });

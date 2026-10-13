@@ -8,6 +8,7 @@ import {
 import { MemoryRouter, Route } from "@solidjs/router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Toast } from "../../components/ui";
+import { setSession } from "../../auth/session";
 import { IssueDetail } from "./IssueDetail";
 
 const issue = {
@@ -84,6 +85,7 @@ let mergedChildren: readonly Readonly<{ id: string; short_id: string; source: st
 let assignedPerson: Readonly<{ kind: "member"; ref: string; display_name: string }> | null = null;
 let canEditComment = true;
 let exposureMissing = false;
+let showDataAsset = false;
 const history = [
   {
     id: "history-1",
@@ -108,9 +110,12 @@ afterEach(() => {
   assignedPerson = null;
   canEditComment = true;
   exposureMissing = false;
+  showDataAsset = false;
 });
 
 function response(url: string, method = "GET"): Response {
+  if (url === "/api/auth/me") return Response.json({ kind: "token", member: { handle: "alex", display_name: "Alex" }, role: "responder", permissions: ["data.read"] });
+  if (url.startsWith("/api/data/resource-assets/")) return Response.json({ asset: showDataAsset ? { id: "data-asset-01", short_id: "DATA-1" } : null });
   const selected = /\/api\/issues\/issue-1\/events\/([^/?]+)$/.exec(url);
   if (selected !== null) {
     const selector = decodeURIComponent(selected[1]!);
@@ -184,6 +189,20 @@ function renderDetail(): void {
 }
 
 describe("IssueDetail", () => {
+  it("links to an associated data asset and omits the link when no asset is paired", async () => {
+    setSession({ kind: "token", access_token: "test-session" });
+    showDataAsset = true;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => response(String(input), init?.method));
+    vi.stubGlobal("fetch", fetchMock);
+    renderDetail();
+    expect(await screen.findByRole("link", { name: "DATA-1" })).toHaveAttribute("href", "/data/data-asset-01");
+    cleanup();
+    showDataAsset = false;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => response(String(input), init?.method)));
+    renderDetail();
+    await screen.findByRole("heading", { name: "Credential finding" });
+    expect(screen.queryByRole("link", { name: "DATA-1" })).toBeNull();
+  });
   it("archives for 24h with the server duration_minutes contract", async () => {
     issueStatus = "unresolved";
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>

@@ -145,3 +145,42 @@ metadata schema exists. Corrections and additions (details in
 | C4 | "Absence from a complete sweep" | Exists only for issues (`resolve_unchecked` after a `SUCCEEDED` map job; full-listing reconciliation of open-issue refs). v1.4 adds the asset equivalents |
 | C5 | New finding | `/scan` and `/findings` key the same custom locator differently (`issues/service.py:524,558`). Kept in v1.4; owner question in `design-docs/user-qa/pending-custom-push-resource-identity.md` |
 | C6 | R7 owner fallback | "Issue owner rules" means: the resource owner of the asset's open issues, then the ownership rules. The policy team is not used for assets |
+
+## 8. Owner live verification (2026-10-13, after run 1)
+
+Run 1 (session 15) accepted p01-p07 and blocked p08 on one missing E2E flow. The owner
+then ran the live stack (PostgreSQL 55432 migrated to `0005_v1_4`, `telescreen serve`,
+`telescreen worker`, the UI dev server, Keycloak SSO as alice, Mailpit). A scripted API
+flow passed 29 of 30 checks:
+- discovery with `inventory_mode=all`;
+- 5 item keys, then 2 removed (one event with `items_removed=2`, removed items listed by
+  12-hex prefix, item series);
+- an incomplete scan that changed nothing;
+- field schema creation with the incomplete flag, secret rejection without echo and
+  required enforcement;
+- manual registration and a manual `-120` change;
+- push removal closing 3 items, then restore and CSV export;
+- no raw sample or item key in any API response.
+
+Owner fixes already applied in the run-2 checkpoint:
+
+| Id | Defect | Fix |
+|----|--------|-----|
+| O1 | `DataOverdueProvider` used the 38-character `data-overdue:<ISO minute>` as `engine_tasks.ref_id` (`varchar(36)`). PostgreSQL rejected every enqueue (`schedule provider failed type=DBAPIError` each minute), so no overdue notification was ever sent. SQLite does not enforce varchar lengths, so every offline test passed | `ref_id` is now `data-overdue:<epoch minute>`; the ISO idempotency key is unchanged. `SqlTaskQueue.enqueue` rejects a `ref_id` over 36 or an idempotency key over 256 characters, so SQLite tests catch this class. Tests: `tests/inventory/retention/test_handler.py::test_overdue_provider_enqueues_through_the_sql_queue`, `tests/workflow/queue/test_queue_limits.py`. Live: alice received "Data past its deletion date: DATA-1" with no raw values |
+| O2 | p08 blocker: no integrated full-listing E3 flow | `tests/e2e/test_flow_v14_inventory.py::test_e3_full_listing_deletes_absent_asset_only_when_authoritative`. Production-wired app, fake Slack adapter: incremental, skipped-ref and failed listings never delete, a completed full listing deletes once, a later sighting restores, and inventory `off` gives `unknown` with `tracking_stopped` and no deletion. A mutation of the skipped-ref guard fails it |
+
+Defects found in the live UI that must be fixed in run 2 (the mock screenshots hid all
+of them):
+
+| Id | Defect | Evidence |
+|----|--------|----------|
+| L1 | The timeline shows "20,740 days ago" for every scan or system event: the UI formats `occurred_at`, which is null unless a person supplied it, instead of falling back to `recorded_at` | `/data/<id>` timeline; `GET /api/data/assets/<id>/events` returns `occurred_at: null` with a valid `recorded_at` |
+| L2 | Events recorded by a collector show the actor "Unknown": `collector:<config id>` refs resolve to `{kind: "unknown", display_name: "Unknown"}` | same events response. Expected: the collector name (for example "Collector live-v14-...") or "Telescreen" for system work, as v1.3 did for issue activity |
+| L3 | A `reference` field (Owner) shows "Choose..." although `value_json` is `"member:alice"` and the list shows "Alice Test" as owner. Saving the form without touching it must keep the value | `/data/<id>` metadata form; option values must be `member:<handle>` / `team:<slug>` to match the stored value |
+| L4 | The Item count section shows "No item count history" while `GET /api/data/assets/<id>/item-series` returns 3 points (5, 3, 0) | `DataDetailSections.tsx` series handling |
+| L5 | Text runs together: tab label and count ("All3", "Overdue1"), the timeline actor initials, name and text ("ATAlice Testrestored"), the list name and locator ("Clean docdocs/clean-...md"), the breadcrumb ("DataDATA-1") | `/data` and `/data/<id>` |
+| L6 | The admin-only "Field schema" entry is missing from the Data secondary nav (design 10.1) and from the Settings secondary nav (the page is reachable only from the settings tab strip) | `/data`, `/settings/data-fields` |
+| L7 | An overdue asset's row shows no Overdue badge in the State column (only `present`), although the Overdue tab counts it | `/data` |
+
+The mock fixtures must also cover null `occurred_at`, collector actors, `reference`
+values and a multi-point item series, so the strict screenshots show these states.

@@ -7,6 +7,7 @@ import { AppShell } from "./components/shell/AppShell";
 import { setTheme } from "./components/shell/theme";
 import { AREAS, AppRoutes, AreaPage, type AreaKey } from "./routes";
 import { SecondaryPanel } from "./components/shell/SecondaryPanel";
+import { entriesFor } from "./components/shell/nav";
 
 const values = new Map<string, string>();
 const storage = {
@@ -53,7 +54,8 @@ describe("web shell", () => {
     render(() => <MemoryRouter root={AppShell}><AppRoutes /></MemoryRouter>);
     const rail = within(screen.getByRole("navigation", { name: "Primary navigation" }));
     const labels = rail.getAllByRole("link").slice(1).map((link) => link.querySelector(":scope > span")?.textContent?.trim());
-    expect(labels).toEqual(["Dashboard", "Issues", "Alerts", "My tasks", "Search", "Workflows", "Police", "Collectors", "Policies", "Escalation", "Audit", "Assistant", "Settings"]);
+    expect(labels).toEqual(["Dashboard", "Issues", "Alerts", "Data", "My tasks", "Search", "Workflows", "Police", "Collectors", "Policies", "Escalation", "Audit", "Assistant", "Settings"]);
+    expect(entriesFor("data")).toEqual([{ label: "All data", href: "/data" }, { label: "Overdue", href: "/data?tab=overdue" }, { label: "Incomplete", href: "/data?tab=incomplete" }, { label: "Register data", href: "/data/new" }]);
     expect(screen.getByRole("link", { name: "Assigned to me" })).toHaveAttribute("href", "/issues?query=assigned%3Ame");
     expect(screen.getByRole("link", { name: "Allowed" })).toHaveAttribute("href", "/issues?query=is%3Aallowed");
     expect(screen.getByRole("link", { name: "Verifying" })).toHaveAttribute("href", "/issues?query=is%3Apending_verification");

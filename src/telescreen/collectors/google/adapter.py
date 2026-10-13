@@ -4,7 +4,7 @@ import hashlib
 import hmac
 import json
 from contextlib import suppress
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from typing import Protocol
 from uuid import uuid4
@@ -42,6 +42,7 @@ from telescreen.ports.collectors import (
     EventResources,
     Exposure,
     InboundWebhook,
+    ItemReport,
     OwnerIdentity,
     PlacementRef,
     RateLimited,
@@ -203,6 +204,7 @@ class GoogleAdapter:
                 payload: bytes = await drive.files_export(file.id, subject=subject)
                 segments: tuple[Segment, ...] = _line_segments(payload.decode("utf-8"))
             elif self.kind is CollectorKind.GSHEETS:
+                item_count: int = 0
                 sheets: SheetsApi = self.sheets_factory()
                 titles: tuple[str, ...] = await sheets.sheet_titles(file.id, subject)
                 ranges: tuple[str, ...] = tuple(
@@ -213,6 +215,12 @@ class GoogleAdapter:
                 )
                 segments = _sheet_segments(values)
                 payload = "".join(segment.text for segment in segments).encode("utf-8")
+                item_count = sum(
+                    1
+                    for sheet in values
+                    for row in sheet.values
+                    if any(str(value) for value in row)
+                )
             else:
                 payload = await drive.files_get_media(file.id, subject)
                 if not _text_like(file.mime_type) or len(payload) > self.max_bytes:
@@ -232,7 +240,7 @@ class GoogleAdapter:
                     )
                 segments = _line_segments(payload.decode("utf-8"))
             complete: bool = len(payload) <= self.max_bytes
-            return self._content(
+            content: ResourceContent = self._content(
                 config,
                 ref,
                 file.name,
@@ -246,6 +254,9 @@ class GoogleAdapter:
                     truncated_bytes=max(0, len(payload) - self.max_bytes),
                 ),
             )
+            if self.kind is CollectorKind.GSHEETS and complete:
+                return replace(content, items=ItemReport(count=item_count))
+            return content
         except UnicodeDecodeError:
             raise TelescreenError(
                 ErrorCode.FETCH_FAILED, "Google Drive content is not UTF-8"

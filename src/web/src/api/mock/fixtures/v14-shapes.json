@@ -1,0 +1,10 @@
+{
+  "DataAsset": ["collector_config_id", "deleted_at", "deletion_due", "display_locator", "first_seen_at", "id", "incomplete", "item_count", "item_trend", "kind", "last_seen_at", "name", "number", "open_issue_count", "origin", "overdue", "owner", "short_id", "source", "state"],
+  "DataAssetDetail": ["collector_config_id", "created_by", "deleted_at", "deletion_due", "display_locator", "fields", "first_seen_at", "id", "incomplete", "item_count", "item_trend", "kind", "last_seen_at", "missing_required", "name", "number", "open_issue_count", "open_issues", "origin", "overdue", "owner", "short_id", "source", "state", "sweep_covered", "value_count"],
+  "DataEvent": ["actor", "field_key", "id", "item_count_after", "items_added", "items_removed", "kind", "new_value", "note", "occurred_at", "old_value", "recorded_at", "value_count_after", "values_added", "values_removed"],
+  "DataItem": ["first_seen_at", "id", "key_prefix", "kind", "removed_at"],
+  "DataField": ["archived", "created_at", "description", "field_type", "id", "key", "label", "options", "position", "required", "role", "updated_at", "value_count"],
+  "DataCounts": ["all", "deleted", "incomplete", "overdue", "present"],
+  "DataItemSeriesPoint": ["at", "item_count"],
+  "DataFieldSlot": ["field_type", "key", "label", "options", "required", "role", "value_json"]
+}

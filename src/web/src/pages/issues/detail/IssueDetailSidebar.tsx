@@ -1,5 +1,7 @@
-import { createMemo, For, Show, type JSX } from "solid-js";
+import { createMemo, For, Show, createResource, type JSX } from "solid-js";
 import { A } from "@solidjs/router";
+import { dataApi } from "../../../api/client";
+import { useAuth } from "../../../auth/useAuth";
 import type { IssueStatus, RunHumanTask } from "../../../api/types";
 import { StatusBadge } from "../../../components/StatusBadge";
 import { Avatar } from "../../../components/Avatar";
@@ -28,6 +30,11 @@ export function IssueDetailSidebar(
     onExceptionDecision(action: "approve" | "reject"): void;
   }>,
 ): JSX.Element {
+  const auth = useAuth();
+  const [asset] = createResource(() => auth.can("data.read") ? props.detail.issue.resource_key : undefined, async (resourceKey) => {
+    try { return (await dataApi.resourceAsset(resourceKey)).asset; }
+    catch { return null; }
+  });
   const activeTask = (): RunHumanTask | undefined =>
     props.detail.activeRun?.human_tasks.find((task) => task.status === "open");
   const workflowName = (definitionId: string): string =>
@@ -69,6 +76,7 @@ export function IssueDetailSidebar(
         <p>Coverage: {props.detail.issue.sweep_covered ? "Scanned" : "Not covered"}</p>
         <p>Last checked <RelativeTime iso={props.detail.issue.last_checked_at} /></p>
       </section>
+      <Show when={auth.can("data.read") && asset()}>{(dataAsset) => <section><h3>Data asset</h3><A aria-label={dataAsset().short_id} href={`/data/${encodeURIComponent(dataAsset().id)}`}>{dataAsset().short_id}</A></section>}</Show>
       <section>
         <h3>Exposure</h3>
         <Show when={props.detail.issue.exposure} keyed fallback={<p>Exposure unknown: the source reported no sharing data.</p>}>{(exposure) => <>

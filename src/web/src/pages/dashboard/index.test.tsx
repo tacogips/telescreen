@@ -61,3 +61,29 @@ it("hides checklist endpoints without their read permissions and persists dismis
   fireEvent.click(screen.getByRole("button", { name: "Dismiss checklist" }));
   expect(storage.get("telescreen.onboarding.dismissed")).toBe("true");
 });
+
+it("shows the overdue data tile for data readers and hides it when the count request is forbidden", async () => {
+  const success = mockApi(["issues.read", "data.read"], (url) => {
+    const base = handler(url);
+    if (base !== undefined) return base;
+    if (url === "/api/data/counts") return Response.json({ all: 5, present: 4, deleted: 1, incomplete: 2, overdue: 3 });
+    return undefined;
+  });
+  renderDashboard();
+  expect(await screen.findByText("Overdue data")).toBeInTheDocument();
+  const overdueLink = screen.getByText("Overdue data").closest("a");
+  expect(overdueLink).not.toBeNull();
+  expect(overdueLink as HTMLAnchorElement).toHaveAttribute("href", "/data?tab=overdue");
+  expect(success).toHaveBeenCalledWith("/api/data/counts", expect.anything());
+  cleanup(); vi.restoreAllMocks();
+
+  mockApi(["issues.read", "data.read"], (url) => {
+    const base = handler(url);
+    if (base !== undefined) return base;
+    if (url === "/api/data/counts") return Response.json({ error: { code: "forbidden", detail: "Forbidden" } }, { status: 403 });
+    return undefined;
+  });
+  renderDashboard();
+  await screen.findByText("TELE-1 · Masked issue");
+  await waitFor(() => expect(screen.queryByText("Overdue data")).toBeNull());
+});

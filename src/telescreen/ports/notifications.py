@@ -48,6 +48,11 @@ class NotificationContext:
     comment_excerpt: str | None = None
     report_summary: str | None = None
     report_assigned_open: str | None = None
+    data_short_id: str | None = None
+    data_name: str | None = None
+    data_locator: str | None = None
+    data_deletion_due: str | None = None
+    data_link: str | None = None
 
 
 @dataclass(frozen=True)

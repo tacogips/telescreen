@@ -6,3 +6,9 @@ useDefault = true
 description = "SHA-256 file hashes recorded in implementation-plan progress logs"
 paths = ['''^impl-plans/.*\.md$''']
 regexes = ['''(?:before|after)=[0-9a-f]{64}''']
+
+[[allowlists]]
+description = "12-hex data item fingerprint prefixes (key_prefix) in web test and mock fixtures"
+paths = ['''^src/web/src/.*\.(test\.tsx|test\.ts|ts|json)$''']
+regexTarget = "line"
+regexes = ['''key_prefix"?\s*:\s*"[0-9a-f]{12}"''']

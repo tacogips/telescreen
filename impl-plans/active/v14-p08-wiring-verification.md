@@ -1,6 +1,6 @@
 # V14-P08 Wiring, Route Permissions, E2E Flows, Leak Matrix, Shape Contract and Doc Status
 
-**Status**: Ready
+**Status**: In Progress
 **Design Reference**: design-docs/specs/design-v1-4-data-inventory.md sections 9, 12, 13, 14; design-docs/specs/design-masking.md "v1.4 additions"
 **Created**: 2026-10-13
 **Last Updated**: 2026-10-13
@@ -211,14 +211,80 @@ Expected:
 
 ## Completion Criteria
 
-- [ ] Wiring binds every v1.4 port, provider, handler and router, with the wiring tests
+- [x] Wiring binds every v1.4 port, provider, handler and router, with the wiring tests
   green.
-- [ ] `test_route_permissions_v14.py` covers all 22 routes.
+- [x] `test_route_permissions_v14.py` covers all 22 routes.
 - [ ] E1-E7 and leak flows 1-7 pass.
-- [ ] The shape contract test passes.
+- [x] The shape contract test passes.
 - [ ] Every gate above exits 0. The doc status lines are updated only after that.
-- [ ] The Progress Log has hashes, and every command with its exit status and log path.
+- [x] The Progress Log has hashes, and every command with its exit status and log path.
 
 ## Progress Log
 
-(none yet)
+Implementation source is integrated and verified. The inventory E2E covers push discovery,
+incomplete and complete item deltas, push removal/restoration, tracking-mode transitions,
+CSV safety, Police 1.2 inventory delivery through the SDK `PullWorker`, and successful vs
+partial sweep reconciliation. E5-E6 field and overdue flows, all seven leak flows, the exact
+22-route permission table, and real response-shape checks pass.
+
+One assigned E3 scenario remains: there is no real-path full-listing test proving an absent
+resource is deleted by an authoritative completed listing. Existing collector tests verify
+the listing gate's skip rules, and the full suite passes, but that does not prove the v1.4
+asset lifecycle result through the integrated container. Keep the E1-E7 completion box open
+until this is covered. Review-dependent design status and index updates remain for the
+serial review/finalization steps.
+
+Final source SHA-256:
+
+- `src/telescreen/wiring.py`: `cf80c5078a89dc4571568b839e4a01b445e21b1a669abbc3bd2dc14cdc27f241`
+- `src/telescreen/wiring_v14.py`: `6aa0be0c798e8c99bf79476f888f630ca1fc68b2fef89685b9cee424dd8752ef`
+- `tests/e2e/test_flow_v14_inventory.py`: `383233783799b06f24c9d5c27b8c8c58db102fc632f3ebfbd9902f9f7a44b3b9`
+- `tests/e2e/test_wiring_v14.py`: `f17eb4b0870ddec959cc61bc8c2d031ddd8128159a03886f11e7e821dd294909`
+- `tests/e2e/test_route_permissions_v14.py`: `e1b71c47eaf90de1c1a9a4b8d363b47a2ecd10d03f728e9eeab3a9ea7165b6cb`
+- `tests/e2e/test_flow_v14_fields.py`: `496f598ba8c113f991769390cf7d7e26c8ad1d582f4ab79499034c07fe46edb7`
+- `tests/leak/flows_v14.py`: `4e0bbfd69c3071d446a507f1e85421a4f728909648fb66c11216beeb16a66065`
+- `tests/leak/test_leak_matrix_v14.py`: `5d863f54ac86cb08ad3cb225c412e5c45fc93280adff326abd8ca06ff6f5de29`
+- `tests/contract/test_data_api_shapes.py`: `5d81ba1c9f28f38c39c861a96e2fc2844b2b294cc2cd67dcee8a332806f85ced`
+
+Final verification (all exits 0):
+
+- `uv run --frozen ruff format --check .` — `/tmp/telescreen-v14-p08-format-final.log`
+- `uv run --frozen ruff check .` — `/tmp/telescreen-v14-p08-ruff-final.log`
+- `uv run --frozen python tools/typelint.py` — `/tmp/telescreen-v14-p08-typelint-final.log` (599 files clean)
+- `uv run --frozen ty check` — `/tmp/telescreen-v14-p08-ty-final.log`
+- `uv run --frozen pytest -p no:cacheprovider tests/e2e tests/leak tests/contract` — `/tmp/telescreen-v14-p08-pytest-scoped-final.log` (84 passed)
+- `uv run --frozen pytest -p no:cacheprovider` — `/tmp/telescreen-v14-p08-pytest-all-final.log` (1104 passed, 11 offline/live skips)
+- `uv build --out-dir /tmp/telescreen-v14-p08-dist-final` — `/tmp/telescreen-v14-p08-build-final.log`
+- `mise run ddl-check` — `/tmp/telescreen-v14-p08-ddl-check-final.log` (10 passed)
+- `cd src/web && bun install --frozen-lockfile` — `/tmp/telescreen-v14-p08-web-install-final.log`
+- `cd src/web && bun run typecheck` — `/tmp/telescreen-v14-p08-web-typecheck-final.log`
+- `cd src/web && bun run test` — `/tmp/telescreen-v14-p08-web-test-final.log` (256 passed)
+- `cd src/web && bun run build --outDir /tmp/telescreen-v14-p08-web-final --emptyOutDir` — `/tmp/telescreen-v14-p08-web-build-final.log`
+- `cd src/web && TELESCREEN_SCREENSHOTS_STRICT=1 bun run screenshots` — `/tmp/telescreen-v14-p08-screenshots-final.log` (0 state-skipped; 0 browser errors)
+- Wiring limits and route composition guards — exit 0: `wiring.py` 808 lines, `wiring_v14.py` 142 lines, no `include_router`.
+
+### Owner resolution (2026-10-13, before run 2)
+
+The run-1 blocker is resolved by the owner: the integrated full-listing E3 flow is
+`tests/e2e/test_flow_v14_inventory.py::test_e3_full_listing_deletes_absent_asset_only_when_authoritative`
+(production-wired app from `build_container`, real inventory services, a fake Slack-kind
+adapter registered in `container.collector_registry`). It proves that incremental,
+skipped-ref and failed listings never delete; that a completed full listing with no
+skipped ref deletes the absent asset once with a `deleted` event; that a later sighting
+restores it with a `restored` event; and that turning inventory `off` gives `unknown`
+with `tracking_stopped` and no deletion (P05-RL-2). Mutating the skipped-ref guard in
+`collectors/tasks.py` makes it fail. The owner also fixed O1 (the overdue provider
+`ref_id` over `varchar(36)`; see section 8 of the requirements) and added a length guard
+in `SqlTaskQueue.enqueue`.
+
+Owner gate run on the combined tree (all exit 0): ruff format and check, typelint (599
+files), ty, full pytest 1109 passed / 11 skipped, uv build, `mise run ddl-check`, and the
+PostgreSQL integration tests (`TELESCREEN_TEST_DATABASE_URL` on a scratch database:
+tests/db, tests/audit and the map-reduce Postgres test, 38 passed).
+
+For the run-2 re-verification: re-run every gate in the Verification section; list only
+the final passing commands in `verification`; leave `priorVerification` empty
+(conventions 7a). Live tests skip inside the workflow and must not be listed; the owner
+ran the live stack and recorded it in section 8 of the requirements. Tick the E1-E7 box
+when the scoped and full pytest pass. The run-1 evidence fingerprint is superseded by
+this resolution.

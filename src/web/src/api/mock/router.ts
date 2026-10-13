@@ -5,6 +5,7 @@ import { teamFixtures } from "./fixtures/directory";
 import { state, workflowRefs } from "./state";
 import type { MockTemplateVersion } from "./fixtures/v12";
 import { evaluateIssueQuery, tokenizeIssueQuery } from "../issueQuery";
+import { routeV14 } from "./v14";
 
 type Handler = (url: URL, request: Request, match: RegExpExecArray) => Response | Promise<Response>;
 type MockRoute = Readonly<{ method: string; pattern: RegExp; handler: Handler }>;
@@ -205,8 +206,8 @@ async function routeV13(url: URL, request: Request, method: string): Promise<Res
 }
 const routes: MockRoute[] = [
   { method: "GET", pattern: /^\/api\/auth\/config$/, handler: () => response({ oidc: { issuer: "https://idp.example.test/realms/telescreen", client_id: "telescreen-ui", authorization_endpoint: "https://idp.example.test/authorize", token_endpoint: "https://idp.example.test/token", end_session_endpoint: "https://idp.example.test/logout", scopes: ["openid", "profile", "email"] }, token_login: true }) },
-  { method: "POST", pattern: /^\/api\/auth\/session$/, handler: () => response({ member: { handle: "alex", display_name: "Alex Morgan" }, role: "admin", permissions: ["users.read", "users.write", "templates.read", "templates.write"] }) },
-  { method: "GET", pattern: /^\/api\/auth\/me$/, handler: () => response({ kind: "token", member: { handle: "alex", display_name: "Alex Morgan" }, role: "admin", permissions: ["users.read", "users.write", "templates.read", "templates.write"] }) },
+  { method: "POST", pattern: /^\/api\/auth\/session$/, handler: () => response({ member: { handle: "alex", display_name: "Alex Morgan" }, role: "admin", permissions: ["users.read", "users.write", "templates.read", "templates.write", "data.read", "data.write", "data_fields.admin"] }) },
+  { method: "GET", pattern: /^\/api\/auth\/me$/, handler: () => response({ kind: "token", member: { handle: "alex", display_name: "Alex Morgan" }, role: "admin", permissions: ["users.read", "users.write", "templates.read", "templates.write", "data.read", "data.write", "data_fields.admin"] }) },
   { method: "GET", pattern: /^\/api\/notification-templates$/, handler: () => response({ items: [...new Map(state.templates.map((item) => [item.name, item])).values()].map((item) => ({ name: item.name, event_kind: item.event_kind, builtin: item.name.startsWith("system."), description: item.description, active_version: state.templates.find((version) => version.name === item.name && version.active)?.version ?? null, latest_version: Math.max(...state.templates.filter((version) => version.name === item.name).map((version) => version.version)), updated_at: null })) }) },
   { method: "GET", pattern: /^\/api\/notification-templates\/([^/]+)\/versions\/(\d+)$/, handler: (_url, _request, match) => { const item = state.templates.find((value) => value.name === decodeURIComponent(match[1]!) && value.version === Number(match[2])); return item ? response(item) : error("not_found", "Not found.", 404); } },
   { method: "GET", pattern: /^\/api\/notification-templates\/([^/]+)$/, handler: (_url, _request, match) => { const name = decodeURIComponent(match[1]!); const versions = state.templates.filter((item) => item.name === name); if (!versions.length) return error("not_found", "Not found.", 404); return response({ name, event_kind: versions[0]!.event_kind, builtin: name.startsWith("system."), active_version: versions.find((item) => item.active)?.version ?? null, versions: versions.map(({ version, active }) => ({ version, active, created_by: "member:alex", created_at: null })), variables: ["issue.short_id", "workflow.name"] }); } },
@@ -417,6 +418,8 @@ export async function routeMockRequest(path: string, init: RequestInit): Promise
   const url = new URL(path, globalThis.location?.origin ?? "http://localhost");
   const request = new Request(url, init);
   const method = request.method.toUpperCase();
+  const v14Response = await routeV14(url, request, method);
+  if (v14Response !== null) return v14Response;
   const v13Response = await routeV13(url, request, method);
   if (v13Response !== null) return v13Response;
   for (const route of routes) {

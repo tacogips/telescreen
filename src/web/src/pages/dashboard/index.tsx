@@ -1,6 +1,8 @@
 import { A } from "@solidjs/router";
 import { For, Show, createResource, createSignal, type JSX } from "solid-js";
 import { apiFetch, dashboardApi } from "../../api/client";
+import { dataApi } from "../../api/client";
+import { useAuth } from "../../auth/useAuth";
 import type { DashboardResponse } from "../../api/types";
 import { PeriodPicker, type Period } from "../../components/PeriodPicker";
 import { TopBar } from "../../components/shell/TopBar";
@@ -77,6 +79,12 @@ function GroupBars(props: Readonly<{ title: string; groups: readonly CountGroup[
 
 /** Overview metrics and onboarding checklist. */
 export default function DashboardPage(): JSX.Element {
+  const auth = useAuth();
+  const [dataCounts] = createResource(() => auth.user()?.permissions.includes("data.read") ?? false, async (enabled) => {
+    if (!enabled) return null;
+    try { return await dataApi.counts(new URLSearchParams()); }
+    catch { return null; }
+  });
   const [selection, setSelection] = createSignal<DashboardSelection>({ period: "14d" });
   const [dashboard] = createResource(selection, async (selected): Promise<DashboardView> => {
     if (selected.period === "custom") {
@@ -100,6 +108,7 @@ export default function DashboardPage(): JSX.Element {
     <Show when={dashboard.error === undefined} fallback={<p role="alert">Dashboard could not be loaded.</p>}>
       <Show when={!dashboard.loading} fallback={<p>Loading dashboard…</p>}>
         <div class="dashboard-tiles">
+          <Show when={auth.can("data.read")}><Show when={dataCounts()}>{(counts) => <A class="dashboard-tile" href="/data?tab=overdue"><span>Overdue data</span><strong>{counts().overdue}</strong></A>}</Show></Show>
           <A class="dashboard-tile" href="/issues?query=is:unresolved"><span>Open issues</span><strong>{dashboard()?.open_issues ?? 0}</strong></A>
           <A class="dashboard-tile" href="/issues?query=is:unresolved assigned:none priority:high"><span>Unassigned high priority</span><strong>{dashboard()?.unassigned_high_priority ?? 0}</strong></A>
           <A class="dashboard-tile" href="/issues?query=is:archived"><span>Archived</span><strong>{dashboard()?.archived_count ?? 0}</strong></A>

@@ -61,6 +61,22 @@ See the [v1.2 design](design-docs/specs/design-v1-2-notifications-and-identity.m
 See the [v1.3 design](design-docs/specs/design-v1-3-sentry-parity.md) for behavior and the
 masking contract.
 
+## Features (v1.4 data inventory)
+
+- The Data register tracks discovered and manually registered assets. Collector inventory
+  modes select sensitive-only, all, or no discovery; deletion and restoration are recorded
+  only from definitive removal signals and complete reconciliations.
+- List-shaped resources track item fingerprints or counts (`items`, `item_count`, and
+  `removed` on push ingest), while findings track value changes.
+  Admins define typed metadata fields, required values, and purpose, owner, and deletion-date
+  roles; overdue deletion dates appear in the Data area and can notify the owner.
+- The Data area provides asset history, related issues, and masked CSV export. Push ingest
+  remains additive; Police contract 1.2 adds `resource_inventories` entries with a `locator`,
+  optional `item_fingerprints` or `item_count`, and optional `kind`.
+  Data reads and writes use `data.read` and `data.write`; schema administration uses
+  `data_fields.admin`. `TELESCREEN_DATA_OVERDUE_CRON` defaults to `0 9 * * *` and an empty
+  value disables the check.
+
 Telescreen does not check provider credential validity or reveal raw values (it links to
 the source location only), and it remains read-only on every monitored source.
 

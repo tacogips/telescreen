@@ -19,6 +19,7 @@ from telescreen.masking.redact import Redactor
 from telescreen.masking.seal import Masker
 from telescreen.ports.collectors import ResourceContent
 from telescreen.ports.findings import MaskedFinding, RecordOutcome, ResourceScan
+from telescreen.ports.inventory import ItemObservation
 from telescreen.ports.search import SearchIndexer
 
 
@@ -127,6 +128,22 @@ class ResourceScannerImpl:
         reference_json: str | None = content.ref.ref_json if content.ref is not None else None
         if reference_json is not None and self.redactor.has_hits(reference_json):
             reference_json = None
+        items: ItemObservation | None = None
+        if content.items is not None:
+            if content.items.keys is not None:
+                fingerprints: tuple[str, ...] = tuple(
+                    sorted(
+                        {
+                            self.fingerprinter.item_key(
+                                self.fingerprinter.resource_key(content.source, raw_locator), key
+                            )
+                            for key in content.items.keys
+                        }
+                    )
+                )
+                items = ItemObservation(fingerprints, None)
+            elif content.items.count is not None:
+                items = ItemObservation(None, content.items.count)
         return ResourceScan(
             content.source,
             self.fingerprinter.resource_key(content.source, raw_locator),
@@ -149,4 +166,6 @@ class ResourceScannerImpl:
             ),
             modified_at=content.modified_at,
             removed=content.removed,
+            items=items,
+            asset_kind=content.asset_kind,
         )

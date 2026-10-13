@@ -1,6 +1,6 @@
 # V14-P06 UI Pages: Data List, Detail, Registration, Field Schema Editor, Issue Link, Dashboard Tile, Collector Mode
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-4-data-inventory.md sections 7.2, 9, 9.1, 10; design-docs/specs/design-ui-sentry.md sections 1-7 and 12
 **Created**: 2026-10-13
 **Last Updated**: 2026-10-13
@@ -207,12 +207,114 @@ Expected:
 
 ## Completion Criteria
 
-- [ ] All five deliverables are done, rendering the binding names.
-- [ ] Every test above is added and passing.
-- [ ] typecheck, vitest, build and strict screenshots pass with 0 skipped states and 0
+- [x] All five deliverables are done, rendering the binding names.
+- [x] Every test above is added and passing.
+- [x] typecheck, vitest, build and strict screenshots pass with 0 skipped states and 0
   browser errors.
-- [ ] The Progress Log has hashes, and every command with its exit status and log path.
+- [x] The Progress Log has hashes, and every command with its exit status and log path.
+- [x] INT-P06-01 keeps CountTabs and filters mounted during refetches; the regression proves
+  search focus and input identity persist, and tabs remain mounted during search and tab reloads.
 
 ## Progress Log
 
-(none yet)
+Implementation completed on the shared `feat/data-inventory` working tree. Replaced the
+p03 Data placeholder with list, registration, detail, metadata values, timeline, item
+history, chart and related issue views. Added the admin field schema editor, issue asset
+link, dashboard overdue tile and collector inventory mode. Write actions use the
+assigned permissions; errors use static code messages and server error banners. No API,
+component, route, screenshot script, or dependency files were changed by p06.
+
+Final-source hashes (SHA-256; modified files are before -> after; new files are after):
+
+- `src/web/src/pages/data/index.tsx`: `050c18052726a3f40d1584bdd1003e78bebc3250d8f2b20c18eee63a949a9aae` -> `55be4d421f38e3ed6bdad2ce495c97e5e92d47a647160f59fd63cb8124868cc8`
+- `src/web/src/pages/data/DataList.tsx`: `8f74360d554b000e78582f19fd36b62af74006a1972030e27321e1df70417d75`
+- `src/web/src/pages/data/DataList.test.tsx`: `78bf2a71d6ca594cb5a3ebd0b2b279d78a3f235fc7510aeaefb07eaf0bdacc2c`
+- `src/web/src/pages/data/MetadataForm.tsx`: `b8102a2baea9638fc8731e8c3678db76eac291526421d3083e01f7ec070e3749`
+- `src/web/src/pages/data/DataRegister.tsx`: `c43d8917da3984020f4a1151394199244df60571e9e5b6a4a00f554045fb211c`
+- `src/web/src/pages/data/DataRegister.test.tsx`: `6cc9d767620b2aa676c697b92bee2388dd7894ecab73e54de12e1e1f36efcb2d`
+- `src/web/src/pages/data/DataDetail.tsx`: `a759396b52f530c7d58fb64182a5b28f1c5fbb26dbabbe850c52654d929fbc6e` -> `4420a245406b5bf1afa6be499fa318b35e2034211cccaf411859b42d20c91f51`
+- `src/web/src/pages/data/DataDetail.test.tsx`: `52def5d4abbe26fabdd922de2e91ad1e27cd9d8eb2c2bd0257dfd6c96b67fc57` -> `6211e0fdb4e314ae3ea25101c36b6625d3810b2918e09312a3d65ccd9955c57`
+- `src/web/src/pages/data/DataDetailSections.tsx`: `80974f953d3c9d8447fc85ee1e1dd6ac1255e00233882ad26b4e54b174c6c832`
+- `src/web/src/pages/settings/index.tsx`: `ea3f9f59616459949e47b233f90c7abdac7c79f3566e7262cfb6055cb4eb76d7` -> `220009ab47f75132c489fc5e70e978daa90e3e9e66b5f820e578a877f31d6543`
+- `src/web/src/pages/settings/index.test.tsx`: `601d0d93da940770e380956ceda5a88c9d459f35e740a63ad0ee1e944ec540b9` -> `5d76ef04b1fb4e43ed0088b96d9ce9691f95f11940b1c28515da827f37849479`
+- `src/web/src/pages/settings/DataFields.tsx`: `6820ed82e73aec2bc2fba9833a1c2e726932ee2bb24b30ae40d5b081bf9dc990`
+- `src/web/src/pages/settings/DataFields.test.tsx`: `206271e39c5a1af848b706877bf32e8d3ff0d364446b41c0971ead28d41e7958`
+- `src/web/src/pages/issues/detail/IssueDetailSidebar.tsx`: `18c5fc3b68079dd63b6375008fb5015562e7e31a1091403842604dfbb8b4595a` -> `dd382624debdd68d791476b2a088c9c1817a3e00ddc6e43b5d707873dc096d7c`
+- `src/web/src/pages/issues/IssueDetail.test.tsx`: `f11c1acff80c63072c7ff15dadd4bb7a9ffbd13bfd5b73a3d532055d3a3be611` -> `77af90f3895c6cd9918b454cc0aebc476d9182c0e91f22eb89baed24a35e4806`
+- `src/web/src/pages/dashboard/index.tsx`: `500772602d6f261b4d58da962e8347665d1b58cbbd3ee5b4249b55049094b8f8` -> `27030c7b97c7065f3a17bc89e5034bbb964a08dd42cdeb5c270cc2e06068e161`
+- `src/web/src/pages/dashboard/index.test.tsx`: `d4e157c8ff4ac6d8225eb1914c16080841a93a88d53821a8f6c1188163257eb1` -> `9efd0e4c76bdc4626794e185e3a860bddd15b4e619b381cb464ec3bc7eca842c`
+- `src/web/src/pages/collectors/index.tsx`: `61f8a0c7e1b339313240137498f2d6df23c19da84a975653a0a8ebcc5d8bdf09` -> `cae0a2c8ccb391a6ee49af2a05f6536064bcad16ae2c5ff79bf8f879f995d385`
+- `src/web/src/pages/collectors/index.test.tsx`: `11f6104b4ad7f205db24b39cabea1164ab7588516553c4a8a7dcc2bb60db0515` -> `447527f47d50b485f29206204de759221329da8d0cf1df8d9ef92bff95253f55`
+
+Verification (all on the final p06 source; full logs at the listed paths):
+
+- `bun install --frozen-lockfile` in `src/web`: exit 0, `/tmp/telescreen-v14-p06-install.log`.
+- `bun run typecheck` in `src/web`: exit 0, `/tmp/telescreen-v14-p06-typecheck.log`.
+- Focused p06 Vitest suite: exit 0, 8 files and 47 tests passed, `/tmp/telescreen-v14-p06-focused.log`.
+- `bun run test` in `src/web`: exit 0, 48 files and 254 tests passed, `/tmp/telescreen-v14-p06-vitest.log`.
+- `bun run build --outDir /tmp/telescreen-v14-p06-web --emptyOutDir` in `src/web`: exit 0, `/tmp/telescreen-v14-p06-build.log`.
+- `TELESCREEN_SCREENSHOTS_STRICT=1 bun run screenshots` in `src/web`: exit 0, `/tmp/telescreen-v14-p06-screenshots.log`; state-skipped count 0 and browser-error match count 0.
+- Screenshot gate `test "$(grep -c 'state-skipped' /tmp/telescreen-v14-p06-screenshots.log)" -eq 0`: exit 0.
+
+TI-P06-01 repair: added the missing `DataDetail.test.tsx` case using stateful detail
+responses and the `POST /api/data/assets/data-asset-01/mark-deleted` and
+`POST /api/data/assets/data-asset-01/restore` endpoints. It asserts both requests and
+the `Mark deleted` -> `Restore` -> `Mark deleted` action transitions. Existing cases
+were preserved. Test SHA-256: `52def5d4abbe26fabdd922de2e91ad1e27cd9d8eb2c2bd0257dfd6c96b67fc57`
+-> `a849b806bfacc8b7ea71d94399e25a3dd3da9745bab8b9f8e8685891c572fce9`.
+
+- `set -o pipefail; (cd src/web && bunx vitest run src/pages/data/DataDetail.test.tsx > /tmp/telescreen-v14-p06-detail.log 2>&1)`: exit 0, 3 tests passed; complete log `/tmp/telescreen-v14-p06-detail.log`.
+- `set -o pipefail; (cd src/web && bun run typecheck > /tmp/telescreen-v14-p06-typecheck-repair.log 2>&1)`: exit 0; complete log `/tmp/telescreen-v14-p06-typecheck-repair.log`.
+- `set -o pipefail; (cd src/web && bun run test > /tmp/telescreen-v14-p06-vitest-repair.log 2>&1)`: exit 0, 48 files and 255 tests passed; complete log `/tmp/telescreen-v14-p06-vitest-repair.log`.
+
+ADV-P06-01 repair: `DataDetail.tsx` now formats the Record event default and reset with
+`localInputValue(new Date())`, converting the instant to local wall-clock text for the
+`datetime-local` input. `saveEvent` still converts the entered local value to an ISO UTC
+instant. The existing manual-event test now parses the POST body and asserts the
+submitted `occurred_at` differs from `Date.now()` by less than 120,000 ms. The existing
+Mark deleted/Restore test and assertions were preserved. SHA-256: `DataDetail.tsx`
+`a759396b52f530c7d58fb64182a5b28f1c5fbb26dbabbe850c52654d929fbc6e` ->
+`4420a245406b5bf1afa6be499fa318b35e2034211cccaf411859b42d20c91f51`; `DataDetail.test.tsx`
+`a849b806bfacc8b7ea71d94399e25a3dd3da9745bab8b9f8e8685891c572fce9` ->
+`6211e0fdb4e314ae3ea25101c36b6625d3810b2918e09312a3d65ccd9955c57`.
+
+Current-source verification for ADV-P06-01 (complete logs):
+
+- `set -o pipefail; (cd src/web && TZ=Asia/Tokyo bunx vitest run src/pages/data/DataDetail.test.tsx > /tmp/telescreen-v14-p06-detail-tz-tokyo-adv-repair.log 2>&1)`: exit 0, 3/3 tests passed.
+- `set -o pipefail; (cd src/web && TZ=America/New_York bunx vitest run src/pages/data/DataDetail.test.tsx > /tmp/telescreen-v14-p06-detail-tz-ny-adv-repair.log 2>&1)`: exit 0, 3/3 tests passed.
+- `set -o pipefail; (cd src/web && bun run typecheck > /tmp/telescreen-v14-p06-typecheck-adv-repair.log 2>&1)`: exit 0.
+- `set -o pipefail; (cd src/web && bun run test > /tmp/telescreen-v14-p06-vitest-adv-repair.log 2>&1)`: exit 0, 48 files and 255/255 tests passed.
+- `set -o pipefail; (cd src/web && bun run build --outDir /tmp/telescreen-v14-p06-web-adv-repair --emptyOutDir > /tmp/telescreen-v14-p06-build-adv-repair.log 2>&1)`: exit 0.
+- `set -o pipefail; (cd src/web && TELESCREEN_SCREENSHOTS_STRICT=1 bun run screenshots > /tmp/telescreen-v14-p06-screenshots-adv-repair.log 2>&1)`: exit 0; screenshot log `/tmp/telescreen-v14-p06-screenshots-adv-repair.log`.
+- `set -o pipefail; test "$(grep -c 'state-skipped' /tmp/telescreen-v14-p06-screenshots-adv-repair.log)" -eq 0`: exit 0; zero state-skipped lines.
+- `set -o pipefail; ! grep -Eiq 'pageerror|console error|browser error' /tmp/telescreen-v14-p06-screenshots-adv-repair.log`: exit 0; no browser-error matches.
+- `set -o pipefail; test "$(grep -c '^- \[ \]' impl-plans/active/v14-p06-ui-pages.md)" -eq 0`: exit 0; zero unchecked criteria; plan is 291 lines.
+
+Independent review and serial integration/finalization remain downstream workflow work.
+
+INT-P06-01 repair: moved CountTabs and the filter bar outside the loading gate in
+`DataList.tsx`; only the result region now shows the loading placeholder. Counts and
+Load more use the latest resolved resource value. Added a deferred-fetch regression in
+`DataList.test.tsx` that asserts search input identity/focus through an in-flight query
+and after resolution, and asserts the tablist remains mounted during an Overdue reload.
+The existing search/export tests remain unchanged. SHA-256: `DataList.tsx`
+`8f74360d554b000e78582f19fd36b62af74006a1972030e27321e1df70417d75` ->
+`9d7f6b687229392ff9251e482fa7956fb54623693673b09e2ee0392dbb4eccf4`; `DataList.test.tsx`
+`78bf2a71d6ca594cb5a3ebd0b2b279d78a3f235fc7510aeaefb07eaf0bdacc2c` ->
+`3237c1a54b4349d483d5ba02496c32c51845e8bd7e4dc9570487ca1689176d48`.
+
+Final-source verification (complete logs):
+
+- `set -o pipefail; (cd src/web && bun install --frozen-lockfile > /tmp/telescreen-v14-p06-install-int-p06-01.log 2>&1)`: exit 0.
+- `set -o pipefail; (cd src/web && bunx vitest run src/pages/data/DataList.test.tsx > /tmp/telescreen-v14-p06-int-p06-01-focused-rerun.log 2>&1)`: exit 0, 1 file and 3 tests passed.
+- `set -o pipefail; (cd src/web && bun run typecheck > /tmp/telescreen-v14-p06-typecheck-int-p06-01.log 2>&1)`: exit 0.
+- `set -o pipefail; (cd src/web && bun run test > /tmp/telescreen-v14-p06-vitest-int-p06-01.log 2>&1)`: exit 0, 48 files and 256 tests passed.
+- `set -o pipefail; (cd src/web && bun run build --outDir /tmp/telescreen-v14-p06-int-p06-01-web --emptyOutDir > /tmp/telescreen-v14-p06-build-int-p06-01.log 2>&1)`: exit 0.
+- `set -o pipefail; (cd src/web && TELESCREEN_SCREENSHOTS_STRICT=1 bun run screenshots > /tmp/telescreen-v14-p06-screenshots-int-p06-01.log 2>&1)`: exit 0; zero state-skipped lines and zero browser error lines. Overdue and Incomplete captures show CountTabs and the full filter bar mounted while the result region is loading.
+- `set -o pipefail; uv run --frozen pytest -p no:cacheprovider tests/leak/test_ui_fixtures.py > /tmp/telescreen-v14-p06-leak-int-p06-01.log 2>&1`: exit 0, 1 test passed.
+
+An initial focused run exited 1 because the regression harness matched its first deferred
+response again after URL parameters merged. The harness now distinguishes the search
+request from the Overdue request; the passing focused and full Vitest runs above are on
+the corrected source. Independent review and serial integration/finalization remain
+downstream workflow work.

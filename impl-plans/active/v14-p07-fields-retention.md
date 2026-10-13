@@ -1,6 +1,6 @@
 # V14-P07 Field Schema, Values, Registration and Retention
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-4-data-inventory.md sections 2 (D14-D18), 7, 8, 9, 11, 12
 **Created**: 2026-10-13
 **Last Updated**: 2026-10-13
@@ -301,10 +301,79 @@ p04's suites, to prove they still pass.
 
 ## Completion Criteria
 
-- [ ] The six deliverables are done and every test case above passes.
-- [ ] No file exceeds 1000 lines.
-- [ ] The Progress Log has hashes, and every command with its exit status and log path.
+- [x] The six deliverables are done and every test case above passes.
+- [x] No file exceeds 1000 lines.
+- [x] The Progress Log has hashes, and every command with its exit status and log path.
 
 ## Progress Log
 
-(none yet)
+Completed p07 field schema, value validation and writes, manual registration, issue asset
+owner fallback, overdue scheduling/handling, and the two unregistered API routers. Added
+service, retention, resolver, route-order/permission and API behavior tests. The API
+permission test double now raises for missing role permissions instead of replacing the
+guard with an unchecked principal. Registration's unique-key insert race is covered by a
+database-backed conflict test. Routers remain unregistered for p08 as planned.
+
+Initial p07 completion source and test SHA-256 (before P07-TI-1):
+
+| Path | SHA-256 |
+| --- | --- |
+| `src/telescreen/inventory/fields.py` | `2948c38876ff71ad3fbf5a0616ec1e38fda3e9243754ffbd8ecf66449cd5a8b4` |
+| `src/telescreen/inventory/values.py` | `082b6d89352309b29401622dc99eeccdab420426edb4e71b61441f0a097c374b` |
+| `src/telescreen/inventory/registration.py` | `407c8e950f2fa6ad66b8733e429a751bd15608e00546470c9d0c22026587b901` |
+| `src/telescreen/inventory/retention.py` | `b87fc9eaf9d542748732926920f53f5ea24dc89604f79aeb21151a8a351a0bf1` |
+| `src/telescreen/issues/asset_owner.py` | `9635b1df7bb0bbda535c7983177f0b6c2acac1e14f9d1c2f944fbc3887860e26` |
+| `src/telescreen/api/routers/data_fields.py` | `8d65dec5a5b28464bb06f9086d39b95c8527586fa6eb7aad6ce452cdd555d1d2` |
+| `src/telescreen/api/routers/data_asset_values.py` | `f70b1e3f32c8adcc6662f9198958e6cab14400c1662e01c814256aa9177b9d09` |
+| `tests/inventory/fields/test_registration.py` | `9dbbb98963576bdc76f6e5b36722d5926c1ff2def2698691e791429af660efea` |
+| `tests/inventory/fields/test_schema.py` | `edc1f75bc22b20a4632265bd18c05700ab1a533ec5bfc17996ffcd028c25bd94` |
+| `tests/inventory/fields/test_values.py` | `3e1bb548df9477b3a4a886da55ce240e7852e71f6817d3af071f3826f29861e3` |
+| `tests/inventory/retention/test_handler.py` | `6c16811d775e46db2c45777730c6f92fac0e211646e3e416c6fd405d827f1620` |
+| `tests/issues/v14_asset_owner/test_resolver.py` | `1c74e946a909da6af153d4aa07f23dfd88d668eb518f24dea61fffa3ad3fcce1` |
+| `tests/api/v14_data_fields/test_routes.py` | `d62603cff7b1c87e79af600cf98e5c9184b263a832d958c9b88162dc9a35b718` |
+
+Initial p07 completion verification (all commands exited 0; superseded for the retention test file by P07-TI-1 below):
+
+- `uv run --frozen ruff format --check --no-cache <p07 source and test paths>`: 22 files
+  formatted; `/tmp/telescreen-v14-p07-format-final.log`.
+- `uv run --frozen ruff check --no-cache <p07 source and test paths>`: all checks passed;
+  `/tmp/telescreen-v14-p07-ruff-final.log`.
+- `uv run --frozen ty check <p07 source and test paths>`: all checks passed;
+  `/tmp/telescreen-v14-p07-ty-final.log`.
+- `uv run --frozen python tools/typelint.py` with the p07 path filter: zero p07
+  violations; whole-tree tool exit 0; `/tmp/telescreen-v14-p07-typelint-final.log`.
+- `uv run --frozen pytest -p no:cacheprovider tests/inventory tests/issues/v14_asset_owner tests/api/v14_data_fields tests/api/v14_data_assets`:
+  42 passed; `/tmp/telescreen-v14-p07-pytest-final.log`.
+- `uv run --frozen pytest -p no:cacheprovider`: 1090 passed, 11 environment-gated
+  skips; `/tmp/telescreen-v14-p07-pytest-all-final.log`.
+- `uv run --frozen pytest -p no:cacheprovider tests/inventory/fields/test_registration.py`:
+  2 passed, including the IntegrityError race; `/tmp/telescreen-v14-p07-registration-race.log`.
+- `wc -l` over all p07 Python source/test files: maximum 385 lines; no file reaches 1000;
+  `/tmp/telescreen-v14-p07-wc-final.log`.
+
+Plan file SHA-256 before this progress update: `520695a8ec93b3150537befb976695260bb5e698d763d8d3b20ff1cb6eb99dd3`.
+
+### P07-TI-1 repair
+
+Preserved the original four retention tests and added five tests in
+`tests/inventory/retention/test_handler.py`: isolated three-asset send failure and next-run
+retry; changed due-date resend; future-date exclusion; deleted versus unknown state; and
+no-recipient audit with `recipient_kind=none`, `notification_count=0`, and a persisted mark.
+All nine retention tests pass. Test file SHA-256 before/after: `6c16811d775e46db2c45777730c6f92fac0e211646e3e416c6fd405d827f1620` ->
+`265425803762d1da5f6e793dc18b9dd1b2b86899c5440817446c4e04b57fc822`.
+
+Final-source verification (all exit 0):
+
+- `uv run --frozen pytest -p no:cacheprovider tests/inventory/retention -v`: 9 passed;
+  `/tmp/telescreen-v14-p07-ti1-retention.log`.
+- `uv run --frozen pytest -p no:cacheprovider tests/inventory tests/issues/v14_asset_owner tests/api/v14_data_fields tests/api/v14_data_assets`:
+  47 passed; `/tmp/telescreen-v14-p07-ti1-pytest.log`.
+- `uv run --frozen pytest -p no:cacheprovider`: 1095 passed, 11 skipped;
+  `/tmp/telescreen-v14-p07-ti1-pytest-all.log`.
+- `uv run --frozen ruff format --check --no-cache tests/inventory/retention` and
+  `uv run --frozen ruff check --no-cache tests/inventory/retention`: passed;
+  `/tmp/telescreen-v14-p07-ti1-ruff-format.log`, `/tmp/telescreen-v14-p07-ti1-ruff-check.log`.
+- `uv run --frozen ty check tests/inventory/retention`: passed;
+  `/tmp/telescreen-v14-p07-ti1-ty.log`.
+- `uv run --frozen python tools/typelint.py`: 591 files clean;
+  `/tmp/telescreen-v14-p07-ti1-typelint.log`.

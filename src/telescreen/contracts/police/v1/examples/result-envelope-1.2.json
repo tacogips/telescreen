@@ -1,0 +1,29 @@
+{
+  "contract_version": "1.2",
+  "task_id": "task-example-1",
+  "status": "completed",
+  "outcome": "passed",
+  "findings": [
+    {
+      "locator": "docs/example.txt",
+      "rule_id": "credential-token",
+      "rule_class": "credential",
+      "masked_snippet": "token = [REDACTED]",
+      "location": "line 4",
+      "confidence": 0.99,
+      "external_fingerprint": "0123456789abcdef"
+    }
+  ],
+  "resource_inventories": [
+    {
+      "locator": "docs/example.txt",
+      "item_fingerprints": ["0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"],
+      "kind": "file"
+    },
+    {
+      "locator": "warehouse/customers",
+      "item_count": 123,
+      "kind": "table"
+    }
+  ]
+}

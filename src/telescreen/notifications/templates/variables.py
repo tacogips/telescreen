@@ -34,6 +34,11 @@ VARIABLE_FIELDS: tuple[tuple[str, str], ...] = (
     ("comment.excerpt", "comment_excerpt"),
     ("report.summary", "report_summary"),
     ("report.assigned_open", "report_assigned_open"),
+    ("data.short_id", "data_short_id"),
+    ("data.name", "data_name"),
+    ("data.locator", "data_locator"),
+    ("data.deletion_due", "data_deletion_due"),
+    ("data.link", "data_link"),
 )
 
 _ISSUE: str = "issue"
@@ -47,6 +52,7 @@ _ALERT: str = "alert"
 _ACTIVITY: str = "activity"
 _COMMENT: str = "comment"
 _REPORT: str = "report"
+_DATA: str = "data"
 
 EVENT_GROUPS: tuple[tuple[NotificationEvent, tuple[str, ...]], ...] = (
     (NotificationEvent.WORKFLOW_NOTIFY, (_ISSUE, _RUN, _STEP, _TASK, _ASSIGNEE)),
@@ -65,6 +71,7 @@ EVENT_GROUPS: tuple[tuple[NotificationEvent, tuple[str, ...]], ...] = (
     (NotificationEvent.ISSUE_ACTIVITY, (_ISSUE, _ACTIVITY, _COMMENT)),
     (NotificationEvent.WEEKLY_REPORT, (_REPORT,)),
     (NotificationEvent.INTEGRATION_TEST, (_HEALTH,)),
+    (NotificationEvent.DATA_OVERDUE, (_DATA,)),
 )
 
 

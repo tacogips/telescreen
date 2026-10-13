@@ -17,6 +17,10 @@ from telescreen.core.vocabulary import EngineTaskKind, EngineTaskStatus, ErrorCo
 from telescreen.db.models import EngineTaskRow
 from telescreen.ports.workflow import ClaimedTask, TaskResult, TaskResultKind, TaskSpec
 
+# Column limits of engine_tasks; SQLite does not enforce varchar lengths, so check here.
+REF_ID_MAX_LENGTH: int = 36
+IDEMPOTENCY_KEY_MAX_LENGTH: int = 256
+
 
 @dataclass
 class SqlTaskQueue:
@@ -26,6 +30,10 @@ class SqlTaskQueue:
 
     async def enqueue(self, session: AsyncSession, spec: TaskSpec) -> bool:
         """Insert a task once; an idempotency collision returns false."""
+        if len(spec.ref_id) > REF_ID_MAX_LENGTH:
+            raise ValueError(f"task ref_id exceeds {REF_ID_MAX_LENGTH} characters")
+        if len(spec.idempotency_key) > IDEMPOTENCY_KEY_MAX_LENGTH:
+            raise ValueError(f"task idempotency_key exceeds {IDEMPOTENCY_KEY_MAX_LENGTH} characters")
         existing: str | None = await session.scalar(
             select(EngineTaskRow.id).where(EngineTaskRow.idempotency_key == spec.idempotency_key)
         )

@@ -3,7 +3,7 @@
 import hashlib
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from croniter import croniter
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +20,7 @@ from telescreen.core.vocabulary import (
     CollectorKind,
     EngineTaskKind,
     ErrorCode,
+    InventoryMode,
     ScanTrigger,
     TriggerMode,
 )
@@ -39,6 +40,7 @@ from telescreen.ports.collectors import (
     ScanJobStore,
     WatchState,
 )
+from telescreen.ports.inventory import InventoryReconciler, NoopInventoryReconciler
 from telescreen.ports.workflow import TaskQueue, TaskSpec
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -67,6 +69,7 @@ class CollectorService:
     audit: AuditLog
     clock: Clock
     health: CollectorHealthRecorder | None = None
+    inventory: InventoryReconciler = field(default_factory=NoopInventoryReconciler)
 
     async def get(self, session: AsyncSession, collector_config_id: str) -> CollectorConfig | None:
         """Read a config by id."""
@@ -91,6 +94,7 @@ class CollectorService:
         selector: CollectorSelector,
         credential_ref: str | None,
         actor_ref: str,
+        inventory_mode: InventoryMode | None = None,
     ) -> CollectorConfig:
         """Validate and create a collector config."""
         self._validate(name, kind, trigger_mode, cron, sweep_cron, selector, credential_ref)
@@ -106,8 +110,9 @@ class CollectorService:
             selector,
             credential_ref,
             self.clock.now(),
+            inventory_mode or InventoryMode.SENSITIVE_ONLY,
         )
-        await self._audit(session, "collector.created", config.id, actor_ref)
+        await self._audit(session, "collector.created", config.id, actor_ref, config.inventory_mode)
         return config
 
     async def update(
@@ -121,6 +126,7 @@ class CollectorService:
         credential_ref: str | None,
         enabled: bool,
         actor_ref: str,
+        inventory_mode: InventoryMode | None = None,
     ) -> CollectorConfig:
         """Validate and update a collector config."""
         current: CollectorConfig | None = await self.repository.get(session, config_id)
@@ -139,8 +145,14 @@ class CollectorService:
             credential_ref,
             enabled,
             self.clock.now(),
+            inventory_mode or current.inventory_mode,
         )
-        await self._audit(session, "collector.updated", config.id, actor_ref)
+        if (
+            current.inventory_mode is not InventoryMode.OFF
+            and config.inventory_mode is InventoryMode.OFF
+        ):
+            await self.inventory.stop_tracking(session, config.id, actor_ref)
+        await self._audit(session, "collector.updated", config.id, actor_ref, config.inventory_mode)
         return config
 
     def _validate(
@@ -308,15 +320,26 @@ class CollectorService:
         return row.cursor_json if row is not None else None
 
     async def _audit(
-        self, session: AsyncSession, action: str, config_id: str, actor_ref: str
+        self,
+        session: AsyncSession,
+        action: str,
+        config_id: str,
+        actor_ref: str,
+        inventory_mode: InventoryMode,
     ) -> None:
         """Append a count-free audit event using only safe identifiers."""
-        from telescreen.core.json import json_object
+        from telescreen.core.json import json_object, json_str
 
         await self.audit.append(
             session,
             AuditEntry(
-                ActorKind.MEMBER, actor_ref, action, "collector", config_id, action, json_object(())
+                ActorKind.MEMBER,
+                actor_ref,
+                action,
+                "collector",
+                config_id,
+                action,
+                json_object((("inventory_mode", json_str(inventory_mode.value)),)),
             ),
         )
 

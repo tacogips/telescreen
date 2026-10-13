@@ -95,6 +95,7 @@ class TelescreenSettings:
     weekly_report_cron: str | None = "0 9 * * 1"
     github_issues_token_ref: str | None = None
     github_issues_repos: tuple[str, ...] = ()
+    data_overdue_cron: str | None = "0 9 * * *"
 
 
 def _read(env: EnvSource, name: str) -> str | None:
@@ -218,6 +219,18 @@ def _weekly_report_cron(env: EnvSource) -> str | None:
         return None
     if not croniter.is_valid(raw):
         raise ConfigError("TELESCREEN_WEEKLY_REPORT_CRON is invalid")
+    return raw
+
+
+def _data_overdue_cron(env: EnvSource) -> str | None:
+    """Read the optional data overdue schedule, with an empty value disabling it."""
+    raw: str | None = _read(env, "DATA_OVERDUE_CRON")
+    if raw is None:
+        return "0 9 * * *"
+    if not raw.strip():
+        return None
+    if not croniter.is_valid(raw):
+        raise ConfigError("TELESCREEN_DATA_OVERDUE_CRON is invalid")
     return raw
 
 
@@ -345,6 +358,7 @@ def load_settings(env: EnvSource) -> TelescreenSettings:
         escalating_min_findings=_bounded_integer(env, "ESCALATING_MIN_FINDINGS", 10, 100000),
         escalating_factor=_bounded_integer(env, "ESCALATING_FACTOR", 3, 100),
         weekly_report_cron=_weekly_report_cron(env),
+        data_overdue_cron=_data_overdue_cron(env),
         github_issues_token_ref=_optional(env, "GITHUB_ISSUES_TOKEN"),
         github_issues_repos=_github_issues_repos(env),
     )

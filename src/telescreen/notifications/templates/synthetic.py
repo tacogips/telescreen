@@ -44,6 +44,11 @@ _SYNTHETIC: NotificationContext = NotificationContext(
     comment_excerpt="Example comment",
     report_summary="Open issues: 3",
     report_assigned_open="1",
+    data_short_id="DATA-1",
+    data_name="Example dataset",
+    data_locator="example://dataset/1",
+    data_deletion_due="2026-01-31",
+    data_link=f"{_BASE_URL}/data/example",
 )
 
 

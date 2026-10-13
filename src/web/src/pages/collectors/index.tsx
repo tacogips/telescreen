@@ -1,7 +1,7 @@
 import { A, useParams, useSearchParams } from "@solidjs/router";
 import { For, Show, createResource, createSignal } from "solid-js";
 import { ApiError, collectorsApi, mapJobsApi } from "../../api/client";
-import type { CollectorConfig, CoverageResource, CoverageSummary, MapJob, MapJobSummary } from "../../api/types";
+import type { CollectorConfig, CoverageResource, CoverageSummary, InventoryMode, MapJob, MapJobSummary } from "../../api/types";
 import { ErrorBanner } from "../../components/ErrorBanner";
 import { JsonTextArea } from "../../components/JsonTextArea";
 import { Drawer, EmptyState, ExposureBadge, Pagination, Panel, PanelItem, Placeholder, StatusIndicator, Table, Tag, showToast } from "../../components/ui";
@@ -13,10 +13,10 @@ function resourceError(failure: unknown): ApiError | null {
 }
 
 type CollectorEntry = Readonly<{ config: CollectorConfig; summary: MapJobSummary | null; job: MapJob | null }>;
-type CollectorBody = Readonly<{ name: string; kind: string; trigger_mode: string; cron: string | null; sweep_cron: string | null; selector_json: string; credential_ref: string | null; enabled: boolean }>;
+type CollectorBody = Readonly<{ name: string; kind: string; trigger_mode: string; cron: string | null; sweep_cron: string | null; selector_json: string; credential_ref: string | null; enabled: boolean; inventory_mode: InventoryMode }>;
 
 function bodyFor(config: CollectorConfig, enabled: boolean): CollectorBody {
-  return { name: config.name, kind: config.kind, trigger_mode: config.trigger_mode, cron: config.cron, sweep_cron: config.sweep_cron, selector_json: config.selector_json, credential_ref: config.credential_ref, enabled };
+  return { name: config.name, kind: config.kind, trigger_mode: config.trigger_mode, cron: config.cron, sweep_cron: config.sweep_cron, selector_json: config.selector_json, credential_ref: config.credential_ref, enabled, inventory_mode: config.inventory_mode };
 }
 
 function progress(job: MapJob | null): number {
@@ -62,6 +62,7 @@ export default function CollectorsPage() {
   const [sweepCron, setSweepCron] = createSignal("");
   const [credentialRef, setCredentialRef] = createSignal("");
   const [selector, setSelector] = createSignal("{}");
+  const [inventoryMode, setInventoryMode] = createSignal<InventoryMode>("sensitive_only");
   const [selectorErrors, setSelectorErrors] = createSignal<Readonly<{ path: string; code: string }[]>>([]);
 
   function startEdit(config: CollectorConfig | null): void {
@@ -69,6 +70,7 @@ export default function CollectorsPage() {
     setEditing(config); setName(config?.name ?? ""); setKind(config?.kind ?? "slack");
     setTriggerMode(config?.trigger_mode ?? "schedule"); setCron(config?.cron ?? "");
     setSweepCron(config?.sweep_cron ?? ""); setCredentialRef(config?.credential_ref ?? "");
+    setInventoryMode(config?.inventory_mode ?? "sensitive_only");
     setSelector(config?.selector_json ?? "{}"); setSelectorErrors([]); setError(null);
   }
 
@@ -78,7 +80,8 @@ export default function CollectorsPage() {
       setError(new ApiError(0, "invalid_credential_ref", "Use an env: or file: secret reference.")); return;
     }
     try { JSON.parse(selector()); } catch { setSelectorErrors([{ path: "$", code: "invalid_json" }]); return; }
-    const value: CollectorBody = { name: name(), kind: kind(), trigger_mode: triggerMode(), selector_json: selector(), cron: cron() || null, sweep_cron: sweepCron() || null, credential_ref: credentialRef() || null, enabled: editing()?.enabled ?? true };
+    if (editing() !== null && editing()?.inventory_mode !== "off" && inventoryMode() === "off" && !window.confirm("Assets of this collector become unknown")) return;
+    const value: CollectorBody = { name: name(), kind: kind(), trigger_mode: triggerMode(), selector_json: selector(), cron: cron() || null, sweep_cron: sweepCron() || null, credential_ref: credentialRef() || null, enabled: editing()?.enabled ?? true, inventory_mode: inventoryMode() };
     try {
       if (editing() === null) await collectorsApi.create(value);
       else await collectorsApi.update(editing()!.id, value);
@@ -155,10 +158,10 @@ export default function CollectorsPage() {
     <Show when={route.id === undefined}>
     <Show when={!entries.loading} fallback={<Placeholder label="Loading collectors…" />}>
       <Show when={(entries()?.length ?? 0) > 0} fallback={<EmptyState title="No collectors configured"><p>Connect a source to begin monitoring.</p><button class="button-primary" onClick={() => startEdit(null)}>Connect a source</button></EmptyState>}>
-        <Table><thead><tr><th>Collector</th><th>Trigger</th><th>Schedule</th><th>Status</th><th>Latest sweep</th><th>Actions</th></tr></thead><tbody>
+        <Table><thead><tr><th>Collector</th><th>Trigger</th><th>Schedule</th><th>Inventory mode</th><th>Status</th><th>Latest sweep</th><th>Actions</th></tr></thead><tbody>
           <For each={entries()}>{(entry) => <tr>
             <td><span class="collector-kind-icon" aria-hidden="true">{entry.config.kind.slice(0, 1).toUpperCase()}</span> <A href={"/collectors/" + encodeURIComponent(entry.config.id)}><strong>{entry.config.name}</strong></A><small>{entry.config.kind}</small></td>
-            <td>{entry.config.trigger_mode}</td><td>{entry.config.cron ?? "—"}<Show when={entry.config.sweep_cron}><small>Sweep {entry.config.sweep_cron}</small></Show></td>
+            <td>{entry.config.trigger_mode}</td><td>{entry.config.cron ?? "—"}<Show when={entry.config.sweep_cron}><small>Sweep {entry.config.sweep_cron}</small></Show></td><td>{entry.config.inventory_mode}</td>
             <td><span title={(entry.config.health?.conditions ?? []).join(", ") + (entry.config.health?.last_success_at ? " · Last success " + entry.config.health.last_success_at : "")}><StatusIndicator status={healthStyle(entry.config.health?.status)} label={entry.config.health?.status ?? (entry.config.enabled ? "unknown" : "disabled")} /></span><Show when={entry.config.health?.event_only}><Tag variant="warning">Event only</Tag></Show><Tag variant={entry.config.enabled ? "success" : "muted"}>{entry.config.enabled ? "Enabled" : "Disabled"}</Tag></td>
             <td><Show when={entry.job} fallback={<span>—</span>}>{(job) => <button class="text-button" onClick={() => setSelectedJob(job())}><StatusIndicator status={job().status} label={job().status} /> <progress max="100" value={progress(job())} /> {job().partitions_done ?? 0}/{job().partitions_total ?? 0}</button>}</Show></td>
             <td class="row-actions"><button class="button-secondary" onClick={() => void run(entry.config, false)}>Run now</button><button class="button-secondary" onClick={() => void run(entry.config, true)}>Sweep now</button><button class="button-secondary" onClick={() => startEdit(entry.config)}>Edit</button><button class="button-secondary" onClick={() => void toggle(entry.config)}>{entry.config.enabled ? "Disable" : "Enable"}</button></td>
@@ -174,6 +177,7 @@ export default function CollectorsPage() {
         <label class="field">Trigger mode<select value={triggerMode()} onChange={(event) => setTriggerMode(event.currentTarget.value)}><option value="event">Event</option><option value="schedule">Schedule</option><option value="both">Both</option></select></label>
         <label class="field">Schedule cron<input value={cron()} onInput={(event) => setCron(event.currentTarget.value)} placeholder="0 * * * *" /></label>
         <label class="field">Sweep cron<input value={sweepCron()} onInput={(event) => setSweepCron(event.currentTarget.value)} placeholder="0 2 * * *" /></label>
+        <label class="field">Inventory mode<select aria-label="Inventory mode" value={inventoryMode()} onChange={(event) => setInventoryMode(event.currentTarget.value as InventoryMode)}><option value="sensitive_only">Sensitive only</option><option value="all">All resources</option><option value="off">Off</option></select></label>
         <label class="field">Credential reference<input value={credentialRef()} onInput={(event) => setCredentialRef(event.currentTarget.value)} placeholder="env:COLLECTOR_TOKEN" /><small>Use env: or file: references; never enter a secret value.</small></label>
         <JsonTextArea label="Selector JSON" value={selector()} onInput={setSelector} errors={selectorErrors()} />
         <div class="row-actions"><button class="button-primary" type="submit">Save collector</button><button class="button-secondary" type="button" onClick={() => setFormOpen(false)}>Cancel</button></div>

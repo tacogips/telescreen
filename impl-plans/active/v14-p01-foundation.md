@@ -1,6 +1,6 @@
 # V14-P01 Foundation: Vocabulary, Permissions, Settings, Ports, Item Keys, Template, Police Contract 1.2
 
-**Status**: Ready
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-v1-4-data-inventory.md sections 3, 6.3, 6.4, 8.1, 13; design-docs/specs/design-police-contract.md "Contract 1.2"
 **Created**: 2026-10-13
 **Last Updated**: 2026-10-13
@@ -312,15 +312,58 @@ outside `writePaths` is a Reconciliation request, not an edit.
 
 ## Completion Criteria
 
-- [ ] All 13 deliverables are present. The signatures in deliverable 4 match exactly.
-- [ ] The scoped checks pass and the typelint grep is empty.
-- [ ] The root and web package files are unchanged.
-- [ ] `http_status_for(FIELD_IN_USE) == 409`. `REQUIRED_FIELD_MISSING` and
+- [x] All 13 deliverables are present. The signatures in deliverable 4 match exactly.
+- [x] The scoped checks pass and the typelint grep is empty.
+- [x] The root and web package files are unchanged.
+- [x] `http_status_for(FIELD_IN_USE) == 409`. `REQUIRED_FIELD_MISSING` and
   `INVALID_FIELD_VALUE` map to 422 (asserted in `tests/core/v14`). The validator loads
   the new schema.
-- [ ] The Progress Log records hashes, and every command with its exit status and log
+- [x] The Progress Log records hashes, and every command with its exit status and log
   path.
 
 ## Progress Log
 
-(none yet)
+### Session: 2026-10-13 19:00 JST
+**Tasks Completed**: Implemented p01 vocabulary, permissions, overdue cron setting, inventory ports and defaulted DTO fields, item-key HMAC, overdue notification template, Police contract 1.2 schema/example/validator and SDK models, p01 tests, compose example setting, and README feature notes. Root/web package files remain unchanged.
+**Tasks In Progress**: None for p01 implementation. Formal independent review and workflow finalization remain downstream.
+**Blockers**: None.
+**Reconciliation requests**: None. The shared worktree now has the 35-variable assertion/docstring in `tests/notifications/v12/test_template_validation.py`; this path is outside p01 `writePaths` and was preserved without edits by this plan owner.
+**Hashes**: Pre-edit hashes for the initial source set are recorded in edit intention 001 / boundary snapshot; fresh hash before the final built-in edit is in intention 003; fresh plan hash before this update is in intention 004. Final SHA-256 manifest: `tmp/telescreen-v14-20261013-f1/p01/final-sha256.txt`. New source/test paths were absent before creation. Initial manifest omitted the exact pre-edit hashes for several test files; their final hashes are in the manifest.
+**Verification**:
+- `uv run --frozen ruff format --check --no-cache src/telescreen/core src/telescreen/ports src/telescreen/masking src/telescreen/notifications/templates src/telescreen/api/common/errors.py src/telescreen/contracts src/telescreen_police_sdk tests/core tests/ports tests/masking tests/notifications tests/contract tests/police_sdk` -> final-source exit 0 (log: `/tmp/telescreen-v14-p01-format-final.log`).
+- `uv run --frozen ruff check --no-cache src/telescreen/core src/telescreen/ports src/telescreen/masking src/telescreen/notifications/templates src/telescreen/api/common/errors.py src/telescreen/contracts src/telescreen_police_sdk tests/core tests/ports tests/masking tests/notifications tests/contract tests/police_sdk` -> final-source exit 0 (log: `/tmp/telescreen-v14-p01-ruff-final.log`).
+- `uv run --frozen ty check src/telescreen/core src/telescreen/ports src/telescreen/masking src/telescreen/notifications/templates src/telescreen/api/common/errors.py src/telescreen/contracts src/telescreen_police_sdk tests/core tests/ports tests/masking tests/notifications tests/contract tests/police_sdk` -> final-source exit 0 (log: `/tmp/telescreen-v14-p01-ty-final.log`).
+- `uv run --frozen python tools/typelint.py` -> final-source exit 0; scoped grep -> no matches (log: `/tmp/telescreen-v14-p01-typelint-final.log`).
+- `uv run --frozen pytest -p no:cacheprovider tests/core tests/ports tests/masking tests/notifications tests/contract tests/police_sdk` -> final-source exit 0, 254 passed, 0 failed (log: `/tmp/telescreen-v14-p01-pytest-final.log`). The prior exit-1 attempt remains in `/tmp/telescreen-v14-p01-pytest.log`; it was superseded after the shared-tree assertion correction.
+- `git diff --quiet HEAD -- pyproject.toml uv.lock mise.toml .gitignore src/web/package.json src/web/bun.lock` -> exit 0.
+**Notes**: Final-source scoped checks pass. No implementation behavior was pulled forward from dependent plans.
+
+### Session: 2026-10-13 19:35 JST
+**Tasks Completed**: Re-ran p01 scoped verification on the current shared worktree. The scoped behavioral suite passes after the shared-tree update to the exact variable count; no p01 source edits were needed.
+**Tasks In Progress**: None for p01 implementation.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: Plan SHA-256 before edit `ea74497884767ef231fa23736565f783fee757a7267c4d02641891711ac8c002`; exact intended hunk is recorded in `tmp/telescreen-v14-20261013-f1/p01/edit-intentions-005.md`; post-edit SHA-256 recorded in this turn's final verification.
+**Verification**:
+- Scoped Ruff format check -> exit 0, 97 files formatted (log: `/tmp/telescreen-v14-p01-format-final.log`).
+- Scoped Ruff check -> exit 0 (log: `/tmp/telescreen-v14-p01-ruff-final.log`).
+- Scoped ty check -> exit 0 (log: `/tmp/telescreen-v14-p01-ty-final.log`).
+- Typelint -> exit 0; scoped grep empty (log: `/tmp/telescreen-v14-p01-typelint-final.log`).
+- Scoped pytest -> exit 0, 254 passed, 0 failed (log: `/tmp/telescreen-v14-p01-pytest-final.log`).
+- Root/web package diff guard -> exit 0.
+- Completion checkbox gate -> exit 0 after updating this entry.
+**Notes**: Formal independent review, cross-plan integration, shared documentation/index changes, commit, and push remain downstream.
+
+### Session: 2026-10-13 (test-integrity repair)
+**Tasks Completed**: Addressed `p01-ti-001` in `tests/ports/v14/test_inventory_ports.py`. The renamed async no-op test now uses Protocol-typed observer/reconciler variables, awaits all four methods, and checks `None`/`0`. Added pre-v1.4 positional-constructor coverage for ResourceContent, ResourceScan, ExternalScan, CollectorConfig, and NotificationContext, asserting every new field default including `InventoryMode.SENSITIVE_ONLY`.
+**Tasks In Progress**: None for p01 implementation.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: Test SHA-256 before repair `10afd48228decaaa5ac48438ba9c5388c330061c9c68ecbd555d321fc6eb5a56`; intermediate file with invalid `DataAssetKind.DATASET` fixture `089f44185c7cab4086de78a129a5e5cacbb12b8c529466111b9249acf4ec0356`; final test SHA-256 `7d1a83488d6cb72efe9790edac2fedae1e9f6b8b6fbd709a571ecb14dc95cac5`. Plan SHA-256 before this edit `a8258f796fbc539265f63e3f9f201471f10e2c3d9197d866628b3aff7d995a52`; exact hunk recorded in `tmp/telescreen-v14-20261013-f1/p01/edit-intentions-008.md`; post-edit hash is recorded in the final verification.
+**Verification**:
+- `uv run --frozen ruff format --check --no-cache tests/ports` -> exit 0, 7 files formatted (log: `/tmp/telescreen-v14-p01-format-ti-final.log`).
+- `uv run --frozen ruff check --no-cache tests/ports` -> exit 0 (log: `/tmp/telescreen-v14-p01-ruff-ti-final.log`).
+- `uv run --frozen ty check tests/ports` -> exit 0 (log: `/tmp/telescreen-v14-p01-ty-ti-final.log`).
+- `uv run --frozen python tools/typelint.py` -> exit 0; `grep -E '^tests/ports'` empty (log: `/tmp/telescreen-v14-p01-typelint-ti-final.log`).
+- `uv run --frozen pytest -p no:cacheprovider tests/core tests/ports tests/masking tests/notifications tests/contract tests/police_sdk` -> exit 0, 255 passed, 0 failed (log: `/tmp/telescreen-v14-p01-pytest-ti-final.log`).
+**Notes**: An initial scoped `ty check tests/ports` attempt exited 1 because `DataAssetKind.DATASET` is not a vocabulary member; corrected the fixture to `DataAssetKind.OTHER` and reran all required gates on final source.

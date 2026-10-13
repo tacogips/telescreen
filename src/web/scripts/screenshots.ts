@@ -30,6 +30,19 @@ const v13States: ScreenshotState[] = [
   { name: "shortcut-help", path: "/issues", actions: [{ kind: "press", key: "?" }] },
   { name: "onboarding", path: "/dashboard", actions: [{ kind: "click", role: "button", name: "Getting started" }] },
 ];
+const v14States: ScreenshotState[] = [
+  { name: "data-list", path: "/data", actions: [] },
+  { name: "data-list-overdue", path: "/data", actions: [{ kind: "click", role: "tab", name: "Overdue", exact: false }] },
+  { name: "data-list-incomplete", path: "/data", actions: [{ kind: "click", role: "tab", name: "Incomplete", exact: false }] },
+  { name: "data-detail", path: "/data/data-asset-01", actions: [] },
+  { name: "data-detail-values", path: "/data/data-asset-01", actions: [{ kind: "click", role: "tab", name: "Values" }] },
+  { name: "data-detail-record-event", path: "/data/data-asset-01", actions: [{ kind: "click", role: "button", name: "Record event" }] },
+  { name: "data-new", path: "/data/new", actions: [] },
+  { name: "data-fields", path: "/settings/data-fields", actions: [] },
+  { name: "data-fields-editor", path: "/settings/data-fields", actions: [{ kind: "click", role: "button", name: "New field" }] },
+  { name: "issue-data-link", path: "/issues/v13-iss-01", actions: [] },
+  { name: "collectors-inventory-mode", path: "/collectors", actions: [{ kind: "click", role: "button", name: "Connect source" }] },
+];
 const browsers = [process.env.TELESCREEN_SCREENSHOT_BROWSER, "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"].filter((value): value is string => Boolean(value));
 let executablePath: string | undefined;
 for (const candidate of browsers) { try { await access(candidate); executablePath = candidate; break; } catch { /* try next known browser */ } }
@@ -52,7 +65,7 @@ else {
         const page = await browser.newPage(); let errors = 0;
         page.on("pageerror", (error) => { errors += 1; console.error(`[pageerror ${page.url()}] ${error.message}`); });
         page.on("response", (response) => { if (response.status() >= 400) console.error(`[http ${response.status()}] ${response.url()}`); }); page.on("console", (message) => { if (message.type() === "error") { errors += 1; console.error(`[console ${page.url()}] ${message.text()}`); } });
-        const states: ScreenshotState[] = [...v13States, ...["/my-tasks", "/search?q=TELE", "/runs", "/police", "/collectors", "/policies", "/escalation", "/audit", "/assistant", "/settings", "/login", "/settings/templates", "/settings/templates/system.workflow_notify"].map((path) => ({ name: path.slice(1).replaceAll("/", "-"), path, actions: [] }))];
+        const states: ScreenshotState[] = [...v13States, ...v14States, ...["/my-tasks", "/search?q=TELE", "/runs", "/police", "/collectors", "/policies", "/escalation", "/audit", "/assistant", "/settings", "/login", "/settings/templates", "/settings/templates/system.workflow_notify"].map((path) => ({ name: path.slice(1).replaceAll("/", "-"), path, actions: [] }))];
         const discoverFirst = async (list: string, prefix: string): Promise<string | null> => { await page.goto(`http://127.0.0.1:4319${list}`, { waitUntil: "networkidle" }); return page.locator(`a[href^="${prefix}/"]`).first().getAttribute("href"); };
         for (const [list, prefix, suffix] of [["/issues", "/issues", ""], ["/workflows", "/workflows", ""], ["/runs", "/runs", ""], ["/policies", "/policies", ""], ["/collectors", "/collectors", "?tab=coverage"]] as const) { const found = await discoverFirst(list, prefix); if (found !== null) states.push({ name: `${prefix.slice(1)}-first${suffix ? "-coverage" : ""}`, path: `${found}${suffix}`, actions: [] }); }
         const destination = "/tmp/telescreen-v13-p03-screenshots"; await mkdir(destination, { recursive: true });

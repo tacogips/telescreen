@@ -20,6 +20,13 @@ from telescreen.db.models.directory import (
 )
 from telescreen.db.models.evidence import EvidenceRow
 from telescreen.db.models.integrations import IntegrationCheckRow
+from telescreen.db.models.inventory import (
+    DataAssetEventRow,
+    DataAssetItemRow,
+    DataAssetRow,
+    DataFieldRow,
+    DataFieldValueRow,
+)
 from telescreen.db.models.issues import (
     FindingRow,
     IssueExceptionRow,
@@ -65,6 +72,11 @@ __all__: list[str] = [
     "CollectorConfigRow",
     "CollectorHealthRow",
     "CounterRow",
+    "DataAssetEventRow",
+    "DataAssetItemRow",
+    "DataAssetRow",
+    "DataFieldRow",
+    "DataFieldValueRow",
     "EngineTaskRow",
     "EscalationPolicyRow",
     "EvidenceRow",
