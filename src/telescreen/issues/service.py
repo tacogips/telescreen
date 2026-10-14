@@ -67,6 +67,12 @@ from telescreen.masking.redact import Redactor
 from telescreen.ports.audit import AuditEntry, AuditLog
 from telescreen.ports.directory import AssigneeIds, OwnerDirectory, RecipientResolver
 from telescreen.ports.findings import ExternalScan, MaskedFinding, RecordOutcome, ResourceScan
+from telescreen.ports.inventory import (
+    InventoryObserver,
+    NoopInventoryObserver,
+    ResourceObservation,
+    ValueFingerprint,
+)
 from telescreen.ports.issues import (
     FindingsObserver,
     FindingsRecorded,
@@ -107,6 +113,7 @@ class IssueService:
     findings_observer: FindingsObserver = field(default_factory=NoopFindingsObserver)
     activity: IssueActivityNotifier = field(default_factory=NoopIssueActivityNotifier)
     archive_policy: ArchivePolicy = field(default_factory=ArchivePolicy)
+    inventory: InventoryObserver = field(default_factory=NoopInventoryObserver)
 
     async def record_scan(self, session: AsyncSession, scan: ResourceScan) -> RecordOutcome:
         """Persist one resource scan and reconcile absent classes when complete."""
@@ -502,79 +509,40 @@ class IssueService:
             issue.last_checked_at = scan.observed_at
             issue.sweep_covered = scan.sweep_covered
             issue.updated_at = scan.observed_at
+        values: tuple[ValueFingerprint, ...] = tuple(
+            sorted(
+                {
+                    ValueFingerprint(finding.fingerprint, finding.fingerprint_key_version)
+                    for finding in scan.findings
+                },
+                key=lambda value: (value.fingerprint, value.key_version),
+            )
+        )
+        await self.inventory.observe(
+            session,
+            ResourceObservation(
+                scan.source,
+                scan.resource_key,
+                scan.display_locator,
+                scan.display_title,
+                scan.collector_config_id,
+                scan.scan_job_id,
+                scan.observed_at,
+                scan.complete,
+                scan.removed,
+                scan.sweep_covered,
+                values,
+                scan.items,
+                scan.asset_kind,
+            ),
+        )
         return RecordOutcome(inserted_total, opened, regressed, resolved, tuple(affected))
 
     async def record_external(self, session: AsyncSession, scan: ExternalScan) -> RecordOutcome:
         """Validate and re-key externally supplied masked findings before recording."""
-        if any(self.redactor.has_hits(locator) for locator in scan.complete_locators):
-            raise TelescreenError(ErrorCode.RAW_VALUE_DETECTED, "raw sensitive value detected")
-        for finding in scan.findings:
-            values: tuple[str, ...] = (
-                finding.locator,
-                finding.rule_id,
-                finding.rule_class.value,
-                finding.masked_snippet,
-                finding.location,
-                finding.external_fingerprint,
-            )
-            if any(self.redactor.has_hits(value) for value in values):
-                raise TelescreenError(ErrorCode.RAW_VALUE_DETECTED, "raw sensitive value detected")
-        by_locator: list[tuple[str, list[MaskedFinding]]] = []
-        for finding in scan.findings:
-            raw_locator: str = f"{scan.source}:{finding.locator}"
-            masked: MaskedFinding = MaskedFinding(
-                finding.rule_id,
-                finding.rule_class,
-                severity_for(finding.rule_class),
-                scan.detector,
-                finding.confidence,
-                finding.masked_snippet,
-                self.redactor.redact(finding.location).text,
-                self.fingerprinter.external(scan.source, finding.external_fingerprint),
-                self.fingerprinter.key_id,
-                fingerprint_key_version=self.fingerprinter.key_version,
-            )
-            group: list[MaskedFinding] | None = next(
-                (values for locator, values in by_locator if locator == raw_locator), None
-            )
-            if group is None:
-                group = []
-                by_locator.append((raw_locator, group))
-            group.append(masked)
-        outcomes: RecordOutcome = RecordOutcome.empty()
-        locators: list[str] = [locator for locator, _ in by_locator]
-        for locator in scan.complete_locators:
-            complete_locator: str = f"{scan.source}:{locator}"
-            if complete_locator not in locators:
-                locators.append(complete_locator)
-        for raw_locator in sorted(locators):
-            findings: tuple[MaskedFinding, ...] = tuple(
-                finding
-                for locator, values in by_locator
-                if locator == raw_locator
-                for finding in values
-            )
-            local_locator: str = raw_locator[len(scan.source) + 1 :]
-            resource_key: str = self.fingerprinter.resource_key(scan.source, raw_locator)
-            resource_scan: ResourceScan = ResourceScan(
-                scan.source,
-                resource_key,
-                self.redactor.redact(raw_locator).text,
-                self.redactor.redact(local_locator).text,
-                scan.collector_config_id,
-                scan.scan_job_id,
-                None,
-                findings,
-                local_locator in scan.complete_locators,
-                scan.sweep_covered,
-                scan.observed_at,
-                exposure=next(
-                    (entry.exposure for entry in scan.exposures if entry.locator == local_locator),
-                    None,
-                ),
-            )
-            outcomes = outcomes.plus(await self.record_scan(session, resource_scan))
-        return outcomes
+        from telescreen.issues.external_scan import record_external_scan
+
+        return await record_external_scan(self, session, scan)
 
     async def add_history(self, session: AsyncSession, entry: IssueHistoryEntry) -> None:
         """Append a masked history entry in the caller transaction."""

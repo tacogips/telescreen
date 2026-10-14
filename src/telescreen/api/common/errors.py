@@ -22,6 +22,8 @@ def http_status_for(code: ErrorCode) -> int:
         ErrorCode.UNKNOWN_TEMPLATE,
         ErrorCode.UNKNOWN_VARIABLE,
         ErrorCode.TEMPLATE_EVENT_MISMATCH,
+        ErrorCode.REQUIRED_FIELD_MISSING,
+        ErrorCode.INVALID_FIELD_VALUE,
     ):
         return 422
     if code in (
@@ -41,6 +43,7 @@ def http_status_for(code: ErrorCode) -> int:
         ErrorCode.EVIDENCE_REQUIRED,
         ErrorCode.IDENTITY_CONFLICT,
         ErrorCode.LAST_ADMIN,
+        ErrorCode.FIELD_IN_USE,
     ):
         return 409
     if code is ErrorCode.PAYLOAD_TOO_LARGE:

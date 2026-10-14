@@ -18,6 +18,7 @@ from telescreen.core.json import JsonValue, dump_json, parse_json
 from telescreen.core.vocabulary import (
     CollectorKind,
     ErrorCode,
+    InventoryMode,
     ScanJobStatus,
     ScanTrigger,
     TriggerMode,
@@ -32,6 +33,15 @@ class CollectorRepository:
     async def get(self, session: AsyncSession, collector_config_id: str) -> CollectorConfig | None:
         """Return a configuration by id."""
         row: CollectorConfigRow | None = await session.get(CollectorConfigRow, collector_config_id)
+        return to_config(row) if row is not None else None
+
+    async def get_locked(
+        self, session: AsyncSession, collector_config_id: str
+    ) -> CollectorConfig | None:
+        """Serialize configuration changes before taking inventory stream locks."""
+        row: CollectorConfigRow | None = await session.get(
+            CollectorConfigRow, collector_config_id, with_for_update=True, populate_existing=True
+        )
         return to_config(row) if row is not None else None
 
     async def get_by_name(self, session: AsyncSession, name: str) -> CollectorConfig | None:
@@ -73,6 +83,7 @@ class CollectorRepository:
         selector: CollectorSelector,
         credential_ref: str | None,
         now: datetime,
+        inventory_mode: InventoryMode = InventoryMode.SENSITIVE_ONLY,
     ) -> CollectorConfig:
         """Insert a collector config and return its safe DTO."""
         row: CollectorConfigRow = CollectorConfigRow(
@@ -87,6 +98,7 @@ class CollectorRepository:
             credential_ref=credential_ref,
             cursor_json=cursor_to_json(CursorState()),
             enabled=True,
+            inventory_mode=inventory_mode.value,
             created_at=now,
             updated_at=now,
         )
@@ -105,6 +117,7 @@ class CollectorRepository:
         credential_ref: str | None,
         enabled: bool,
         now: datetime,
+        inventory_mode: InventoryMode = InventoryMode.SENSITIVE_ONLY,
     ) -> CollectorConfig:
         """Update editable collector fields."""
         row: CollectorConfigRow | None = await session.get(CollectorConfigRow, config_id)
@@ -116,6 +129,7 @@ class CollectorRepository:
         row.selector_json = dump_json(selector_to_json(selector))
         row.credential_ref = credential_ref
         row.enabled = enabled
+        row.inventory_mode = inventory_mode.value
         row.updated_at = now
         await session.flush()
         return to_config(row)
@@ -199,6 +213,7 @@ def to_config(row: CollectorConfigRow) -> CollectorConfig:
         selector,
         row.credential_ref,
         row.enabled,
+        InventoryMode(row.inventory_mode),
     )
 
 

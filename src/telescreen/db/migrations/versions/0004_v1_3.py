@@ -5,7 +5,7 @@ from alembic import op
 from sqlalchemy import MetaData, Table, text
 from sqlalchemy.engine import Connection
 
-from telescreen.db import models as _models
+from telescreen.db.migrations.frozen import metadata_for
 
 revision: str = "0004_v1_3"
 down_revision: str | None = "0003_v1_2"
@@ -47,6 +47,8 @@ NEW_COLUMNS: tuple[tuple[str, tuple[str, ...]], ...] = (
 )
 ISSUE_INDEXES: tuple[str, ...] = ("ix_issues_merged_into_id", "ix_issues_status_merged")
 
+_metadata: MetaData = metadata_for(4)
+
 
 def upgrade() -> None:
     """Create missing v1.3 schema and backfill newly introduced priority state."""
@@ -55,7 +57,7 @@ def upgrade() -> None:
     existing_tables: set[str] = set(inspector.get_table_names())
     for table_name in NEW_TABLES:
         if table_name not in existing_tables:
-            table: Table = _models.IssueRow.metadata.tables[table_name]
+            table: Table = _metadata.tables[table_name]
             clone_metadata: MetaData = MetaData()
             cloned: Table = table.to_metadata(clone_metadata)
             op.create_table(table.name, *list(cloned.columns), *list(cloned.constraints))
@@ -68,14 +70,14 @@ def upgrade() -> None:
         }
         for column_name in column_names:
             if column_name not in existing_columns:
-                column: sa.Column[str] = _models.IssueRow.metadata.tables[table_name].c[column_name]
+                column: sa.Column[str] = _metadata.tables[table_name].c[column_name]
                 op.add_column(table_name, column._copy())
                 existing_columns.add(column_name)
                 if table_name == "issues" and column_name == "priority":
                     priority_added = True
 
     for table_name in (*NEW_TABLES, "issues"):
-        table: Table = _models.IssueRow.metadata.tables[table_name]
+        table: Table = _metadata.tables[table_name]
         existing_indexes: set[str] = {
             str(index["name"])
             for index in sa.inspect(bind).get_indexes(table_name)

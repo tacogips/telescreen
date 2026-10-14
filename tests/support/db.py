@@ -1,6 +1,7 @@
 """SQLite database harness for repository and service tests."""
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -12,12 +13,13 @@ from sqlalchemy.pool import StaticPool
 
 from telescreen.db.base import Base
 from telescreen.db.models import AuditChainHeadRow, CounterRow
+from telescreen.db.ownership import Store, tables_for
 from telescreen.db.session import create_sessionmaker
 
 
 @dataclass
 class SqliteHarness:
-    """An in-memory SQLite engine, session factory and cleanup operation."""
+    """A SQLite engine, session factory and cleanup operation."""
 
     engine: AsyncEngine
     sessions: async_sessionmaker[AsyncSession]
@@ -27,13 +29,25 @@ class SqliteHarness:
         await self.engine.dispose()
 
 
-async def make_sqlite_harness() -> SqliteHarness:
+async def make_sqlite_harness(
+    database_path: Path | None = None, *, store: Store | None = None
+) -> SqliteHarness:
     """Create all tables and seed the issue counter and audit chain genesis."""
-    engine: AsyncEngine = create_async_engine("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
+    engine: AsyncEngine = (
+        create_async_engine("sqlite+aiosqlite:///:memory:", poolclass=StaticPool)
+        if database_path is None
+        else create_async_engine(f"sqlite+aiosqlite:///{database_path}")
+    )
     sessions: async_sessionmaker[AsyncSession] = create_sessionmaker(engine)
     async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
-    async with sessions.begin() as session:
-        session.add(CounterRow(name="issue_number", value=0))
-        session.add(AuditChainHeadRow(id=1, seq=0, hash="0" * 64))
+        await connection.run_sync(
+            Base.metadata.create_all,
+            tables=[Base.metadata.tables[name] for name in tables_for(store)]
+            if store is not None
+            else None,
+        )
+    if store is not Store.INVENTORY:
+        async with sessions.begin() as session:
+            session.add(CounterRow(name="issue_number", value=0))
+            session.add(AuditChainHeadRow(id=1, seq=0, hash="0" * 64))
     return SqliteHarness(engine=engine, sessions=sessions)

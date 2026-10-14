@@ -14,9 +14,11 @@ from telescreen.core.vocabulary import (
     ChannelKind,
     CollectorKind,
     CoverageState,
+    DataAssetKind,
     DetectorKind,
     ErrorCode,
     IdentityKind,
+    InventoryMode,
     PlacementKind,
     RepoVisibility,
     ScanJobStatus,
@@ -110,6 +112,16 @@ class ResourceContent:
     modified_at: datetime | None = None
     coverage: Coverage | None = None
     removed: bool = False
+    items: ItemReport | None = None
+    asset_kind: DataAssetKind | None = None
+
+
+@dataclass(frozen=True)
+class ItemReport:
+    """Transient raw item keys or count from a resource provider."""
+
+    keys: tuple[str, ...] | None = field(default=None, repr=False)
+    count: int | None = None
 
 
 @dataclass(frozen=True)
@@ -237,6 +249,7 @@ class CollectorConfig:
     selector: CollectorSelector
     credential_ref: str | None
     enabled: bool
+    inventory_mode: InventoryMode = InventoryMode.SENSITIVE_ONLY
 
 
 @dataclass(frozen=True)

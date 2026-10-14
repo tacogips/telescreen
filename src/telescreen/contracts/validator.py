@@ -22,6 +22,7 @@ _SCHEMA_NAMES: tuple[str, ...] = (
     "result-envelope.schema.json",
     "masked-finding.schema.json",
     "resource-exposure.schema.json",
+    "resource-inventory.schema.json",
     "partition-result.schema.json",
     "error.schema.json",
 )

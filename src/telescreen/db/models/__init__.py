@@ -2,6 +2,7 @@
 
 from telescreen.db.models.alerts import AlertFireRow, AlertRuleRow
 from telescreen.db.models.audit import AuditChainHeadRow, AuditRecordRow
+from telescreen.db.models.audit_handoff import AuditReceiptRow, InventoryAuditOutboxRow
 from telescreen.db.models.collectors import (
     CollectorConfigRow,
     CollectorHealthRow,
@@ -20,6 +21,20 @@ from telescreen.db.models.directory import (
 )
 from telescreen.db.models.evidence import EvidenceRow
 from telescreen.db.models.integrations import IntegrationCheckRow
+from telescreen.db.models.inventory import (
+    DataAssetEventRow,
+    DataAssetItemRow,
+    DataAssetRow,
+    DataFieldRow,
+    DataFieldValueRow,
+)
+from telescreen.db.models.inventory_counter import InventoryCounterRow
+from telescreen.db.models.inventory_handoff import (
+    InventoryInboxRow,
+    InventoryInboxStreamRow,
+    InventoryOutboxRow,
+    InventoryOutboxStreamRow,
+)
 from telescreen.db.models.issues import (
     FindingRow,
     IssueExceptionRow,
@@ -46,6 +61,10 @@ from telescreen.db.models.notifications import (
     NotificationTemplateRow,
 )
 from telescreen.db.models.police import PoliceTaskRow, PoliceWorkerRow
+from telescreen.db.models.retention_handoff import (
+    InventoryRetentionOutboxRow,
+    RetentionNotificationReceiptRow,
+)
 from telescreen.db.models.workflow import (
     EngineTaskRow,
     EscalationPolicyRow,
@@ -62,15 +81,29 @@ __all__: list[str] = [
     "AlertRuleRow",
     "AuditChainHeadRow",
     "AuditRecordRow",
+    "AuditReceiptRow",
+    "InventoryAuditOutboxRow",
+    "InventoryRetentionOutboxRow",
+    "RetentionNotificationReceiptRow",
     "CollectorConfigRow",
     "CollectorHealthRow",
     "CounterRow",
+    "InventoryCounterRow",
+    "DataAssetEventRow",
+    "DataAssetItemRow",
+    "DataAssetRow",
+    "DataFieldRow",
+    "DataFieldValueRow",
     "EngineTaskRow",
     "EscalationPolicyRow",
     "EvidenceRow",
     "ExternalIssueLinkRow",
     "FindingRow",
     "HumanTaskRow",
+    "InventoryInboxRow",
+    "InventoryInboxStreamRow",
+    "InventoryOutboxRow",
+    "InventoryOutboxStreamRow",
     "IssueHistoryRow",
     "IssueBookmarkRow",
     "IssueCommentRow",

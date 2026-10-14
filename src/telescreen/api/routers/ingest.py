@@ -1,6 +1,7 @@
 """Custom collector push-ingestion endpoints."""
 
 import json as json_library
+import re
 from dataclasses import dataclass, field
 from typing import Annotated
 
@@ -14,16 +15,17 @@ from telescreen.api.common.context import ApiContext
 from telescreen.core.errors import TelescreenError
 from telescreen.core.json import dump_json
 from telescreen.core.permissions import Permission
-from telescreen.core.vocabulary import CollectorKind, ErrorCode, RuleClass
+from telescreen.core.vocabulary import CollectorKind, DataAssetKind, ErrorCode, RuleClass
 from telescreen.issues.ingest import IngestScanResult, IngestService
 from telescreen.ports.collectors import (
     CollectorConfig,
     CollectorConfigReader,
     CustomSelector,
+    ItemReport,
     ResourceContent,
     Segment,
 )
-from telescreen.ports.findings import ExternalFinding, RecordOutcome
+from telescreen.ports.findings import ExternalFinding, LocatorInventory, RecordOutcome
 
 
 @pydantic.dataclasses.dataclass
@@ -42,6 +44,24 @@ class ResourceBody:
     segments: list[SegmentBody] = field(default_factory=list, repr=False)
     title: str | None = field(default=None, repr=False)
     complete: bool = True
+    removed: bool = False
+    item_keys: list[str] | None = field(default=None, repr=False)
+    item_count: int | None = None
+    kind: DataAssetKind | None = None
+
+    def __post_init__(self) -> None:
+        """Reject invalid inventory values without exposing raw keys."""
+        if self.removed and (self.segments or not self.complete):
+            raise ValueError("invalid inventory payload")
+        if self.item_keys is not None and self.item_count is not None:
+            raise ValueError("invalid inventory payload")
+        if self.item_keys is not None and (
+            len(self.item_keys) > 100000
+            or any(not key or len(key) > 1024 for key in self.item_keys)
+        ):
+            raise ValueError("invalid inventory payload")
+        if self.item_count is not None and not 0 <= self.item_count <= 9007199254740991:
+            raise ValueError("invalid inventory payload")
 
 
 @pydantic.dataclasses.dataclass
@@ -73,6 +93,21 @@ class FindingsBody:
     locator: str = field(repr=False)
     complete: bool = True
     findings: list[ExternalFindingBody] = field(default_factory=list, repr=False)
+    item_fingerprints: list[str] | None = None
+    item_count: int | None = None
+    kind: DataAssetKind | None = None
+
+    def __post_init__(self) -> None:
+        """Reject invalid inventory values without echoing them."""
+        if self.item_fingerprints is not None and self.item_count is not None:
+            raise ValueError("invalid inventory payload")
+        if self.item_fingerprints is not None and (
+            len(self.item_fingerprints) > 10000
+            or any(re.fullmatch(r"[0-9a-f]{64}", value) is None for value in self.item_fingerprints)
+        ):
+            raise ValueError("invalid inventory payload")
+        if self.item_count is not None and not 0 <= self.item_count <= 9007199254740991:
+            raise ValueError("invalid inventory payload")
 
 
 @dataclass(frozen=True)
@@ -107,13 +142,24 @@ def build_ingest_router(deps: IngestRouterDeps) -> APIRouter:
         for resource in body.resources:
             resources.append(
                 ResourceContent(
-                    body.source,
-                    None,
-                    tuple(Segment(segment.locator, segment.text) for segment in resource.segments),
-                    resource.complete,
-                    False,
-                    resource.locator,
-                    resource.title or resource.locator,
+                    source=body.source,
+                    collector_config_id=None,
+                    segments=tuple(
+                        Segment(segment.locator, segment.text) for segment in resource.segments
+                    ),
+                    complete=resource.complete,
+                    sweep_covered=False,
+                    raw_locator=resource.locator,
+                    display_title=resource.title or resource.locator,
+                    removed=resource.removed,
+                    items=(
+                        ItemReport(tuple(resource.item_keys), None)
+                        if resource.item_keys is not None
+                        else ItemReport(None, resource.item_count)
+                        if resource.item_count is not None
+                        else None
+                    ),
+                    asset_kind=resource.kind,
                 )
             )
         result: IngestScanResult = await deps.ingest.scan_push(body.source, resources)
@@ -155,8 +201,20 @@ def build_ingest_router(deps: IngestRouterDeps) -> APIRouter:
             )
             for item in body.findings
         )
+        inventory: LocatorInventory | None = (
+            LocatorInventory(
+                body.locator,
+                tuple(body.item_fingerprints) if body.item_fingerprints is not None else None,
+                body.item_count,
+                body.kind,
+            )
+            if body.item_fingerprints is not None
+            or body.item_count is not None
+            or body.kind is not None
+            else None
+        )
         outcome: RecordOutcome = await deps.ingest.findings_push(
-            body.source, body.locator, body.complete, findings
+            body.source, body.locator, body.complete, findings, inventory
         )
         return Response(
             content=json_library.dumps(

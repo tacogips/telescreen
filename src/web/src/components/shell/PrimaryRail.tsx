@@ -1,9 +1,9 @@
 import { useLocation, useNavigate } from "@solidjs/router";
-import { Activity, Bell, Bot, ClipboardCheck, ClipboardList, FileSearch, GitBranch, LayoutDashboard, ScrollText, Settings, Shield, Users, Workflow } from "lucide-solid";
+import { Activity, Bell, Bot, ClipboardCheck, ClipboardList, Database, FileSearch, GitBranch, LayoutDashboard, ScrollText, Settings, Shield, Users, Workflow } from "lucide-solid";
 import { createResource, For, Show, type JSX } from "solid-js";
 import { exceptionsApi, humanTasksApi } from "../../api/client";
 import { AREAS } from "../../routes";
-const icons = { dashboard: LayoutDashboard, alerts: Bell, issues: ClipboardList, tasks: ClipboardCheck, search: FileSearch, workflows: Workflow, police: Shield, collectors: Users, policies: ScrollText, escalation: Activity, audit: GitBranch, chat: Bot, settings: Settings } as const;
+const icons = { dashboard: LayoutDashboard, alerts: Bell, data: Database, issues: ClipboardList, tasks: ClipboardCheck, search: FileSearch, workflows: Workflow, police: Shield, collectors: Users, policies: ScrollText, escalation: Activity, audit: GitBranch, chat: Bot, settings: Settings } as const;
 export function PrimaryRail(): JSX.Element {
   const location = useLocation();
   const navigate = useNavigate();

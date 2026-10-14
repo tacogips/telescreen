@@ -5,9 +5,16 @@ import { auditFixtures, escalationFixtures, evidenceFixtures, runFixtures, searc
 import { coverageResourceFixtures, coverageSummaryFixture, exceptionFixtures, occurrenceFixtures, policyFixtures, policyVersionFixtures, v11Issues } from "./fixtures/v11";
 import { mockRoleMatrix, mockTemplates, mockTokens, mockUsers } from "./fixtures/v12";
 import { v13AlertFires, v13AlertRules, v13Integrations, v13Issues, v13OwnershipRules, v13Settings, v13Tokens } from "./fixtures/v13";
+import { v14AssetDetails, v14Assets, v14Events, v14Fields, v14Items } from "./fixtures/v14";
 
 export const state = {
   issues: structuredClone([...v11Issues, ...v13Issues]) as Issue[],
+  dataAssets: structuredClone(v14Assets),
+  dataAssetDetails: structuredClone(v14AssetDetails),
+  dataEvents: structuredClone(v14Events),
+  dataItems: structuredClone(v14Items),
+  dataFields: structuredClone(v14Fields),
+  nextDataAssetNumber: 25,
   exceptions: structuredClone(exceptionFixtures) as IssueException[],
   policies: structuredClone(policyFixtures) as PolicySummary[],
   policyVersions: structuredClone(policyVersionFixtures) as PolicyVersion[],

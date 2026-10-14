@@ -1,0 +1,15 @@
+.data-timeline-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+}
+.data-locator {
+  display: block;
+  color: var(--text-secondary);
+}
+.data-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--text-secondary);
+}

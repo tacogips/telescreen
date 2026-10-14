@@ -18,6 +18,7 @@ EXPECTED_TABLES: set[str] = {
     "team_memberships",
     "api_tokens",
     "counters",
+    "inventory_counters",
     "collector_configs",
     "scan_jobs",
     "replay_nonces",
@@ -40,6 +41,10 @@ EXPECTED_TABLES: set[str] = {
     "police_tasks",
     "audit_records",
     "audit_chain_head",
+    "audit_receipts",
+    "inventory_retention_outbox",
+    "retention_notification_receipts",
+    "inventory_audit_outbox",
     # v1.1 (design-v1-1-dspm-adoption.md)
     "placement_policies",
     "resource_coverage",
@@ -63,13 +68,23 @@ EXPECTED_TABLES: set[str] = {
     "alert_fires",
     "notification_settings",
     "integration_checks",
+    # v1.4 data inventory
+    "inventory_outbox_streams",
+    "inventory_outbox",
+    "inventory_inbox_streams",
+    "inventory_inbox",
+    "data_assets",
+    "data_asset_events",
+    "data_asset_items",
+    "data_fields",
+    "data_field_values",
 }
 
 
 def test_metadata_has_the_exact_table_contract() -> None:
     """Expose every planned table in the ORM metadata."""
     assert set(Base.metadata.tables) == EXPECTED_TABLES
-    assert len(Base.metadata.tables) == 48
+    assert len(Base.metadata.tables) == 62
 
 
 @pytest.mark.asyncio

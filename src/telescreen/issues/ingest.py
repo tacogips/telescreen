@@ -21,7 +21,7 @@ from telescreen.ports.collectors import (
     ResourceContent,
     ScanJobStore,
 )
-from telescreen.ports.findings import ExternalFinding, ExternalScan, RecordOutcome
+from telescreen.ports.findings import ExternalFinding, ExternalScan, LocatorInventory, RecordOutcome
 from telescreen.ports.issues import ResourceScanner
 from telescreen.ports.search import SearchIndexer
 
@@ -74,6 +74,9 @@ class IngestService:
                     content.raw_locator,
                     content.display_title,
                     content.ref,
+                    removed=content.removed,
+                    items=content.items,
+                    asset_kind=content.asset_kind,
                 )
                 resource_outcome: RecordOutcome = await self.scanner.scan_resource(
                     normalized, scan_job_id
@@ -111,7 +114,12 @@ class IngestService:
         )
 
     async def findings_push(
-        self, source: str, locator: str, complete: bool, findings: Sequence[ExternalFinding]
+        self,
+        source: str,
+        locator: str,
+        complete: bool,
+        findings: Sequence[ExternalFinding],
+        inventory: LocatorInventory | None = None,
     ) -> RecordOutcome:
         """Validate a custom source and record only re-keyed masked findings."""
         collector_name: str = self._source_name(source)
@@ -130,6 +138,7 @@ class IngestService:
                     (locator,) if complete else (),
                     False,
                     self.clock.now(),
+                    inventories=(inventory,) if inventory is not None else (),
                 ),
             )
 

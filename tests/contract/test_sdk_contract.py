@@ -110,7 +110,7 @@ def test_sdk_parses_every_shared_contract_example() -> None:
     """Every contract example round-trips through its SDK model or closed JSON model."""
     examples: Traversable = files("telescreen.contracts").joinpath("police", "v1", "examples")
     names: tuple[str, ...] = tuple(sorted(item.name for item in examples.iterdir()))
-    assert len(names) == 16
+    assert len(names) == 17
     for name in names:
         value: _json.Json = _json.parse(examples.joinpath(name).read_bytes())
         round_trip: _json.Json = value

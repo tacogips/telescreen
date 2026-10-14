@@ -7,6 +7,7 @@ import { AppShell } from "./components/shell/AppShell";
 import { setTheme } from "./components/shell/theme";
 import { AREAS, AppRoutes, AreaPage, type AreaKey } from "./routes";
 import { SecondaryPanel } from "./components/shell/SecondaryPanel";
+import { entriesFor } from "./components/shell/nav";
 
 const values = new Map<string, string>();
 const storage = {
@@ -41,23 +42,38 @@ describe("web shell", () => {
     expect(screen.getByRole("link", { name: "Ownership rules" })).toHaveAttribute("href", "/settings/ownership");
     expect(screen.queryByRole("link", { name: "Integrations" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Tokens" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Field schema" })).toBeNull();
     viewer.unmount();
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ kind: "token", member: { handle: "ada", display_name: "Ada Admin" }, role: "admin", permissions: ["templates.read", "users.read", "profile.self", "integrations.read", "tokens.read", "ownership.read"] })));
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ kind: "token", member: { handle: "ada", display_name: "Ada Admin" }, role: "admin", permissions: ["templates.read", "users.read", "profile.self", "integrations.read", "tokens.read", "ownership.read", "data_fields.admin"] })));
     render(() => <MemoryRouter><Route path="/" component={() => <SecondaryPanel area="settings" collapsed={false} onToggle={() => undefined}/>} /></MemoryRouter>);
     await waitFor(() => expect(screen.getByRole("link", { name: "Integrations" })).toHaveAttribute("href", "/settings/integrations"));
     expect(screen.getByRole("link", { name: "Tokens" })).toHaveAttribute("href", "/settings/tokens");
     expect(screen.getByRole("link", { name: "Profile" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Ownership rules" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Field schema" })).toHaveAttribute("href", "/settings/data-fields");
   });
   it("renders the rail labels in order and the skip link", () => {
     render(() => <MemoryRouter root={AppShell}><AppRoutes /></MemoryRouter>);
     const rail = within(screen.getByRole("navigation", { name: "Primary navigation" }));
     const labels = rail.getAllByRole("link").slice(1).map((link) => link.querySelector(":scope > span")?.textContent?.trim());
-    expect(labels).toEqual(["Dashboard", "Issues", "Alerts", "My tasks", "Search", "Workflows", "Police", "Collectors", "Policies", "Escalation", "Audit", "Assistant", "Settings"]);
+    expect(labels).toEqual(["Dashboard", "Issues", "Alerts", "Data", "My tasks", "Search", "Workflows", "Police", "Collectors", "Policies", "Escalation", "Audit", "Assistant", "Settings"]);
+    expect(entriesFor("data", () => false)).toEqual([{ label: "All data", href: "/data" }, { label: "Overdue", href: "/data?tab=overdue" }, { label: "Incomplete", href: "/data?tab=incomplete" }, { label: "Register data", href: "/data/new" }]);
+    expect(entriesFor("data", () => true).at(-1)).toEqual({ label: "Field schema", href: "/settings/data-fields" });
     expect(screen.getByRole("link", { name: "Assigned to me" })).toHaveAttribute("href", "/issues?query=assigned%3Ame");
     expect(screen.getByRole("link", { name: "Allowed" })).toHaveAttribute("href", "/issues?query=is%3Aallowed");
     expect(screen.getByRole("link", { name: "Verifying" })).toHaveAttribute("href", "/issues?query=is%3Apending_verification");
     expect(screen.getByRole("link", { name: "Skip to main content" })).toHaveAttribute("href", "#main");
+  });
+
+  it("shows Field schema in the Data panel only to data field admins", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ kind: "token", member: { handle: "ada", display_name: "Ada Admin" }, role: "admin", permissions: ["data.read", "data_fields.admin"] })));
+    const admin = render(() => <MemoryRouter><Route path="/" component={() => <SecondaryPanel area="data" collapsed={false} onToggle={() => undefined}/>} /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByRole("link", { name: "Field schema" })).toHaveAttribute("href", "/settings/data-fields"));
+    admin.unmount();
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ kind: "token", member: { handle: "sam", display_name: "Sam" }, role: "viewer", permissions: ["data.read"] })));
+    render(() => <MemoryRouter><Route path="/" component={() => <SecondaryPanel area="data" collapsed={false} onToggle={() => undefined}/>} /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByRole("link", { name: "All data" })).toBeInTheDocument());
+    expect(screen.queryByRole("link", { name: "Field schema" })).toBeNull();
   });
 
   it("shows the combined attention badge on My tasks", async () => {

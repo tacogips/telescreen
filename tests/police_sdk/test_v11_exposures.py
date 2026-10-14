@@ -41,7 +41,7 @@ def test_resource_exposure_round_trips_full_and_required_shapes() -> None:
 def test_result_envelope_omits_empty_exposures_and_uses_contract_11() -> None:
     """Default envelopes omit the optional key and the SDK advertises 1.1."""
     envelope: ResultEnvelope = ResultEnvelope("task", ResultStatus.COMPLETED)
-    assert CONTRACT_VERSION == "1.1"
+    assert CONTRACT_VERSION == "1.2"
     assert all(member.name != "resource_exposures" for member in envelope.to_json().members)
 
 

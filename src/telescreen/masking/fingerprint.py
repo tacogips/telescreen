@@ -68,6 +68,15 @@ class Fingerprinter:
         identity_key: bytes = self.identity_secret if self.identity_secret is not None else self.key
         return hmac.new(identity_key, message, hashlib.sha256).hexdigest()
 
+    def item_key(self, resource_key: str, raw_item_key: str) -> str:
+        """Create a stable item fingerprint using the version-one identity key."""
+        identity_key: bytes = self.identity_secret if self.identity_secret is not None else self.key
+        item_secret: bytes = hmac.new(
+            identity_key, b"telescreen:data-item:v1", hashlib.sha256
+        ).digest()
+        message: bytes = (resource_key + "\0" + raw_item_key).encode()
+        return hmac.new(item_secret, message, hashlib.sha256).hexdigest()
+
     def placement_key(self, kind: PlacementKind, value: str) -> str:
         """Create a keyed placement reference without retaining its source value."""
         message: bytes = f"placement\0{kind}\0{value}".encode()

@@ -1,0 +1,6407 @@
+{
+  "tables": [
+    {
+      "name": "alert_fires",
+      "introduced": 4,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "rule_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "issue_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "trigger_kind",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "outcome",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "notification_count",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "run_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "error_code",
+          "kind": "String",
+          "length": 32,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "fired_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": [
+        {
+          "name": "ix_alert_fires_rule_issue_at",
+          "columns": [
+            "rule_id",
+            "issue_id",
+            "fired_at"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "alert_rules",
+      "introduced": 4,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "name",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "enabled",
+          "kind": "Boolean",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "trigger_kind",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "threshold",
+          "kind": "Integer",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "window_minutes",
+          "kind": "Integer",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "filters_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "actions_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "action_interval_minutes",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "muted_until",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "last_fired_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_by",
+          "kind": "String",
+          "length": 256,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "updated_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": null,
+          "columns": [
+            "name"
+          ]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "api_tokens",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "label",
+          "kind": "String",
+          "length": 128,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "token_hash",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "scopes",
+          "kind": "String",
+          "length": 512,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "member_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "revoked_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": null,
+          "columns": [
+            "token_hash"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_api_tokens_member_id",
+          "columns": [
+            "member_id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "audit_chain_head",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "seq",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "hash",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": []
+    },
+    {
+      "name": "audit_records",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "seq",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": false
+        },
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "actor_kind",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "actor_ref",
+          "kind": "String",
+          "length": 256,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "action",
+          "kind": "String",
+          "length": 128,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "target_kind",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "target_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "summary",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "details_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "prev_hash",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "hash",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": null,
+          "columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_audit_records_at",
+          "columns": [
+            "at"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "collector_configs",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "name",
+          "kind": "String",
+          "length": 128,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "kind",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "trigger_mode",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "cron",
+          "kind": "String",
+          "length": 128,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "sweep_cron",
+          "kind": "String",
+          "length": 128,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "sweep_max_concurrency",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "selector_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "credential_ref",
+          "kind": "String",
+          "length": 512,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "cursor_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "enabled",
+          "kind": "Boolean",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "last_scheduled_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "updated_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "inventory_mode",
+          "kind": "String",
+          "length": 16,
+          "nullable": false,
+          "primary_key": false,
+          "default": "sensitive_only",
+          "introduced": 5,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": null,
+          "columns": [
+            "name"
+          ]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "collector_health",
+      "introduced": 2,
+      "columns": [
+        {
+          "name": "collector_config_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "last_success_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "last_failure_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "consecutive_failures",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": "0",
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "last_event_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "watch_expires_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "open_conditions",
+          "kind": "String",
+          "length": 256,
+          "nullable": false,
+          "primary_key": false,
+          "default": "",
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "alerted_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "updated_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": []
+    },
+    {
+      "name": "counters",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "name",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "value",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": []
+    },
+    {
+      "name": "data_asset_events",
+      "introduced": 5,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "asset_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "kind",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "occurred_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "recorded_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "actor_ref",
+          "kind": "String",
+          "length": 256,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "scan_job_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "items_added",
+          "kind": "Integer",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "items_removed",
+          "kind": "Integer",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "item_count_after",
+          "kind": "Integer",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "values_added",
+          "kind": "Integer",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "values_removed",
+          "kind": "Integer",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "value_count_after",
+          "kind": "Integer",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "field_key",
+          "kind": "String",
+          "length": 48,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "old_value",
+          "kind": "Text",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "new_value",
+          "kind": "Text",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "note",
+          "kind": "Text",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": [
+        {
+          "name": "ix_data_asset_events_asset_recorded",
+          "columns": [
+            "asset_id",
+            "recorded_at"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "data_asset_items",
+      "introduced": 5,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "asset_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "kind",
+          "kind": "String",
+          "length": 8,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "fingerprint",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "key_version",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": "1",
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "first_seen_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "removed_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": "uq_data_asset_items_key",
+          "columns": [
+            "asset_id",
+            "kind",
+            "fingerprint"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_data_asset_items_asset_state",
+          "columns": [
+            "asset_id",
+            "kind",
+            "removed_at"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "data_assets",
+      "introduced": 5,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "number",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "resource_key",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "source",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "origin",
+          "kind": "String",
+          "length": 16,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "kind",
+          "kind": "String",
+          "length": 16,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "state",
+          "kind": "String",
+          "length": 16,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "name",
+          "kind": "String",
+          "length": 512,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "display_locator",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "collector_config_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "sweep_covered",
+          "kind": "Boolean",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": "0",
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "item_count",
+          "kind": "Integer",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "first_seen_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "last_seen_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "deleted_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "overdue_notified_for",
+          "kind": "String",
+          "length": 10,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_by",
+          "kind": "String",
+          "length": 256,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "updated_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": null,
+          "columns": [
+            "resource_key"
+          ]
+        },
+        {
+          "name": null,
+          "columns": [
+            "number"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_data_assets_config_state",
+          "columns": [
+            "collector_config_id",
+            "state",
+            "last_seen_at"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_data_assets_source",
+          "columns": [
+            "source"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_data_assets_state_last_seen",
+          "columns": [
+            "state",
+            "last_seen_at"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "data_field_values",
+      "introduced": 5,
+      "columns": [
+        {
+          "name": "asset_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "field_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "value_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "value_date",
+          "kind": "String",
+          "length": 10,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "updated_by",
+          "kind": "String",
+          "length": 256,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "updated_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": [
+        {
+          "name": "ix_data_field_values_field_date",
+          "columns": [
+            "field_id",
+            "value_date"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "data_fields",
+      "introduced": 5,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "key",
+          "kind": "String",
+          "length": 48,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "label",
+          "kind": "String",
+          "length": 80,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "description",
+          "kind": "String",
+          "length": 500,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "field_type",
+          "kind": "String",
+          "length": 16,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "options_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "required",
+          "kind": "Boolean",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": "0",
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "position",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "role",
+          "kind": "String",
+          "length": 16,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "archived_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_by",
+          "kind": "String",
+          "length": 256,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "updated_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 5,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": null,
+          "columns": [
+            "key"
+          ]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "engine_tasks",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "kind",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "ref_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "payload_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "status",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "available_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "lease_owner",
+          "kind": "String",
+          "length": 128,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "lease_expires_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "attempts",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "max_attempts",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "idempotency_key",
+          "kind": "String",
+          "length": 256,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "last_error_code",
+          "kind": "String",
+          "length": 64,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": null,
+          "columns": [
+            "idempotency_key"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_engine_tasks_available_at",
+          "columns": [
+            "available_at"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_engine_tasks_ref_id",
+          "columns": [
+            "ref_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_engine_tasks_status",
+          "columns": [
+            "status"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "escalation_policies",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "name",
+          "kind": "String",
+          "length": 128,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "tiers_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "updated_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": null,
+          "columns": [
+            "name"
+          ]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "evidence",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "issue_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "run_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "step_run_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "display_filename",
+          "kind": "String",
+          "length": 512,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "content_type",
+          "kind": "String",
+          "length": 128,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "size_bytes",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "sha256",
+          "kind": "String",
+          "length": 64,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "storage_key",
+          "kind": "String",
+          "length": 512,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "verdict",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "rejection_rule_classes",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "uploaded_by",
+          "kind": "String",
+          "length": 128,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": [
+        {
+          "name": "ix_evidence_issue_id",
+          "columns": [
+            "issue_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_evidence_run_id",
+          "columns": [
+            "run_id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "external_issue_links",
+      "introduced": 4,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "issue_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "kind",
+          "kind": "String",
+          "length": 16,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "url",
+          "kind": "String",
+          "length": 2048,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "title",
+          "kind": "String",
+          "length": 200,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "external_ref",
+          "kind": "String",
+          "length": 256,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_by",
+          "kind": "String",
+          "length": 256,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": null,
+          "columns": [
+            "issue_id",
+            "url"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_external_issue_links_issue_id",
+          "columns": [
+            "issue_id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "findings",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "issue_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "scan_job_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "source",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "resource_key",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "display_locator",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "location",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "rule_id",
+          "kind": "String",
+          "length": 128,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "rule_class",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "detector",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "confidence",
+          "kind": "Float",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "masked_snippet",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "fingerprint",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "fingerprint_key_id",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "observed_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "fingerprint_key_version",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": "1",
+          "introduced": 2,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": "uq_findings_observation",
+          "columns": [
+            "issue_id",
+            "scan_job_id",
+            "fingerprint"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_findings_issue_id",
+          "columns": [
+            "issue_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_findings_key_fingerprint",
+          "columns": [
+            "fingerprint_key_version",
+            "fingerprint"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "human_tasks",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "run_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "step_run_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "kind",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "title",
+          "kind": "String",
+          "length": 512,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "assignee_ref",
+          "kind": "String",
+          "length": 256,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "escalation_policy_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "tier_index",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "due_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "status",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "outcome",
+          "kind": "String",
+          "length": 32,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "comment",
+          "kind": "Text",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "completed_by",
+          "kind": "String",
+          "length": 128,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "completed_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": null,
+          "columns": [
+            "step_run_id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_human_tasks_due_at",
+          "columns": [
+            "due_at"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_human_tasks_run_id",
+          "columns": [
+            "run_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_human_tasks_status",
+          "columns": [
+            "status"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "integration_checks",
+      "introduced": 4,
+      "columns": [
+        {
+          "name": "kind",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "checked_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "ok",
+          "kind": "Boolean",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "error_code",
+          "kind": "String",
+          "length": 32,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": []
+    },
+    {
+      "name": "issue_bookmarks",
+      "introduced": 4,
+      "columns": [
+        {
+          "name": "issue_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "member_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": []
+    },
+    {
+      "name": "issue_comments",
+      "introduced": 4,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "issue_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "author_ref",
+          "kind": "String",
+          "length": 256,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "body",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "edited_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "deleted_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": [
+        {
+          "name": "ix_issue_comments_issue_id",
+          "columns": [
+            "issue_id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "issue_exceptions",
+      "introduced": 2,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "issue_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "reason",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "duration",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "status",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "requested_by",
+          "kind": "String",
+          "length": 256,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "approver_ref",
+          "kind": "String",
+          "length": 256,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "decided_by",
+          "kind": "String",
+          "length": 256,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "decided_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "expires_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": [
+        {
+          "name": "ix_issue_exceptions_issue",
+          "columns": [
+            "issue_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_issue_exceptions_status_expiry",
+          "columns": [
+            "status",
+            "expires_at"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "issue_history",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "issue_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "kind",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "actor_ref",
+          "kind": "String",
+          "length": 256,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "from_value",
+          "kind": "Text",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "to_value",
+          "kind": "Text",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "note",
+          "kind": "Text",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": [
+        {
+          "name": "ix_issue_history_issue_id",
+          "columns": [
+            "issue_id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "issue_mentions",
+      "introduced": 4,
+      "columns": [
+        {
+          "name": "comment_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "member_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": []
+    },
+    {
+      "name": "issue_merges",
+      "introduced": 4,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "primary_issue_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "merged_issue_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "merged_by",
+          "kind": "String",
+          "length": 256,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "merged_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "unmerged_by",
+          "kind": "String",
+          "length": 256,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "unmerged_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": [
+        {
+          "name": "ix_issue_merges_merged_issue_id",
+          "columns": [
+            "merged_issue_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_issue_merges_primary_issue_id",
+          "columns": [
+            "primary_issue_id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "issue_subscriptions",
+      "introduced": 4,
+      "columns": [
+        {
+          "name": "issue_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "member_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "subscribed",
+          "kind": "Boolean",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "reason",
+          "kind": "String",
+          "length": 16,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "updated_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": []
+    },
+    {
+      "name": "issues",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "number",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "grouping_key",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "source",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "resource_key",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "display_locator",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "resource_ref_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "collector_config_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "display_title",
+          "kind": "String",
+          "length": 512,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "rule_class",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "severity",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "status",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "assignee_member_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "assignee_team_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "first_seen",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "last_seen",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "last_checked_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "sweep_covered",
+          "kind": "Boolean",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "times_seen",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "distinct_fingerprints",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "regression_count",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "resolved_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "resolution",
+          "kind": "String",
+          "length": 32,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "updated_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "base_severity",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": "medium",
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "exposure_visibility",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": "unknown",
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "exposure_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "exposure_changed_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "placement_keys_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "resource_modified_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "owner_ref",
+          "kind": "String",
+          "length": 80,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "policy_name",
+          "kind": "String",
+          "length": 64,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "policy_version",
+          "kind": "Integer",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "risk_score",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": "0",
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "asset_tier",
+          "kind": "String",
+          "length": 32,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "priority",
+          "kind": "String",
+          "length": 16,
+          "nullable": false,
+          "primary_key": false,
+          "default": "medium",
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "priority_manual",
+          "kind": "Boolean",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": "0",
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "needs_review",
+          "kind": "Boolean",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": "0",
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "merged_into_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "archive_kind",
+          "kind": "String",
+          "length": 32,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "archive_until",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "archive_threshold",
+          "kind": "Integer",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "archive_baseline",
+          "kind": "Integer",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "archived_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": null,
+          "columns": [
+            "grouping_key"
+          ]
+        },
+        {
+          "name": null,
+          "columns": [
+            "number"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_issues_collector_config_id",
+          "columns": [
+            "collector_config_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_issues_exposure_visibility",
+          "columns": [
+            "exposure_visibility"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_issues_merged_into_id",
+          "columns": [
+            "merged_into_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_issues_resource_key",
+          "columns": [
+            "resource_key"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_issues_source",
+          "columns": [
+            "source"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_issues_status",
+          "columns": [
+            "status"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_issues_status_last_seen",
+          "columns": [
+            "status",
+            "last_seen"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_issues_status_merged",
+          "columns": [
+            "status",
+            "merged_into_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_issues_status_risk",
+          "columns": [
+            "status",
+            "risk_score"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_issues_sweep_lookup",
+          "columns": [
+            "collector_config_id",
+            "status",
+            "last_checked_at"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "map_items",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "map_job_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "shard_key",
+          "kind": "String",
+          "length": 256,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "descriptor_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "weight",
+          "kind": "Float",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "status",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "attempt",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "dispatched_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "finished_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "summary_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "error_code",
+          "kind": "String",
+          "length": 64,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "police_task_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "scan_job_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": "uq_map_item_shard",
+          "columns": [
+            "map_job_id",
+            "shard_key"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_map_items_job_status",
+          "columns": [
+            "map_job_id",
+            "status"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_map_items_map_job_id",
+          "columns": [
+            "map_job_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_map_items_police_task",
+          "columns": [
+            "police_task_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_map_items_status",
+          "columns": [
+            "status"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "map_jobs",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "origin",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "step_run_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "collector_config_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "spec_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "status",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "partition_done",
+          "kind": "Boolean",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "max_concurrency",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "paused_until",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "deadline",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "result_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "finished_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": [
+        {
+          "name": "ix_map_jobs_collector_config_id",
+          "columns": [
+            "collector_config_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_map_jobs_status",
+          "columns": [
+            "status"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_map_jobs_step_run_id",
+          "columns": [
+            "step_run_id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "map_partitions",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "map_job_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "corpus_key",
+          "kind": "String",
+          "length": 256,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "cursor",
+          "kind": "Text",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "status",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "attempt",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "police_task_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": "uq_map_partition_corpus",
+          "columns": [
+            "map_job_id",
+            "corpus_key"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_map_partitions_job_status",
+          "columns": [
+            "map_job_id",
+            "status"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_map_partitions_map_job_id",
+          "columns": [
+            "map_job_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_map_partitions_status",
+          "columns": [
+            "status"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "member_identities",
+      "introduced": 2,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "member_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "kind",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "identity_key",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "origin",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": null,
+          "columns": [
+            "kind",
+            "identity_key"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_member_identities_member_id",
+          "columns": [
+            "member_id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "members",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "handle",
+          "kind": "String",
+          "length": 128,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "display_name",
+          "kind": "String",
+          "length": 256,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "email",
+          "kind": "String",
+          "length": 320,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "slack_user_id",
+          "kind": "String",
+          "length": 128,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "active",
+          "kind": "Boolean",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "updated_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "role",
+          "kind": "String",
+          "length": 16,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 3,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "last_sign_in_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 3,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": null,
+          "columns": [
+            "handle"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_members_role_active",
+          "columns": [
+            "role",
+            "active"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "notification_settings",
+      "introduced": 4,
+      "columns": [
+        {
+          "name": "member_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "category",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "channel",
+          "kind": "String",
+          "length": 16,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "updated_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": []
+    },
+    {
+      "name": "notification_templates",
+      "introduced": 3,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 3,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "name",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 3,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "version",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 3,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "event_kind",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 3,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "description",
+          "kind": "String",
+          "length": 200,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 3,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "subject",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 3,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "body",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 3,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "email_subject",
+          "kind": "Text",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 3,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "email_body",
+          "kind": "Text",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 3,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "slack_body",
+          "kind": "Text",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 3,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "active",
+          "kind": "Boolean",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 3,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_by",
+          "kind": "String",
+          "length": 80,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 3,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 3,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": null,
+          "columns": [
+            "name",
+            "version"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_notification_templates_name_active",
+          "columns": [
+            "name",
+            "active"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "notifications",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "channel",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "recipient_ref",
+          "kind": "String",
+          "length": 256,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "subject",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "body",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "dlp_verdict",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "dlp_hit_count",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "status",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "delivery_attempts",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "run_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "issue_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "sent_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "event_kind",
+          "kind": "String",
+          "length": 32,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 3,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "template_name",
+          "kind": "String",
+          "length": 64,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 3,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "template_version",
+          "kind": "Integer",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 3,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "set_name",
+          "kind": "String",
+          "length": 64,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 3,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "target_index",
+          "kind": "Integer",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 3,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "error_code",
+          "kind": "String",
+          "length": 32,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 3,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "category",
+          "kind": "String",
+          "length": 32,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": [
+        {
+          "name": "ix_notifications_issue_id",
+          "columns": [
+            "issue_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_notifications_run_id",
+          "columns": [
+            "run_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_notifications_status",
+          "columns": [
+            "status"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "ownership_rules",
+      "introduced": 4,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "position",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "source",
+          "kind": "String",
+          "length": 32,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "pattern",
+          "kind": "String",
+          "length": 512,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "team_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "enabled",
+          "kind": "Boolean",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_by",
+          "kind": "String",
+          "length": 256,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "updated_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": []
+    },
+    {
+      "name": "placement_policies",
+      "introduced": 2,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "name",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "version",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "source_format",
+          "kind": "String",
+          "length": 16,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "source_text",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "compiled_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "effect",
+          "kind": "String",
+          "length": 16,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "enabled",
+          "kind": "Boolean",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "active",
+          "kind": "Boolean",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "owner_team",
+          "kind": "String",
+          "length": 128,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_by",
+          "kind": "String",
+          "length": 256,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": null,
+          "columns": [
+            "name",
+            "version"
+          ]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "police_tasks",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "task_type",
+          "kind": "String",
+          "length": 128,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "labels",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "input_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "status",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "worker_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "attempt",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "max_attempts",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "lease_expires_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "deadline",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "callback_token_hash",
+          "kind": "String",
+          "length": 64,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "callback_token_used_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "result_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "outcome",
+          "kind": "String",
+          "length": 32,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "step_run_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "collector_config_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "completed_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": [
+        {
+          "name": "ix_police_tasks_collector_config_id",
+          "columns": [
+            "collector_config_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_police_tasks_status",
+          "columns": [
+            "status"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_police_tasks_step_run_id",
+          "columns": [
+            "step_run_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_police_tasks_worker_id",
+          "columns": [
+            "worker_id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "police_workers",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "name",
+          "kind": "String",
+          "length": 128,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "version",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "mode",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "contract_version",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "task_types",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "labels",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "concurrency",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "endpoint_url",
+          "kind": "String",
+          "length": 2048,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "token_hash",
+          "kind": "String",
+          "length": 64,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "status",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "last_heartbeat_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "last_delivery_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "health_alerted_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": [
+        {
+          "name": "ix_police_workers_status",
+          "columns": [
+            "status"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "replay_nonces",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "scope",
+          "kind": "String",
+          "length": 128,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "nonce",
+          "kind": "String",
+          "length": 256,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "expires_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": [
+        {
+          "name": "ix_replay_nonces_expires_at",
+          "columns": [
+            "expires_at"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "resource_coverage",
+      "introduced": 2,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "collector_config_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "resource_key",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "source",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "state",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "reason",
+          "kind": "String",
+          "length": 32,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "truncated_bytes",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": "0",
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "exposure_visibility",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": "unknown",
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "first_seen_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "last_attempt_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": null,
+          "columns": [
+            "collector_config_id",
+            "resource_key"
+          ]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "saved_view_defaults",
+      "introduced": 4,
+      "columns": [
+        {
+          "name": "member_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "view_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": []
+    },
+    {
+      "name": "saved_view_stars",
+      "introduced": 4,
+      "columns": [
+        {
+          "name": "view_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "member_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": []
+    },
+    {
+      "name": "saved_views",
+      "introduced": 4,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "name",
+          "kind": "String",
+          "length": 64,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "query",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "sort",
+          "kind": "String",
+          "length": 16,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "period",
+          "kind": "String",
+          "length": 64,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "visibility",
+          "kind": "String",
+          "length": 16,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "owner_member_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "position",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "updated_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 4,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": [
+        {
+          "name": "ix_saved_views_owner_member_id",
+          "columns": [
+            "owner_member_id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "scan_coverage",
+      "introduced": 2,
+      "columns": [
+        {
+          "name": "scan_job_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "state",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "reason",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": true,
+          "default": "",
+          "introduced": 2,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "count",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": "0",
+          "introduced": 2,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": []
+    },
+    {
+      "name": "scan_jobs",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "collector_config_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "source",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "trigger",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "status",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "started_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "finished_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "resources_scanned",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "resources_skipped",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "findings_count",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "error_code",
+          "kind": "String",
+          "length": 64,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": [
+        {
+          "name": "ix_scan_jobs_collector_config_id",
+          "columns": [
+            "collector_config_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_scan_jobs_status",
+          "columns": [
+            "status"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "step_runs",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "run_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "step_id",
+          "kind": "String",
+          "length": 128,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "visit",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "branch_token",
+          "kind": "String",
+          "length": 128,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "status",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "attempt",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "input_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "output_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "outcome",
+          "kind": "String",
+          "length": 32,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "error_code",
+          "kind": "String",
+          "length": 64,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "started_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "finished_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": "uq_step_run_visit",
+          "columns": [
+            "run_id",
+            "step_id",
+            "visit",
+            "branch_token"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_step_runs_run_id",
+          "columns": [
+            "run_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_step_runs_status",
+          "columns": [
+            "status"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "team_memberships",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "team_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "member_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "origin",
+          "kind": "String",
+          "length": 16,
+          "nullable": false,
+          "primary_key": false,
+          "default": "manual",
+          "introduced": 3,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": []
+    },
+    {
+      "name": "teams",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "slug",
+          "kind": "String",
+          "length": 128,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "name",
+          "kind": "String",
+          "length": 256,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "email",
+          "kind": "String",
+          "length": 320,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "slack_channel",
+          "kind": "String",
+          "length": 128,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "updated_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "lead_member_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 2,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": null,
+          "columns": [
+            "slug"
+          ]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "transitions",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "run_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "from_step_run_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "to_step_id",
+          "kind": "String",
+          "length": 128,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "kind",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "reason",
+          "kind": "Text",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": [
+        {
+          "name": "ix_transitions_run_id",
+          "columns": [
+            "run_id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "name": "workflow_definitions",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "name",
+          "kind": "String",
+          "length": 128,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "version",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "source_format",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "source_text",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "compiled_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "active",
+          "kind": "Boolean",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_by",
+          "kind": "String",
+          "length": 128,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "created_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [
+        {
+          "name": "uq_workflow_definition_version",
+          "columns": [
+            "name",
+            "version"
+          ]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "workflow_runs",
+      "introduced": 1,
+      "columns": [
+        {
+          "name": "id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "definition_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "issue_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "parent_step_run_id",
+          "kind": "String",
+          "length": 36,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "status",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "trigger",
+          "kind": "String",
+          "length": 32,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "context_json",
+          "kind": "Text",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "lock_version",
+          "kind": "Integer",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "started_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        },
+        {
+          "name": "finished_at",
+          "kind": "DateTime",
+          "length": null,
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "introduced": 1,
+          "autoincrement": "auto"
+        }
+      ],
+      "uniques": [],
+      "indexes": [
+        {
+          "name": "ix_workflow_runs_definition_id",
+          "columns": [
+            "definition_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_workflow_runs_issue_id",
+          "columns": [
+            "issue_id"
+          ],
+          "unique": false
+        },
+        {
+          "name": "ix_workflow_runs_status",
+          "columns": [
+            "status"
+          ],
+          "unique": false
+        }
+      ]
+    }
+  ]
+}

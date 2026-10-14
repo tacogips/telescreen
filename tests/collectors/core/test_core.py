@@ -471,6 +471,9 @@ async def test_collectors_router_responses_conflicts_and_no_echo() -> None:
         )
         headers: Headers = Headers({"Authorization": f"Bearer {token.token}"})
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            listed: HttpxResponse = await client.get("/api/collectors", headers=headers)
+            assert listed.status_code == 200
+            assert listed.json()["items"][0]["inventory_mode"] == "sensitive_only"
             swept: HttpxResponse = await client.post(
                 f"/api/collectors/{config.id}/sweep", headers=headers
             )

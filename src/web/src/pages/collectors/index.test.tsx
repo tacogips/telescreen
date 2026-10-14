@@ -11,7 +11,7 @@ function renderCollector(path: string = "/collectors"): void {
   render(() => <MemoryRouter history={history}><Route path="/collectors" component={CollectorsPage} /><Route path="/collectors/:id" component={CollectorsPage} /></MemoryRouter>);
 }
 
-const config = (id: string, name: string, enabled: boolean = true) => ({ id, name, kind: "slack", trigger_mode: "both", cron: null, sweep_cron: null, selector_json: "{}", credential_ref: null, enabled });
+const config = (id: string, name: string, enabled: boolean = true) => ({ id, name, kind: "slack", trigger_mode: "both", cron: null, sweep_cron: null, selector_json: "{}", credential_ref: null, enabled, inventory_mode: "sensitive_only" });
 
 it("shows a sweep conflict returned by the API", async () => {
   const fetchMock = vi.spyOn(globalThis, "fetch")
@@ -75,7 +75,24 @@ it("sends the full collector body when disabling a config", async () => {
     .mockResolvedValueOnce(new Response(JSON.stringify({ items: [], next_cursor: null })));
   renderCollector();
   fireEvent.click(await screen.findByRole("button", { name: "Disable" }));
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/collectors/c1", expect.objectContaining({ method: "PATCH", body: JSON.stringify({ name: "Slack", kind: "slack", trigger_mode: "both", cron: null, sweep_cron: null, selector_json: "{}", credential_ref: null, enabled: false }) })));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/collectors/c1", expect.objectContaining({ method: "PATCH", body: JSON.stringify({ name: "Slack", kind: "slack", trigger_mode: "both", cron: null, sweep_cron: null, selector_json: "{}", credential_ref: null, enabled: false, inventory_mode: "sensitive_only" }) })));
+});
+
+it("sends inventory_mode when changing a collector to Off", async () => {
+  const collector = { ...config("c1", "Slack"), inventory_mode: "all" };
+  const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = String(input);
+    if (url === "/api/collectors") return Response.json({ items: [collector], next_cursor: null });
+    if (url === "/api/map-jobs") return Response.json({ items: [], next_cursor: null });
+    if (url === "/api/collectors/c1" && init?.method === "PATCH") return Response.json({ id: "c1" });
+    return Response.json({ items: [collector], next_cursor: null });
+  });
+  vi.stubGlobal("confirm", vi.fn(() => true));
+  renderCollector();
+  fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+  fireEvent.change(screen.getByLabelText("Inventory mode"), { target: { value: "off" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save collector" }));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/collectors/c1", expect.objectContaining({ method: "PATCH", body: expect.stringContaining('"inventory_mode":"off"') })));
 });
 
 it("shows collector health and event-only metadata", async () => {

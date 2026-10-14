@@ -62,6 +62,17 @@ When writing, reviewing, or refactoring Python code, follow `.claude/skills/pyth
 
 Any touched Python source or test file at **1000+ lines** must be split according to `.claude/skills/python-coding-standards/SKILL.md` (Codex: `.codex/skills/python-coding-standards/SKILL.md`) unless the user explicitly excludes that work.
 
+## Database Schema (DDL)
+
+The database schema is designed in the Nodetto app. `db/schema/telescreen.nodetto.jsonl`
+is the source of truth for every table, column, key and index; `db/schema/*.sql` are
+Nodetto exports. Never change the DDL only in the SQLAlchemy models or Alembic: edit the
+Nodetto document first (`mise run ddl-edit`), regenerate the exports (`mise run ddl-export`),
+then update the models and add an Alembic revision. Draw every new reference column as a
+logical relation (field to field) and keep the layout tidy with Arrange > Tidy layout
+(`mise run ddl-arrange`). `tests/db/test_nodetto_schema.py` and
+`mise run ddl-check` enforce the match. See `db/schema/README.md`.
+
 ## Design Documentation
 
 When creating or updating design or investigation documents, follow `.claude/skills/design-doc/SKILL.md` (Codex: `.codex/skills/design-doc/SKILL.md`).

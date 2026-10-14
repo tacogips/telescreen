@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { createMemoryHistory, MemoryRouter, Route } from "@solidjs/router";
 import { afterEach, expect, it, vi } from "vitest";
+import { setSession } from "../../auth/session";
 import SettingsPage from "./index";
 
 afterEach(() => { cleanup(); sessionStorage.clear(); document.documentElement.removeAttribute("data-theme"); vi.restoreAllMocks(); });
@@ -78,4 +79,32 @@ it("adds an identity without displaying the submitted value and saves the team l
   fireEvent.click(screen.getByRole("button", { name: "Save team changes" }));
   await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/teams/response/lead", expect.objectContaining({ method: "PUT", body: JSON.stringify({ lead: "alex" }) })));
   expect(fetchMock).not.toHaveBeenCalledWith("/api/teams/response/members", expect.anything());
+});
+
+it("shows the Field schema link only to data field administrators", async () => {
+  const history = createMemoryHistory(); history.set({ value: "/settings/data-fields" });
+  const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = String(input);
+    if (url === "/api/auth/me") return Response.json({ kind: "token", member: { handle: "alex", display_name: "Alex" }, role: "viewer", permissions: [] });
+    return Response.json({ items: [] });
+  });
+  render(() => <MemoryRouter history={history}><Route path="/settings" component={SettingsPage} /><Route path="/settings/:id" component={SettingsPage} /></MemoryRouter>);
+  await screen.findByText("General");
+  expect(screen.queryByRole("link", { name: "Field schema" })).toBeNull();
+  expect(fetchMock).not.toHaveBeenCalledWith("/api/data/fields", expect.anything());
+});
+
+it("renders the field schema page for data field administrators", async () => {
+  setSession({ kind: "token", access_token: "test-session" });
+  const history = createMemoryHistory(); history.set({ value: "/settings/data-fields" });
+  const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = String(input);
+    if (url === "/api/auth/me") return Response.json({ kind: "token", member: { handle: "admin", display_name: "Admin" }, role: "admin", permissions: ["data_fields.admin"] });
+    if (url === "/api/data/fields") return Response.json({ items: [] });
+    return Response.json({ items: [] });
+  });
+  render(() => <MemoryRouter history={history}><Route path="/settings" component={SettingsPage} /><Route path="/settings/:id" component={SettingsPage} /></MemoryRouter>);
+  expect(await screen.findByRole("link", { name: "Field schema" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Field schema" })).toBeInTheDocument();
+  expect(fetchMock).toHaveBeenCalledWith("/api/data/fields", expect.anything());
 });

@@ -277,6 +277,50 @@ Audited actions added:
 
 Details hold ids, enums, counts and field names only.
 
+### v1.4 additions (revision `0005_v1_4`)
+
+Status: implemented 2026-10-14. Behavior is in `design-v1-4-data-inventory.md` (section 4
+lists every column). The Nodetto document is changed first. Then one new revision,
+`0005_v1_4` (`down_revision = "0004_v1_3"`), adds everything below. It is idempotent in the
+same way as `0004_v1_3`, and earlier revisions are never edited.
+
+New tables (owner `inventory`, frame "Data inventory"):
+
+| Table | Purpose |
+|-------|---------|
+| `data_assets` | The register: one row per `resource_key` (discovered, or registered with `resource_key("registered:" + source, locator)`); `number` shown as `DATA-<n>` from the counter `data_asset_number`; origin, kind, state (`present`, `deleted`, `unknown`), redacted name and locator, item count, first/last seen, deleted at, `overdue_notified_for` |
+| `data_asset_events` | Append-only lifecycle events with item and value counts, metadata changes (field key, old and new display text) and notes. A PostgreSQL trigger rejects `UPDATE` and `DELETE` |
+| `data_asset_items` | Keyed item fingerprints (`kind = item`) and finding fingerprints (`kind = value`) per asset, with `first_seen_at` and `removed_at`; UNIQUE (`asset_id`, `kind`, `fingerprint`) |
+| `data_fields` | Admin field schema: immutable `key`, label, type, options, required, position, role, archived |
+| `data_field_values` | One canonical JSON value per (asset, field); `value_date` for date fields |
+
+New column: `collector_configs.inventory_mode` varchar(16), not null, server default
+`sensitive_only`.
+
+Item fingerprints are `HMAC(HMAC(identity key v1, "telescreen:data-item:v1"), resource_key
++ "\0" + raw_item_key)`. Raw item keys are never stored. Audited actions added:
+
+- `data_asset.registered`, `data_asset.updated`, `data_asset.fields_changed`;
+- `data_asset.event_recorded`, `data_asset.marked_deleted`, `data_asset.restored`;
+- `data_asset.exported`, `data_asset.overdue_notified`;
+- `data_field.created`, `data_field.updated`, `data_field.reordered`;
+- `data_field.archived`, `data_field.unarchived`, `data_field.deleted`.
+
+### Schema source of truth (Nodetto)
+
+Since v1.3 the DDL is designed in the Nodetto desktop app. The ERD document
+`db/schema/telescreen.nodetto.jsonl` (one page, tables grouped into frames by
+model module) is authoritative; `db/schema/telescreen.postgresql.sql` and
+`telescreen.sqlite.sql` are its `nodetto-cli ddl` exports. SQLAlchemy models and
+Alembic revisions remain the runtime mechanism, and
+`tests/db/test_nodetto_schema.py` requires that the models match the document
+exactly (types, nullability, defaults, primary keys, identity columns, unique
+keys, index names) and that the SQLite export builds the same structure as
+`alembic upgrade head`. Table-to-table references are drawn field to field as
+Nodetto logical relations (dashed, no database constraint); the test checks
+that each joins same-typed columns to a primary or unique key. Triggers and seed rows are outside Nodetto's ERD model
+and stay in Alembic code. The change workflow is in `db/schema/README.md`.
+
 ## References
 
 See `design-docs/references/README.md`.

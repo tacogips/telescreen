@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
-from telescreen.core.vocabulary import DetectorKind, RuleClass, Severity
+from telescreen.core.vocabulary import DataAssetKind, DetectorKind, RuleClass, Severity
 from telescreen.ports.collectors import Exposure
+from telescreen.ports.inventory import ItemObservation
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,18 @@ class ResourceScan:
     placement_keys: tuple[str, ...] = ()
     modified_at: datetime | None = None
     removed: bool = False
+    items: ItemObservation | None = None
+    asset_kind: DataAssetKind | None = None
+
+
+@dataclass(frozen=True)
+class LocatorInventory:
+    """Safe item inventory reported for one external locator."""
+
+    locator: str = field(repr=False)
+    item_fingerprints: tuple[str, ...] | None = None
+    item_count: int | None = None
+    kind: DataAssetKind | None = None
 
 
 @dataclass(frozen=True)
@@ -81,6 +94,7 @@ class ExternalScan:
     sweep_covered: bool
     observed_at: datetime
     exposures: tuple[LocatorExposure, ...] = ()
+    inventories: tuple[LocatorInventory, ...] = ()
 
 
 @dataclass(frozen=True)

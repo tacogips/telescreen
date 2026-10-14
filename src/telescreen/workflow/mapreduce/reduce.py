@@ -1,6 +1,6 @@
 """Count-only reduction, removal reconciliation and map job controls."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from sqlalchemy import func, select
@@ -19,6 +19,7 @@ from telescreen.core.vocabulary import (
 )
 from telescreen.db.models import MapItemRow, MapJobRow, MapPartitionRow
 from telescreen.ports.audit import AuditEntry, AuditLog
+from telescreen.ports.inventory import InventoryReconciler, NoopInventoryReconciler
 from telescreen.ports.issues import IssueRecorder
 from telescreen.ports.police import PoliceGateway
 from telescreen.ports.sweeps import ShardSummary
@@ -48,6 +49,7 @@ class MapReduceHandler:
     audit: AuditLog
     clock: Clock
     kind: EngineTaskKind = EngineTaskKind.MAP_REDUCE
+    inventory: InventoryReconciler = field(default_factory=NoopInventoryReconciler)
 
     async def handle(self, task: ClaimedTask) -> TaskResult:
         """Handle a claimed reduction task through the durable queue contract."""
@@ -127,6 +129,9 @@ class MapReduceHandler:
             auto_resolved: int = summary.issues_auto_resolved
             if status is MapJobStatus.SUCCEEDED:
                 auto_resolved += await self.issues.resolve_unchecked(
+                    session, job.collector_config_id, job.created_at
+                )
+                await self.inventory.reconcile_sweep(
                     session, job.collector_config_id, job.created_at
                 )
             failed_codes: list[tuple[str, int]] = []

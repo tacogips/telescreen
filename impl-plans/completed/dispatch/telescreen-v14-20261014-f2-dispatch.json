@@ -1,0 +1,236 @@
+{
+  "taskId": "telescreen-v14-20261014-f2",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/data-inventory",
+  "baseBranch": "feat/data-inventory",
+  "remote": "origin",
+  "originalHead": "3c5c1dda0f03b0f30ba0cfe333bd2f0211eed2e6",
+  "originalHeadNotes": "Run-2 base (session-15 checkpoint plus the owner fixes O1 and O2). Before fanout, these are committed on feat/data-inventory: the design section 17 (design-v1-4-data-inventory.md), the new plan v14-p09-live-fixes, the p08 'Run 2 scope' section and this manifest. Plans then run against that commit.",
+  "evidenceRoot": "tmp/telescreen-v14-20261014-f2",
+  "evidenceRootNotes": "Untracked (gitignored by **/tmp); never staged or committed. Use tmp/telescreen-v14-20261014-f2/<planId>/attempt-<n>/. Command logs go to /tmp/telescreen-v14-<pNN>-*.log and builds to /tmp/telescreen-v14-<pNN>-web or /tmp/telescreen-v14-<pNN>-dist (conventions section 7). Do not read from or write to the f1 evidence root.",
+  "supersedes": "none (telescreen-v14-20261013-f1 stays in impl-plans/active until the serial finalization archives it)",
+  "runScope": "Run 2 (final) of Telescreen v1.4 data inventory (design-v1-4-data-inventory.md section 17) at base 3c5c1dd. Waves run serially, one plan each: A = v14-p09-live-fixes (implement L1-L7), then B = v14-p08-wiring-verification (re-verify on the integrated tree), then the serial finalization (archive, docs, commit, push). Whole tree at 3c5c1dd: pytest 1109 passed / 11 skipped; ruff, typelint (599 files) and ty clean; ddl-check OK; web vitest 256 passed.",
+  "planModes": {
+    "implement": "Implement the plan's deliverables inside writePaths, then run every manifest verification command. Files outside writePaths are read-only; a failure there is a Reconciliation request in the plan Progress Log naming the owner, never an edit.",
+    "re-verify": "Code is complete at the run base per the plan's 'Owner resolution' section (impl-plans/active/v14-p08-wiring-verification.md) and its 'Run 2 scope'. Do not change code unless a check fails, and then only inside the run-2 writePaths. Run every manifest verification command on the integrated tree, which includes p09. Append a run-2 Progress Log session (each command, its exit status and log path) and set Status to Completed. Step result per conventions 7a: the run-1 E3 blocker, resolved by the owner (O2: tests/e2e/test_flow_v14_inventory.py::test_e3_full_listing_deletes_absent_asset_only_when_authoritative), appears ONLY in addressedFeedback, with changed paths 'none in p08' and the passing scoped pytest command. findings, risks, authorSelfCheck.findings, authorSelfCheck.residualRisks and priorVerification are EMPTY. verification lists only the final passing commands. Skipped live and integration tests are never listed."
+  },
+  "designDocPaths": [
+    "design-docs/specs/design-v1-4-data-inventory.md",
+    "design-docs/specs/design-v1-4-data-inventory-requirements.md",
+    "design-docs/specs/design-ui-sentry.md",
+    "design-docs/specs/architecture.md"
+  ],
+  "planIndexPath": "impl-plans/README.md",
+  "conventionsPath": "impl-plans/conventions.md",
+  "acceptedDependencies": [
+    {"planId": "v14-p01-foundation", "planPath": "impl-plans/active/v14-p01-foundation.md", "commit": "3c5c1dda0f03b0f30ba0cfe333bd2f0211eed2e6", "provides": "vocabulary, permissions (data.read, data.write, data_fields.admin), config, ports, item fingerprints, police contract 1.2, README v1.4 section", "acceptedIn": "run 1, session 15 integration review"},
+    {"planId": "v14-p02-db", "planPath": "impl-plans/active/v14-p02-db.md", "commit": "3c5c1dda0f03b0f30ba0cfe333bd2f0211eed2e6", "provides": "Nodetto document, exports, models and Alembic 0005_v1_4", "acceptedIn": "run 1, session 15 integration review"},
+    {"planId": "v14-p03-ui-foundation", "planPath": "impl-plans/active/v14-p03-ui-foundation.md", "commit": "3c5c1dda0f03b0f30ba0cfe333bd2f0211eed2e6", "provides": "web types, dataApi client, v14 mock router and fixtures, CountTabs, ItemCountChart, nav and screenshot states", "acceptedIn": "run 1, session 15 integration review"},
+    {"planId": "v14-p04-inventory-core", "planPath": "impl-plans/active/v14-p04-inventory-core.md", "commit": "3c5c1dda0f03b0f30ba0cfe333bd2f0211eed2e6", "provides": "observer, items, lifecycle, reconciler, repository, AssetQueries and the data asset routers", "acceptedIn": "run 1, session 15 integration review"},
+    {"planId": "v14-p05-scan-hooks", "planPath": "impl-plans/active/v14-p05-scan-hooks.md", "commit": "3c5c1dda0f03b0f30ba0cfe333bd2f0211eed2e6", "provides": "inventory hooks in scan, ingest, collectors, police results and map-reduce", "acceptedIn": "run 1, session 15 integration review"},
+    {"planId": "v14-p06-ui-pages", "planPath": "impl-plans/active/v14-p06-ui-pages.md", "commit": "3c5c1dda0f03b0f30ba0cfe333bd2f0211eed2e6", "provides": "Data list, detail and register pages, the field schema editor, issue link, dashboard tile and collector inventory mode", "acceptedIn": "run 1, session 15 integration review"},
+    {"planId": "v14-p07-fields-retention", "planPath": "impl-plans/active/v14-p07-fields-retention.md", "commit": "3c5c1dda0f03b0f30ba0cfe333bd2f0211eed2e6", "provides": "field schema and values, registration, retention overdue provider and handler", "acceptedIn": "run 1, session 15 integration review"}
+  ],
+  "acceptedDependencyRule": "Accepted plans are not redispatched, re-implemented or edited. Their files are read-only for every run-2 plan unless listed in that plan's writePaths (p09 takes over specific p03, p04 and p06 files: see sharedFileOwnership).",
+  "waves": [
+    {"id": "A", "plans": ["v14-p09-live-fixes"], "mode": "implement"},
+    {"id": "B", "plans": ["v14-p08-wiring-verification"], "mode": "re-verify", "dependsOn": ["A"]},
+    {"id": "finalize", "serial": true, "dependsOn": ["B"]}
+  ],
+  "sharedFileOwnership": {
+    "rule": "Design 17.6: the p09 and p08 run-2 writePaths are disjoint and every sharedPaths list is empty. The waves still run serially because workers share one working directory: a concurrent p08 would run its whole-tree gates (full pytest, leak matrix, strict screenshots) on p09's partial edits. Workers do not commit; wave B sees wave A's uncommitted changes.",
+    "handoffs": "src/telescreen/wiring_v14.py and src/web/scripts/screenshots.ts move from p08 to p09 for run 2. These run-1 files are p09-owned in run 2: src/web/src/pages/data/** (p06), src/web/src/components/{CountTabs,ItemCountChart}.tsx and their tests, src/web/src/components/shell/nav.ts, src/web/src/shell.test.tsx, src/web/src/api/types.ts and src/web/src/api/mock v14 files (p03). Design docs, README.md and impl-plans/README.md are edited only by the serial finalization.",
+    "readOnly": "src/telescreen/directory/**, src/telescreen/ports/**, src/telescreen/inventory/{queries,observer,reconcile}.py, db/**, src/web/src/api/mock/fixtures/v14-shapes.json, tests/leak/test_ui_fixtures.py, pyproject.toml, uv.lock, src/web/package.json and src/web/bun.lock.",
+    "dependencies": "No dependency or lockfile change in run 2."
+  },
+  "serialFinalization": {
+    "when": "After v14-p08-wiring-verification (re-verify) is integration-accepted.",
+    "steps": [
+      "Set the Status line of each v14 plan to Completed, with 0 open Completion Criteria boxes (p08's gates box covers the doc status, which this finalization completes).",
+      "git mv impl-plans/active/v14-p01-foundation.md ... v14-p09-live-fixes.md impl-plans/completed/ (all 9 plans).",
+      "git mv impl-plans/active/telescreen-v14-20261013-f1-dispatch.json and impl-plans/active/telescreen-v14-20261014-f2-dispatch.json impl-plans/completed/dispatch/.",
+      "Update impl-plans/README.md: the v1.4 section says complete (run 1 plus run 2 live fixes, p01-p09), its table paths point to completed/, and no active v14 entry remains.",
+      "Set the v1.4 Status lines to implemented in design-v1-4-data-inventory.md, design-v1-4-data-inventory-requirements.md and the v1.4 sections of architecture.md, design-data-model.md, design-api-and-ui.md, design-collectors-and-ingestion.md, design-police-contract.md, design-masking.md and design-ui-sentry.md.",
+      "Check that the README.md v1.4 data inventory feature section matches design sections 9, 10 and 17; edit only what is missing or wrong.",
+      "Rerun on the final tree: mise run ci; mise run ddl-check; cd src/web && bun install --frozen-lockfile && bun run typecheck && bun run test && bun run build --outDir /tmp/telescreen-v14-final-web --emptyOutDir && TELESCREEN_SCREENSHOTS_STRICT=1 bun run screenshots. Record exit codes and log paths.",
+      "Only if every gate exits 0: commit on feat/data-inventory (no secrets, no tmp/ or dist/ files, no unrelated files) and git push origin feat/data-inventory. Then git rev-list --count @{u}..HEAD -> 0 and git status --porcelain=v1 -> empty."
+    ]
+  },
+  "reviewContext": {
+    "issueReference": "workflowInput issue (no GitHub URL/number) - Telescreen v1.4 data inventory FINAL RUN 2, base 3c5c1dd on feat/data-inventory, workflowExecutionId opus-luna-design-and-implement-review-loop-session-16, intake comm-000848, design comm-000849 (accepted by step3 comm-000850), plan comm-000851 (accepted by step5-impl-plan-review comm-000852)",
+    "userProblem": "After run 1 the owner's live run found seven UI/API defects that the mock hid (requirements section 8, L1-L7). The owner fixed O1 (overdue ref_id length) and O2 (the E3 flow blocking p08) at the checkpoint.",
+    "requiredOutcomes": [
+      "L1: the timeline shows occurred_at ?? recorded_at; DataEvent.occurred_at and DataAsset.last_seen_at are nullable in the UI types.",
+      "L2: collector:<id> actors show the collector name (Telescreen when the config is missing) through InventoryActorDirectory, wired in wiring_v14.py.",
+      "L3: the reference select preselects member:<handle>/team:<slug>, keeps unknown stored values, and an unchanged save keeps the value.",
+      "L4: ItemCountChart renders points that arrive after mount.",
+      "L5: separated text in count tabs, timeline rows, list name cells and the breadcrumb.",
+      "L6: admins see Field schema in the Data and Settings secondary navs.",
+      "L7: an Overdue tag in the list State column.",
+      "Mock fixtures have null occurred_at, collector/system actors, reference values and a multi-point series for data-asset-01; every regression test was red on 3c5c1dd.",
+      "p08 re-verifies the integrated tree; all gates pass; plans and both manifests are archived; docs updated; committed and pushed to feat/data-inventory."
+    ],
+    "nonGoals": [
+      "No DDL, route, permission, response key or dependency change; D1-D24 unchanged; p01-p07 not redispatched.",
+      "No rewrite of stored actor refs; no change to DirectoryActorDirectory or issue activity.",
+      "No C5 custom push identity change (pending owner decision)."
+    ],
+    "constraints": [
+      "AGENTS.md / CLAUDE.md: English only, no emojis; plans under 400 lines; Python files under 1000 lines.",
+      "Strict typing (no Any, object, dict or **kwargs; dataclasses or enums; no type-ignore); typelint, ruff ANN/PGH and ty not weakened.",
+      "Raw detected values and raw item keys are never persisted, logged, indexed, notified, exported or returned; the leak matrix stays green.",
+      "Default uv run pytest passes offline; integration and live tests skip and are never listed as verification.",
+      "Conventions 2, 7 and 7a; workers never run git checkout/restore/stash/reset/clean/commit/add/push."
+    ],
+    "intentionalTradeoffs": [
+      "Serial waves despite disjoint writePaths, because of the shared working directory (design 17.6).",
+      "Collector names appear in the data timeline; every data.read holder also holds collectors.read, so nothing new is exposed (design 17.3).",
+      "The live L1-L7 checks are owner-only after the run."
+    ],
+    "designDecisionsAndRationale": [
+      "Design 17.2 L1: the UI types follow API 9.1 nullability (occurred_at and last_seen_at nullable) because the API sets occurred_at only for person-supplied events; the timeline falls back to recorded_at.",
+      "Design 17.3 L2: collector actors are resolved at read time by an InventoryActorDirectory wrapper, because lifecycle events are append-only and stored refs must not be rewritten; the shared DirectoryActorDirectory and issue activity stay unchanged.",
+      "Design 17.2 L3/L4: Solid reactivity fixes (per-option selected, reactive Show over points) because a component body runs once and resources resolve after mount.",
+      "Design 17.2 L5: explicit DOM separators plus CSS rules in ui.css and a new pages/data/data.css, keeping accessible names unchanged.",
+      "Design 17.2 L6: entriesFor(area, can) receives the permission check so Field schema appears for data_fields.admin in the Data and Settings navs, as section 10.1 specifies.",
+      "Design 17.4: mock fixtures gain the live shapes (null occurred_at, collector/system actors, reference values, multi-point series) so the mock can no longer hide these defects.",
+      "Design 17.6: one plan p09 (backend L2 is one module plus one wiring line), then p08 re-verify, serial because of the shared working directory."
+    ],
+    "supportedEdgeCases": [
+      "collector:<id> whose config was deleted resolves to Telescreen; repeated collector ids are read once per call; input length and order preserved.",
+      "A stored reference value not in the directory (inactive member, deleted team) stays selectable as 'Current value (not in directory)'; an unchanged save writes no metadata_changed event.",
+      "Item count chart: no points shows 'No item count history', one point a flat line, two or more a step line, including points arriving after mount.",
+      "last_seen_at null renders as an em dash in the list and detail; manual events keep their occurred_at.",
+      "A member (no data_fields.admin) sees no Field schema entry in either nav."
+    ],
+    "outOfScopeEdgeCases": [
+      "Rewriting historical actor_ref values in stored events.",
+      "C5 custom push identity semantics (pending owner decision).",
+      "Live L1-L7 confirmation and PostgreSQL/Meilisearch integration runs (owner-only, skipped offline)."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-v1-4-data-inventory.md",
+      "design-docs/specs/design-v1-4-data-inventory-requirements.md",
+      "impl-plans/conventions.md",
+      "src/telescreen/directory/actors.py",
+      "src/telescreen/ports/directory.py",
+      "src/telescreen/ports/collectors.py",
+      "src/telescreen/inventory/observer.py",
+      "src/telescreen/inventory/queries.py",
+      "src/telescreen/wiring_v14.py",
+      "src/web/src/pages/data/DataDetailSections.tsx",
+      "src/web/src/pages/data/MetadataForm.tsx",
+      "src/web/src/pages/data/DataList.tsx",
+      "src/web/src/pages/data/DataDetail.tsx",
+      "src/web/src/components/ItemCountChart.tsx",
+      "src/web/src/components/CountTabs.tsx",
+      "src/web/src/components/shell/nav.ts",
+      "src/web/src/components/shell/SecondaryPanel.tsx",
+      "src/web/src/api/mock/fixtures/v14.ts"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "v14-p09-live-fixes",
+      "planPath": "impl-plans/active/v14-p09-live-fixes.md",
+      "wave": "A",
+      "mode": "implement",
+      "dependsOn": ["v14-p01-foundation", "v14-p03-ui-foundation", "v14-p04-inventory-core", "v14-p06-ui-pages", "v14-p07-fields-retention"],
+      "writePaths": [
+        "impl-plans/active/v14-p09-live-fixes.md",
+        "src/telescreen/inventory/actors.py",
+        "src/telescreen/wiring_v14.py",
+        "tests/inventory/actors",
+        "tests/e2e/test_flow_v14_live_fixes.py",
+        "src/web/src/pages/data",
+        "src/web/src/components/CountTabs.tsx",
+        "src/web/src/components/CountTabs.test.tsx",
+        "src/web/src/components/ItemCountChart.tsx",
+        "src/web/src/components/ItemCountChart.test.tsx",
+        "src/web/src/components/ui/ui.css",
+        "src/web/src/components/shell/nav.ts",
+        "src/web/src/components/shell/SecondaryPanel.tsx",
+        "src/web/src/shell.test.tsx",
+        "src/web/src/api/types.ts",
+        "src/web/src/api/mock/fixtures/v14.ts",
+        "src/web/src/api/mock/v14.ts",
+        "src/web/src/api/mock/fixtures.test.ts",
+        "src/web/src/api/mock/mock.test.ts",
+        "src/web/scripts/screenshots.ts"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "src/telescreen/wiring_v14.py", "intendedEdit": "Only the AssetQueries construction changes: pass InventoryActorDirectory(parts.actors, parts.collector_configs) instead of parts.actors."},
+        {"path": "src/web/scripts/screenshots.ts", "intendedEdit": "Only if a strict state breaks because of the L5 markup or the fixture changes; never remove a state or theme, never relax strict mode; log each change."},
+        {"path": "src/web/src/api/mock/mock.test.ts", "intendedEdit": "Only assertions broken by the v14 fixture changes (item_count residue, event actors and occurred_at); log each change."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "InventoryActorDirectory resolves collector:<id> to the collector name (kind system) or Telescreen, delegates the other refs in one batch, and keeps length and order; wiring_v14.py changes only the AssetQueries construction.",
+        "tests/e2e/test_flow_v14_live_fixes.py: a push to custom:v14-live-actor gives a discovered event with actor display_name v14-live-actor, occurred_at null and recorded_at set.",
+        "Vitest regression tests for L1 and L3-L7 as listed in the plan; each was red on 3c5c1dd (failure recorded in the Progress Log) and is green now.",
+        "fixtures.test.ts asserts null occurred_at, collector and system actors, a member:<handle> owner and a series of 3 or more points for data-asset-01; v14-shapes.json key sets unchanged; tests/leak/test_ui_fixtures.py passes.",
+        "All verification commands exit 0, including the full pytest and the strict screenshots (0 state-skipped, 0 browser errors); forbidden paths unchanged against 3c5c1dd."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/inventory/actors.py src/telescreen/wiring_v14.py tests/inventory/actors tests/e2e/test_flow_v14_live_fixes.py > /tmp/telescreen-v14-p09-format.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/inventory/actors.py src/telescreen/wiring_v14.py tests/inventory/actors tests/e2e/test_flow_v14_live_fixes.py > /tmp/telescreen-v14-p09-ruff.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v14-p09-typelint.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check > /tmp/telescreen-v14-p09-ty.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/inventory tests/e2e/test_flow_v14_live_fixes.py tests/e2e/test_wiring_v14.py tests/leak 2>&1 | tee /tmp/telescreen-v14-p09-pytest-scoped.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-v14-p09-pytest-all.log 2>&1",
+        "set -o pipefail; (cd src/web && bun install --frozen-lockfile > /tmp/telescreen-v14-p09-web-install.log 2>&1 && bun run typecheck > /tmp/telescreen-v14-p09-web-typecheck.log 2>&1 && bun run test > /tmp/telescreen-v14-p09-web-test.log 2>&1 && bun run build --outDir /tmp/telescreen-v14-p09-web --emptyOutDir > /tmp/telescreen-v14-p09-web-build.log 2>&1 && TELESCREEN_SCREENSHOTS_STRICT=1 bun run screenshots > /tmp/telescreen-v14-p09-screenshots.log 2>&1)",
+        "test \"$(grep -c 'state-skipped' /tmp/telescreen-v14-p09-screenshots.log)\" -eq 0",
+        "git diff --quiet 3c5c1dd -- src/telescreen/directory src/telescreen/ports src/telescreen/inventory/queries.py src/telescreen/inventory/observer.py src/telescreen/inventory/reconcile.py src/telescreen/wiring.py db pyproject.toml uv.lock src/web/package.json src/web/bun.lock",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v14-p09-live-fixes.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v14-p08-wiring-verification",
+      "planPath": "impl-plans/active/v14-p08-wiring-verification.md",
+      "wave": "B",
+      "mode": "re-verify",
+      "dependsOn": ["v14-p09-live-fixes"],
+      "writePaths": [
+        "impl-plans/active/v14-p08-wiring-verification.md",
+        "src/telescreen/wiring.py",
+        "src/telescreen/api/app.py",
+        "tests/e2e/test_api_routes.py",
+        "tests/e2e/test_route_permissions.py",
+        "tests/e2e/test_wiring_v14.py",
+        "tests/e2e/test_route_permissions_v14.py",
+        "tests/e2e/test_flow_v14_inventory.py",
+        "tests/e2e/test_flow_v14_fields.py",
+        "tests/leak/flows_v14.py",
+        "tests/leak/test_leak_matrix_v14.py",
+        "tests/contract/test_data_api_shapes.py"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "src/telescreen/wiring.py", "intendedEdit": "None expected (re-verify). Edit only if a gate fails because of wiring, keep build_container's signature, no include_router, under 1000 lines."},
+        {"path": "tests/e2e/test_flow_v14_inventory.py", "intendedEdit": "None expected; the owner's E3 full-listing test (O2) must pass unchanged."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Every verification command exits 0 on the integrated tree (p09 included): ruff format and check, typelint, ty, scoped and full pytest, uv build, ddl-check, web install, typecheck, vitest, build and strict screenshots (0 state-skipped, 0 browser errors).",
+        "Run-2 Progress Log session with each command, exit status and log path; E1-E7 and gates boxes ticked; Status Completed.",
+        "Step result per conventions 7a: the O2-resolved E3 blocker only in addressedFeedback; findings, risks and priorVerification empty; skipped live and integration tests not listed."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check . > /tmp/telescreen-v14-p08-format.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check . > /tmp/telescreen-v14-p08-ruff.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v14-p08-typelint.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check > /tmp/telescreen-v14-p08-ty.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/e2e tests/leak tests/contract 2>&1 | tee /tmp/telescreen-v14-p08-pytest-scoped.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-v14-p08-pytest-all.log 2>&1",
+        "set -o pipefail; uv build --out-dir /tmp/telescreen-v14-p08-dist > /tmp/telescreen-v14-p08-build.log 2>&1",
+        "mise run ddl-check > /tmp/telescreen-v14-p08-ddl-check.log 2>&1",
+        "set -o pipefail; (cd src/web && bun install --frozen-lockfile > /tmp/telescreen-v14-p08-web-install.log 2>&1 && bun run typecheck > /tmp/telescreen-v14-p08-web-typecheck.log 2>&1 && bun run test > /tmp/telescreen-v14-p08-web-test.log 2>&1 && bun run build --outDir /tmp/telescreen-v14-p08-web --emptyOutDir > /tmp/telescreen-v14-p08-web-build.log 2>&1 && TELESCREEN_SCREENSHOTS_STRICT=1 bun run screenshots > /tmp/telescreen-v14-p08-screenshots.log 2>&1)",
+        "test \"$(grep -c 'state-skipped' /tmp/telescreen-v14-p08-screenshots.log)\" -eq 0",
+        "test \"$(wc -l < src/telescreen/wiring.py)\" -lt 1000 && test \"$(wc -l < src/telescreen/wiring_v14.py)\" -lt 1000",
+        "! grep -n include_router src/telescreen/wiring.py src/telescreen/wiring_v14.py",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v14-p08-wiring-verification.md)\" -eq 0"
+      ]
+    }
+  ]
+}

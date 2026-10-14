@@ -9,6 +9,7 @@ import { TemplateDetail } from "./TemplateDetail";
 import { TemplatesList } from "./TemplatesList";
 import { TokensSettings } from "./TokensSettings";
 import { UsersRoles } from "./UsersRoles";
+import DataFields from "./DataFields";
 import "./settings.css";
 
 const profileModules = import.meta.glob<{ default: Component }>("../profile/ProfilePage.tsx");
@@ -28,6 +29,7 @@ function SettingsNavigation(): JSX.Element {
     ...(auth.can("integrations.read") ? [{ label: "Integrations", href: "/settings/integrations" }] : []),
     ...(auth.can("tokens.read") ? [{ label: "Tokens", href: "/settings/tokens" }] : []),
     ...(auth.can("ownership.read") ? [{ label: "Ownership rules", href: "/settings/ownership" }] : []),
+    ...(auth.can("data_fields.admin") ? [{ label: "Field schema", href: "/settings/data-fields" }] : []),
   ];
   return <nav class="settings-page-nav" aria-label="Settings sections"><For each={links()}>{(item) => <A href={item.href} classList={{ active: location.pathname === item.href || (item.href === "/settings/templates" && location.pathname.startsWith("/settings/templates/")) }}>{item.label}</A>}</For></nav>;
 }
@@ -45,6 +47,7 @@ export default function SettingsPage(): JSX.Element {
     <Match when={params.id === "integrations"}><IntegrationsSettings /></Match>
     <Match when={params.id === "tokens"}><TokensSettings /></Match>
     <Match when={params.id === "ownership"}><OwnershipRules /></Match>
+    <Match when={params.id === "data-fields"}><DataFields /></Match>
     <Match when={params.id === "templates" && params.sub !== undefined}><TemplateDetail name={decodeName(params.sub ?? "")} /></Match>
     <Match when={params.id === "templates"}><TemplatesList /></Match>
     <Match when={params.id === "users"}><UsersRoles /></Match>

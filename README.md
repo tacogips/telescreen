@@ -61,6 +61,25 @@ See the [v1.2 design](design-docs/specs/design-v1-2-notifications-and-identity.m
 See the [v1.3 design](design-docs/specs/design-v1-3-sentry-parity.md) for behavior and the
 masking contract.
 
+## Features (v1.4 data inventory)
+
+- The Data register tracks discovered and manually registered assets. Collector inventory
+  modes select sensitive-only, all, or no discovery; deletion and restoration are recorded
+  only from definitive removal signals and complete reconciliations.
+- List-shaped resources track item fingerprints or counts (`item_keys`, `item_count`, and
+  `removed` on push ingest), while findings track value changes.
+  Admins define typed metadata fields, required values, and purpose, owner, and deletion-date
+  roles; overdue deletion dates appear in the Data area and can notify the owner.
+- The Data area provides asset history, related issues, and masked CSV export. Push ingest
+  remains additive; Police contract 1.2 adds `resource_inventories` entries with a `locator`,
+  optional `item_fingerprints` or `item_count`, and optional `kind`.
+  Data reads and writes use `data.read` and `data.write`; schema administration uses
+  `data_fields.admin`. `TELESCREEN_DATA_OVERDUE_CRON` defaults to `0 9 * * *` and an empty
+  value disables the check.
+
+See the [v1.4 design](design-docs/specs/design-v1-4-data-inventory.md) for behavior and the
+data-handling rules for item keys and metadata values.
+
 Telescreen does not check provider credential validity or reveal raw values (it links to
 the source location only), and it remains read-only on every monitored source.
 
@@ -143,6 +162,22 @@ ownership rules. The v1.3 endpoint families are:
 See the [v1.3 endpoint table](design-docs/specs/design-api-and-ui.md#v13-endpoints) for
 request shapes and permissions.
 
+v1.4 adds the data inventory under `/api/data`:
+
+- Assets (`data.read` to read, `data.write` to change): `GET /api/data/assets`,
+  `GET /api/data/counts`, `GET /api/data/export` (masked CSV),
+  `GET /api/data/resource-assets/{resource_key}`, per-asset `/events`, `/items` and
+  `/item-series`, `POST /api/data/assets` (manual registration), `PATCH`,
+  `PUT /api/data/assets/{id}/fields`, and `/events`, `/mark-deleted` and `/restore`.
+- Field schema: `GET /api/data/fields` (`data.read`),
+  `POST /api/data/fields/validate-values` (`data.write`), and create, update, delete,
+  archive, unarchive and reorder (`data_fields.admin`).
+- The push ingest `/scan` and `/findings` requests and the collector `inventory_mode`
+  (`sensitive_only`, `all`, `off`) change additively.
+
+See the [v1.4 endpoint table](design-docs/specs/design-api-and-ui.md#v14-endpoints) for
+request shapes and permissions.
+
 ## Web application
 
 The SolidJS application is in `src/web`. Install dependencies and run the frontend
@@ -157,7 +192,8 @@ Vite proxies API requests to `http://localhost:8000`; start the Bureau there whe
 against live data. To render every page with masked local fixtures and no backend, run
 `cd src/web && VITE_TELESCREEN_MOCK=1 bun run dev`. The mock data contains masked values.
 Run `cd src/web && bun run screenshots` for the screenshot smoke against the mock API
-(every page in light and dark themes plus the mobile Issues page, 43 images); it needs Chrome/Chromium or `TELESCREEN_SCREENSHOT_BROWSER` and writes images under
+(every page, including the Data pages, in light and dark themes plus the mobile Issues
+page); it needs Chrome/Chromium or `TELESCREEN_SCREENSHOT_BROWSER` and writes images under
 `tmp/ui-screenshots/`. The visual reference is
 [`design-docs/specs/design-ui-sentry.md`](design-docs/specs/design-ui-sentry.md). The
 self-hosted Rubik and Roboto Mono fonts use the OFL licenses in `src/web/public/fonts/`;
@@ -180,6 +216,13 @@ counts, saved views, query autocomplete, bulk actions, and shortcuts; issue deta
 finding navigation, trends, activity, comments, mentions, and external links. The dashboard's
 getting-started checklist links to [Collectors](#collectors), [Notifications](#notifications),
 [Members](#members), and [Alert rules](#alert-rules).
+
+In v1.4 the UI adds the Data area: `/data` lists assets with All, Overdue and Incomplete
+tabs, counts, filters and CSV export; `/data/new` registers an asset manually; and
+`/data/:id` shows the metadata form, timeline, item-count chart, items and related issues.
+Admins edit the field schema in Settings → Field schema (`/settings/data-fields`). Issue
+details link to their data asset, the dashboard shows an overdue-data tile, and collector
+settings choose the inventory mode.
 
 To serve a production build locally, run `cd src/web && bun run build`, then set
 `TELESCREEN_WEB_DIST=src/web/dist` when running `telescreen serve`. The directory must
@@ -206,6 +249,9 @@ v1.3 adds these optional settings; defaults and validation are documented in
 `TELESCREEN_ESCALATING_FACTOR`, `TELESCREEN_WEEKLY_REPORT_CRON`,
 `TELESCREEN_GITHUB_ISSUES_TOKEN`, and `TELESCREEN_GITHUB_ISSUES_REPOS`. The GitHub token
 uses the existing secret-reference format; do not put token values in configuration files.
+
+v1.4 adds `TELESCREEN_DATA_OVERDUE_CRON` (default `0 9 * * *`, UTC; an empty value
+disables the retention overdue check and owner notification).
 
 ### Collectors
 
@@ -296,6 +342,15 @@ the `telescreen` realm and users alice, bob, carol and dave, and PostgreSQL). Th
 running Telescreen against them, signing in through Keycloak, and sending test
 notifications is in the "Local test services" section of `examples/compose/README.md`.
 
+## Database schema
+
+The DDL is designed in the Nodetto desktop app: `db/schema/telescreen.nodetto.jsonl`
+is the source of truth and `db/schema/*.sql` are its PostgreSQL and SQLite exports.
+Change the schema in Nodetto first (`mise run ddl-edit`, then `mise run ddl-export`),
+then update the models and add an Alembic revision; `mise run ddl-check` and the test
+suite reject models that drift from the design. Install Nodetto and `nodetto-cli` with
+`brew install --cask tacogips/tap/nodetto`. Details: `db/schema/README.md`.
+
 ## Testing and checks
 
 Run the Python format, lint, typing, test, and build gates with:
@@ -313,7 +368,12 @@ raw samples, file names and owner emails never reach a sink. The v1.2 flows
 `tests/e2e/test_flow_v12_identity.py` for roles and OIDC sign-in) and
 `tests/leak/test_leak_matrix_v12.py` cover templates, notification sets, role changes, API
 tokens, OIDC sign-ins and the notify-test path, so that raw samples, tokens and secrets
-never reach a sink. Live delivery and sign-in tests for Mailpit, Slack and Keycloak are in
+never reach a sink. The v1.4 flows (`tests/e2e/test_flow_v14_inventory.py`,
+`test_flow_v14_fields.py` and `test_flow_v14_live_fixes.py`), the route-permission walk in
+`tests/e2e/test_route_permissions_v14.py` and `tests/leak/test_leak_matrix_v14.py` cover
+asset discovery, deletion and restoration, item changes, field values, CSV export and
+overdue notifications, so that raw samples and raw item keys never reach a sink. Live
+delivery and sign-in tests for Mailpit, Slack and Keycloak are in
 `tests/live`, marked `live`, and run only when their `TELESCREEN_TEST_*` variables are set
 (see `examples/compose/README.md`). The default test suite is
 offline and uses fakes or in-memory SQLite. Tests requiring

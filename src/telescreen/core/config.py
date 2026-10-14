@@ -95,6 +95,8 @@ class TelescreenSettings:
     weekly_report_cron: str | None = "0 9 * * 1"
     github_issues_token_ref: str | None = None
     github_issues_repos: tuple[str, ...] = ()
+    data_overdue_cron: str | None = "0 9 * * *"
+    inventory_database_url: str | None = None
 
 
 def _read(env: EnvSource, name: str) -> str | None:
@@ -221,6 +223,18 @@ def _weekly_report_cron(env: EnvSource) -> str | None:
     return raw
 
 
+def _data_overdue_cron(env: EnvSource) -> str | None:
+    """Read the optional data overdue schedule, with an empty value disabling it."""
+    raw: str | None = _read(env, "DATA_OVERDUE_CRON")
+    if raw is None:
+        return "0 9 * * *"
+    if not raw.strip():
+        return None
+    if not croniter.is_valid(raw):
+        raise ConfigError("TELESCREEN_DATA_OVERDUE_CRON is invalid")
+    return raw
+
+
 def _github_issues_repos(env: EnvSource) -> tuple[str, ...]:
     """Read the bounded GitHub issue repository allow-list."""
     values: tuple[str, ...] = _comma_values(env, "GITHUB_ISSUES_REPOS")
@@ -285,6 +299,7 @@ def load_settings(env: EnvSource) -> TelescreenSettings:
     )
     return TelescreenSettings(
         database_url=_optional(env, "DATABASE_URL"),
+        inventory_database_url=_optional(env, "INVENTORY_DATABASE_URL"),
         fingerprint_key_ref=fingerprint_key_ref,
         police_signing_key_ref=_optional(env, "POLICE_SIGNING_KEY"),
         police_enrollment_token_ref=_optional(env, "POLICE_ENROLLMENT_TOKEN"),
@@ -345,6 +360,7 @@ def load_settings(env: EnvSource) -> TelescreenSettings:
         escalating_min_findings=_bounded_integer(env, "ESCALATING_MIN_FINDINGS", 10, 100000),
         escalating_factor=_bounded_integer(env, "ESCALATING_FACTOR", 3, 100),
         weekly_report_cron=_weekly_report_cron(env),
+        data_overdue_cron=_data_overdue_cron(env),
         github_issues_token_ref=_optional(env, "GITHUB_ISSUES_TOKEN"),
         github_issues_repos=_github_issues_repos(env),
     )

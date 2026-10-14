@@ -29,6 +29,9 @@ class CollectorConfigRow(Base, kw_only=True):
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    inventory_mode: Mapped[str] = mapped_column(
+        String(16), default="sensitive_only", server_default="sensitive_only"
+    )
 
 
 class ScanJobRow(Base, kw_only=True):

@@ -1,0 +1,518 @@
+{
+  "taskId": "telescreen-v14-20261013-f1",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/data-inventory",
+  "baseBranch": "feat/data-inventory",
+  "remote": "origin",
+  "originalHead": "07c975f2cffec678c016113f7895037f518cc34c",
+  "originalHeadNotes": "Run base. The v1.4 design (design-v1-4-data-inventory.md plus the summary-doc v1.4 sections, the requirements section 7 corrections and the C5 user-qa note), the 8 accepted v14 plans, the impl-plans/README.md v1.4 index and this manifest are committed on feat/data-inventory before fanout; plans then run against that commit.",
+  "evidenceRoot": "tmp/telescreen-v14-20261013-f1",
+  "evidenceRootNotes": "Untracked (gitignored by **/tmp); never staged or committed. Use tmp/telescreen-v14-20261013-f1/<planId>/attempt-<n>/. Command logs go to /tmp/telescreen-v14-<pNN>-*.log and builds to /tmp/telescreen-v14-<pNN>-web or /tmp/telescreen-v14-<pNN>-dist (conventions section 7).",
+  "supersedes": "none (first v1.4 dispatch manifest)",
+  "runScope": "Telescreen v1.4 data inventory (R1-R9 of design-docs/specs/design-v1-4-data-inventory-requirements.md) in one run of 8 plans at base 07c975f: wave 1 p01, p02, p03; wave 2 p04, p05, p06; wave 3 p07; wave 4 p08; then the serial finalization.",
+  "designDocPaths": [
+    "design-docs/specs/design-v1-4-data-inventory.md",
+    "design-docs/specs/design-v1-4-data-inventory-requirements.md",
+    "design-docs/specs/architecture.md",
+    "design-docs/specs/design-data-model.md",
+    "design-docs/specs/design-api-and-ui.md",
+    "design-docs/specs/design-collectors-and-ingestion.md",
+    "design-docs/specs/design-police-contract.md",
+    "design-docs/specs/design-masking.md",
+    "design-docs/specs/design-ui-sentry.md",
+    "design-docs/specs/command.md",
+    "design-docs/user-qa/pending-custom-push-resource-identity.md",
+    "design-docs/user-qa/README.md"
+  ],
+  "planIndexPath": "impl-plans/README.md",
+  "conventionsPath": "impl-plans/conventions.md",
+  "waves": [
+    {"id": "1", "plans": ["v14-p01-foundation", "v14-p02-db", "v14-p03-ui-foundation"]},
+    {"id": "2", "plans": ["v14-p04-inventory-core", "v14-p05-scan-hooks", "v14-p06-ui-pages"], "dependsOn": ["1"]},
+    {"id": "3", "plans": ["v14-p07-fields-retention"], "dependsOn": ["2"]},
+    {"id": "4", "plans": ["v14-p08-wiring-verification"], "dependsOn": ["3"]},
+    {"id": "finalize", "serial": true, "dependsOn": ["4"]}
+  ],
+  "sharedFileOwnership": {
+    "rule": "Design section 13: within each wave writePaths are disjoint and every sharedPaths list is empty. Each plan owns every exact-count or inventory test its change breaks. Workers run in the same working directory and do not commit; a later wave sees the earlier waves' uncommitted changes. Files outside a plan's writePaths are read-only; a defect there is a Reconciliation request in the plan Progress Log naming the owning plan.",
+    "crossWaveHandoffs": "src/web/src/pages/data/index.tsx: p03 (wave 1) writes a Placeholder stub; p06 (wave 2) replaces it inside its src/web/src/pages/data write path. src/web/scripts/screenshots.ts: p03 (wave 1) adds v14States; p08 (wave 4) may only fix strict-run selectors. README.md: p01 only. Design docs and impl-plans/README.md: p08 status lines only.",
+    "routeWalk": "p04 and p07 build their routers directly in tests; p08 registers them via container.routers by copying APIRoute objects, never include_router. tests/api/v12_rbac/** is read-only (fixed MODULES tuple).",
+    "dependencies": "No dependency change. p01 owns pyproject.toml, uv.lock, mise.toml, .gitignore, src/web/package.json and src/web/bun.lock and keeps them byte-identical."
+  },
+  "serialFinalization": {
+    "when": "After v14-p08-wiring-verification is integration-accepted.",
+    "steps": [
+      "git mv impl-plans/active/v14-p*.md impl-plans/completed/ (all 8 plans; each Status Completed with 0 open Completion Criteria boxes).",
+      "git mv impl-plans/active/telescreen-v14-20261013-f1-dispatch.json impl-plans/completed/dispatch/.",
+      "Move the v1.4 rows of impl-plans/README.md to its completed section with completed/ paths.",
+      "Rerun on the final tree: mise run ci; mise run ddl-check; cd src/web && bun install --frozen-lockfile && bun run typecheck && bun run test && bun run build && TELESCREEN_SCREENSHOTS_STRICT=1 bun run screenshots; record exit codes and log paths.",
+      "Only if every gate exits 0: commit on feat/data-inventory (no secrets, no tmp/ or dist/ files, no unrelated files) and git push origin feat/data-inventory; then git rev-list --count @{u}..HEAD -> 0."
+    ]
+  },
+  "reviewContext": {
+    "issueReference": "workflowInput:telescreen-v1.4-data-inventory (Telescreen v1.4: data inventory; workflowExecutionId opus-luna-design-and-implement-review-loop-session-15; plans accepted by step5-impl-plan-review in comm-000749)",
+    "userProblem": "The owner asked (translated) whether Telescreen holds a data management list of where data lives and its audit history (when added, when deleted). It does not (requirements section 1, re-verified in design section 1). v1.4 adds a data asset register with append-only lifecycle events, list-item change tracking, an admin-defined metadata field schema with required flags and validated values, retention overdue handling, a Data UI area and a masked CSV export.",
+    "requiredOutcomes": [
+      "R1-R3: data_assets register (DATA-n) discovered from every scan path per collector inventory_mode (sensitive_only, all, off) or registered manually; deletion and restoration only from definitive removal signals and the SUCCEEDED-sweep and full-listing reconciliations; manual mark deleted and restore.",
+      "R4: item keys or counts on the collector port, push ingest (additive) and police contract 1.2; item keys HMAC'd on receipt (Fingerprinter.item_key, separate domain label); finding-fingerprint value diffs for every asset; manual partial-change events.",
+      "R5-R6: admin field schema (types, options, required, order, archive, roles purpose/owner/deletion_due, immutable keys, type change only without values); validated values; incomplete flag; metadata_changed events and audit; values with detected secrets rejected 422 without echo.",
+      "R7: overdue tab, dashboard tile and one owner notification per due date (system.data_overdue).",
+      "R8-R9: Data UI (list with tabs and counts, filters, detail, metadata form, timeline, item-count chart, items, related issues), schema editor, registration, issue-to-asset link, masked CSV export; every member write audited; events append-only (PostgreSQL trigger).",
+      "Nodetto document changed first, exports regenerated, models and exactly one Alembic revision 0005_v1_4 match; mise run ddl-check passes.",
+      "Every new route declares exactly one permission (22 routes, test_route_permissions_v14.py); leak flows 1-7 cover assets, events, items, field values, export and overdue notifications; E2E E1-E7 pass offline.",
+      "mise run ci passes offline; src/web typecheck, vitest, build and strict screenshots (0 state-skipped, 0 browser errors, light and dark) pass; README v1.4 features, design status lines and impl-plans index updated; v14 plans archived."
+    ],
+    "nonGoals": [
+      "Requirements section 5: data lineage, classification beyond existing detectors, deletion execution, per-item metadata, versioned field schemas.",
+      "No Meilisearch indexing of assets (D21); no new notification category (D18); no LLM detector for metadata (D14).",
+      "No fix of the C5 custom push identity mismatch (pending owner decision).",
+      "No dependency change; no edit of Alembic 0001-0004; no weakening of tools/typelint.py, ruff ANN/PGH or ty strictness; no per-file-ignore entries."
+    ],
+    "constraints": [
+      "AGENTS.md / CLAUDE.md: English only, no emojis; plan files under 400 lines; every Python file under 1000 lines (issues/service.py split via issues/external_scan.py; v1.4 wiring in wiring_v14.py).",
+      "Strict typing (no Any, object, dict or **kwargs; dataclasses or enums; no type-ignore).",
+      "Raw detected values, raw item keys and source content are never persisted, logged, indexed, notified, exported or returned; only masked text, 12-hex prefixes and keyed HMAC fingerprints.",
+      "Telescreen stays read-only on sources; lifecycle events append-only; incomplete or failed scans never infer deletion or item removal.",
+      "Default uv run pytest passes offline; integration and live tests skip without TELESCREEN_TEST_* and are never listed as verification.",
+      "Conventions 2, 7 and 7a: write only inside writePaths; per-edit fresh read and pre/post SHA-256 in the Progress Log; fixed findings only in addressedFeedback; verification lists only final passing commands.",
+      "Workers never run git checkout/restore/stash/reset/clean/commit/add/push; only the serial finalization commits and pushes to feat/data-inventory."
+    ],
+    "designDecisionsAndRationale": [
+      "D1: new L3 package telescreen.inventory owns the five tables; API prefix /api/data; UI label Data.",
+      "D2: one asset per resource_key (issue identity); registered assets use resource_key('registered:' + source, locator); UNIQUE(resource_key) makes a duplicate registration 409.",
+      "D3/D8: collector_configs.inventory_mode column; switching to off turns present discovered assets unknown (tracking_stopped) and turning it back on resumes (tracking_resumed).",
+      "D4-D6/D11: any non-removed observation proves presence; removal only from removed observations and the SUCCEEDED-sweep and full-listing reconciliations (only when no listed ref was skipped); additions on every observation, removals and count changes only on complete ones.",
+      "D10: item_fingerprint = HMAC(HMAC(identity key v1, 'telescreen:data-item:v1'), resource_key + NUL + raw key); stable across key rotation; only 12-hex prefixes leave the Bureau.",
+      "D12: value diffs over finding fingerprints with a silent re-baseline on key-version change.",
+      "D15-D17: incomplete and overdue computed in SQL; overdue_notified_for stores the notified due date so a changed date notifies again.",
+      "D22: no literal segment under /api/data/assets/ (counts, export and resource-assets lookup live elsewhere) to avoid route capture.",
+      "D23: event repository is insert-only; PostgreSQL trigger blocks UPDATE/DELETE on data_asset_events.",
+      "C3: push ingest has no JSON Schema, so only the police contract is versioned (1.2); ingest v1 bodies get additive optional members.",
+      "Read paths resolve owners with ActorDirectory.display, never RecipientResolver.assignee_of (unmapped RECIPIENT_UNKNOWN would be 500); writes map RECIPIENT_UNKNOWN to unknown_reference / 422; the overdue handler falls back to fallback_owner."
+    ],
+    "intentionalTradeoffs": [
+      "C5 identity mismatch is kept: one locator pushed via /scan and /findings becomes two assets until the owner decides.",
+      "Item diffs accept up to 100000 keys per complete observation (push) and 10000 fingerprints per police inventory; performance is a residual risk.",
+      "Strict screenshot state issue-data-link has no action, so the asset link render is proven by the p06 vitest (pages/issues/IssueDetail.test.tsx), not the screenshot run.",
+      "Wave-1 and wave-2 plans treat the full pytest suite as informational because parallel siblings are mid-change; p07 and p08 require it to pass.",
+      "p04/p07 routers stay unregistered until p08 wires them, so route-walk proof comes only in wave 4."
+    ],
+    "supportedEdgeCases": [
+      "A removed observation for an unknown or already deleted asset is a no-op.",
+      "Out-of-order observations never move last_seen_at backwards.",
+      "A previously removed item is reopened, never re-inserted (unique constraint).",
+      "Discovered asset name only changes from a non-empty scan title; empty-title creation uses display_locator.",
+      "Deactivated-member or deleted-team owners give 200 on list, detail and export; overdue handler falls back and still marks and audits.",
+      "A per-asset send failure in the overdue run rolls back only that asset; the keyset cursor guarantees termination and each asset is attempted once per run.",
+      "Concurrent registration race (IntegrityError after pre-check) returns 409, not 500.",
+      "GET /api/data/resource-assets/{key} returns {asset: null} with 200 when absent; 422 unless 64 lowercase hex.",
+      "CSV cells starting with =, +, -, @, tab or CR are prefixed with a quote; at most 10000 rows with X-Telescreen-Truncated.",
+      "Police 1.0 and 1.1 envelopes still validate; old ingest payloads keep their response shape."
+    ],
+    "outOfScopeEdgeCases": [
+      "Unifying /scan and /findings custom resource identity (C5).",
+      "Live runs against Keycloak, Mailpit, Slack or PostgreSQL in default CI (owner-only, TELESCREEN_TEST_* variables).",
+      "Per-item metadata, lineage between assets and versioned field schemas (requirements section 5)."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-v1-4-data-inventory.md",
+      "design-docs/specs/design-v1-4-data-inventory-requirements.md",
+      "design-docs/user-qa/pending-custom-push-resource-identity.md",
+      "impl-plans/conventions.md",
+      "impl-plans/README.md",
+      "db/schema/README.md",
+      "src/telescreen/issues/service.py",
+      "src/telescreen/issues/scan.py",
+      "src/telescreen/issues/ingest.py",
+      "src/telescreen/api/routers/ingest.py",
+      "src/telescreen/collectors/tasks.py",
+      "src/telescreen/workflow/mapreduce/reduce.py",
+      "src/telescreen/police/results.py",
+      "src/telescreen/wiring.py",
+      "src/telescreen/wiring_v13.py",
+      "src/web/src/routes.tsx",
+      "src/web/src/api/mock/router.ts",
+      "src/web/scripts/screenshots.ts"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "v14-p01-foundation",
+      "planPath": "impl-plans/active/v14-p01-foundation.md",
+      "wave": "1",
+      "dependsOn": [],
+      "writePaths": [
+        "impl-plans/active/v14-p01-foundation.md",
+        "src/telescreen/core/vocabulary.py",
+        "src/telescreen/core/permissions.py",
+        "src/telescreen/core/config.py",
+        "src/telescreen/ports/inventory.py",
+        "src/telescreen/ports/collectors.py",
+        "src/telescreen/ports/findings.py",
+        "src/telescreen/ports/notifications.py",
+        "src/telescreen/masking/fingerprint.py",
+        "src/telescreen/notifications/templates/builtins.py",
+        "src/telescreen/notifications/templates/variables.py",
+        "src/telescreen/notifications/templates/synthetic.py",
+        "src/telescreen/contracts/police/v1",
+        "src/telescreen_police_sdk/models.py",
+        "src/telescreen_police_sdk/masking.py",
+        "examples/compose/.env.example",
+        "README.md",
+        "src/telescreen/api/common/errors.py",
+        "src/telescreen/contracts/validator.py",
+        "pyproject.toml",
+        "uv.lock",
+        "mise.toml",
+        ".gitignore",
+        "src/web/package.json",
+        "src/web/bun.lock",
+        "tests/core/v14",
+        "tests/ports/v14",
+        "tests/masking/v14",
+        "tests/notifications/v14",
+        "tests/contract/test_schemas.py",
+        "tests/contract/test_sdk_contract.py",
+        "tests/contract/test_v14_contract.py",
+        "tests/police_sdk/test_v11_exposures.py",
+        "tests/police_sdk/test_v14_inventories.py",
+        "tests/notifications/v12/test_builtin_parity.py",
+        "tests/core/v12/test_permissions_and_oidc_settings.py"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "pyproject.toml", "intendedEdit": "Owned per the intake dependency rule; expected byte-identical (no dependency change). Same for uv.lock, mise.toml, .gitignore, src/web/package.json and src/web/bun.lock."},
+        {"path": "README.md", "intendedEdit": "Add the v1.4 data inventory feature section written from the design; p01 is the only README editor in this run."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "All 13 deliverables present; the ports/inventory.py signatures match deliverable 4 exactly; every new DTO field is last and defaulted so existing constructors work.",
+        "Permissions: viewer data.read; responder data.read and data.write; admin also data_fields.admin. http_status_for(FIELD_IN_USE) == 409; REQUIRED_FIELD_MISSING and INVALID_FIELD_VALUE map to 422.",
+        "system.data_overdue built-in uses dotted data.* paths; allowed_paths(DATA_OVERDUE) equals the five data.* paths; the synthetic render leaves no {{.",
+        "Police contract 1.2 schema, example, validator registration and SDK ResourceInventory/item_fingerprint with CONTRACT_VERSION 1.2; 1.0 and 1.1 examples still validate.",
+        "Root and web package files unchanged; scoped checks pass and the scoped typelint grep is empty; every Completion Criteria box ticked; Progress Log with hashes and command evidence."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/core src/telescreen/ports src/telescreen/masking src/telescreen/notifications/templates src/telescreen/api/common/errors.py src/telescreen/contracts src/telescreen_police_sdk tests/core tests/ports tests/masking tests/notifications tests/contract tests/police_sdk 2>&1 | tee /tmp/telescreen-v14-p01-format.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/core src/telescreen/ports src/telescreen/masking src/telescreen/notifications/templates src/telescreen/api/common/errors.py src/telescreen/contracts src/telescreen_police_sdk tests/core tests/ports tests/masking tests/notifications tests/contract tests/police_sdk 2>&1 | tee /tmp/telescreen-v14-p01-ruff.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/core src/telescreen/ports src/telescreen/masking src/telescreen/notifications/templates src/telescreen/api/common/errors.py src/telescreen/contracts src/telescreen_police_sdk tests/core tests/ports tests/masking tests/notifications tests/contract tests/police_sdk 2>&1 | tee /tmp/telescreen-v14-p01-ty.log",
+        "export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v14-p01-typelint.log 2>&1; ! grep -E '^(src/telescreen/(core|ports|masking|notifications/templates|api/common/errors.py|contracts)|src/telescreen_police_sdk|tests/(core|ports|masking|notifications|contract|police_sdk))' /tmp/telescreen-v14-p01-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/core tests/ports tests/masking tests/notifications tests/contract tests/police_sdk 2>&1 | tee /tmp/telescreen-v14-p01-pytest.log",
+        "git diff --quiet HEAD -- pyproject.toml uv.lock mise.toml .gitignore src/web/package.json src/web/bun.lock",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v14-p01-foundation.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v14-p02-db",
+      "planPath": "impl-plans/active/v14-p02-db.md",
+      "wave": "1",
+      "dependsOn": [],
+      "writePaths": [
+        "impl-plans/active/v14-p02-db.md",
+        "db/schema/telescreen.nodetto.jsonl",
+        "db/schema/telescreen.postgresql.sql",
+        "db/schema/telescreen.sqlite.sql",
+        "src/telescreen/db/models",
+        "src/telescreen/db/migrations/versions/0005_v1_4.py",
+        "tests/db"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "db/schema/telescreen.nodetto.jsonl", "intendedEdit": "Source of truth edited first: frame f-data-inventory, five erd.table elements, collector_configs.inventory_mode column and six logical erd.relation elements; then nodetto-cli validate, nodetto-cli arrange --write and mise run ddl-export regenerate the two SQL exports."},
+        {"path": "tests/db", "intendedEdit": "tests/db/test_models.py EXPECTED_TABLES 48 -> 53 plus minimal-row inserts; new tests/db/test_v14_migration.py; tests/db/test_nodetto_schema.py passes unchanged."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Nodetto document has the frame, the 5 tables, the inventory_mode column and the 6 logical relations with exact index names; exports regenerated; mise run ddl-check exits 0.",
+        "53 tables in metadata; 0005_v1_4 (down_revision 0004_v1_3) is idempotent, seeds counter data_asset_number, installs the PostgreSQL append-only trigger and downgrades cleanly.",
+        "Alembic 0001-0004 unchanged; model files under 1000 lines; every Completion Criteria box ticked; Progress Log with hashes and command evidence."
+      ],
+      "verification": [
+        "nodetto-cli validate db/schema/telescreen.nodetto.jsonl > /tmp/telescreen-v14-p02-validate.log 2>&1",
+        "mise run ddl-check > /tmp/telescreen-v14-p02-ddl-check.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/db tests/db 2>&1 | tee /tmp/telescreen-v14-p02-format.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/db tests/db 2>&1 | tee /tmp/telescreen-v14-p02-ruff.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/db tests/db 2>&1 | tee /tmp/telescreen-v14-p02-ty.log",
+        "export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v14-p02-typelint.log 2>&1; ! grep -E '^(src/telescreen/db|tests/db)' /tmp/telescreen-v14-p02-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/db 2>&1 | tee /tmp/telescreen-v14-p02-pytest.log",
+        "test -z \"$(git diff --name-only HEAD -- src/telescreen/db/migrations/versions/0001_initial.py src/telescreen/db/migrations/versions/0002_v1_1.py src/telescreen/db/migrations/versions/0003_v1_2.py src/telescreen/db/migrations/versions/0004_v1_3.py)\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v14-p02-db.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v14-p03-ui-foundation",
+      "planPath": "impl-plans/active/v14-p03-ui-foundation.md",
+      "wave": "1",
+      "dependsOn": [],
+      "writePaths": [
+        "impl-plans/active/v14-p03-ui-foundation.md",
+        "src/web/src/api",
+        "src/web/src/components",
+        "src/web/src/routes.tsx",
+        "src/web/src/shell.test.tsx",
+        "src/web/src/pages/data/index.tsx",
+        "src/web/scripts/screenshots.ts",
+        "tests/leak/test_ui_fixtures.py"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "src/web/src/pages/data/index.tsx", "intendedEdit": "Wave-1 Placeholder stub titled Data; v14-p06-ui-pages replaces it in wave 2 inside its src/web/src/pages/data write path (explicit cross-wave handoff)."},
+        {"path": "src/web/scripts/screenshots.ts", "intendedEdit": "Append the v14States array with the binding accessible names; v14-p08-wiring-verification may later fix only strict-run selectors in wave 4."},
+        {"path": "src/web/src/api", "intendedEdit": "Includes the mock auth permissions in api/mock/router.ts and mockRoleMatrix in api/mock/fixtures/v12.ts (data.read, data.write, data_fields.admin), collector inventory_mode, fixtures/v14.ts, v14.ts and fixtures/v14-shapes.json."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Types, dataApi, mock routes, fixtures and v14-shapes.json cover every route and shape of design 9 and 9.1 with exact field names and nullability; the mock admin principal and role matrix carry the three v1.4 permissions.",
+        "CountTabs, ItemCountChart, the Data area after Alerts, the Database rail icon and the nav entries exist with tests.",
+        "v14States added with the binding names; typecheck, vitest, build, non-strict screenshots (0 browser errors; data-* states may skip until p06) and tests/leak/test_ui_fixtures.py pass.",
+        "No package.json or bun.lock change; every Completion Criteria box ticked; Progress Log with hashes and command evidence."
+      ],
+      "verification": [
+        "set -o pipefail; (cd src/web && bun install --frozen-lockfile > /tmp/telescreen-v14-p03-install.log 2>&1)",
+        "set -o pipefail; (cd src/web && bun run typecheck > /tmp/telescreen-v14-p03-typecheck.log 2>&1)",
+        "set -o pipefail; (cd src/web && bun run test > /tmp/telescreen-v14-p03-vitest.log 2>&1)",
+        "set -o pipefail; (cd src/web && bun run build --outDir /tmp/telescreen-v14-p03-web --emptyOutDir > /tmp/telescreen-v14-p03-build.log 2>&1)",
+        "set -o pipefail; (cd src/web && bun run screenshots > /tmp/telescreen-v14-p03-screenshots.log 2>&1)",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/leak/test_ui_fixtures.py 2>&1 | tee /tmp/telescreen-v14-p03-ui-fixtures.log",
+        "git diff --quiet HEAD -- src/web/package.json src/web/bun.lock",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v14-p03-ui-foundation.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v14-p04-inventory-core",
+      "planPath": "impl-plans/active/v14-p04-inventory-core.md",
+      "wave": "2",
+      "dependsOn": ["v14-p01-foundation", "v14-p02-db"],
+      "writePaths": [
+        "impl-plans/active/v14-p04-inventory-core.md",
+        "src/telescreen/inventory/__init__.py",
+        "src/telescreen/inventory/repository.py",
+        "src/telescreen/inventory/lifecycle.py",
+        "src/telescreen/inventory/items.py",
+        "src/telescreen/inventory/observer.py",
+        "src/telescreen/inventory/reconcile.py",
+        "src/telescreen/inventory/queries.py",
+        "src/telescreen/inventory/queries_series.py",
+        "src/telescreen/inventory/export.py",
+        "src/telescreen/inventory/assets.py",
+        "src/telescreen/api/routers/data_common.py",
+        "src/telescreen/api/routers/data_assets.py",
+        "src/telescreen/api/routers/data_asset_detail.py",
+        "tests/inventory/core",
+        "tests/api/v14_data_assets"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "src/telescreen/inventory/queries_series.py", "intendedEdit": "Optional split of the trend and series helpers if queries.py nears 800 lines; record the split in the Progress Log."},
+        {"path": "src/telescreen/inventory/repository.py", "intendedEdit": "Pins DataEventDraft and InventoryRepository (insert-only events); v14-p07 imports it read-only in wave 3 and re-runs tests/inventory and tests/api/v14_data_assets."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Repository, items, lifecycle, observer (design 5.2), reconciler (sweep, listing, stop_tracking), queries (tabs, filters, sorts, keyset paging, computed incomplete/overdue, item_trend), export (design 9.2) and AssetService implemented with the pinned contracts unchanged.",
+        "AssetQueries(issues: ResourceIssueReader, actors: ActorDirectory) resolves owner display with one ActorDirectory.display call per page; RecipientResolver.assignee_of is never called on read paths; stale member and team owners give 200 from list, detail and export.",
+        "12 routes in data_assets.py and data_asset_detail.py, each with exactly one permission; no literal segment under /api/data/assets/; 404 for unknown ids; q with a sample secret is 422 with no echo; each write audited.",
+        "Every listed test exists and passes; no file exceeds 1000 lines; every Completion Criteria box ticked; Progress Log with hashes and command evidence."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/inventory src/telescreen/api/routers/data_common.py src/telescreen/api/routers/data_assets.py src/telescreen/api/routers/data_asset_detail.py tests/inventory/core tests/api/v14_data_assets 2>&1 | tee /tmp/telescreen-v14-p04-format.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/inventory src/telescreen/api/routers/data_common.py src/telescreen/api/routers/data_assets.py src/telescreen/api/routers/data_asset_detail.py tests/inventory/core tests/api/v14_data_assets 2>&1 | tee /tmp/telescreen-v14-p04-ruff.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/inventory src/telescreen/api/routers/data_common.py src/telescreen/api/routers/data_assets.py src/telescreen/api/routers/data_asset_detail.py tests/inventory/core tests/api/v14_data_assets 2>&1 | tee /tmp/telescreen-v14-p04-ty.log",
+        "export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v14-p04-typelint.log 2>&1; ! grep -E '^(src/telescreen/inventory|src/telescreen/api/routers/data_|tests/inventory/core|tests/api/v14_data_assets)' /tmp/telescreen-v14-p04-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/inventory/core tests/api/v14_data_assets 2>&1 | tee /tmp/telescreen-v14-p04-pytest.log",
+        "wc -l src/telescreen/inventory/*.py src/telescreen/api/routers/data_common.py src/telescreen/api/routers/data_assets.py src/telescreen/api/routers/data_asset_detail.py > /tmp/telescreen-v14-p04-wc.log; ! awk '$2 != \"total\" && $1 >= 1000' /tmp/telescreen-v14-p04-wc.log | grep -q .",
+        "! grep -rn assignee_of src/telescreen/inventory/queries.py src/telescreen/inventory/export.py src/telescreen/api/routers/data_common.py src/telescreen/api/routers/data_assets.py src/telescreen/api/routers/data_asset_detail.py",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v14-p04-inventory-core.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v14-p05-scan-hooks",
+      "planPath": "impl-plans/active/v14-p05-scan-hooks.md",
+      "wave": "2",
+      "dependsOn": ["v14-p01-foundation", "v14-p02-db"],
+      "writePaths": [
+        "impl-plans/active/v14-p05-scan-hooks.md",
+        "src/telescreen/issues/scan.py",
+        "src/telescreen/issues/service.py",
+        "src/telescreen/issues/external_scan.py",
+        "src/telescreen/issues/ingest.py",
+        "src/telescreen/api/routers/ingest.py",
+        "src/telescreen/api/routers/collectors.py",
+        "src/telescreen/police/results.py",
+        "src/telescreen/workflow/mapreduce/reduce.py",
+        "src/telescreen/collectors/tasks.py",
+        "src/telescreen/collectors/service.py",
+        "src/telescreen/collectors/repository.py",
+        "src/telescreen/collectors/google/adapter.py",
+        "tests/issues/v14_hooks",
+        "tests/collectors/v14",
+        "tests/collectors/core/test_core.py",
+        "tests/police/v14",
+        "tests/workflow/v14",
+        "tests/api/v14_ingest"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "src/telescreen/issues/service.py", "intendedEdit": "First move record_external unchanged into issues/external_scan.py:record_external_scan with a one-line delegate (IssueRecorder unchanged); then add the defaulted inventory field and the observe call at the end of record_scan; stays under 1000 lines."},
+        {"path": "tests/collectors/core/test_core.py", "intendedEdit": "Only supply or assert inventory_mode; no other change."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "record_external split with behavior unchanged; the observer hook lives in record_scan only, inside the caller's transaction, after issue processing, for complete, incomplete, skipped, removed and external scans.",
+        "Raw item keys are keyed via Fingerprinter.item_key in issues/scan.py before ResourceScan is built and never logged; police inventories re-keyed per resource.",
+        "Push ingest additive members (removed, item_keys, item_count, kind; findings item_fingerprints, item_count, kind) validated with 422 and no echo; old payloads keep their responses.",
+        "Police 1.2 inventories parsed for detect and scan_shard with inventories_dropped audited; reduce calls reconcile_sweep only for SUCCEEDED jobs; full listing calls reconcile_listing only when no ref was skipped; inventory_mode persisted, defaulted, kept on omission and off triggers stop_tracking once; gsheets complete fetch reports a row count.",
+        "Existing tests under tests/issues, tests/collectors, tests/police and tests/workflow pass; issues/service.py under 1000 lines; every Completion Criteria box ticked; Progress Log with hashes and command evidence."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/issues/scan.py src/telescreen/issues/service.py src/telescreen/issues/external_scan.py src/telescreen/issues/ingest.py src/telescreen/api/routers/ingest.py src/telescreen/api/routers/collectors.py src/telescreen/police/results.py src/telescreen/workflow/mapreduce/reduce.py src/telescreen/collectors/tasks.py src/telescreen/collectors/service.py src/telescreen/collectors/repository.py src/telescreen/collectors/google/adapter.py tests/issues tests/collectors tests/police tests/workflow tests/api/v14_ingest 2>&1 | tee /tmp/telescreen-v14-p05-format.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/issues/scan.py src/telescreen/issues/service.py src/telescreen/issues/external_scan.py src/telescreen/issues/ingest.py src/telescreen/api/routers/ingest.py src/telescreen/api/routers/collectors.py src/telescreen/police/results.py src/telescreen/workflow/mapreduce/reduce.py src/telescreen/collectors/tasks.py src/telescreen/collectors/service.py src/telescreen/collectors/repository.py src/telescreen/collectors/google/adapter.py tests/issues tests/collectors tests/police tests/workflow tests/api/v14_ingest 2>&1 | tee /tmp/telescreen-v14-p05-ruff.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/issues/scan.py src/telescreen/issues/service.py src/telescreen/issues/external_scan.py src/telescreen/issues/ingest.py src/telescreen/api/routers/ingest.py src/telescreen/api/routers/collectors.py src/telescreen/police/results.py src/telescreen/workflow/mapreduce/reduce.py src/telescreen/collectors/tasks.py src/telescreen/collectors/service.py src/telescreen/collectors/repository.py src/telescreen/collectors/google/adapter.py tests/issues tests/collectors tests/police tests/workflow tests/api/v14_ingest 2>&1 | tee /tmp/telescreen-v14-p05-ty.log",
+        "export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v14-p05-typelint.log 2>&1; ! grep -E '^(src/telescreen/(issues|api/routers/(ingest|collectors)|police/results|workflow/mapreduce/reduce|collectors)|tests/(issues/v14_hooks|collectors|police/v14|workflow/v14|api/v14_ingest))' /tmp/telescreen-v14-p05-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/issues tests/collectors tests/police tests/workflow tests/api/v14_ingest 2>&1 | tee /tmp/telescreen-v14-p05-pytest.log",
+        "test \"$(wc -l < src/telescreen/issues/service.py)\" -lt 1000 && test \"$(wc -l < src/telescreen/issues/external_scan.py)\" -lt 1000",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v14-p05-scan-hooks.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v14-p06-ui-pages",
+      "planPath": "impl-plans/active/v14-p06-ui-pages.md",
+      "wave": "2",
+      "dependsOn": ["v14-p03-ui-foundation"],
+      "writePaths": [
+        "impl-plans/active/v14-p06-ui-pages.md",
+        "src/web/src/pages/data",
+        "src/web/src/pages/settings/index.tsx",
+        "src/web/src/pages/settings/index.test.tsx",
+        "src/web/src/pages/settings/DataFields.tsx",
+        "src/web/src/pages/settings/DataFields.test.tsx",
+        "src/web/src/pages/issues/detail/IssueDetailSidebar.tsx",
+        "src/web/src/pages/issues/IssueDetail.test.tsx",
+        "src/web/src/pages/dashboard/index.tsx",
+        "src/web/src/pages/dashboard/index.test.tsx",
+        "src/web/src/pages/collectors/index.tsx",
+        "src/web/src/pages/collectors/index.test.tsx"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "src/web/src/pages/data", "intendedEdit": "Replace the p03 wave-1 stub index.tsx (cross-wave handoff) and add DataList, DataDetail, MetadataForm, DataRegister and their tests."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Data list (CountTabs with counts, filters, table, Load more, Export CSV, Register data), detail (actions, incomplete banner, MetadataForm with validate-values before PUT, timeline, ItemCountChart, items/values tabs, related issues), registration, Field schema editor under Settings, issue Data asset link, dashboard Overdue data tile and collector Inventory mode select are implemented.",
+        "Pages render the binding accessible names of p03 v14States; write actions gated by data.write, the schema page and link by data_fields.admin; server errors render without echo.",
+        "No edits to src/web/src/api, components, routes.tsx or scripts; no new dependency.",
+        "Typecheck, vitest, build and strict screenshots pass with 0 state-skipped lines and 0 browser errors; every Completion Criteria box ticked; Progress Log with hashes and command evidence."
+      ],
+      "verification": [
+        "set -o pipefail; (cd src/web && bun install --frozen-lockfile > /tmp/telescreen-v14-p06-install.log 2>&1)",
+        "set -o pipefail; (cd src/web && bun run typecheck > /tmp/telescreen-v14-p06-typecheck.log 2>&1)",
+        "set -o pipefail; (cd src/web && bun run test > /tmp/telescreen-v14-p06-vitest.log 2>&1)",
+        "set -o pipefail; (cd src/web && bun run build --outDir /tmp/telescreen-v14-p06-web --emptyOutDir > /tmp/telescreen-v14-p06-build.log 2>&1)",
+        "set -o pipefail; (cd src/web && TELESCREEN_SCREENSHOTS_STRICT=1 bun run screenshots > /tmp/telescreen-v14-p06-screenshots.log 2>&1)",
+        "test \"$(grep -c 'state-skipped' /tmp/telescreen-v14-p06-screenshots.log)\" -eq 0",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v14-p06-ui-pages.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v14-p07-fields-retention",
+      "planPath": "impl-plans/active/v14-p07-fields-retention.md",
+      "wave": "3",
+      "dependsOn": ["v14-p04-inventory-core"],
+      "writePaths": [
+        "impl-plans/active/v14-p07-fields-retention.md",
+        "src/telescreen/inventory/fields.py",
+        "src/telescreen/inventory/values.py",
+        "src/telescreen/inventory/registration.py",
+        "src/telescreen/inventory/retention.py",
+        "src/telescreen/issues/asset_owner.py",
+        "src/telescreen/api/routers/data_fields.py",
+        "src/telescreen/api/routers/data_asset_values.py",
+        "tests/inventory/fields",
+        "tests/inventory/retention",
+        "tests/issues/v14_asset_owner",
+        "tests/api/v14_data_fields"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "FieldService implements design 7.1 (key pattern and immutability, options, roles, one field per role, max 100, reorder exact set, field_in_use 409s) with audit records holding ids, enums, counts and keys only.",
+        "ValueValidator maps RECIPIENT_UNKNOWN and malformed refs to unknown_reference (422 invalid_field_value on PUT, never 500); Redactor hits give raw_value_detected with no echo; ValueService writes metadata_changed events and one audit record; required check over the resulting state.",
+        "RegistrationService returns 409 on a pre-check duplicate and on an IntegrityError insert race; IssueAssetOwnerResolver implements fallback_owner (open issue owner, then ownership rule, else None).",
+        "DataOverdueProvider and DataOverdueHandler walk a keyset cursor (id > last_id, limit 200) so each asset is attempted once per run; stale owner refs fall back to fallback_owner and are still marked and audited; team owners get two sends; one notification per due date.",
+        "Field and value routers (10 routes) each declare exactly one permission with reorder and validate-values registered before {field_id}; every test passes including p04 suites; no file exceeds 1000 lines; every Completion Criteria box ticked; Progress Log with hashes and command evidence."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/inventory/fields.py src/telescreen/inventory/values.py src/telescreen/inventory/registration.py src/telescreen/inventory/retention.py src/telescreen/issues/asset_owner.py src/telescreen/api/routers/data_fields.py src/telescreen/api/routers/data_asset_values.py tests/inventory tests/issues/v14_asset_owner tests/api/v14_data_fields tests/api/v14_data_assets 2>&1 | tee /tmp/telescreen-v14-p07-format.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/inventory/fields.py src/telescreen/inventory/values.py src/telescreen/inventory/registration.py src/telescreen/inventory/retention.py src/telescreen/issues/asset_owner.py src/telescreen/api/routers/data_fields.py src/telescreen/api/routers/data_asset_values.py tests/inventory tests/issues/v14_asset_owner tests/api/v14_data_fields tests/api/v14_data_assets 2>&1 | tee /tmp/telescreen-v14-p07-ruff.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/inventory/fields.py src/telescreen/inventory/values.py src/telescreen/inventory/registration.py src/telescreen/inventory/retention.py src/telescreen/issues/asset_owner.py src/telescreen/api/routers/data_fields.py src/telescreen/api/routers/data_asset_values.py tests/inventory tests/issues/v14_asset_owner tests/api/v14_data_fields tests/api/v14_data_assets 2>&1 | tee /tmp/telescreen-v14-p07-ty.log",
+        "export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v14-p07-typelint.log 2>&1; ! grep -E '^(src/telescreen/inventory/(fields|values|registration|retention)|src/telescreen/issues/asset_owner|src/telescreen/api/routers/data_(fields|asset_values)|tests/inventory/(fields|retention)|tests/issues/v14_asset_owner|tests/api/v14_data_fields)' /tmp/telescreen-v14-p07-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/inventory tests/issues/v14_asset_owner tests/api/v14_data_fields tests/api/v14_data_assets 2>&1 | tee /tmp/telescreen-v14-p07-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-v14-p07-pytest-all.log 2>&1",
+        "wc -l src/telescreen/inventory/fields.py src/telescreen/inventory/values.py src/telescreen/inventory/registration.py src/telescreen/inventory/retention.py src/telescreen/issues/asset_owner.py src/telescreen/api/routers/data_fields.py src/telescreen/api/routers/data_asset_values.py > /tmp/telescreen-v14-p07-wc.log; ! awk '$2 != \"total\" && $1 >= 1000' /tmp/telescreen-v14-p07-wc.log | grep -q .",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v14-p07-fields-retention.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v14-p08-wiring-verification",
+      "planPath": "impl-plans/active/v14-p08-wiring-verification.md",
+      "wave": "4",
+      "dependsOn": ["v14-p04-inventory-core", "v14-p05-scan-hooks", "v14-p06-ui-pages", "v14-p07-fields-retention"],
+      "writePaths": [
+        "impl-plans/active/v14-p08-wiring-verification.md",
+        "src/telescreen/wiring.py",
+        "src/telescreen/wiring_v14.py",
+        "src/telescreen/api/app.py",
+        "tests/e2e/test_api_routes.py",
+        "tests/e2e/test_route_permissions.py",
+        "tests/e2e/test_wiring_v14.py",
+        "tests/e2e/test_route_permissions_v14.py",
+        "tests/e2e/test_flow_v14_inventory.py",
+        "tests/e2e/test_flow_v14_fields.py",
+        "tests/leak/flows_v14.py",
+        "tests/leak/test_leak_matrix_v14.py",
+        "tests/contract/test_data_api_shapes.py",
+        "src/web/scripts/screenshots.ts",
+        "impl-plans/README.md",
+        "design-docs/specs/design-v1-4-data-inventory.md",
+        "design-docs/specs/architecture.md",
+        "design-docs/specs/design-data-model.md",
+        "design-docs/specs/design-api-and-ui.md",
+        "design-docs/specs/design-collectors-and-ingestion.md",
+        "design-docs/specs/design-police-contract.md",
+        "design-docs/specs/design-masking.md",
+        "design-docs/specs/design-ui-sentry.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "src/web/scripts/screenshots.ts", "intendedEdit": "Strict-run selector fixes only, when the page is correct and the state is wrong; record state, old and new name in the Progress Log; otherwise a Reconciliation request against p06. Never relax strict mode or remove a state or theme."},
+        {"path": "src/telescreen/wiring.py", "intendedEdit": "Build the v1.4 reconciler before CollectorService, CollectorScanHandler and MapReduceHandler; set issue_service.inventory; add v14 providers, handlers and routers (before the issues router); Container gains v14 last; stays under 1000 lines."},
+        {"path": "tests/e2e/test_route_permissions.py", "intendedEdit": "Edit only if the inventory needs the new routers; never weaken the one-marker rule. Same for tests/e2e/test_api_routes.py."},
+        {"path": "impl-plans/README.md", "intendedEdit": "Record the v1.4 outcome in the v1.4 rows; the serial finalization moves them."},
+        {"path": "design-docs/specs/design-v1-4-data-inventory.md", "intendedEdit": "Status lines only (designed -> implemented) after every gate passes; same rule for the v1.4 sections of the seven summary docs."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "wiring_v14.py builds every v1.4 service, port, provider, handler and router; wiring.py binds them with build_container's signature unchanged and no include_router; test_wiring_v14.py proves the bindings and route resolution (/api/data/counts, /export, /resource-assets/{k}, POST /api/data/fields/reorder).",
+        "test_route_permissions_v14.py covers exactly the 22 routes of design 9 with one marker each; viewer 403 on a write and an admin route, 200 on a read route.",
+        "E2E flows E1-E7 and leak flows 1-7 (all sinks including SMTP, production path, no stubbed inventory services) pass offline; tests/contract/test_data_api_shapes.py proves real key sets equal v14-shapes.json.",
+        "mise run ci gates, ddl-check and web typecheck, vitest, build and strict screenshots (0 state-skipped, 0 browser errors) pass; wiring files under 1000 lines; status lines updated only after the gates; every Completion Criteria box ticked; Progress Log with hashes and command evidence."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check . > /tmp/telescreen-v14-p08-format.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check . > /tmp/telescreen-v14-p08-ruff.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v14-p08-typelint.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check > /tmp/telescreen-v14-p08-ty.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/e2e tests/leak tests/contract 2>&1 | tee /tmp/telescreen-v14-p08-pytest-scoped.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-v14-p08-pytest-all.log 2>&1",
+        "set -o pipefail; uv build --out-dir /tmp/telescreen-v14-p08-dist > /tmp/telescreen-v14-p08-build.log 2>&1",
+        "mise run ddl-check > /tmp/telescreen-v14-p08-ddl-check.log 2>&1",
+        "set -o pipefail; (cd src/web && bun install --frozen-lockfile > /tmp/telescreen-v14-p08-web-install.log 2>&1 && bun run typecheck > /tmp/telescreen-v14-p08-web-typecheck.log 2>&1 && bun run test > /tmp/telescreen-v14-p08-web-test.log 2>&1 && bun run build --outDir /tmp/telescreen-v14-p08-web --emptyOutDir > /tmp/telescreen-v14-p08-web-build.log 2>&1 && TELESCREEN_SCREENSHOTS_STRICT=1 bun run screenshots > /tmp/telescreen-v14-p08-screenshots.log 2>&1)",
+        "test \"$(grep -c 'state-skipped' /tmp/telescreen-v14-p08-screenshots.log)\" -eq 0",
+        "test \"$(wc -l < src/telescreen/wiring.py)\" -lt 1000 && test \"$(wc -l < src/telescreen/wiring_v14.py)\" -lt 1000",
+        "! grep -n include_router src/telescreen/wiring.py src/telescreen/wiring_v14.py",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v14-p08-wiring-verification.md)\" -eq 0"
+      ]
+    }
+  ]
+}

@@ -19,6 +19,7 @@ from telescreen.core.vocabulary import (
     SuggestionReason,
     Visibility,
 )
+from telescreen.ports.asset_context import ResourceIssueRef as ResourceIssueRef
 from telescreen.ports.collectors import ResourceContent
 from telescreen.ports.findings import ExternalScan, RecordOutcome, ResourceScan
 
@@ -207,15 +208,6 @@ class NoopIssueActivityNotifier:
     async def on_activity(self, session: AsyncSession, activity: IssueActivity) -> None:
         """Accept an activity event without taking action."""
         del session, activity
-
-
-@dataclass(frozen=True)
-class ResourceIssueRef:
-    """Safe link between a resource and one open issue."""
-
-    resource_key: str
-    issue_id: str
-    short_id: str
 
 
 @dataclass(frozen=True)

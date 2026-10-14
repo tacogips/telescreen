@@ -5,7 +5,7 @@ from alembic import op
 from sqlalchemy import MetaData, Table, text
 from sqlalchemy.engine import Connection, Result
 
-from telescreen.db import models as _models
+from telescreen.db.migrations.frozen import metadata_for
 
 revision: str = "0003_v1_2"
 down_revision: str | None = "0002_v1_1"
@@ -33,6 +33,8 @@ NEW_INDEXES: tuple[tuple[str, str], ...] = (
     ("members", "ix_members_role_active"),
 )
 
+_metadata: MetaData = metadata_for(3)
+
 
 def upgrade() -> None:
     """Create only missing v1.2 tables, columns and indexes, then backfill roles."""
@@ -41,7 +43,7 @@ def upgrade() -> None:
     existing_tables: set[str] = set(inspector.get_table_names())
     for table_name in NEW_TABLES:
         if table_name not in existing_tables:
-            table: Table = _models.AuditRecordRow.metadata.tables[table_name]
+            table: Table = _metadata.tables[table_name]
             clone_metadata: MetaData = MetaData()
             cloned: Table = table.to_metadata(clone_metadata)
             op.create_table(table.name, *list(cloned.columns), *list(cloned.constraints))
@@ -54,9 +56,7 @@ def upgrade() -> None:
         }
         for column_name in column_names:
             if column_name not in existing_columns:
-                column: sa.Column[str] = _models.AuditRecordRow.metadata.tables[table_name].c[
-                    column_name
-                ]
+                column: sa.Column[str] = _metadata.tables[table_name].c[column_name]
                 op.add_column(table_name, column._copy())
                 existing_columns.add(column_name)
                 if table_name == "members" and column_name == "role":
@@ -68,9 +68,7 @@ def upgrade() -> None:
         }
         if index_name not in existing_indexes:
             index: sa.Index = next(
-                index
-                for index in _models.AuditRecordRow.metadata.tables[table_name].indexes
-                if index.name == index_name
+                index for index in _metadata.tables[table_name].indexes if index.name == index_name
             )
             index_columns: list[str] = [column.name for column in index.columns]
             op.create_index(index_name, table_name, index_columns, unique=index.unique)

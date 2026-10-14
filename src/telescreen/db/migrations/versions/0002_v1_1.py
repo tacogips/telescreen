@@ -5,7 +5,7 @@ from alembic import op
 from sqlalchemy import MetaData, Table, text
 from sqlalchemy.engine import Connection
 
-from telescreen.db import models as _models
+from telescreen.db.migrations.frozen import metadata_for
 
 revision: str = "0002_v1_1"
 down_revision: str | None = "0001_initial"
@@ -52,6 +52,8 @@ NEW_INDEX_TABLES: tuple[str, ...] = (
     "collector_health",
 )
 
+_metadata: MetaData = metadata_for(2)
+
 
 def upgrade() -> None:
     """Create only missing v1.1 tables, columns and indexes."""
@@ -60,7 +62,7 @@ def upgrade() -> None:
     existing_tables: set[str] = set(inspector.get_table_names())
     for table_name in NEW_TABLES:
         if table_name not in existing_tables:
-            table: Table = _models.AuditRecordRow.metadata.tables[table_name]
+            table: Table = _metadata.tables[table_name]
             clone_metadata: MetaData = MetaData()
             cloned: Table = table.to_metadata(clone_metadata)
             op.create_table(table.name, *list(cloned.columns), *list(cloned.constraints))
@@ -78,9 +80,7 @@ def upgrade() -> None:
         }
         for column_name in column_names:
             if column_name not in existing_columns:
-                column: sa.Column[str] = _models.AuditRecordRow.metadata.tables[table_name].c[
-                    column_name
-                ]
+                column: sa.Column[str] = _metadata.tables[table_name].c[column_name]
                 op.add_column(table_name, column._copy())
                 existing_columns.add(column_name)
                 if table_name == "issues" and column_name == "base_severity":
@@ -90,7 +90,7 @@ def upgrade() -> None:
         op.execute(text("UPDATE issues SET base_severity = severity"))
 
     for table_name in NEW_INDEX_TABLES:
-        table: Table = _models.AuditRecordRow.metadata.tables[table_name]
+        table: Table = _metadata.tables[table_name]
         existing_indexes: set[str] = {
             index["name"] for index in inspector.get_indexes(table_name) if index["name"]
         }
@@ -120,7 +120,7 @@ def downgrade() -> None:
         existing_indexes: set[str] = {
             index["name"] for index in inspector.get_indexes(table_name) if index["name"]
         }
-        for index in _models.AuditRecordRow.metadata.tables[table_name].indexes:
+        for index in _metadata.tables[table_name].indexes:
             if index.name in existing_indexes and index.name in {
                 "ix_issues_status_risk",
                 "ix_issues_exposure_visibility",

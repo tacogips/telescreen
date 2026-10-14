@@ -52,6 +52,7 @@ from telescreen.detection.factory import (
 from telescreen.detection.harness import LlmClient
 from telescreen.detection.rule_detector import RuleDetector
 from telescreen.detection.types import Detector
+from telescreen.directory.actors import DirectoryActorDirectory
 from telescreen.directory.resolver import DirectoryRecipientResolver
 from telescreen.directory.service import DirectoryService
 from telescreen.directory.tokens import TokenService
@@ -104,6 +105,7 @@ from telescreen.wiring_v11 import (
 )
 from telescreen.wiring_v12 import WiringV12, WiringV12Parts, build_v12
 from telescreen.wiring_v13 import IssueEventFanout, WiringV13, WiringV13Parts, build_v13
+from telescreen.wiring_v14 import WiringV14, WiringV14Parts, build_v14
 from telescreen.workflow.engine.child import ChildRunFinishedHandler
 from telescreen.workflow.engine.definitions import WorkflowService
 from telescreen.workflow.engine.engine import AdvanceStepHandler, RunEngine, TimerFiredHandler
@@ -189,6 +191,9 @@ class Container:
     owns_engine: bool
     v12: WiringV12
     v13: WiringV13
+    v14: WiringV14
+    inventory_sessions: async_sessionmaker[AsyncSession]
+    inventory_engine: AsyncEngine | None
 
     async def ensure_indexes(self) -> None:
         """Initialize configured search indexes before serving requests."""
@@ -197,10 +202,16 @@ class Container:
 
 async def close_container(container: Container) -> None:
     """Close database and HTTP resources owned by the application."""
-    if container.owns_engine:
-        await container.engine.dispose()
-    if container.owns_http:
-        await container.http.aclose()
+    try:
+        if container.inventory_engine is not None:
+            await container.inventory_engine.dispose()
+    finally:
+        try:
+            if container.owns_engine:
+                await container.engine.dispose()
+        finally:
+            if container.owns_http:
+                await container.http.aclose()
 
 
 def build_container(
@@ -209,9 +220,12 @@ def build_container(
     http: httpx.AsyncClient,
     sessions: async_sessionmaker[AsyncSession] | None = None,
     clock: Clock | None = None,
+    inventory_sessions: async_sessionmaker[AsyncSession] | None = None,
 ) -> Container:
     """Build feature services, worker handlers, and API routers."""
-    primitives: RuntimePrimitives = build_primitives(settings, env, http, sessions, clock)
+    primitives: RuntimePrimitives = build_primitives(
+        settings, env, http, sessions, clock, inventory_sessions
+    )
     resolver: DirectoryRecipientResolver = DirectoryRecipientResolver()
     directory: DirectoryService = DirectoryService(
         primitives.audit, primitives.clock, fingerprinter=primitives.fingerprinter
@@ -303,6 +317,26 @@ def build_container(
         primitives.indexer,
         primitives.clock,
     )
+    v14: WiringV14 = build_v14(
+        WiringV14Parts(
+            primitives.sessions,
+            primitives.clock,
+            settings,
+            primitives.redactor,
+            primitives.fingerprinter,
+            collector_repository,
+            issue_service,
+            DirectoryActorDirectory(),
+            resolver,
+            directory_v11.owners,
+            notification_service,
+            notification_service,
+            queue,
+            ctx,
+            inventory_sessions=primitives.inventory_sessions,
+        )
+    )
+    issue_service.inventory = v14.publisher
     collector: CollectorService = CollectorService(
         collector_registry,
         queue,
@@ -313,6 +347,7 @@ def build_container(
         primitives.audit,
         primitives.clock,
         health.collector_recorder,
+        inventory=v14.publisher,
     )
     sweeper: CollectorSweeperImpl = CollectorSweeperImpl(
         primitives.sessions,
@@ -532,6 +567,7 @@ def build_container(
             health.collector_provider,
             health.police_provider,
             *v13.providers,
+            *v14.providers,
         ),
         primitives.clock,
     )
@@ -545,6 +581,8 @@ def build_container(
     )
     handlers.register(cast(TaskHandler, notification_handler))
     for handler in v13.handlers:
+        handlers.register(handler)
+    for handler in v14.handlers:
         handlers.register(handler)
     handlers.register(issue_ops.verify_handler)
     handlers.register(issue_ops.policy_handler)
@@ -565,6 +603,7 @@ def build_container(
             100,
             coverage=health.coverage,
             health=health.collector_recorder,
+            inventory=v14.publisher,
         )
     )
     handlers.register(WatchRenewHandler(primitives.sessions, collector))
@@ -589,6 +628,7 @@ def build_container(
         run_engine,
         primitives.audit,
         primitives.clock,
+        inventory=v14.publisher,
     )
     handlers.register(map_reducer)
     handlers.register(
@@ -679,6 +719,7 @@ def build_container(
     collector_secrets: WebhookSecrets = build_webhook_secrets(settings, env, channel_key)
     routers: tuple[APIRouter, ...] = (
         *v13.routers,
+        *v14.routers,
         build_health_router(),
         build_directory_router(
             DirectoryRouterDeps(ctx, directory, directory_v11.identities, v13.member_admin)
@@ -774,4 +815,7 @@ def build_container(
             v12_parts.sign_in,
         ),
         v13,
+        v14,
+        primitives.inventory_sessions,
+        primitives.inventory_engine,
     )
