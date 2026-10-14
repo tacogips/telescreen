@@ -1,30 +1,19 @@
 """Audit log port and entry DTO."""
 
-from dataclasses import dataclass
 from typing import Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from telescreen.core.json import JsonValue
-from telescreen.core.vocabulary import ActorKind
-
-
-@dataclass(frozen=True)
-class AuditEntry:
-    """A masked audit event to append inside the caller's transaction."""
-
-    actor_kind: ActorKind
-    actor_ref: str
-    action: str
-    target_kind: str
-    target_id: str
-    summary: str
-    details: JsonValue
+from telescreen.ports.audit_types import AuditEntry as AuditEntry
 
 
 class AuditLog(Protocol):
-    """Append audit events in an existing transaction."""
+    """Record audit intent atomically with a business operation.
+
+    Owner-local logs return the chain sequence; durable publishers return zero until
+    delivery. A caller must not use the returned value as the business event identity.
+    """
 
     async def append(self, session: AsyncSession, entry: AuditEntry) -> int:
-        """Append one event and return its sequence number."""
+        """Append or durably stage an entry in the caller-owned transaction."""
         ...

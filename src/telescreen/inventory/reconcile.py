@@ -11,22 +11,26 @@ from telescreen.core.vocabulary import DataAssetOrigin, DataAssetState, Inventor
 from telescreen.db.models import DataAssetRow
 from telescreen.inventory.lifecycle import delete_asset, stop_tracking_asset
 from telescreen.inventory.repository import InventoryRepository
-from telescreen.ports.collectors import CollectorConfig, CollectorConfigReader
 
 
 @dataclass(frozen=True)
 class InventoryReconcilerImpl:
     """Apply only authoritative sweep and full-listing absence signals."""
 
-    configs: CollectorConfigReader
     repository: InventoryRepository
     clock: Clock
 
     async def reconcile_sweep(
-        self, session: AsyncSession, collector_config_id: str, seen_before: datetime
+        self,
+        session: AsyncSession,
+        collector_config_id: str,
+        seen_before: datetime,
+        *,
+        mode: InventoryMode,
+        recorded_at: datetime | None = None,
     ) -> int:
         """Delete sweep-covered assets not observed after the sweep watermark."""
-        if not await self._enabled(session, collector_config_id):
+        if mode is InventoryMode.OFF:
             return 0
         rows: tuple[DataAssetRow, ...] = await self._candidates(session, collector_config_id)
         removed: int = 0
@@ -39,33 +43,48 @@ class InventoryReconcilerImpl:
                     asset,
                     self.repository,
                     f"collector:{collector_config_id}",
-                    self.clock.now(),
+                    recorded_at or self.clock.now(),
                 )
                 removed += 1
         return removed
 
     async def reconcile_listing(
-        self, session: AsyncSession, collector_config_id: str, listed_keys: frozenset[str]
+        self,
+        session: AsyncSession,
+        collector_config_id: str,
+        listed_keys: frozenset[str],
+        *,
+        mode: InventoryMode,
+        recorded_at: datetime | None = None,
     ) -> int:
         """Delete covered assets omitted from a complete resource listing."""
-        if not await self._enabled(session, collector_config_id):
+        if mode is InventoryMode.OFF:
             return 0
         rows: tuple[DataAssetRow, ...] = await self._candidates(session, collector_config_id)
         removed: int = 0
         for asset in rows:
-            if asset.resource_key not in listed_keys:
+            if asset.resource_key not in listed_keys and (
+                recorded_at is None
+                or asset.last_seen_at is None
+                or ensure_utc(asset.last_seen_at) <= ensure_utc(recorded_at)
+            ):
                 await delete_asset(
                     session,
                     asset,
                     self.repository,
                     f"collector:{collector_config_id}",
-                    self.clock.now(),
+                    recorded_at or self.clock.now(),
                 )
                 removed += 1
         return removed
 
     async def stop_tracking(
-        self, session: AsyncSession, collector_config_id: str, actor_ref: str
+        self,
+        session: AsyncSession,
+        collector_config_id: str,
+        actor_ref: str,
+        *,
+        recorded_at: datetime | None = None,
     ) -> int:
         """Mark present discovered assets unknown when inventory tracking stops."""
         rows: tuple[DataAssetRow, ...] = tuple(
@@ -82,13 +101,10 @@ class InventoryReconcilerImpl:
             ).all()
         )
         for asset in rows:
-            await stop_tracking_asset(session, asset, self.repository, actor_ref, self.clock.now())
+            await stop_tracking_asset(
+                session, asset, self.repository, actor_ref, recorded_at or self.clock.now()
+            )
         return len(rows)
-
-    async def _enabled(self, session: AsyncSession, collector_config_id: str) -> bool:
-        """Return whether the collector still contributes to inventory."""
-        config: CollectorConfig | None = await self.configs.get(session, collector_config_id)
-        return config is not None and config.inventory_mode is not InventoryMode.OFF
 
     async def _candidates(
         self, session: AsyncSession, collector_config_id: str
@@ -100,6 +116,7 @@ class InventoryReconcilerImpl:
                     select(DataAssetRow)
                     .where(
                         DataAssetRow.collector_config_id == collector_config_id,
+                        DataAssetRow.origin == DataAssetOrigin.DISCOVERED.value,
                         DataAssetRow.sweep_covered.is_(True),
                         DataAssetRow.state == DataAssetState.PRESENT.value,
                     )

@@ -3,6 +3,12 @@
 This document describes the Telescreen system architecture, its boundaries and the major
 decisions. Detailed designs live in the supporting `design-*.md` files listed at the end.
 
+The inventory/alert database separation work is specified in
+[Inventory and alert boundaries](design-inventory-alert-boundaries.md), implemented and
+verified in the [completion audit](design-inventory-boundary-verification.md). Inventory
+can use an independent database while the API and worker remain one application; see
+the [cutover and rollback procedure](design-inventory-store-cutover.md).
+
 ## Overview
 
 Telescreen is "Sentry for sensitive data stored where it must not be". Collectors read

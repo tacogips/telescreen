@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.core.clock import Clock
@@ -20,7 +20,7 @@ from telescreen.core.json import (
     parse_json,
 )
 from telescreen.core.vocabulary import ActorKind, DataFieldRole, DataFieldType, ErrorCode
-from telescreen.db.models import DataFieldRow, DataFieldValueRow
+from telescreen.db.models import DataAssetRow, DataFieldRow, DataFieldValueRow
 from telescreen.masking.redact import Redactor
 from telescreen.ports.audit import AuditEntry, AuditLog
 
@@ -123,7 +123,10 @@ class FieldService:
         row.field_type = field_type.value
         row.options_json = self._options_json(options)
         row.required = required
-        row.role = role.value if role is not None else None
+        next_role: str | None = role.value if role is not None else None
+        if row.role != next_role and DataFieldRole.DELETION_DUE.value in (row.role, next_role):
+            await session.execute(update(DataAssetRow).values(overdue_notified_for=None))
+        row.role = next_role
         row.updated_at = self.clock.now()
         await self._audit(session, actor_ref, "data_field.updated", row.id, (row.key,))
         return row

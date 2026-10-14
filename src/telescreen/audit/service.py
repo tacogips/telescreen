@@ -2,38 +2,23 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+from hashlib import sha256
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.audit.chain import GENESIS_HASH, compute_hash
 from telescreen.core.clock import Clock, ensure_utc
+from telescreen.core.errors import TelescreenError
 from telescreen.core.ids import new_id
-from telescreen.core.json import (
-    JsonKind,
-    JsonValue,
-    dump_json,
-    json_array,
-    json_object,
-    json_str,
-)
-from telescreen.db.models import AuditChainHeadRow, AuditRecordRow
+from telescreen.core.json import dump_json
+from telescreen.core.vocabulary import ErrorCode
+from telescreen.db.models import AuditChainHeadRow, AuditReceiptRow, AuditRecordRow
+from telescreen.masking.audit import redact_audit_entry
 from telescreen.masking.redact import Redactor
 from telescreen.ports.audit import AuditEntry, AuditLog
-
-
-def _redact_json(value: JsonValue, redactor: Redactor) -> JsonValue:
-    """Redact string leaves recursively without changing JSON structure."""
-    if value.kind is JsonKind.STRING:
-        return json_str(redactor.redact(value.str_value).text)
-    if value.kind is JsonKind.ARRAY:
-        return json_array(tuple(_redact_json(item, redactor) for item in value.items))
-    if value.kind is JsonKind.OBJECT:
-        members: list[tuple[str, JsonValue]] = [
-            (member.name, _redact_json(member.value, redactor)) for member in value.members
-        ]
-        return json_object(members)
-    return value
+from telescreen.ports.audit_commands import AuditCommand, AuditReceipt, encode_audit_command
 
 
 @dataclass(frozen=True)
@@ -45,18 +30,56 @@ class AuditLogService(AuditLog):
 
     async def append(self, session: AsyncSession, entry: AuditEntry) -> int:
         """Append one masked event within the caller's transaction."""
+        head: AuditChainHeadRow = await self._head(session)
+        return await self._append(session, entry, head, ensure_utc(self.clock.now()))
+
+    async def append_command(self, session: AsyncSession, command: AuditCommand) -> AuditReceipt:
+        """Serialize receipt checking with all writers of the global chain head."""
+        digest: str = sha256(encode_audit_command(command).encode("utf-8")).hexdigest()
+        head: AuditChainHeadRow = await self._head(session)
+        receipt: AuditReceiptRow | None = await session.get(AuditReceiptRow, command.event_id)
+        if receipt is not None:
+            if receipt.payload_sha256 != digest:
+                raise TelescreenError(ErrorCode.CONFLICT, "audit event identity conflict")
+            return AuditReceipt.DUPLICATE
+        await self._append(session, command.entry, head, ensure_utc(command.occurred_at))
+        session.add(
+            AuditReceiptRow(
+                id=command.event_id,
+                payload_sha256=digest,
+                applied_at=ensure_utc(self.clock.now()),
+            )
+        )
+        await session.flush()
+        return AuditReceipt.APPLIED
+
+    async def _head(self, session: AsyncSession) -> AuditChainHeadRow:
+        """Lock the global head, including a safe first-writer initialization."""
         head: AuditChainHeadRow | None = await session.scalar(
             select(AuditChainHeadRow).where(AuditChainHeadRow.id == 1).with_for_update()
         )
         if head is None:
-            head = AuditChainHeadRow(id=1, seq=0, hash=GENESIS_HASH)
-            session.add(head)
-            await session.flush()
+            try:
+                async with session.begin_nested():
+                    session.add(AuditChainHeadRow(id=1, seq=0, hash=GENESIS_HASH))
+                    await session.flush()
+            except IntegrityError:
+                pass
+            head = await session.scalar(
+                select(AuditChainHeadRow).where(AuditChainHeadRow.id == 1).with_for_update()
+            )
+        if head is None:
+            raise TelescreenError(ErrorCode.CONFLICT, "audit head unavailable")
+        return head
+
+    async def _append(
+        self, session: AsyncSession, entry: AuditEntry, head: AuditChainHeadRow, at: datetime
+    ) -> int:
+        """Append one entry while holding the chain head until transaction commit."""
         seq: int = head.seq + 1
-        at: datetime = ensure_utc(self.clock.now())
-        summary: str = self.redactor.redact(entry.summary).text
-        details: JsonValue = _redact_json(entry.details, self.redactor)
-        details_json: str = dump_json(details)
+        masked: AuditEntry = redact_audit_entry(entry, self.redactor)
+        summary: str = masked.summary
+        details_json: str = dump_json(masked.details)
         record_id: str = new_id()
         chain_hash: str = compute_hash(
             head.hash,

@@ -24,7 +24,7 @@ async def test_v14_leak_matrix(
 ) -> None:
     """Assert seven real-container inventory flows leave no raw sample in any sink."""
     caplog.set_level("INFO")
-    world: LeakWorld = await make_leak_world(tmp_path, False)
+    world: LeakWorld = await make_leak_world(tmp_path, False, independent_sessions=True)
     smtp_messages: list[str] = []
 
     def capture_smtp(_transport: SmtplibTransport, message: EmailMessage) -> None:

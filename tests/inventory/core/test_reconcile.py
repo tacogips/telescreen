@@ -1,66 +1,23 @@
 """Offline tests for authoritative inventory reconciliation."""
 
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.core.clock import FakeClock
-from telescreen.core.json import json_object
 from telescreen.core.vocabulary import (
-    CollectorKind,
     DataAssetOrigin,
     DataAssetState,
     InventoryMode,
-    TriggerMode,
 )
 from telescreen.db.models import DataAssetEventRow, DataAssetRow
 from telescreen.inventory.observer import InventoryObserverImpl
 from telescreen.inventory.reconcile import InventoryReconcilerImpl
 from telescreen.inventory.repository import InventoryRepository
-from telescreen.ports.collectors import (
-    CollectorConfig,
-    CollectorConfigReader,
-    CustomSelector,
-)
 from telescreen.ports.inventory import ItemObservation, ResourceObservation
 from tests.support.db import SqliteHarness, make_sqlite_harness
-
-
-@dataclass(frozen=True)
-class ConfigReader(CollectorConfigReader):
-    """Return the configured inventory mode for one collector."""
-
-    mode: InventoryMode
-
-    async def get(self, session: AsyncSession, collector_config_id: str) -> CollectorConfig | None:
-        """Return the configured collector by id."""
-        del session
-        return _config(self.mode) if collector_config_id == "config-id" else None
-
-    async def get_by_name(self, session: AsyncSession, name: str) -> CollectorConfig | None:
-        """Return the configured collector by name."""
-        del session
-        return _config(self.mode) if name == "test-config" else None
-
-
-def _config(mode: InventoryMode) -> CollectorConfig:
-    """Build a deterministic custom collector config."""
-    return CollectorConfig(
-        id="config-id",
-        name="test-config",
-        kind=CollectorKind.CUSTOM,
-        trigger_mode=TriggerMode.SCHEDULE,
-        cron=None,
-        sweep_cron=None,
-        sweep_max_concurrency=1,
-        selector=CustomSelector(json_object(())),
-        credential_ref=None,
-        enabled=True,
-        inventory_mode=mode,
-    )
 
 
 def _asset(
@@ -104,9 +61,7 @@ async def test_reconcile_sweep_deletes_only_covered_assets_before_watermark() ->
     before: datetime = datetime(2026, 10, 12, tzinfo=UTC)
     watermark: datetime = datetime(2026, 10, 13, tzinfo=UTC)
     clock: FakeClock = FakeClock(watermark)
-    reconciler: InventoryReconcilerImpl = InventoryReconcilerImpl(
-        ConfigReader(InventoryMode.ALL), InventoryRepository(), clock
-    )
+    reconciler: InventoryReconcilerImpl = InventoryReconcilerImpl(InventoryRepository(), clock)
     try:
         async with harness.sessions.begin() as session:
             session.add_all(
@@ -118,7 +73,12 @@ async def test_reconcile_sweep_deletes_only_covered_assets_before_watermark() ->
                 )
             )
             await session.flush()
-            assert await reconciler.reconcile_sweep(session, "config-id", watermark) == 1
+            assert (
+                await reconciler.reconcile_sweep(
+                    session, "config-id", watermark, mode=InventoryMode.ALL
+                )
+                == 1
+            )
             deleted: DataAssetRow | None = await session.get(DataAssetRow, "old-covered")
             new: DataAssetRow | None = await session.get(DataAssetRow, "new-covered")
             uncovered: DataAssetRow | None = await session.get(DataAssetRow, "uncovered")
@@ -133,10 +93,15 @@ async def test_reconcile_sweep_deletes_only_covered_assets_before_watermark() ->
             assert event.actor_ref == "collector:config-id"
 
         off_reconciler: InventoryReconcilerImpl = InventoryReconcilerImpl(
-            ConfigReader(InventoryMode.OFF), InventoryRepository(), clock
+            InventoryRepository(), clock
         )
         async with harness.sessions.begin() as session:
-            assert await off_reconciler.reconcile_sweep(session, "config-id", watermark) == 0
+            assert (
+                await off_reconciler.reconcile_sweep(
+                    session, "config-id", watermark, mode=InventoryMode.OFF
+                )
+                == 0
+            )
     finally:
         await harness.close()
 
@@ -147,7 +112,7 @@ async def test_reconcile_listing_deletes_only_unlisted_covered_assets() -> None:
     harness: SqliteHarness = await make_sqlite_harness()
     now: datetime = datetime(2026, 10, 13, tzinfo=UTC)
     reconciler: InventoryReconcilerImpl = InventoryReconcilerImpl(
-        ConfigReader(InventoryMode.ALL), InventoryRepository(), FakeClock(now)
+        InventoryRepository(), FakeClock(now)
     )
     try:
         async with harness.sessions.begin() as session:
@@ -162,7 +127,7 @@ async def test_reconcile_listing_deletes_only_unlisted_covered_assets() -> None:
             await session.flush()
             assert (
                 await reconciler.reconcile_listing(
-                    session, "config-id", frozenset({str(1).zfill(64)})
+                    session, "config-id", frozenset({str(1).zfill(64)}), mode=InventoryMode.ALL
                 )
                 == 1
             )
@@ -189,9 +154,7 @@ async def test_stop_tracking_marks_discovered_assets_unknown_and_observation_res
     now: datetime = datetime(2026, 10, 13, tzinfo=UTC)
     repository: InventoryRepository = InventoryRepository()
     clock: FakeClock = FakeClock(now)
-    reconciler: InventoryReconcilerImpl = InventoryReconcilerImpl(
-        ConfigReader(InventoryMode.ALL), repository, clock
-    )
+    reconciler: InventoryReconcilerImpl = InventoryReconcilerImpl(repository, clock)
     try:
         async with harness.sessions.begin() as session:
             session.add_all(
@@ -228,12 +191,10 @@ async def test_stop_tracking_marks_discovered_assets_unknown_and_observation_res
                 items=ItemObservation(None, 2),
                 kind_hint=None,
             )
-            observer: InventoryObserverImpl = InventoryObserverImpl(
-                ConfigReader(InventoryMode.ALL), repository
-            )
+            observer: InventoryObserverImpl = InventoryObserverImpl(repository)
             clock.advance(timedelta(minutes=1))
             observation = replace(observation, observed_at=clock.now())
-            await observer.observe(session, observation)
+            await observer.apply_observation(session, observation, InventoryMode.ALL)
             assert discovered.state == DataAssetState.PRESENT.value
             events = tuple(
                 (

@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import Boolean, DateTime, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
+from telescreen.core.ids import new_id
 from telescreen.db.base import Base
 
 
@@ -114,3 +115,4 @@ class DataFieldValueRow(Base, kw_only=True):
     value_date: Mapped[str | None] = mapped_column(String(10), default=None)
     updated_by: Mapped[str] = mapped_column(String(256))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revision_id: Mapped[str] = mapped_column(String(36), default_factory=new_id)

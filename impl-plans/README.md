@@ -40,7 +40,10 @@ Large features are split into multiple related plans with cross-references.
 All plans share `impl-plans/conventions.md` (ownership, typing, verification and
 progress-log rules).
 
-There are no active plans.
+The [inventory and alert boundary plan](active/inventory-alert-boundaries.md) is complete:
+independent persistence, durable handoffs, inventory master authority, owner migrations
+and verified cutover/rollback. Its [completion audit](../design-docs/specs/design-inventory-boundary-verification.md)
+records final backend/web/schema checks. The completed plan retains its original path.
 
 Telescreen v1 is complete (all 32 plans integration-accepted, final commit 7a8c600).
 Telescreen v1.1 (F1-F10 of `design-docs/specs/design-v1-1-dspm-adoption.md`) is complete:

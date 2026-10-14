@@ -16,13 +16,13 @@ from telescreen.inventory.repository import InventoryRepository
 from telescreen.inventory.values import ValueInput, ValueIssue, ValueService, ValueValidator
 from telescreen.masking.redact import Redactor
 from telescreen.ports.audit import AuditEntry, AuditLog
-from telescreen.ports.directory import AssigneeIds, RecipientResolver, ResolvedRecipients
+from telescreen.ports.directory import AssigneeIds, ResolvedRecipients
 from tests.support.db import SqliteHarness, make_sqlite_harness
 from tests.support.samples import Sample, github_token
 
 
 @dataclass(frozen=True)
-class FakeRecipients(RecipientResolver):
+class FakeRecipients:
     """Resolve the one active member reference used by these tests."""
 
     async def resolve(self, session: AsyncSession, ref: str) -> ResolvedRecipients:
@@ -35,9 +35,8 @@ class FakeRecipients(RecipientResolver):
         del session, member_id, ref
         return False
 
-    async def assignee_of(self, session: AsyncSession, ref: str) -> AssigneeIds:
+    async def assignee_of(self, ref: str) -> AssigneeIds:
         """Resolve a reference or raise the normal stale-reference code."""
-        del session
         if ref == "member:active":
             return AssigneeIds("member-id", None)
         raise TelescreenError(ErrorCode.RECIPIENT_UNKNOWN, "recipient is unknown")
@@ -83,10 +82,10 @@ async def _issue(
     value: str,
 ) -> str | None:
     """Return the first validation code for one field value."""
-    async with harness.sessions() as session:
-        issues: tuple[ValueIssue, ...] = await validator.validate(
-            session, (field,), (ValueInput(field.key, value),)
-        )
+    del harness
+    issues: tuple[ValueIssue, ...] = await validator.validate(
+        (field,), (ValueInput(field.key, value),)
+    )
     return issues[0].code if issues else None
 
 

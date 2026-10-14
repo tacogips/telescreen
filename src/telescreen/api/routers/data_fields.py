@@ -6,7 +6,7 @@ from typing import Annotated
 import pydantic
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from telescreen.api.common.auth import Principal, require_permission
 from telescreen.api.common.context import ApiContext
@@ -90,6 +90,7 @@ class DataFieldsRouterDeps:
     ctx: ApiContext
     fields: FieldService
     validator: ValueValidator
+    inventory_sessions: async_sessionmaker[AsyncSession] | None = None
 
 
 async def _value_count(session: AsyncSession, field_id: str) -> int:
@@ -131,6 +132,7 @@ async def _field_json(session: AsyncSession, row: DataFieldRow) -> JsonValue:
 
 def build_data_fields_router(deps: DataFieldsRouterDeps) -> APIRouter:
     """Build schema routes with fixed route ordering and one permission each."""
+    data_sessions: async_sessionmaker[AsyncSession] = deps.inventory_sessions or deps.ctx.sessions
     router: APIRouter = APIRouter()
 
     @router.get("/api/data/fields")
@@ -141,7 +143,7 @@ def build_data_fields_router(deps: DataFieldsRouterDeps) -> APIRouter:
     ) -> Response:
         """Return all fields, including archived definitions."""
         del principal
-        async with deps.ctx.sessions() as session:
+        async with data_sessions() as session:
             rows: tuple[DataFieldRow, ...] = await deps.fields.list(session)
             items: list[JsonValue] = [await _field_json(session, row) for row in rows]
         return Response(
@@ -160,9 +162,9 @@ def build_data_fields_router(deps: DataFieldsRouterDeps) -> APIRouter:
         values: tuple[ValueInput, ...] = tuple(
             ValueInput(item.key, item.value_json) for item in body.values
         )
-        async with deps.ctx.sessions() as session:
+        async with data_sessions() as session:
             fields: tuple[DataFieldRow, ...] = await deps.fields.list(session)
-            issues: tuple[ValueIssue, ...] = await deps.validator.validate(session, fields, values)
+            issues: tuple[ValueIssue, ...] = await deps.validator.validate(fields, values)
             supplied: frozenset[str] = frozenset(
                 item.key for item in values if item.value_json is not None
             )
@@ -191,7 +193,7 @@ def build_data_fields_router(deps: DataFieldsRouterDeps) -> APIRouter:
         ],
     ) -> Response:
         """Set the order of all active fields."""
-        async with deps.ctx.sessions.begin() as session:
+        async with data_sessions.begin() as session:
             rows: tuple[DataFieldRow, ...] = await deps.fields.reorder(
                 session, tuple(body.ids), principal.actor_ref()
             )
@@ -211,7 +213,7 @@ def build_data_fields_router(deps: DataFieldsRouterDeps) -> APIRouter:
         options: tuple[FieldOption, ...] = tuple(
             FieldOption(item.value, item.label) for item in body.options
         )
-        async with deps.ctx.sessions.begin() as session:
+        async with data_sessions.begin() as session:
             row: DataFieldRow = await deps.fields.create(
                 session,
                 body.key,
@@ -238,7 +240,7 @@ def build_data_fields_router(deps: DataFieldsRouterDeps) -> APIRouter:
         options: tuple[FieldOption, ...] = tuple(
             FieldOption(item.value, item.label) for item in body.options
         )
-        async with deps.ctx.sessions.begin() as session:
+        async with data_sessions.begin() as session:
             row: DataFieldRow = await deps.fields.update(
                 session,
                 field_id,
@@ -261,7 +263,7 @@ def build_data_fields_router(deps: DataFieldsRouterDeps) -> APIRouter:
         ],
     ) -> Response:
         """Delete an unused field."""
-        async with deps.ctx.sessions.begin() as session:
+        async with data_sessions.begin() as session:
             await deps.fields.delete(session, field_id, principal.actor_ref())
         return Response(status_code=204)
 
@@ -273,7 +275,7 @@ def build_data_fields_router(deps: DataFieldsRouterDeps) -> APIRouter:
         ],
     ) -> Response:
         """Archive a field."""
-        async with deps.ctx.sessions.begin() as session:
+        async with data_sessions.begin() as session:
             row: DataFieldRow = await deps.fields.archive(session, field_id, principal.actor_ref())
             content: JsonValue = await _field_json(session, row)
         return Response(dump_json(content), media_type="application/json")
@@ -286,7 +288,7 @@ def build_data_fields_router(deps: DataFieldsRouterDeps) -> APIRouter:
         ],
     ) -> Response:
         """Unarchive a field."""
-        async with deps.ctx.sessions.begin() as session:
+        async with data_sessions.begin() as session:
             row: DataFieldRow = await deps.fields.unarchive(
                 session, field_id, principal.actor_ref()
             )

@@ -65,7 +65,7 @@ class ConfigReader(CollectorConfigReader):
 @pytest.mark.asyncio
 async def test_resolves_collector_and_delegates_other_refs_once_in_order() -> None:
     """Collector refs resolve safely while other refs are delegated as one batch."""
-    from telescreen.inventory.actors import InventoryActorDirectory
+    from telescreen.directory.inventory_actors import InventoryActorDirectory
 
     database: SqliteHarness = await make_sqlite_harness()
     base: BaseDirectory = BaseDirectory([])

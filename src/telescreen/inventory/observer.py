@@ -25,31 +25,28 @@ from telescreen.inventory.items import (
 )
 from telescreen.inventory.lifecycle import delete_asset, restore_asset, resume_asset
 from telescreen.inventory.repository import DataEventDraft, InventoryRepository
-from telescreen.ports.collectors import CollectorConfig, CollectorConfigReader
-from telescreen.ports.inventory import ItemObservation, ResourceObservation
+from telescreen.ports.inventory_types import ItemObservation, ResourceObservation
 
 
 @dataclass(frozen=True)
 class InventoryObserverImpl:
     """Persist resource observations in the caller's transaction."""
 
-    configs: CollectorConfigReader
     repository: InventoryRepository
 
-    async def observe(self, session: AsyncSession, observation: ResourceObservation) -> None:
-        """Apply one safe resource observation to its asset and event history."""
-        mode: InventoryMode = InventoryMode.SENSITIVE_ONLY
-        if observation.collector_config_id is not None:
-            config: CollectorConfig | None = await self.configs.get(
-                session, observation.collector_config_id
-            )
-            if config is not None:
-                mode = config.inventory_mode
+    async def apply_observation(
+        self, session: AsyncSession, observation: ResourceObservation, mode: InventoryMode
+    ) -> None:
+        """Apply an observation using captured policy, without consulting collector tables."""
         if mode is InventoryMode.OFF:
             return
         asset: DataAssetRow | None = await self.repository.get_by_resource_key(
             session, observation.resource_key, lock=True
         )
+        if asset is not None and asset.origin == DataAssetOrigin.REGISTERED.value:
+            return
+        if asset is not None and _is_stale(asset, observation):
+            return
         actor_ref: str = (
             f"collector:{observation.collector_config_id}"
             if observation.collector_config_id is not None
@@ -79,6 +76,9 @@ class InventoryObserverImpl:
             if created:
                 await self._record_created(session, asset, observation, actor_ref, values)
                 return
+        if asset.origin == DataAssetOrigin.REGISTERED.value or _is_stale(asset, observation):
+            return
+        previous_updated_at: datetime = asset.updated_at
         was_deleted: bool = asset.state == DataAssetState.DELETED.value
         was_unknown: bool = asset.state == DataAssetState.UNKNOWN.value
         if was_deleted:
@@ -94,7 +94,7 @@ class InventoryObserverImpl:
         asset.sweep_covered = observation.sweep_covered
         if observation.display_title:
             asset.name = observation.display_title[:512]
-        asset.updated_at = observation.observed_at
+        asset.updated_at = max(ensure_utc(previous_updated_at), ensure_utc(observation.observed_at))
         if asset.collector_config_id is None:
             asset.collector_config_id = observation.collector_config_id
         await self._record_diffs(session, asset, observation, actor_ref, values)
@@ -269,3 +269,15 @@ def _default_kind(source: str, locator: str) -> DataAssetKind:
     if source == "slack":
         return DataAssetKind.FILE if "/file/" in locator else DataAssetKind.OBJECT
     return DataAssetKind.OTHER
+
+
+def _is_stale(asset: DataAssetRow, observation: ResourceObservation) -> bool:
+    """Older source observations cannot reverse a newer lifecycle or value baseline."""
+    watermark: datetime | None = (
+        asset.deleted_at
+        if asset.state == DataAssetState.DELETED.value
+        else asset.updated_at
+        if asset.state == DataAssetState.UNKNOWN.value
+        else asset.last_seen_at
+    )
+    return watermark is not None and ensure_utc(observation.observed_at) < ensure_utc(watermark)

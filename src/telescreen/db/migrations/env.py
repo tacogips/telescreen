@@ -4,22 +4,17 @@ import asyncio
 
 from alembic import context
 from alembic.config import Config
-from sqlalchemy import MetaData
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine, async_engine_from_config
 from sqlalchemy.pool import NullPool
 
-from telescreen.db import models as _models
-
 config: Config = context.config
-target_metadata: MetaData = _models.AuditRecordRow.metadata
 
 
 def run_migrations_offline() -> None:
     """Render migrations without connecting to a database."""
     context.configure(
         url=config.get_main_option("sqlalchemy.url"),
-        target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
@@ -29,7 +24,7 @@ def run_migrations_offline() -> None:
 
 def do_run_migrations(connection: Connection) -> None:
     """Run migrations on an established synchronous connection."""
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(connection=connection)
     with context.begin_transaction():
         context.run_migrations()
 

@@ -4,18 +4,20 @@ from alembic import op
 from sqlalchemy import MetaData, Table, text
 from sqlalchemy.engine import Connection
 
-from telescreen.db import models as _models
+from telescreen.db.migrations.frozen import metadata_for
 
 revision: str = "0001_initial"
 down_revision: str | None = None
 branch_labels: tuple[str, ...] | None = None
 depends_on: str | None = None
 
+_metadata: MetaData = metadata_for(1)
+
 
 def upgrade() -> None:
     """Create all declared tables, indexes and database seed rows."""
     bind: Connection = op.get_bind()
-    for table in _models.AuditRecordRow.metadata.sorted_tables:
+    for table in _metadata.sorted_tables:
         clone_metadata: MetaData = MetaData()
         cloned: Table = table.to_metadata(clone_metadata)
         op.create_table(table.name, *list(cloned.columns), *list(cloned.constraints))
@@ -30,11 +32,11 @@ def upgrade() -> None:
                 unique=index.unique,
             )
     op.bulk_insert(
-        _models.AuditRecordRow.metadata.tables["counters"],
+        _metadata.tables["counters"],
         [{"name": "issue_number", "value": 0}],
     )
     op.bulk_insert(
-        _models.AuditRecordRow.metadata.tables["audit_chain_head"],
+        _metadata.tables["audit_chain_head"],
         [{"id": 1, "seq": 0, "hash": "0" * 64}],
     )
     if bind.dialect.name == "postgresql":
@@ -59,5 +61,5 @@ def downgrade() -> None:
     if bind.dialect.name == "postgresql":
         op.execute(text("DROP TRIGGER IF EXISTS audit_records_append_only ON audit_records"))
         op.execute(text("DROP FUNCTION IF EXISTS telescreen_reject_audit_mutation()"))
-    for table in reversed(_models.AuditRecordRow.metadata.sorted_tables):
+    for table in reversed(_metadata.sorted_tables):
         op.drop_table(table.name)

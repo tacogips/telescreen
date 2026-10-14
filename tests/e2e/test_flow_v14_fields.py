@@ -19,7 +19,7 @@ async def test_e5_e6_fields_required_values_audit_and_overdue_notifications(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Validate metadata writes and send one owner notice per changed due date."""
-    world: E2EWorld = await make_world(tmp_path, (), OutboundRecorder())
+    world: E2EWorld = await make_world(tmp_path, (), OutboundRecorder(), independent_sessions=True)
     smtp_messages: list[str] = []
 
     def capture_smtp(_transport: SmtplibTransport, message: EmailMessage) -> None:

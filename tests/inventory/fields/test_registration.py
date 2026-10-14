@@ -11,11 +11,11 @@ from telescreen.core.clock import FakeClock
 from telescreen.core.errors import TelescreenError
 from telescreen.core.vocabulary import DataAssetKind, DataFieldType, ErrorCode
 from telescreen.db.models import (
-    CounterRow,
     DataAssetEventRow,
     DataAssetRow,
     DataFieldRow,
     DataFieldValueRow,
+    InventoryCounterRow,
 )
 from telescreen.inventory.registration import RegistrationBody, RegistrationService
 from telescreen.inventory.repository import InventoryRepository
@@ -23,7 +23,7 @@ from telescreen.inventory.values import ValueInput, ValueService, ValueValidator
 from telescreen.masking.fingerprint import Fingerprinter
 from telescreen.masking.redact import Redactor
 from telescreen.ports.audit import AuditEntry, AuditLog
-from telescreen.ports.directory import AssigneeIds, RecipientResolver, ResolvedRecipients
+from telescreen.ports.directory import AssigneeIds, ResolvedRecipients
 from tests.support.db import SqliteHarness, make_sqlite_harness
 from tests.support.samples import Sample, github_token
 
@@ -41,7 +41,7 @@ class RaceRepository(InventoryRepository):
 
 
 @dataclass(frozen=True)
-class EmptyRecipients(RecipientResolver):
+class EmptyRecipients:
     """No recipient values are needed for these registration cases."""
 
     async def resolve(self, session: AsyncSession, ref: str) -> ResolvedRecipients:
@@ -54,9 +54,9 @@ class EmptyRecipients(RecipientResolver):
         del session, member_id, ref
         return False
 
-    async def assignee_of(self, session: AsyncSession, ref: str) -> AssigneeIds:
+    async def assignee_of(self, ref: str) -> AssigneeIds:
         """Reject unused references as unknown."""
-        del session, ref
+        del ref
         raise TelescreenError(ErrorCode.RECIPIENT_UNKNOWN, "recipient is unknown")
 
 
@@ -192,7 +192,7 @@ async def test_registration_maps_insert_race_to_conflict() -> None:
         async with harness.sessions.begin() as session:
             session.add_all(
                 (
-                    CounterRow(name="data_asset_number", value=1),
+                    InventoryCounterRow(name="data_asset_number", value=1),
                     DataAssetRow(
                         id="race-winner",
                         number=1,

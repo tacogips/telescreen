@@ -34,32 +34,30 @@ from telescreen.inventory.export import AssetExporter
 from telescreen.inventory.queries import AssetQueries
 from telescreen.inventory.repository import InventoryRepository
 from telescreen.masking.redact import Redactor
+from telescreen.ports.asset_context import AssetIssueLookup
 from telescreen.ports.audit import AuditEntry, AuditLog
-from telescreen.ports.directory import ActorDirectory, ActorDisplay
-from telescreen.ports.issues import ResourceIssueReader, ResourceIssueRef
+from telescreen.ports.identity_context import ActorDisplay, ActorLookup
+from telescreen.ports.issues import ResourceIssueRef
 from tests.support.db import SqliteHarness, make_sqlite_harness
 from tests.support.samples import Sample, github_token
 
 
-class EmptyIssueReader(ResourceIssueReader):
+class EmptyIssueReader(AssetIssueLookup):
     """Return no open issues for router construction tests."""
 
     async def open_issues_for_resources(
-        self, session: AsyncSession, resource_keys: tuple[str, ...]
+        self, resource_keys: tuple[str, ...]
     ) -> tuple[ResourceIssueRef, ...]:
         """Return an empty issue projection."""
-        del session, resource_keys
+        del resource_keys
         return ()
 
 
-class EmptyActorDirectory(ActorDirectory):
+class EmptyActorLookup(ActorLookup):
     """Return unknown safe displays for router construction tests."""
 
-    async def display(
-        self, session: AsyncSession, refs: tuple[str, ...]
-    ) -> tuple[ActorDisplay, ...]:
+    async def display(self, refs: tuple[str, ...]) -> tuple[ActorDisplay, ...]:
         """Return one unknown display per requested reference."""
-        del session
         return tuple(
             ActorDisplay(ref, ActorDisplayKind.UNKNOWN, "Unknown", None, False) for ref in refs
         )
@@ -152,7 +150,7 @@ async def test_p04_routes_have_one_expected_permission_each() -> None:
         audit: EmptyAudit = EmptyAudit()
         clock: FakeClock = FakeClock(now)
         ctx: ApiContext = ApiContext(harness.sessions, clock, audit)
-        actors: EmptyActorDirectory = EmptyActorDirectory()
+        actors: EmptyActorLookup = EmptyActorLookup()
         issues: EmptyIssueReader = EmptyIssueReader()
         queries: AssetQueries = AssetQueries(issues, actors)
         redactor: Redactor = Redactor.default()
@@ -205,7 +203,7 @@ async def test_p04_api_statuses_redaction_writes_and_response_shape() -> None:
     audit: EmptyAudit = EmptyAudit()
     clock: FakeClock = FakeClock(now)
     ctx: ApiContext = ApiContext(harness.sessions, clock, audit)
-    queries: AssetQueries = AssetQueries(EmptyIssueReader(), EmptyActorDirectory())
+    queries: AssetQueries = AssetQueries(EmptyIssueReader(), EmptyActorLookup())
     redactor: Redactor = Redactor.default()
     repository: InventoryRepository = InventoryRepository()
     exporter: AssetExporter = AssetExporter(queries, redactor)

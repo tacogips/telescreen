@@ -20,12 +20,12 @@ from telescreen.core.vocabulary import (
     ErrorCode,
 )
 from telescreen.db.models import DataAssetRow, DataFieldRow
-from telescreen.directory.actors import actor_kind_for
 from telescreen.inventory.repository import DataEventDraft, InventoryRepository
 from telescreen.inventory.values import ValueInput, ValueService
 from telescreen.masking.fingerprint import Fingerprinter
 from telescreen.masking.redact import Redactor
 from telescreen.ports.audit import AuditEntry, AuditLog
+from telescreen.ports.identity_context import actor_kind_for
 
 _SOURCE: re.Pattern[str] = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.:/-]{0,63}$")
 

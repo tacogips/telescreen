@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.core.clock import Clock
 from telescreen.core.errors import TelescreenError
+from telescreen.core.ids import new_id
 from telescreen.core.json import (
     JsonKind,
     JsonValue,
@@ -18,13 +19,12 @@ from telescreen.core.json import (
     json_str,
     parse_json,
 )
-from telescreen.core.vocabulary import DataEventKind, DataFieldType, ErrorCode
+from telescreen.core.vocabulary import DataEventKind, DataFieldRole, DataFieldType, ErrorCode
 from telescreen.db.models import DataAssetRow, DataFieldRow, DataFieldValueRow
-from telescreen.directory.actors import actor_kind_for
 from telescreen.inventory.repository import DataEventDraft, InventoryRepository
 from telescreen.masking.redact import Redactor
 from telescreen.ports.audit import AuditEntry, AuditLog
-from telescreen.ports.directory import RecipientResolver
+from telescreen.ports.identity_context import AssigneeLookup, actor_kind_for
 
 _DECIMAL: re.Pattern[str] = re.compile(r"^-?[0-9]{1,18}(\.[0-9]{1,6})?$")
 _DATE: re.Pattern[str] = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
@@ -51,12 +51,11 @@ class ValueIssue:
 class ValueValidator:
     """Validate field values without echoing or retaining their contents."""
 
-    recipients: RecipientResolver
+    recipients: AssigneeLookup
     redactor: Redactor
 
     async def validate(
         self,
-        session: AsyncSession,
         fields: tuple[DataFieldRow, ...],
         values: tuple[ValueInput, ...],
     ) -> tuple[ValueIssue, ...]:
@@ -74,14 +73,12 @@ class ValueValidator:
             elif field.archived_at is not None:
                 issues.append(ValueIssue(item.key, "archived_field"))
             elif item.value_json is not None:
-                issue: ValueIssue | None = await self._validate_one(session, field, item.value_json)
+                issue: ValueIssue | None = await self._validate_one(field, item.value_json)
                 if issue is not None:
                     issues.append(issue)
         return tuple(issues)
 
-    async def _validate_one(
-        self, session: AsyncSession, field: DataFieldRow, raw: str
-    ) -> ValueIssue | None:
+    async def _validate_one(self, field: DataFieldRow, raw: str) -> ValueIssue | None:
         """Validate a single encoded JSON value."""
         try:
             value: JsonValue = parse_json(raw)
@@ -134,7 +131,7 @@ class ValueValidator:
             if not separator or not subject or kind not in ("member", "team"):
                 return ValueIssue(field.key, "unknown_reference")
             try:
-                await self.recipients.assignee_of(session, reference)
+                await self.recipients.assignee_of(reference)
             except TelescreenError as error:
                 if error.code is ErrorCode.RECIPIENT_UNKNOWN:
                     return ValueIssue(field.key, "unknown_reference")
@@ -170,7 +167,7 @@ class ValueService:
         actor_ref: str,
     ) -> None:
         """Validate, apply, enforce required fields, and record changed values."""
-        issues: tuple[ValueIssue, ...] = await self.validator.validate(session, fields, values)
+        issues: tuple[ValueIssue, ...] = await self.validator.validate(fields, values)
         if issues:
             code: ErrorCode = (
                 ErrorCode.RAW_VALUE_DETECTED
@@ -212,6 +209,7 @@ class ValueService:
             row.value_date = value_date
             row.updated_by = actor_ref
             row.updated_at = now
+            row.revision_id = new_id()
             if stored is None:
                 session.add(row)
             resulting_ids.add(field.id)
@@ -222,6 +220,8 @@ class ValueService:
         if missing:
             raise TelescreenError(ErrorCode.REQUIRED_FIELD_MISSING, "required field missing")
         for field, old_json, new_json in changed:
+            if field.role == DataFieldRole.DELETION_DUE.value:
+                asset.overdue_notified_for = None
             await self.repository.append_event(
                 session,
                 DataEventDraft(

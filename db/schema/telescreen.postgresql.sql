@@ -50,6 +50,13 @@ CREATE TABLE "audit_chain_head" (
   CONSTRAINT "pk_audit_chain_head" PRIMARY KEY ("id")
 );
 
+CREATE TABLE "audit_receipts" (
+  "id" VARCHAR(36) NOT NULL,
+  "payload_sha256" VARCHAR(64) NOT NULL,
+  "applied_at" TIMESTAMPTZ NOT NULL,
+  CONSTRAINT "pk_audit_receipts" PRIMARY KEY ("id")
+);
+
 CREATE TABLE "audit_records" (
   "seq" INTEGER NOT NULL,
   "id" VARCHAR(36) NOT NULL,
@@ -166,6 +173,7 @@ CREATE TABLE "data_field_values" (
   "value_date" VARCHAR(10),
   "updated_by" VARCHAR(256) NOT NULL,
   "updated_at" TIMESTAMPTZ NOT NULL,
+  "revision_id" VARCHAR(36) NOT NULL,
   CONSTRAINT "pk_data_field_values" PRIMARY KEY ("asset_id", "field_id")
 );
 
@@ -285,6 +293,59 @@ CREATE TABLE "integration_checks" (
   "ok" BOOLEAN NOT NULL,
   "error_code" VARCHAR(32),
   CONSTRAINT "pk_integration_checks" PRIMARY KEY ("kind")
+);
+
+CREATE TABLE "inventory_audit_outbox" (
+  "id" VARCHAR(36) NOT NULL,
+  "payload_json" TEXT NOT NULL,
+  "recorded_at" TIMESTAMPTZ NOT NULL,
+  "delivered_at" TIMESTAMPTZ,
+  CONSTRAINT "pk_inventory_audit_outbox" PRIMARY KEY ("id")
+);
+
+CREATE TABLE "inventory_counters" (
+  "name" VARCHAR(64) NOT NULL,
+  "value" INTEGER NOT NULL,
+  CONSTRAINT "pk_inventory_counters" PRIMARY KEY ("name")
+);
+
+CREATE TABLE "inventory_inbox" (
+  "id" VARCHAR(36) NOT NULL,
+  "stream_id" VARCHAR(256) NOT NULL,
+  "sequence" INTEGER NOT NULL,
+  "payload_sha256" VARCHAR(64) NOT NULL,
+  "applied_at" TIMESTAMPTZ NOT NULL,
+  CONSTRAINT "pk_inventory_inbox" PRIMARY KEY ("stream_id", "sequence")
+);
+
+CREATE TABLE "inventory_inbox_streams" (
+  "id" VARCHAR(256) NOT NULL,
+  "last_sequence" INTEGER NOT NULL,
+  CONSTRAINT "pk_inventory_inbox_streams" PRIMARY KEY ("id")
+);
+
+CREATE TABLE "inventory_outbox" (
+  "id" VARCHAR(36) NOT NULL,
+  "stream_id" VARCHAR(256) NOT NULL,
+  "sequence" INTEGER NOT NULL,
+  "payload_json" TEXT NOT NULL,
+  "recorded_at" TIMESTAMPTZ NOT NULL,
+  "delivered_at" TIMESTAMPTZ,
+  CONSTRAINT "pk_inventory_outbox" PRIMARY KEY ("id")
+);
+
+CREATE TABLE "inventory_outbox_streams" (
+  "id" VARCHAR(256) NOT NULL,
+  "last_sequence" INTEGER NOT NULL,
+  CONSTRAINT "pk_inventory_outbox_streams" PRIMARY KEY ("id")
+);
+
+CREATE TABLE "inventory_retention_outbox" (
+  "id" VARCHAR(36) NOT NULL,
+  "payload_json" TEXT NOT NULL,
+  "recorded_at" TIMESTAMPTZ NOT NULL,
+  "delivered_at" TIMESTAMPTZ,
+  CONSTRAINT "pk_inventory_retention_outbox" PRIMARY KEY ("id")
 );
 
 CREATE TABLE "issue_bookmarks" (
@@ -617,6 +678,13 @@ CREATE TABLE "resource_coverage" (
   CONSTRAINT "pk_resource_coverage" PRIMARY KEY ("id")
 );
 
+CREATE TABLE "retention_notification_receipts" (
+  "id" VARCHAR(36) NOT NULL,
+  "payload_sha256" VARCHAR(64) NOT NULL,
+  "applied_at" TIMESTAMPTZ NOT NULL,
+  CONSTRAINT "pk_retention_notification_receipts" PRIMARY KEY ("id")
+);
+
 CREATE TABLE "saved_view_defaults" (
   "member_id" VARCHAR(36) NOT NULL,
   "view_id" VARCHAR(36) NOT NULL,
@@ -773,6 +841,8 @@ CREATE UNIQUE INDEX "uq_human_tasks_step_run_id" ON "human_tasks" ("step_run_id"
 CREATE INDEX "ix_human_tasks_due_at" ON "human_tasks" ("due_at");
 CREATE INDEX "ix_human_tasks_run_id" ON "human_tasks" ("run_id");
 CREATE INDEX "ix_human_tasks_status" ON "human_tasks" ("status");
+CREATE UNIQUE INDEX "uq_inventory_inbox_id" ON "inventory_inbox" ("id");
+CREATE UNIQUE INDEX "uq_inventory_outbox_stream_sequence" ON "inventory_outbox" ("stream_id", "sequence");
 CREATE INDEX "ix_issue_comments_issue_id" ON "issue_comments" ("issue_id");
 CREATE INDEX "ix_issue_exceptions_issue" ON "issue_exceptions" ("issue_id");
 CREATE INDEX "ix_issue_exceptions_status_expiry" ON "issue_exceptions" ("status", "expires_at");

@@ -4,29 +4,26 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.core.vocabulary import ActorDisplayKind
 from telescreen.db.models import DataAssetRow, DataFieldRow, DataFieldValueRow
 from telescreen.inventory.export import AssetExporter, CsvExport
 from telescreen.inventory.queries import AssetFilters, AssetPage, AssetQueries
 from telescreen.masking.redact import Redactor
-from telescreen.ports.directory import ActorDirectory, ActorDisplay
-from telescreen.ports.issues import ResourceIssueReader, ResourceIssueRef
+from telescreen.ports.asset_context import AssetIssueLookup
+from telescreen.ports.identity_context import ActorDisplay, ActorLookup
+from telescreen.ports.issues import ResourceIssueRef
 from tests.support.db import SqliteHarness, make_sqlite_harness
 
 
 @dataclass
-class UnknownActorDirectory(ActorDirectory):
+class UnknownActorLookup(ActorLookup):
     """Return Unknown for stale references and record page batch calls."""
 
     calls: int = 0
 
-    async def display(
-        self, session: AsyncSession, refs: tuple[str, ...]
-    ) -> tuple[ActorDisplay, ...]:
+    async def display(self, refs: tuple[str, ...]) -> tuple[ActorDisplay, ...]:
         """Return stale refs without failing the inventory read."""
-        del session
         self.calls += 1
         return tuple(
             ActorDisplay(ref, ActorDisplayKind.UNKNOWN, "Unknown", None, False) for ref in refs
@@ -34,14 +31,14 @@ class UnknownActorDirectory(ActorDirectory):
 
 
 @dataclass(frozen=True)
-class EmptyIssues(ResourceIssueReader):
+class EmptyIssues(AssetIssueLookup):
     """Return no issue links for inventory query tests."""
 
     async def open_issues_for_resources(
-        self, session: AsyncSession, resource_keys: tuple[str, ...]
+        self, resource_keys: tuple[str, ...]
     ) -> tuple[ResourceIssueRef, ...]:
         """Return an empty page of issues."""
-        del session, resource_keys
+        del resource_keys
         return ()
 
 
@@ -50,7 +47,7 @@ async def test_stale_owner_is_batched_and_exportable() -> None:
     """Stale owner refs remain visible and do not fail list or export reads."""
     harness: SqliteHarness = await make_sqlite_harness()
     now: datetime = datetime(2026, 10, 13, tzinfo=UTC)
-    actors: UnknownActorDirectory = UnknownActorDirectory()
+    actors: UnknownActorLookup = UnknownActorLookup()
     queries: AssetQueries = AssetQueries(EmptyIssues(), actors)
     try:
         async with harness.sessions.begin() as session:

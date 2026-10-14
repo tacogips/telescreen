@@ -21,7 +21,7 @@ from telescreen.core.clock import FakeClock
 from telescreen.core.errors import TelescreenError
 from telescreen.core.permissions import Permission, role_permissions
 from telescreen.core.vocabulary import ActorDisplayKind, ErrorCode, PrincipalKind, Role
-from telescreen.db.models import CounterRow, DataAssetRow, DataFieldRow
+from telescreen.db.models import DataAssetRow, DataFieldRow, InventoryCounterRow
 from telescreen.inventory.fields import FieldService
 from telescreen.inventory.queries import AssetQueries
 from telescreen.inventory.registration import RegistrationService
@@ -29,15 +29,15 @@ from telescreen.inventory.repository import InventoryRepository
 from telescreen.inventory.values import ValueService, ValueValidator
 from telescreen.masking.fingerprint import Fingerprinter
 from telescreen.masking.redact import Redactor
+from telescreen.ports.asset_context import AssetIssueLookup
 from telescreen.ports.audit import AuditEntry, AuditLog
 from telescreen.ports.directory import (
-    ActorDirectory,
     ActorDisplay,
     AssigneeIds,
-    RecipientResolver,
     ResolvedRecipients,
 )
-from telescreen.ports.issues import ResourceIssueReader, ResourceIssueRef
+from telescreen.ports.identity_context import ActorLookup
+from telescreen.ports.issues import ResourceIssueRef
 from tests.support.db import SqliteHarness, make_sqlite_harness
 
 
@@ -50,7 +50,7 @@ class EmptyAudit(AuditLog):
         return 1
 
 
-class EmptyRecipients(RecipientResolver):
+class EmptyRecipients:
     """Provide the resolver dependency without external directory calls."""
 
     async def resolve(self, session: AsyncSession, ref: str) -> ResolvedRecipients:
@@ -63,33 +63,30 @@ class EmptyRecipients(RecipientResolver):
         del session, member_id, ref
         return False
 
-    async def assignee_of(self, session: AsyncSession, ref: str) -> AssigneeIds:
+    async def assignee_of(self, ref: str) -> AssigneeIds:
         """Raise the static unknown-recipient boundary."""
-        del session, ref
+        del ref
         from telescreen.core.errors import TelescreenError
 
         raise TelescreenError(ErrorCode.RECIPIENT_UNKNOWN, "recipient is unknown")
 
 
-class EmptyIssueReader(ResourceIssueReader):
+class EmptyIssueReader(AssetIssueLookup):
     """Return no issue references."""
 
     async def open_issues_for_resources(
-        self, session: AsyncSession, resource_keys: tuple[str, ...]
+        self, resource_keys: tuple[str, ...]
     ) -> tuple[ResourceIssueRef, ...]:
         """Return no issue references for every resource key."""
-        del session, resource_keys
+        del resource_keys
         return ()
 
 
-class EmptyActors(ActorDirectory):
+class EmptyActors(ActorLookup):
     """Return an empty actor view for each requested ref."""
 
-    async def display(
-        self, session: AsyncSession, refs: tuple[str, ...]
-    ) -> tuple[ActorDisplay, ...]:
+    async def display(self, refs: tuple[str, ...]) -> tuple[ActorDisplay, ...]:
         """Provide a typed empty sequence for router construction only."""
-        del session
         return tuple(
             ActorDisplay(ref, ActorDisplayKind.UNKNOWN, "Unknown", None, False) for ref in refs
         )
@@ -228,7 +225,7 @@ async def test_values_validation_put_and_registration() -> None:
                 created_at=now,
                 updated_at=now,
             )
-            counter: CounterRow = CounterRow(name="data_asset_number", value=1)
+            counter: InventoryCounterRow = InventoryCounterRow(name="data_asset_number", value=1)
             session.add_all((field_row, asset, counter))
         async with AsyncClient(
             transport=ASGITransport(app=admin), base_url="http://test"

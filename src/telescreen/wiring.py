@@ -192,6 +192,8 @@ class Container:
     v12: WiringV12
     v13: WiringV13
     v14: WiringV14
+    inventory_sessions: async_sessionmaker[AsyncSession]
+    inventory_engine: AsyncEngine | None
 
     async def ensure_indexes(self) -> None:
         """Initialize configured search indexes before serving requests."""
@@ -200,10 +202,16 @@ class Container:
 
 async def close_container(container: Container) -> None:
     """Close database and HTTP resources owned by the application."""
-    if container.owns_engine:
-        await container.engine.dispose()
-    if container.owns_http:
-        await container.http.aclose()
+    try:
+        if container.inventory_engine is not None:
+            await container.inventory_engine.dispose()
+    finally:
+        try:
+            if container.owns_engine:
+                await container.engine.dispose()
+        finally:
+            if container.owns_http:
+                await container.http.aclose()
 
 
 def build_container(
@@ -212,9 +220,12 @@ def build_container(
     http: httpx.AsyncClient,
     sessions: async_sessionmaker[AsyncSession] | None = None,
     clock: Clock | None = None,
+    inventory_sessions: async_sessionmaker[AsyncSession] | None = None,
 ) -> Container:
     """Build feature services, worker handlers, and API routers."""
-    primitives: RuntimePrimitives = build_primitives(settings, env, http, sessions, clock)
+    primitives: RuntimePrimitives = build_primitives(
+        settings, env, http, sessions, clock, inventory_sessions
+    )
     resolver: DirectoryRecipientResolver = DirectoryRecipientResolver()
     directory: DirectoryService = DirectoryService(
         primitives.audit, primitives.clock, fingerprinter=primitives.fingerprinter
@@ -311,7 +322,6 @@ def build_container(
             primitives.sessions,
             primitives.clock,
             settings,
-            primitives.audit,
             primitives.redactor,
             primitives.fingerprinter,
             collector_repository,
@@ -323,9 +333,10 @@ def build_container(
             notification_service,
             queue,
             ctx,
+            inventory_sessions=primitives.inventory_sessions,
         )
     )
-    issue_service.inventory = v14.observer
+    issue_service.inventory = v14.publisher
     collector: CollectorService = CollectorService(
         collector_registry,
         queue,
@@ -336,7 +347,7 @@ def build_container(
         primitives.audit,
         primitives.clock,
         health.collector_recorder,
-        inventory=v14.reconciler,
+        inventory=v14.publisher,
     )
     sweeper: CollectorSweeperImpl = CollectorSweeperImpl(
         primitives.sessions,
@@ -592,7 +603,7 @@ def build_container(
             100,
             coverage=health.coverage,
             health=health.collector_recorder,
-            inventory=v14.reconciler,
+            inventory=v14.publisher,
         )
     )
     handlers.register(WatchRenewHandler(primitives.sessions, collector))
@@ -617,7 +628,7 @@ def build_container(
         run_engine,
         primitives.audit,
         primitives.clock,
-        inventory=v14.reconciler,
+        inventory=v14.publisher,
     )
     handlers.register(map_reducer)
     handlers.register(
@@ -805,4 +816,6 @@ def build_container(
         ),
         v13,
         v14,
+        primitives.inventory_sessions,
+        primitives.inventory_engine,
     )

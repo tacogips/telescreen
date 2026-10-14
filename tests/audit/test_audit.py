@@ -225,7 +225,7 @@ async def test_postgres_audit_records_reject_update() -> None:
         pytest.skip("requires TELESCREEN_TEST_DATABASE_URL")
     await asyncio.to_thread(upgrade, database_url)
     engine: AsyncEngine = create_async_engine(database_url)
-    sequence: int = 2_000_000_000 + time.time_ns() % 1_000_000_000
+    sequence: int = 2_000_000_000 + time.time_ns() % 100_000_000
     async with engine.connect() as connection:
         await connection.begin()
         try:

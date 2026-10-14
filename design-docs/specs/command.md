@@ -12,6 +12,69 @@ are secret references (`env:NAME` or `file:/path`).
 
 ---
 
+### Inventory delivery
+
+Apply migrations through `0009_inventory_counter` before deploying the inventory changes.
+Stop application writers during revision backfill and allocator cutover. Use the existing worker for asynchronous inventory projection:
+
+```bash
+uv run python -m telescreen migrate
+uv run python -m telescreen worker
+```
+
+Source ingestion commits issue/alert work and a durable inventory command together.
+The asset list, counts and resource-to-asset lookup can lag successful ingestion until
+the worker applies that command. Manual inventory metadata writes remain local.
+`worker --once` processes currently ready tasks and may leave delayed retries or sequence
+gaps pending; use the continuous worker in deployed environments. Recovery polling
+requeues abandoned or exhausted delivery tasks while their outbox commands remain pending.
+
+Inventory mutations and exports also commit a local masked audit intent. The worker
+appends it to the global audit chain and acknowledges it after commit. The audit log can
+lag a successful inventory response during retries; the intent remains durable. Its record
+timestamp preserves occurrence time, while chain sequence follows audit insertion order.
+Stop writers and drain the inventory audit outbox before downgrading past
+`0007_inventory_audit`; the downgrade refuses to discard pending audit entries.
+
+Overdue checks publish masked, revision-specific obligations without waiting for
+notifications. The worker rechecks eligibility and current owner, then applies notification
+preferences and DLP in the notification transaction. A due-date edit can commit during a
+notification outage; superseded pending revisions are skipped on recovery. The legacy
+`overdue_notified_for` column records publication rather than successful channel delivery.
+Keep the worker running to recover exhausted attempts. Stop writers and drain the retention
+outbox before downgrading past `0008_retention_handoff`. The `0009_inventory_counter`
+downgrade preserves newly allocated numbers in legacy counter storage; stop all writers
+before switching allocator versions.
+
+For a new deployment with empty stores, set `TELESCREEN_DATABASE_URL` to main and
+`TELESCREEN_INVENTORY_DATABASE_URL` to inventory, then run `migrate`. Each owner uses a
+frozen migration history and separate version table. The command upgrades main before
+inventory; rerun after a failure to finish the remaining owner. To migrate with one
+owner's credentials only, use `migrate --store main` or `migrate --store inventory`.
+Inventory migration uses the inventory URL, falling back to the main URL if unset.
+Migration does not require fingerprint or channel secrets.
+
+An unset, empty or identical inventory URL preserves shared runtime sessions and the
+legacy default migration command. The new owner baselines refuse existing owner tables;
+existing shared deployments can adopt the existing schema explicitly after applying
+legacy migrations through `0009_inventory_counter`. With every application writer stopped,
+run `migrate --store main --adopt --writers-stopped` against main. The equivalent inventory
+command adopts existing inventory tables at its configured URL. Adoption validates schema,
+allocation and audit state and stamps the owner history in one transaction; it preserves
+business rows and refuses mismatches. After both owners have adopted independent histories,
+shared `migrate` commands continue those histories. These migrations require online
+database connections.
+
+`inventory-store copy --writers-stopped` copies the ten inventory tables from main to
+inventory; `inventory-store verify --writers-stopped` compares their complete manifests.
+`--direction merge` reverses the direction for authoritative rollback after new inventory
+writes. Copy commits only after target verification; identical retries do not rewrite data.
+Stop every writer through the database/configuration switch. Follow the complete
+[cutover and rollback procedure](design-inventory-store-cutover.md), including credential
+scope, backups, adoption and handling pending handoffs. Setting a URL alone does not move
+assets or delivery state.
+
+
 ## Sections
 
 ### Subcommands
@@ -20,7 +83,10 @@ are secret references (`env:NAME` or `file:/path`).
 |---------|-------------|
 | `telescreen serve [--host 0.0.0.0] [--port 8000]` | Run the Reporting Bureau API (uvicorn) |
 | `telescreen worker [--once]` | Run the engine worker and scheduler; `--once` processes ready tasks then exits |
-| `telescreen migrate [--revision head]` | Apply Alembic migrations |
+| `telescreen migrate [--revision head] [--store main\|inventory]` | Apply the configured migration histories; optionally select one owner |
+| `telescreen migrate --store main\|inventory --adopt --writers-stopped` | Validate an existing baseline owner schema and adopt its history without rewriting business data |
+| `telescreen inventory-store copy [--direction split\|merge] --writers-stopped` | Copy/verify all inventory rows atomically; merge restores authoritative inventory to main |
+| `telescreen inventory-store verify [--direction split\|merge] --writers-stopped` | Compare complete inventory manifests without replacing rows |
 | `telescreen workflow validate FILE...` | Offline validation of workflow YAML/JSON; prints errors with JSON paths |
 | `telescreen collector run NAME [--watch]` | Enqueue an immediate scan of a collector config; `--watch` (gdrive kinds) registers the Drive push channel |
 | `telescreen collector sweep NAME` | Start a concurrent map-reduce sweep of a collector config's whole estate and print the map job id (exit 1 with `conflict` if a sweep of that config is still active) |
@@ -38,6 +104,7 @@ Bare `telescreen` prints help and exits 2.
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `TELESCREEN_DATABASE_URL` | yes (except `workflow validate`) | - | SQLAlchemy async URL (`postgresql+asyncpg://...`) |
+| `TELESCREEN_INVENTORY_DATABASE_URL` | no | main URL | Inventory-owned SQLAlchemy async store; a distinct URL selects independent migrations for new empty stores |
 | `TELESCREEN_FINGERPRINT_KEY` | yes, unless `TELESCREEN_FINGERPRINT_KEYS` is set (except `workflow validate`) | - | Secret ref; HMAC key for fingerprints and resource keys (>= 32 bytes). From v1.1 it means key version 1; setting it together with `TELESCREEN_FINGERPRINT_KEYS` is a configuration error |
 | `TELESCREEN_FINGERPRINT_KEYS` | no (v1.1) | unset | Comma list `<version>=<secret ref>`; version 1 is required (identity key for resource, placement and owner keys) |
 | `TELESCREEN_FINGERPRINT_ACTIVE_VERSION` | no (v1.1) | highest configured version | Key version for new value fingerprints and external re-keying |

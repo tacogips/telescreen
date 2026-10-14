@@ -65,7 +65,7 @@ RAW_LISTING_EMAIL: str = "listing-owner@example.com"
 @pytest.mark.asyncio
 async def test_e1_e2_e3_e7_inventory_modes_items_lifecycle_and_export(tmp_path: Path) -> None:
     """Exercise push discovery, item deltas, lifecycle signals, and safe CSV export."""
-    world: E2EWorld = await make_world(tmp_path, (), OutboundRecorder())
+    world: E2EWorld = await make_world(tmp_path, (), OutboundRecorder(), independent_sessions=True)
     try:
 
         async def collector(name: str, mode: str) -> str:
@@ -110,11 +110,13 @@ async def test_e1_e2_e3_e7_inventory_modes_items_lifecycle_and_export(tmp_path: 
                 removed=removed,
                 item_keys=item_keys,
             )
-            return await world.client.post(
+            response: httpx.Response = await world.client.post(
                 "/api/ingest/v1/scan",
                 headers=bearer(ingest_token.token),
                 json=asdict(IngestScanBody(source, [resource])),
             )
+            await world.drain()
+            return response
 
         no_finding: httpx.Response = await ingest("custom:v14-sensitive", "clean.txt")
         assert no_finding.status_code == 200, no_finding.text
@@ -216,6 +218,7 @@ async def test_e1_e2_e3_e7_inventory_modes_items_lifecycle_and_export(tmp_path: 
             },
         )
         assert patch_off.status_code == 200, patch_off.text
+        await world.drain()
         stopped: httpx.Response = await world.client.get(
             "/api/data/assets?source=custom:v14-sensitive", headers=bearer(world.admin_token)
         )
@@ -268,6 +271,7 @@ async def test_e4_police_pull_inventory_creates_rekeyed_items(tmp_path: Path) ->
             ("E2E_ENROLL", "e2e-enrollment-" + "x" * 32),
         ),
         OutboundRecorder(),
+        independent_sessions=True,
     )
     try:
         collector: httpx.Response = await world.client.post(
@@ -333,6 +337,7 @@ async def test_e4_police_pull_inventory_creates_rekeyed_items(tmp_path: Path) ->
             1,
         )
         await worker.run(stop)
+        await world.drain()
         async with world.database.sessions() as session:
             task: PoliceTaskRow | None = await session.get(PoliceTaskRow, task_id)
             assert task is not None and task.status == PoliceTaskStatus.COMPLETED.value, (
@@ -449,7 +454,7 @@ async def test_e3_full_listing_deletes_absent_asset_only_when_authoritative(
     tmp_path: Path,
 ) -> None:
     """Only a completed full listing with no skipped ref deletes; a later sighting restores."""
-    world: E2EWorld = await make_world(tmp_path, (), OutboundRecorder())
+    world: E2EWorld = await make_world(tmp_path, (), OutboundRecorder(), independent_sessions=True)
     adapter: ListingAdapter = ListingAdapter(listed=("doc-a", "doc-b"))
     world.container.collector_registry.register(adapter)
     try:

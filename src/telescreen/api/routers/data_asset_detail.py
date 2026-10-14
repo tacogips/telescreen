@@ -6,6 +6,7 @@ from typing import Annotated
 
 import pydantic
 from fastapi import APIRouter, Depends, Query, Response
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from telescreen.api.common.auth import Principal, require_permission
 from telescreen.api.common.context import ApiContext
@@ -59,10 +60,12 @@ class DataAssetDetailRouterDeps:
     ctx: ApiContext
     queries: AssetQueries
     assets: AssetService
+    inventory_sessions: async_sessionmaker[AsyncSession] | None = None
 
 
 def build_data_asset_detail_router(deps: DataAssetDetailRouterDeps) -> APIRouter:
     """Build the eight standalone asset detail and mutation routes."""
+    data_sessions: async_sessionmaker[AsyncSession] = deps.inventory_sessions or deps.ctx.sessions
     router: APIRouter = APIRouter(tags=["data"])
 
     @router.get("/api/data/assets/{asset_id}")
@@ -73,7 +76,7 @@ def build_data_asset_detail_router(deps: DataAssetDetailRouterDeps) -> APIRouter
         ],
     ) -> Response:
         del principal
-        async with deps.ctx.sessions() as session:
+        async with data_sessions() as session:
             view: AssetDetailView | None = await deps.queries.detail(
                 session, asset_id, deps.ctx.clock.now().date()
             )
@@ -92,7 +95,7 @@ def build_data_asset_detail_router(deps: DataAssetDetailRouterDeps) -> APIRouter
     ) -> Response:
         del principal
         await _require_asset(deps, asset_id)
-        async with deps.ctx.sessions() as session:
+        async with data_sessions() as session:
             page: EventPage = await deps.queries.events(session, asset_id, limit, cursor)
         return Response(
             dump_json(
@@ -124,7 +127,7 @@ def build_data_asset_detail_router(deps: DataAssetDetailRouterDeps) -> APIRouter
         if kind not in ("item", "value") or state not in ("present", "removed"):
             raise TelescreenError(ErrorCode.VALIDATION_ERROR, "invalid item filter")
         await _require_asset(deps, asset_id)
-        async with deps.ctx.sessions() as session:
+        async with data_sessions() as session:
             page: ItemPage = await deps.queries.items(session, asset_id, kind, state, limit, cursor)
         return Response(
             dump_json(
@@ -151,7 +154,7 @@ def build_data_asset_detail_router(deps: DataAssetDetailRouterDeps) -> APIRouter
     ) -> Response:
         del principal
         await _require_asset(deps, asset_id)
-        async with deps.ctx.sessions() as session:
+        async with data_sessions() as session:
             points: tuple[SeriesPoint, ...] = await deps.queries.item_series(
                 session, asset_id, days, deps.ctx.clock.now().date()
             )
@@ -187,7 +190,7 @@ def build_data_asset_detail_router(deps: DataAssetDetailRouterDeps) -> APIRouter
             Principal, Depends(require_permission(deps.ctx, Permission.DATA_WRITE))
         ],
     ) -> Response:
-        async with deps.ctx.sessions.begin() as session:
+        async with data_sessions.begin() as session:
             await deps.assets.patch(session, asset_id, body.name, body.kind, principal.actor_ref())
             view: AssetDetailView | None = await deps.queries.detail(
                 session, asset_id, deps.ctx.clock.now().date()
@@ -204,7 +207,7 @@ def build_data_asset_detail_router(deps: DataAssetDetailRouterDeps) -> APIRouter
             Principal, Depends(require_permission(deps.ctx, Permission.DATA_WRITE))
         ],
     ) -> Response:
-        async with deps.ctx.sessions.begin() as session:
+        async with data_sessions.begin() as session:
             await deps.assets.record_event(
                 session,
                 asset_id,
@@ -231,7 +234,7 @@ def build_data_asset_detail_router(deps: DataAssetDetailRouterDeps) -> APIRouter
             Principal, Depends(require_permission(deps.ctx, Permission.DATA_WRITE))
         ],
     ) -> Response:
-        async with deps.ctx.sessions.begin() as session:
+        async with data_sessions.begin() as session:
             await deps.assets.mark_deleted(
                 session, asset_id, principal.actor_ref(), body.occurred_at, body.note
             )
@@ -249,7 +252,7 @@ def build_data_asset_detail_router(deps: DataAssetDetailRouterDeps) -> APIRouter
             Principal, Depends(require_permission(deps.ctx, Permission.DATA_WRITE))
         ],
     ) -> Response:
-        async with deps.ctx.sessions.begin() as session:
+        async with data_sessions.begin() as session:
             await deps.assets.restore(session, asset_id, principal.actor_ref())
             view: AssetDetailView | None = await deps.queries.detail(
                 session, asset_id, deps.ctx.clock.now().date()
@@ -263,7 +266,8 @@ def build_data_asset_detail_router(deps: DataAssetDetailRouterDeps) -> APIRouter
 
 async def _require_asset(deps: DataAssetDetailRouterDeps, asset_id: str) -> None:
     """Raise a stable not-found response for unknown asset ids."""
-    async with deps.ctx.sessions() as session:
+    data_sessions: async_sessionmaker[AsyncSession] = deps.inventory_sessions or deps.ctx.sessions
+    async with data_sessions() as session:
         row: AssetDetailView | None = await deps.queries.detail(
             session, asset_id, deps.ctx.clock.now().date()
         )

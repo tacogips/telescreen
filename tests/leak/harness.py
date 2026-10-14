@@ -165,10 +165,17 @@ class LeakWorld:
 
 
 async def make_leak_world(
-    tmp: Path, with_llm: bool, oidc: OidcSettings | None = None, idp: TestIdp | None = None
+    tmp: Path,
+    with_llm: bool,
+    oidc: OidcSettings | None = None,
+    idp: TestIdp | None = None,
+    *,
+    independent_sessions: bool = False,
 ) -> LeakWorld:
     """Build a real Telescreen container with only declared test seams."""
-    database: SqliteHarness = await make_sqlite_harness()
+    database: SqliteHarness = await make_sqlite_harness(
+        tmp / "telescreen.sqlite3" if independent_sessions else None
+    )
     clock: FakeClock = FakeClock(datetime(2026, 10, 10, tzinfo=UTC))
     recorder: Recorder = Recorder(idp=idp)
     log_buffer: io.StringIO = io.StringIO()

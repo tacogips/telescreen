@@ -96,6 +96,7 @@ class TelescreenSettings:
     github_issues_token_ref: str | None = None
     github_issues_repos: tuple[str, ...] = ()
     data_overdue_cron: str | None = "0 9 * * *"
+    inventory_database_url: str | None = None
 
 
 def _read(env: EnvSource, name: str) -> str | None:
@@ -298,6 +299,7 @@ def load_settings(env: EnvSource) -> TelescreenSettings:
     )
     return TelescreenSettings(
         database_url=_optional(env, "DATABASE_URL"),
+        inventory_database_url=_optional(env, "INVENTORY_DATABASE_URL"),
         fingerprint_key_ref=fingerprint_key_ref,
         police_signing_key_ref=_optional(env, "POLICE_SIGNING_KEY"),
         police_enrollment_token_ref=_optional(env, "POLICE_ENROLLMENT_TOKEN"),

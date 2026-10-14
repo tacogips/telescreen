@@ -129,7 +129,7 @@ class CollectorService:
         inventory_mode: InventoryMode | None = None,
     ) -> CollectorConfig:
         """Validate and update a collector config."""
-        current: CollectorConfig | None = await self.repository.get(session, config_id)
+        current: CollectorConfig | None = await self.repository.get_locked(session, config_id)
         if current is None:
             raise TelescreenError(ErrorCode.NOT_FOUND, "collector not found")
         self._validate(

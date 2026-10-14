@@ -5,7 +5,7 @@ from alembic import op
 from sqlalchemy import MetaData, Table, text
 from sqlalchemy.engine import Connection
 
-from telescreen.db import models as _models
+from telescreen.db.migrations.frozen import metadata_for
 
 revision: str = "0005_v1_4"
 down_revision: str | None = "0004_v1_3"
@@ -21,6 +21,8 @@ NEW_TABLES: tuple[str, ...] = (
 )
 NEW_COLUMNS: tuple[tuple[str, tuple[str, ...]], ...] = (("collector_configs", ("inventory_mode",)),)
 
+_metadata: MetaData = metadata_for(5)
+
 
 def upgrade() -> None:
     """Create missing inventory schema and seed its asset counter."""
@@ -29,7 +31,7 @@ def upgrade() -> None:
     existing_tables: set[str] = set(inspector.get_table_names())
     for table_name in NEW_TABLES:
         if table_name not in existing_tables:
-            table: Table = _models.DataAssetRow.metadata.tables[table_name]
+            table: Table = _metadata.tables[table_name]
             cloned: Table = table.to_metadata(MetaData())
             op.create_table(table.name, *list(cloned.columns), *list(cloned.constraints))
             existing_tables.add(table_name)
@@ -40,14 +42,12 @@ def upgrade() -> None:
         }
         for column_name in column_names:
             if column_name not in existing_columns:
-                column: sa.Column[str] = _models.DataAssetRow.metadata.tables[table_name].c[
-                    column_name
-                ]
+                column: sa.Column[str] = _metadata.tables[table_name].c[column_name]
                 op.add_column(table_name, column._copy())
                 existing_columns.add(column_name)
 
     for table_name in NEW_TABLES:
-        table = _models.DataAssetRow.metadata.tables[table_name]
+        table = _metadata.tables[table_name]
         existing_indexes: set[str] = {
             str(index["name"])
             for index in sa.inspect(bind).get_indexes(table_name)

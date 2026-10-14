@@ -48,6 +48,12 @@ def _parser() -> argparse.ArgumentParser:
     worker.add_argument("--once", action="store_true")
     migrate: argparse.ArgumentParser = commands.add_parser("migrate")
     migrate.add_argument("--revision", default="head")
+    migrate.add_argument("--store", choices=("main", "inventory"))
+    migrate.add_argument("--adopt", action="store_true")
+    migrate.add_argument("--writers-stopped", action="store_true")
+    from telescreen.cli_inventory_store import add_commands
+
+    add_commands(commands)
     workflow: argparse.ArgumentParser = commands.add_parser("workflow")
     workflow_commands: argparse._SubParsersAction[argparse.ArgumentParser] = (
         workflow.add_subparsers(dest="workflow_command")
@@ -257,12 +263,35 @@ def main(argv: Sequence[str] | None = None) -> int:
         if arguments.command == "migrate":
             if settings.database_url is None:
                 raise ConfigError("TELESCREEN_DATABASE_URL is required")
-            from telescreen.db.migrate import upgrade
+            from telescreen.db.migrate import upgrade_configured
+            from telescreen.db.ownership import Store
 
-            upgrade(settings.database_url, arguments.revision)
+            if arguments.adopt:
+                if arguments.store is None or arguments.revision != "head":
+                    raise ConfigError("owner adoption requires --store and the baseline head")
+                from telescreen.db.adopt import adopt_owner
+
+                store: Store = Store(arguments.store)
+                selected_url: str = (
+                    settings.inventory_database_url or settings.database_url
+                    if store is Store.INVENTORY
+                    else settings.database_url
+                )
+                adopt_owner(selected_url, store, writers_stopped=arguments.writers_stopped)
+            else:
+                upgrade_configured(
+                    settings.database_url,
+                    settings.inventory_database_url,
+                    arguments.revision,
+                    Store(arguments.store) if arguments.store is not None else None,
+                )
             return 0
         if arguments.command == "serve":
             return _serve(settings, env, arguments.host, arguments.port)
+        if arguments.command == "inventory-store":
+            from telescreen.cli_inventory_store import run
+
+            return run(settings, arguments)
         container: Container
         container = _build_cli_container(settings, env)
         return asyncio.run(_run_and_close(container, arguments))

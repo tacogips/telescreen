@@ -49,7 +49,7 @@ async def test_real_data_api_key_sets_match_v14_mock_manifest(tmp_path: Path) ->
     manifest: JsonValue = parse_json(
         Path("src/web/src/api/mock/fixtures/v14-shapes.json").read_text(encoding="utf-8")
     )
-    world: E2EWorld = await make_world(tmp_path, (), OutboundRecorder())
+    world: E2EWorld = await make_world(tmp_path, (), OutboundRecorder(), independent_sessions=True)
     try:
         collector: httpx.Response = await world.client.post(
             "/api/collectors",
@@ -86,6 +86,7 @@ async def test_real_data_api_key_sets_match_v14_mock_manifest(tmp_path: Path) ->
             },
         )
         assert ingest.status_code == 200, ingest.text
+        await world.drain()
 
         created_field: httpx.Response = await world.client.post(
             "/api/data/fields",

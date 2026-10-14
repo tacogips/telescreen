@@ -6,6 +6,7 @@ from typing import Annotated
 import pydantic
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from telescreen.api.common.auth import Principal, require_permission
 from telescreen.api.common.context import ApiContext
@@ -55,10 +56,12 @@ class DataAssetValuesRouterDeps:
     values: ValueService
     registration: RegistrationService
     queries: AssetQueries
+    inventory_sessions: async_sessionmaker[AsyncSession] | None = None
 
 
 def build_data_asset_values_router(deps: DataAssetValuesRouterDeps) -> APIRouter:
     """Build value update and manual registration routes."""
+    data_sessions: async_sessionmaker[AsyncSession] = deps.inventory_sessions or deps.ctx.sessions
     router: APIRouter = APIRouter(tags=["data"])
 
     @router.put("/api/data/assets/{asset_id}/fields")
@@ -73,7 +76,7 @@ def build_data_asset_values_router(deps: DataAssetValuesRouterDeps) -> APIRouter
         values: tuple[ValueInput, ...] = tuple(
             ValueInput(item.key, item.value_json) for item in body.values
         )
-        async with deps.ctx.sessions.begin() as session:
+        async with data_sessions.begin() as session:
             asset: DataAssetRow | None = await session.get(
                 DataAssetRow, asset_id, with_for_update=True
             )
@@ -105,7 +108,7 @@ def build_data_asset_values_router(deps: DataAssetValuesRouterDeps) -> APIRouter
         request: RegistrationBody = RegistrationBody(
             body.name, body.source, body.locator, body.kind, body.item_count, values
         )
-        async with deps.ctx.sessions.begin() as session:
+        async with data_sessions.begin() as session:
             asset_id: str = await deps.registration.register(
                 session, request, principal.actor_ref()
             )

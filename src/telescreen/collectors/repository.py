@@ -35,6 +35,15 @@ class CollectorRepository:
         row: CollectorConfigRow | None = await session.get(CollectorConfigRow, collector_config_id)
         return to_config(row) if row is not None else None
 
+    async def get_locked(
+        self, session: AsyncSession, collector_config_id: str
+    ) -> CollectorConfig | None:
+        """Serialize configuration changes before taking inventory stream locks."""
+        row: CollectorConfigRow | None = await session.get(
+            CollectorConfigRow, collector_config_id, with_for_update=True, populate_existing=True
+        )
+        return to_config(row) if row is not None else None
+
     async def get_by_name(self, session: AsyncSession, name: str) -> CollectorConfig | None:
         """Return a configuration by its unique name."""
         row: CollectorConfigRow | None = await session.scalar(

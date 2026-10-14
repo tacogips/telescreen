@@ -15,7 +15,7 @@ from tests.e2e.harness import E2EWorld, OutboundRecorder, bearer, make_world
 @pytest.mark.asyncio
 async def test_push_discovery_displays_collector_actor_and_null_occurred_at(tmp_path: Path) -> None:
     """A discovered push event shows its collector name and recorded timestamp."""
-    world: E2EWorld = await make_world(tmp_path, (), OutboundRecorder())
+    world: E2EWorld = await make_world(tmp_path, (), OutboundRecorder(), independent_sessions=True)
     try:
         collector: httpx.Response = await world.client.post(
             "/api/collectors",
@@ -48,6 +48,7 @@ async def test_push_discovery_displays_collector_actor_and_null_occurred_at(tmp_
             ),
         )
         assert pushed.status_code == 200, pushed.text
+        await world.drain()
         assets: httpx.Response = await world.client.get(
             "/api/data/assets?source=custom:v14-live-actor", headers=bearer(world.admin_token)
         )

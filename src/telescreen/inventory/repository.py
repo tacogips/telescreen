@@ -4,18 +4,21 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
+from telescreen.core.errors import TelescreenError
 from telescreen.core.ids import new_id
-from telescreen.core.vocabulary import DataEventKind
+from telescreen.core.vocabulary import DataEventKind, ErrorCode
 from telescreen.db.models import (
-    CounterRow,
     DataAssetEventRow,
     DataAssetItemRow,
     DataAssetRow,
     DataFieldValueRow,
+    InventoryCounterRow,
 )
 
 
@@ -46,16 +49,31 @@ class InventoryRepository:
     """Read and insert inventory rows within a caller-owned transaction."""
 
     async def next_asset_number(self, session: AsyncSession) -> int:
-        """Lock and increment the asset number counter."""
-        counter: CounterRow | None = await session.scalar(
-            select(CounterRow).where(CounterRow.name == "data_asset_number").with_for_update()
-        )
-        if counter is None:
-            counter = CounterRow(name="data_asset_number", value=0)
-            session.add(counter)
-            await session.flush()
-        counter.value += 1
-        return counter.value
+        """Allocate atomically, including concurrent first use of an empty inventory store."""
+        result: int | None
+        if session.get_bind().dialect.name == "postgresql":
+            result = await session.scalar(
+                pg_insert(InventoryCounterRow)
+                .values(name="data_asset_number", value=1)
+                .on_conflict_do_update(
+                    index_elements=("name",), set_={"value": InventoryCounterRow.value + 1}
+                )
+                .returning(InventoryCounterRow.value)
+            )
+        elif session.get_bind().dialect.name == "sqlite":
+            result = await session.scalar(
+                sqlite_insert(InventoryCounterRow)
+                .values(name="data_asset_number", value=1)
+                .on_conflict_do_update(
+                    index_elements=("name",), set_={"value": InventoryCounterRow.value + 1}
+                )
+                .returning(InventoryCounterRow.value)
+            )
+        else:
+            raise TelescreenError(ErrorCode.CONFIG_ERROR, "unsupported inventory counter database")
+        if result is None:
+            raise TelescreenError(ErrorCode.CONFLICT, "inventory counter unavailable")
+        return result
 
     async def get(
         self, session: AsyncSession, asset_id: str, lock: bool = False

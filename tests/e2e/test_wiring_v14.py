@@ -45,9 +45,9 @@ async def test_v14_wiring_binds_services_and_resolves_static_routes() -> None:
     try:
         assert isinstance(container.v14.observer, InventoryObserverImpl)
         assert isinstance(container.v14.reconciler, InventoryReconcilerImpl)
-        assert container.issue_service.inventory is container.v14.observer
+        assert container.issue_service.inventory is container.v14.publisher
         assert isinstance(container.collector, CollectorService)
-        assert container.collector.inventory is container.v14.reconciler
+        assert container.collector.inventory is container.v14.publisher
         scan_handler: TaskHandler | None = container.worker.registry.get(
             EngineTaskKind.COLLECTOR_SCAN
         )
@@ -55,9 +55,9 @@ async def test_v14_wiring_binds_services_and_resolves_static_routes() -> None:
             EngineTaskKind.MAP_REDUCE
         )
         assert isinstance(scan_handler, CollectorScanHandler)
-        assert scan_handler.inventory is container.v14.reconciler
+        assert scan_handler.inventory is container.v14.publisher
         assert isinstance(reduce_handler, MapReduceHandler)
-        assert reduce_handler.inventory is container.v14.reconciler
+        assert reduce_handler.inventory is container.v14.publisher
         assert any(
             isinstance(item, DataOverdueProvider) for item in container.worker.scheduler.providers
         )
@@ -66,6 +66,25 @@ async def test_v14_wiring_binds_services_and_resolves_static_routes() -> None:
             is container.v14.overdue_handler
         )
         assert isinstance(container.v14.overdue_handler, DataOverdueHandler)
+        assert (
+            container.worker.registry.get(EngineTaskKind.INVENTORY_DELIVERY)
+            is container.v14.delivery_handler
+        )
+        assert container.v14.recovery_provider in container.worker.scheduler.providers
+        assert container.v14.audit_recovery_provider in container.worker.scheduler.providers
+        assert (
+            container.worker.registry.get(EngineTaskKind.INVENTORY_AUDIT_DELIVERY)
+            is container.v14.audit_delivery_handler
+        )
+        assert container.v14.assets.audit is container.v14.audit_publisher
+        assert container.v14.fields.audit is container.v14.audit_publisher
+        assert container.v14.values.audit is container.v14.audit_publisher
+        assert container.v14.registration.audit is container.v14.audit_publisher
+        assert container.v14.retention_recovery_provider in container.worker.scheduler.providers
+        assert (
+            container.worker.registry.get(EngineTaskKind.RETENTION_DELIVERY)
+            is container.v14.retention_delivery_handler
+        )
 
         app: FastAPI = create_app(container)
         routes: tuple[APIRoute, ...] = tuple(

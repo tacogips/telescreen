@@ -477,6 +477,9 @@ class EngineTaskKind(StrEnum):
     OWNER_DIGEST = "owner_digest"
     WEEKLY_REPORT = "weekly_report"
     DATA_OVERDUE_CHECK = "data_overdue_check"
+    INVENTORY_DELIVERY = "inventory_delivery"
+    INVENTORY_AUDIT_DELIVERY = "inventory_audit_delivery"
+    RETENTION_DELIVERY = "retention_delivery"
 
 
 class InventoryMode(StrEnum):

@@ -40,6 +40,8 @@ class RuntimePrimitives:
     search: SearchBackend
     indexer: DocumentIndexer
     owns_engine: bool
+    inventory_sessions: async_sessionmaker[AsyncSession]
+    inventory_engine: AsyncEngine | None
 
 
 def build_primitives(
@@ -48,6 +50,7 @@ def build_primitives(
     http: httpx.AsyncClient,
     sessions: async_sessionmaker[AsyncSession] | None = None,
     clock: Clock | None = None,
+    inventory_sessions: async_sessionmaker[AsyncSession] | None = None,
 ) -> RuntimePrimitives:
     """Build database, masking, audit and guarded search primitives."""
     if settings.database_url is None:
@@ -70,6 +73,16 @@ def build_primitives(
     )
     engine: AsyncEngine = create_engine(settings.database_url)
     selected_sessions: async_sessionmaker[AsyncSession] = sessions or create_sessionmaker(engine)
+    inventory_engine: AsyncEngine | None = None
+    selected_inventory: async_sessionmaker[AsyncSession] = selected_sessions
+    if inventory_sessions is not None:
+        selected_inventory = inventory_sessions
+    elif (
+        settings.inventory_database_url is not None
+        and settings.inventory_database_url != settings.database_url
+    ):
+        inventory_engine = create_engine(settings.inventory_database_url)
+        selected_inventory = create_sessionmaker(inventory_engine)
     audit: AuditLogService = AuditLogService(selected_clock, redactor)
     backend: SearchBackend
     if settings.meili_url is None:
@@ -99,4 +112,6 @@ def build_primitives(
         backend,
         indexer,
         True,
+        selected_inventory,
+        inventory_engine,
     )

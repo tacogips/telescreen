@@ -46,7 +46,8 @@ def _assert_v14_schema(engine: Engine) -> None:
         column["name"] for column in inspector.get_columns("collector_configs")
     }
     assert "inventory_mode" in config_columns
-    assert len(table_names - {"alembic_version"}) == 53
+    # Head also includes the four durable inventory handoff tables.
+    assert len(table_names - {"alembic_version"}) == 62
     assert "uq_data_asset_items_key" in {
         str(constraint["name"])
         for constraint in inspector.get_unique_constraints("data_asset_items")

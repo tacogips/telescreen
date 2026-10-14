@@ -5,19 +5,11 @@ from dataclasses import dataclass, field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from telescreen.core.vocabulary import ActorDisplayKind, ActorKind
+from telescreen.core.vocabulary import ActorDisplayKind
 from telescreen.db.models import ApiTokenRow, MemberRow, TeamRow
 from telescreen.directory.repository import DirectoryRepository
 from telescreen.ports.directory import ActorDirectory, ActorDisplay
-
-
-def actor_kind_for(actor_ref: str) -> ActorKind:
-    """Classify an actor reference by its prefix for audit entries."""
-    if actor_ref.startswith("member:"):
-        return ActorKind.MEMBER
-    if actor_ref.startswith("token:"):
-        return ActorKind.TOKEN
-    return ActorKind.SYSTEM
+from telescreen.ports.identity_context import actor_kind_for as actor_kind_for
 
 
 @dataclass

@@ -6,7 +6,8 @@ from typing import Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from telescreen.core.vocabulary import ActorDisplayKind
+from telescreen.ports.identity_context import ActorDisplay as ActorDisplay
+from telescreen.ports.identity_context import AssigneeIds as AssigneeIds
 
 SLACK_CHANNEL_ID: re.Pattern[str] = re.compile(r"^[CG][A-Z0-9]{8,}$")
 """Public (C) or private (G) Slack channel id; user (U/W) and DM (D) ids are not channels."""
@@ -20,14 +21,6 @@ class ResolvedRecipients:
     slack_channels: tuple[str, ...]
     slack_user_ids: tuple[str, ...]
     member_ids: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class AssigneeIds:
-    """Resolved member or team assignment identifiers."""
-
-    member_id: str | None
-    team_id: str | None
 
 
 class RecipientResolver(Protocol):
@@ -68,17 +61,6 @@ class OwnerDirectory(Protocol):
     async def team_lead(self, session: AsyncSession, team_slug: str) -> str | None:
         """Return the lead member reference for a team slug."""
         ...
-
-
-@dataclass(frozen=True)
-class ActorDisplay:
-    """Safe display identity resolved from an actor reference."""
-
-    ref: str
-    kind: ActorDisplayKind
-    display_name: str
-    handle: str | None
-    active: bool
 
 
 class ActorDirectory(Protocol):

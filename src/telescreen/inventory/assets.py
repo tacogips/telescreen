@@ -16,11 +16,11 @@ from telescreen.core.vocabulary import (
     ErrorCode,
 )
 from telescreen.db.models import DataAssetRow
-from telescreen.directory.actors import actor_kind_for
 from telescreen.inventory.lifecycle import delete_asset, restore_asset
 from telescreen.inventory.repository import DataEventDraft, InventoryRepository
 from telescreen.masking.redact import Redactor
 from telescreen.ports.audit import AuditEntry, AuditLog
+from telescreen.ports.identity_context import actor_kind_for
 
 
 @dataclass(frozen=True)

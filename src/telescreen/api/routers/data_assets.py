@@ -6,6 +6,7 @@ from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from telescreen.api.common.auth import Principal, require_permission
 from telescreen.api.common.context import ApiContext
@@ -44,10 +45,12 @@ class DataAssetsRouterDeps:
     exporter: AssetExporter
     audit: AuditLog
     redactor: Redactor
+    inventory_sessions: async_sessionmaker[AsyncSession] | None = None
 
 
 def build_data_assets_router(deps: DataAssetsRouterDeps) -> APIRouter:
     """Build the standalone data asset collection router."""
+    data_sessions: async_sessionmaker[AsyncSession] = deps.inventory_sessions or deps.ctx.sessions
     router: APIRouter = APIRouter(tags=["data"])
 
     @router.get("/api/data/assets")
@@ -59,7 +62,7 @@ def build_data_assets_router(deps: DataAssetsRouterDeps) -> APIRouter:
     ) -> Response:
         del principal
         filters: AssetFilters = parse_filters(request.query_params, deps.redactor)
-        async with deps.ctx.sessions() as session:
+        async with data_sessions() as session:
             page: AssetPage = await deps.queries.list(session, filters, deps.ctx.clock.now().date())
         return Response(
             dump_json(
@@ -85,7 +88,7 @@ def build_data_assets_router(deps: DataAssetsRouterDeps) -> APIRouter:
     ) -> Response:
         del principal
         filters: AssetFilters = parse_filters(request.query_params, deps.redactor)
-        async with deps.ctx.sessions() as session:
+        async with data_sessions() as session:
             result: CountsView = await deps.queries.counts(
                 session, filters, deps.ctx.clock.now().date()
             )
@@ -113,7 +116,7 @@ def build_data_assets_router(deps: DataAssetsRouterDeps) -> APIRouter:
     ) -> Response:
         filters: AssetFilters = parse_filters(request.query_params, deps.redactor)
         today: date = deps.ctx.clock.now().date()
-        async with deps.ctx.sessions.begin() as session:
+        async with data_sessions.begin() as session:
             export: CsvExport = await deps.exporter.export(session, filters, today)
             await deps.audit.append(
                 session,
@@ -158,7 +161,7 @@ def build_data_assets_router(deps: DataAssetsRouterDeps) -> APIRouter:
         del principal
         if re.fullmatch(r"[0-9a-f]{64}", resource_key) is None:
             raise TelescreenError(ErrorCode.VALIDATION_ERROR, "invalid resource key")
-        async with deps.ctx.sessions() as session:
+        async with data_sessions() as session:
             asset: AssetView | None = await deps.queries.by_resource_key(
                 session, resource_key, deps.ctx.clock.now().date()
             )

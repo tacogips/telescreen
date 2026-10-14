@@ -63,6 +63,7 @@ async def run_v14_flows(world: LeakWorld, smtp_messages: list[str]) -> tuple[str
             json=asdict(IngestScanBody(source, [body])),
         )
         world.recorder.responses.append(response.text)
+        await world.drain()
         return response
 
     created: httpx.Response = await ingest()

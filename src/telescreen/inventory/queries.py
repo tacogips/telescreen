@@ -21,8 +21,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.sql.selectable import ScalarSelect, Select
 
-from telescreen.api.common.pagination import decode_cursor, encode_cursor
 from telescreen.core.clock import ensure_utc
+from telescreen.core.cursors import decode_cursor, encode_cursor
 from telescreen.core.errors import TelescreenError
 from telescreen.core.json import JsonValue, dump_json, json_str, parse_json
 from telescreen.core.vocabulary import DataAssetState, ErrorCode
@@ -33,8 +33,8 @@ from telescreen.db.models import (
     DataFieldRow,
     DataFieldValueRow,
 )
-from telescreen.ports.directory import ActorDirectory, ActorDisplay
-from telescreen.ports.issues import ResourceIssueReader, ResourceIssueRef
+from telescreen.ports.asset_context import AssetIssueLookup, ResourceIssueRef
+from telescreen.ports.identity_context import ActorDisplay, ActorLookup
 
 
 @dataclass(frozen=True)
@@ -219,8 +219,8 @@ class ItemPage:
 class AssetQueries:
     """Query assets while batching issue and actor enrichment per page."""
 
-    issues: ResourceIssueReader
-    actors: ActorDirectory
+    issues: AssetIssueLookup
+    actors: ActorLookup
 
     async def list(self, session: AsyncSession, filters: AssetFilters, today: date) -> AssetPage:
         """Return an enriched asset page with keyset continuation."""
@@ -340,11 +340,11 @@ class AssetQueries:
             or 0
         )
         issues: tuple[ResourceIssueRef, ...] = await self.issues.open_issues_for_resources(
-            session, (asset.resource_key,)
+            (asset.resource_key,)
         )
         actor_view: ActorView | None = None
         if asset.created_by is not None:
-            actor: ActorDisplay = (await self.actors.display(session, (asset.created_by,)))[0]
+            actor: ActorDisplay = (await self.actors.display((asset.created_by,)))[0]
             actor_view = ActorView(actor.kind.value, actor.ref, actor.display_name)
         return AssetDetailView(
             views[0],
@@ -399,7 +399,7 @@ class AssetQueries:
         has_more: bool = len(rows) > limit
         page_rows: tuple[DataAssetEventRow, ...] = rows[:limit]
         refs: tuple[str, ...] = tuple(sorted({row.actor_ref for row in page_rows}))
-        actors: tuple[ActorDisplay, ...] = await self.actors.display(session, refs) if refs else ()
+        actors: tuple[ActorDisplay, ...] = await self.actors.display(refs) if refs else ()
         page: tuple[EventView, ...] = tuple(
             EventView(
                 row.id,
@@ -510,7 +510,7 @@ class AssetQueries:
         """Enrich a page with one issue read and one owner display call."""
         keys: tuple[str, ...] = tuple(row.resource_key for row in rows)
         issue_refs: tuple[ResourceIssueRef, ...] = (
-            await self.issues.open_issues_for_resources(session, keys) if keys else ()
+            await self.issues.open_issues_for_resources(keys) if keys else ()
         )
         issue_counts: tuple[tuple[str, int], ...] = tuple(
             (
@@ -531,9 +531,7 @@ class AssetQueries:
                 }
             )
         )
-        actor_displays: tuple[ActorDisplay, ...] = (
-            await self.actors.display(session, refs) if refs else ()
-        )
+        actor_displays: tuple[ActorDisplay, ...] = await self.actors.display(refs) if refs else ()
         owner_names: tuple[tuple[str, str], ...] = tuple(
             (actor.ref, actor.display_name) for actor in actor_displays
         )

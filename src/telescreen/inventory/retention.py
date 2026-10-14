@@ -12,27 +12,20 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from telescreen.core.clock import Clock, ensure_utc
 from telescreen.core.errors import TelescreenError
-from telescreen.core.json import json_int, json_object, json_str, parse_json
+from telescreen.core.json import json_object, json_str
 from telescreen.core.vocabulary import (
     DataAssetState,
     DataFieldRole,
     EngineTaskKind,
-    ErrorCode,
-    NotificationCategory,
-    NotificationChannel,
-    NotificationEvent,
 )
-from telescreen.db.models import DataAssetRow, DataFieldRow, DataFieldValueRow, TeamRow
-from telescreen.directory.actors import actor_kind_for
-from telescreen.ports.audit import AuditEntry, AuditLog
-from telescreen.ports.directory import AssigneeIds, RecipientResolver
-from telescreen.ports.inventory import AssetOwnerResolver
-from telescreen.ports.notifications import (
-    MemberNotification,
-    MemberNotifier,
-    NotificationContext,
-    NotificationRequest,
-    NotificationSender,
+from telescreen.db.models import DataAssetRow, DataFieldRow, DataFieldValueRow
+from telescreen.db.models.retention_handoff import InventoryRetentionOutboxRow
+from telescreen.masking.redact import Redactor
+from telescreen.ports.notification_types import NotificationContext
+from telescreen.ports.retention import (
+    RetentionCommand,
+    encode_retention_command,
+    retention_event_id,
 )
 from telescreen.ports.workflow import (
     ClaimedTask,
@@ -98,20 +91,16 @@ class _DueAsset:
 
 @dataclass(frozen=True)
 class DataOverdueHandler(TaskHandler):
-    """Notify overdue asset owners once per due date in isolated transactions."""
+    """Publish overdue obligations without accessing identity or notification tables."""
 
     sessions: async_sessionmaker[AsyncSession]
-    members: MemberNotifier
-    sender: NotificationSender
-    recipients: RecipientResolver
-    owners: AssetOwnerResolver
-    audit: AuditLog
+    redactor: Redactor
     clock: Clock
     public_base_url: str | None
     kind: EngineTaskKind = EngineTaskKind.DATA_OVERDUE_CHECK
 
     async def handle(self, task: ClaimedTask) -> TaskResult:
-        """Walk due assets in stable id batches; isolate failures per asset."""
+        """Walk due assets in stable batches; isolate publication failures per asset."""
         del task
         today: str = self.clock.now().date().isoformat()
         last_id: str = ""
@@ -124,17 +113,17 @@ class DataOverdueHandler(TaskHandler):
                 last_id = item.id
                 try:
                     async with self.sessions.begin() as session:
-                        await self._notify(session, item)
+                        await self._publish(session, item)
                 except Exception as error:
                     code: str = (
                         error.code.value if isinstance(error, TelescreenError) else "unexpected"
                     )
-                    logger.warning("data overdue notification failed code=%s", code)
+                    logger.warning("data overdue publication failed code=%s", code)
 
     async def _batch(
         self, session: AsyncSession, today: str, last_id: str
     ) -> tuple[_DueAsset, ...]:
-        """Read the next 200 due and not-yet-notified assets by primary key."""
+        """Select overdue and not-yet-published values with an advancing asset cursor."""
         rows: Sequence[Row[tuple[DataAssetRow, DataFieldValueRow]]] = (
             await session.execute(
                 select(DataAssetRow, DataFieldValueRow)
@@ -156,137 +145,62 @@ class DataOverdueHandler(TaskHandler):
                 .limit(_BATCH_SIZE)
             )
         ).all()
-        selected: list[_DueAsset] = []
-        for row in rows:
-            asset: DataAssetRow = row[0]
-            value: DataFieldValueRow = row[1]
-            selected.append(_DueAsset(asset.id, value.value_date or ""))
-        return tuple(selected)
+        return tuple(_DueAsset(row[0].id, row[1].value_date or "") for row in rows)
 
-    async def _notify(self, session: AsyncSession, selected: _DueAsset) -> None:
-        """Resolve a valid owner or fallback, send, mark, and audit one asset."""
+    async def _publish(self, session: AsyncSession, selected: _DueAsset) -> None:
+        """Lock, recheck and atomically stage a masked revision-specific obligation."""
         asset: DataAssetRow | None = await session.get(
             DataAssetRow, selected.id, with_for_update=True
         )
-        if asset is None:
+        if asset is None or asset.state == DataAssetState.DELETED.value:
             return
-        due_field: DataFieldRow | None = await session.scalar(
+        field: DataFieldRow | None = await session.scalar(
             select(DataFieldRow).where(
                 DataFieldRow.role == DataFieldRole.DELETION_DUE.value,
                 DataFieldRow.archived_at.is_(None),
             )
         )
-        if due_field is None:
+        if field is None:
             return
-        due_value: DataFieldValueRow | None = await session.get(
-            DataFieldValueRow, (asset.id, due_field.id)
-        )
+        value: DataFieldValueRow | None = await session.get(DataFieldValueRow, (asset.id, field.id))
         if (
-            due_value is None
-            or due_value.value_date is None
-            or due_value.value_date >= self.clock.now().date().isoformat()
+            value is None
+            or value.value_date is None
+            or value.value_date >= self.clock.now().date().isoformat()
+            or asset.overdue_notified_for == value.value_date
         ):
             return
-        due: str = due_value.value_date
-        owner_field: DataFieldRow | None = await session.scalar(
-            select(DataFieldRow).where(
-                DataFieldRow.role == DataFieldRole.OWNER.value, DataFieldRow.archived_at.is_(None)
-            )
+        event_id: str = retention_event_id(asset.id, field.id, value.revision_id)
+        existing: InventoryRetentionOutboxRow | None = await session.get(
+            InventoryRetentionOutboxRow, event_id
         )
-        owner_value: DataFieldValueRow | None = (
-            await session.get(DataFieldValueRow, (asset.id, owner_field.id))
-            if owner_field is not None
-            else None
-        )
-        owner_ref: str | None = None
-        if owner_value is not None:
-            owner_ref = parse_json(owner_value.value_json).as_str()
-        assignee: AssigneeIds | None = await self._assignee(session, owner_ref)
-        if assignee is None:
-            fallback: str | None = await self.owners.fallback_owner(
-                session, asset.source, asset.resource_key, asset.display_locator
-            )
-            assignee = await self._assignee(session, fallback)
-        context: NotificationContext = NotificationContext(
-            data_short_id=f"DATA-{asset.number}",
-            data_name=asset.name,
-            data_locator=asset.display_locator,
-            data_deletion_due=due,
-            data_link=f"{self.public_base_url.rstrip('/')}/data/{asset.id}"
-            if self.public_base_url
-            else None,
-        )
-        count: int = 0
-        recipient_kind: str = "none"
-        if assignee is not None and assignee.member_id is not None:
-            recipient_kind = "member"
-            await self.members.send_to_member(
-                session,
-                MemberNotification(
-                    member_id=assignee.member_id,
-                    category=NotificationCategory.ASSIGNED,
-                    event=NotificationEvent.DATA_OVERDUE,
-                    context=context,
-                ),
-            )
-            count = 1
-        elif assignee is not None and assignee.team_id is not None:
-            team_ref: str | None = await self._team_ref(session, assignee.team_id)
-            if team_ref is not None:
-                recipient_kind = "team"
-                for channel in (NotificationChannel.EMAIL, NotificationChannel.SLACK):
-                    await self.sender.send(
-                        session,
-                        NotificationRequest(
-                            channel=channel,
-                            recipients=(team_ref,),
-                            subject="",
-                            body="",
-                            actor_ref="system:data-overdue",
-                            event=NotificationEvent.DATA_OVERDUE,
-                            template_name="system.data_overdue",
-                            context=context,
-                            record_unreachable=True,
-                        ),
-                    )
-                    count += 1
-        asset.overdue_notified_for = due
-        await self.audit.append(
-            session,
-            AuditEntry(
-                actor_kind_for("system:data-overdue"),
-                "system:data-overdue",
-                "data_asset.overdue_notified",
-                "data_asset",
+        if existing is None:
+            now: datetime = ensure_utc(self.clock.now())
+            command: RetentionCommand = RetentionCommand(
+                event_id,
+                now,
                 asset.id,
-                "Overdue data notification recorded",
-                json_object(
-                    (
-                        ("recipient_kind", json_str(recipient_kind)),
-                        ("notification_count", json_int(count)),
-                    )
+                field.id,
+                value.revision_id,
+                asset.source,
+                asset.resource_key,
+                NotificationContext(
+                    data_short_id=f"DATA-{asset.number}",
+                    data_name=self.redactor.redact(asset.name).text,
+                    data_locator=self.redactor.redact(asset.display_locator).text,
+                    data_deletion_due=value.value_date,
+                    data_link=f"{self.public_base_url.rstrip('/')}/data/{asset.id}"
+                    if self.public_base_url
+                    else None,
                 ),
-            ),
-        )
-
-    async def _assignee(self, session: AsyncSession, ref: str | None) -> AssigneeIds | None:
-        """Resolve only valid member or team refs; stale references use fallback."""
-        if ref is None:
-            return None
-        kind: str
-        separator: str
-        subject: str
-        kind, separator, subject = ref.partition(":")
-        if not separator or not subject or kind not in ("member", "team"):
-            return None
-        try:
-            return await self.recipients.assignee_of(session, ref)
-        except TelescreenError as error:
-            if error.code is ErrorCode.RECIPIENT_UNKNOWN:
-                return None
-            raise
-
-    async def _team_ref(self, session: AsyncSession, team_id: str) -> str | None:
-        """Resolve a validated team id to its slug reference for sender delivery."""
-        team: TeamRow | None = await session.get(TeamRow, team_id)
-        return f"team:{team.slug}" if team is not None else None
+            )
+            session.add(
+                InventoryRetentionOutboxRow(
+                    id=event_id,
+                    payload_json=encode_retention_command(command),
+                    recorded_at=now,
+                )
+            )
+        # Legacy name: this now records publication, never remote delivery success.
+        asset.overdue_notified_for = value.value_date
+        await session.flush()

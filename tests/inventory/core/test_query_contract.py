@@ -6,7 +6,6 @@ from datetime import UTC, date, datetime
 import pytest
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import asyncpg
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
 
 from telescreen.core.json import dump_json, json_array, json_str
@@ -25,22 +24,20 @@ from telescreen.inventory.queries import (
     _sort_column,
 )
 from telescreen.masking.redact import Redactor
-from telescreen.ports.directory import ActorDirectory, ActorDisplay
-from telescreen.ports.issues import ResourceIssueReader, ResourceIssueRef
+from telescreen.ports.asset_context import AssetIssueLookup
+from telescreen.ports.identity_context import ActorDisplay, ActorLookup
+from telescreen.ports.issues import ResourceIssueRef
 from tests.support.db import SqliteHarness, make_sqlite_harness
 
 
 @dataclass
-class RecordingActors(ActorDirectory):
+class RecordingActors(ActorLookup):
     """Return stale-safe display names while recording each page batch."""
 
     calls: list[tuple[str, ...]]
 
-    async def display(
-        self, session: AsyncSession, refs: tuple[str, ...]
-    ) -> tuple[ActorDisplay, ...]:
+    async def display(self, refs: tuple[str, ...]) -> tuple[ActorDisplay, ...]:
         """Resolve all supplied refs to the safe unknown display."""
-        del session
         self.calls.append(refs)
         return tuple(
             ActorDisplay(ref, ActorDisplayKind.UNKNOWN, "Unknown", None, False) for ref in refs
@@ -48,14 +45,14 @@ class RecordingActors(ActorDirectory):
 
 
 @dataclass(frozen=True)
-class EmptyIssues(ResourceIssueReader):
+class EmptyIssues(AssetIssueLookup):
     """Return no issue references for query contract tests."""
 
     async def open_issues_for_resources(
-        self, session: AsyncSession, resource_keys: tuple[str, ...]
+        self, resource_keys: tuple[str, ...]
     ) -> tuple[ResourceIssueRef, ...]:
         """Return an empty result without external access."""
-        del session, resource_keys
+        del resource_keys
         return ()
 
 

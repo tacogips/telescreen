@@ -9,8 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from telescreen.inventory.export import AssetExporter, CsvExport
 from telescreen.inventory.queries import AssetFilters, AssetPage, AssetQueries, AssetView
 from telescreen.masking.redact import Redactor
-from telescreen.ports.directory import ActorDirectory, ActorDisplay
-from telescreen.ports.issues import ResourceIssueReader, ResourceIssueRef
+from telescreen.ports.asset_context import AssetIssueLookup
+from telescreen.ports.identity_context import ActorDisplay, ActorLookup
+from telescreen.ports.issues import ResourceIssueRef
 from tests.support.db import SqliteHarness, make_sqlite_harness
 
 
@@ -68,8 +69,8 @@ class FastExporter(AssetExporter):
 async def test_export_truncates_after_ten_thousand_rows() -> None:
     """CSV export caps data rows and signals when a later page exists."""
     harness: SqliteHarness = await make_sqlite_harness()
-    empty_actors: ActorDirectory
-    empty_issues: ResourceIssueReader
+    empty_actors: ActorLookup
+    empty_issues: AssetIssueLookup
     queries: PagedQueries
     try:
         # The synthetic query never uses these ports; satisfy the typed base contract.
@@ -86,23 +87,21 @@ async def test_export_truncates_after_ten_thousand_rows() -> None:
         await harness.close()
 
 
-class _UnusedActors(ActorDirectory):
+class _UnusedActors(ActorLookup):
     """Port placeholder that fails if the fake query unexpectedly uses enrichment."""
 
-    async def display(
-        self, session: AsyncSession, refs: tuple[str, ...]
-    ) -> tuple[ActorDisplay, ...]:
+    async def display(self, refs: tuple[str, ...]) -> tuple[ActorDisplay, ...]:
         """Reject unexpected actor resolution in the synthetic query."""
-        del session, refs
+        del refs
         raise AssertionError("synthetic pages do not resolve actors")
 
 
-class _UnusedIssues(ResourceIssueReader):
+class _UnusedIssues(AssetIssueLookup):
     """Port placeholder that fails if the fake query unexpectedly reads issues."""
 
     async def open_issues_for_resources(
-        self, session: AsyncSession, resource_keys: tuple[str, ...]
+        self, resource_keys: tuple[str, ...]
     ) -> tuple[ResourceIssueRef, ...]:
         """Reject unexpected issue lookup in the synthetic query."""
-        del session, resource_keys
+        del resource_keys
         raise AssertionError("synthetic pages do not read issues")
