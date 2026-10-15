@@ -8,6 +8,8 @@ from enum import StrEnum
 from typing import ClassVar
 
 from telescreen.core.json import JsonValue
+from telescreen.core.templating import Template as Template
+from telescreen.core.templating import TemplatePart as TemplatePart
 from telescreen.core.vocabulary import (
     DetectorKind,
     HumanTaskKind,
@@ -58,17 +60,6 @@ class Expression:
     value: JsonValue | None = None
     path: tuple[str, ...] = ()
     children: tuple[Expression, ...] = ()
-
-
-@dataclass(frozen=True)
-class TemplatePart:
-    """Literal text or a context path in a parsed template."""
-
-    literal: str | None = None
-    path: tuple[str, ...] = ()
-
-
-type Template = tuple[TemplatePart, ...]
 
 
 @dataclass(frozen=True)

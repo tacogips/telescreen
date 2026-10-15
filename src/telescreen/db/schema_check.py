@@ -25,9 +25,14 @@ from telescreen.db.owned_migrations.baseline import snapshot_tables
 from telescreen.db.ownership import Store
 
 
-def baseline_metadata() -> MetaData:
+def baseline_metadata(store: Store = Store.MAIN) -> MetaData:
     """Return the baseline schema even after future runtime models have changed."""
-    return read_metadata(Path(__file__).parent / "owned_migrations/baseline_schema.json", 1)
+    filename: str = (
+        "notification_baseline_schema.json"
+        if store is Store.NOTIFICATION
+        else "baseline_schema.json"
+    )
+    return read_metadata(Path(__file__).parent / "owned_migrations" / filename, 1)
 
 
 def _default(value: str | None) -> str | None:
@@ -88,7 +93,7 @@ def _serial_default(connection: Connection, table: str, column: str, value: str 
 
 def validate_owner_schema(connection: Connection, store: Store) -> None:
     """Refuse missing, altered or partially upgraded owner tables without writing data."""
-    metadata: MetaData = baseline_metadata()
+    metadata: MetaData = baseline_metadata(store)
     inspector: Inspector = inspect(connection)
     names: tuple[str, ...] = snapshot_tables(f"{store}_0001", connection.dialect.name)
     if not set(names) <= set(inspector.get_table_names()):
@@ -157,12 +162,15 @@ def validate_owner_schema(connection: Connection, store: Store) -> None:
 
 def _validate_trigger(connection: Connection, store: Store) -> None:
     """Require the baseline append-only trigger and its enabled exception function."""
-    table: str = "audit_records" if store is Store.MAIN else "data_asset_events"
-    function: str = (
-        "telescreen_reject_audit_mutation"
-        if store is Store.MAIN
-        else "telescreen_reject_data_asset_event_mutation"
-    )
+    if store is Store.MAIN:
+        table: str = "audit_records"
+        function: str = "telescreen_reject_audit_mutation"
+    elif store is Store.INVENTORY:
+        table = "data_asset_events"
+        function = "telescreen_reject_data_asset_event_mutation"
+    else:
+        table = "notification_audit_records"
+        function = "telescreen_reject_notification_audit_mutation"
     valid: int = connection.execute(
         text(
             "SELECT count(*) FROM pg_trigger t JOIN pg_proc p ON p.oid = t.tgfoid "

@@ -8,6 +8,7 @@ class Store(StrEnum):
 
     MAIN = "main"
     INVENTORY = "inventory"
+    NOTIFICATION = "notification"
 
 
 INVENTORY_TABLES: tuple[str, ...] = (
@@ -21,6 +22,32 @@ INVENTORY_TABLES: tuple[str, ...] = (
     "inventory_inbox",
     "inventory_audit_outbox",
     "inventory_retention_outbox",
+    "inventory_audit_records",
+    "inventory_audit_chain_head",
+    "inventory_directory_entries",
+    "inventory_issue_links",
+    "inventory_notification_outbox",
+)
+
+
+NOTIFICATION_TABLES: tuple[str, ...] = (
+    "notifications",
+    "notification_templates",
+    "notification_settings",
+    "retention_notification_receipts",
+    "notification_inbox",
+    "notification_delivery_state",
+    "notification_directory_entries",
+    "notification_audit_records",
+    "notification_audit_chain_head",
+)
+
+
+MAIN_RETAINED_TABLES: tuple[str, ...] = (
+    "notifications",
+    "notification_templates",
+    "notification_settings",
+    "retention_notification_receipts",
 )
 
 
@@ -56,16 +83,14 @@ MAIN_TABLES: tuple[str, ...] = (
     "map_partitions",
     "member_identities",
     "members",
-    "notification_settings",
-    "notification_templates",
-    "notifications",
+    "notification_outbox",
     "ownership_rules",
     "placement_policies",
     "police_tasks",
     "police_workers",
     "replay_nonces",
     "resource_coverage",
-    "retention_notification_receipts",
+    "projection_changes",
     "saved_view_defaults",
     "saved_view_stars",
     "saved_views",
@@ -82,7 +107,20 @@ MAIN_TABLES: tuple[str, ...] = (
 
 def tables_for(store: Store) -> tuple[str, ...]:
     """Return the exact table contract for a store, without querying another database."""
-    return INVENTORY_TABLES if store is Store.INVENTORY else MAIN_TABLES
+    if store is Store.INVENTORY:
+        return INVENTORY_TABLES
+    if store is Store.NOTIFICATION:
+        return NOTIFICATION_TABLES
+    return MAIN_TABLES
+
+
+def main_database_tables() -> tuple[str, ...]:
+    """Return the single-process main schema, including notification tables kept by main_0001.
+
+    The full split retains these four tables in the legacy main database without granting
+    their ownership to MAIN; the single-process main database continues to host and use them.
+    """
+    return MAIN_TABLES + MAIN_RETAINED_TABLES
 
 
 def store_for(table_name: str) -> Store:
@@ -91,4 +129,6 @@ def store_for(table_name: str) -> Store:
         return Store.INVENTORY
     if table_name in MAIN_TABLES:
         return Store.MAIN
+    if table_name in NOTIFICATION_TABLES:
+        return Store.NOTIFICATION
     raise ValueError("table has no declared persistence owner")

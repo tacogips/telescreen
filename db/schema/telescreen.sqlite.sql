@@ -296,6 +296,12 @@ CREATE TABLE "integration_checks" (
   CONSTRAINT "pk_integration_checks" PRIMARY KEY ("kind")
 );
 
+CREATE TABLE "inventory_audit_chain_head" (
+  "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+  "seq" INTEGER NOT NULL,
+  "hash" TEXT NOT NULL
+);
+
 CREATE TABLE "inventory_audit_outbox" (
   "id" TEXT NOT NULL,
   "payload_json" TEXT NOT NULL,
@@ -304,10 +310,37 @@ CREATE TABLE "inventory_audit_outbox" (
   CONSTRAINT "pk_inventory_audit_outbox" PRIMARY KEY ("id")
 );
 
+CREATE TABLE "inventory_audit_records" (
+  "seq" INTEGER NOT NULL,
+  "id" TEXT NOT NULL,
+  "at" TEXT NOT NULL,
+  "actor_kind" TEXT NOT NULL,
+  "actor_ref" TEXT NOT NULL,
+  "action" TEXT NOT NULL,
+  "target_kind" TEXT NOT NULL,
+  "target_id" TEXT NOT NULL,
+  "summary" TEXT NOT NULL,
+  "details_json" TEXT NOT NULL,
+  "prev_hash" TEXT NOT NULL,
+  "hash" TEXT NOT NULL,
+  CONSTRAINT "pk_inventory_audit_records" PRIMARY KEY ("seq")
+);
+
 CREATE TABLE "inventory_counters" (
   "name" TEXT NOT NULL,
   "value" INTEGER NOT NULL,
   CONSTRAINT "pk_inventory_counters" PRIMARY KEY ("name")
+);
+
+CREATE TABLE "inventory_directory_entries" (
+  "kind" TEXT NOT NULL,
+  "id" TEXT NOT NULL,
+  "revision" INTEGER NOT NULL,
+  "present" INTEGER NOT NULL,
+  "lookup_key" TEXT,
+  "payload_json" TEXT NOT NULL,
+  "applied_at" TEXT NOT NULL,
+  CONSTRAINT "pk_inventory_directory_entries" PRIMARY KEY ("kind", "id")
 );
 
 CREATE TABLE "inventory_inbox" (
@@ -323,6 +356,23 @@ CREATE TABLE "inventory_inbox_streams" (
   "id" TEXT NOT NULL,
   "last_sequence" INTEGER NOT NULL,
   CONSTRAINT "pk_inventory_inbox_streams" PRIMARY KEY ("id")
+);
+
+CREATE TABLE "inventory_issue_links" (
+  "issue_id" TEXT NOT NULL,
+  "resource_key" TEXT NOT NULL,
+  "short_id" TEXT NOT NULL,
+  "status" TEXT NOT NULL,
+  "owner_ref" TEXT,
+  CONSTRAINT "pk_inventory_issue_links" PRIMARY KEY ("issue_id")
+);
+
+CREATE TABLE "inventory_notification_outbox" (
+  "id" TEXT NOT NULL,
+  "payload_json" TEXT NOT NULL,
+  "recorded_at" TEXT NOT NULL,
+  "delivered_at" TEXT,
+  CONSTRAINT "pk_inventory_notification_outbox" PRIMARY KEY ("id")
 );
 
 CREATE TABLE "inventory_outbox" (
@@ -539,6 +589,63 @@ CREATE TABLE "members" (
   CONSTRAINT "pk_members" PRIMARY KEY ("id")
 );
 
+CREATE TABLE "notification_audit_chain_head" (
+  "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+  "seq" INTEGER NOT NULL,
+  "hash" TEXT NOT NULL
+);
+
+CREATE TABLE "notification_audit_records" (
+  "seq" INTEGER NOT NULL,
+  "id" TEXT NOT NULL,
+  "at" TEXT NOT NULL,
+  "actor_kind" TEXT NOT NULL,
+  "actor_ref" TEXT NOT NULL,
+  "action" TEXT NOT NULL,
+  "target_kind" TEXT NOT NULL,
+  "target_id" TEXT NOT NULL,
+  "summary" TEXT NOT NULL,
+  "details_json" TEXT NOT NULL,
+  "prev_hash" TEXT NOT NULL,
+  "hash" TEXT NOT NULL,
+  CONSTRAINT "pk_notification_audit_records" PRIMARY KEY ("seq")
+);
+
+CREATE TABLE "notification_delivery_state" (
+  "notification_id" TEXT NOT NULL,
+  "attempt" INTEGER NOT NULL,
+  "max_attempts" INTEGER NOT NULL,
+  "available_at" TEXT NOT NULL,
+  "leased_until" TEXT,
+  CONSTRAINT "pk_notification_delivery_state" PRIMARY KEY ("notification_id")
+);
+
+CREATE TABLE "notification_directory_entries" (
+  "kind" TEXT NOT NULL,
+  "id" TEXT NOT NULL,
+  "revision" INTEGER NOT NULL,
+  "present" INTEGER NOT NULL,
+  "lookup_key" TEXT,
+  "payload_json" TEXT NOT NULL,
+  "applied_at" TEXT NOT NULL,
+  CONSTRAINT "pk_notification_directory_entries" PRIMARY KEY ("kind", "id")
+);
+
+CREATE TABLE "notification_inbox" (
+  "id" TEXT NOT NULL,
+  "payload_sha256" TEXT NOT NULL,
+  "applied_at" TEXT NOT NULL,
+  CONSTRAINT "pk_notification_inbox" PRIMARY KEY ("id")
+);
+
+CREATE TABLE "notification_outbox" (
+  "id" TEXT NOT NULL,
+  "payload_json" TEXT NOT NULL,
+  "recorded_at" TEXT NOT NULL,
+  "delivered_at" TEXT,
+  CONSTRAINT "pk_notification_outbox" PRIMARY KEY ("id")
+);
+
 CREATE TABLE "notification_settings" (
   "member_id" TEXT NOT NULL,
   "category" TEXT NOT NULL,
@@ -656,6 +763,14 @@ CREATE TABLE "police_workers" (
   "created_at" TEXT NOT NULL,
   "health_alerted_at" TEXT,
   CONSTRAINT "pk_police_workers" PRIMARY KEY ("id")
+);
+
+CREATE TABLE "projection_changes" (
+  "id" TEXT NOT NULL,
+  "kind" TEXT NOT NULL,
+  "entity_ref" TEXT NOT NULL,
+  "recorded_at" TEXT NOT NULL,
+  CONSTRAINT "pk_projection_changes" PRIMARY KEY ("id")
 );
 
 CREATE TABLE "replay_nonces" (
@@ -842,7 +957,11 @@ CREATE UNIQUE INDEX "uq_human_tasks_step_run_id" ON "human_tasks" ("step_run_id"
 CREATE INDEX "ix_human_tasks_due_at" ON "human_tasks" ("due_at");
 CREATE INDEX "ix_human_tasks_run_id" ON "human_tasks" ("run_id");
 CREATE INDEX "ix_human_tasks_status" ON "human_tasks" ("status");
+CREATE INDEX "ix_inventory_audit_records_at" ON "inventory_audit_records" ("at");
+CREATE UNIQUE INDEX "uq_inventory_audit_records_id" ON "inventory_audit_records" ("id");
+CREATE INDEX "ix_inventory_directory_entries_lookup" ON "inventory_directory_entries" ("kind", "lookup_key");
 CREATE UNIQUE INDEX "uq_inventory_inbox_id" ON "inventory_inbox" ("id");
+CREATE INDEX "ix_inventory_issue_links_resource_key" ON "inventory_issue_links" ("resource_key");
 CREATE UNIQUE INDEX "uq_inventory_outbox_stream_sequence" ON "inventory_outbox" ("stream_id", "sequence");
 CREATE INDEX "ix_issue_comments_issue_id" ON "issue_comments" ("issue_id");
 CREATE INDEX "ix_issue_exceptions_issue" ON "issue_exceptions" ("issue_id");
@@ -878,6 +997,10 @@ CREATE UNIQUE INDEX "uq_member_identities_kind_identity_key" ON "member_identiti
 CREATE INDEX "ix_member_identities_member_id" ON "member_identities" ("member_id");
 CREATE UNIQUE INDEX "uq_members_handle" ON "members" ("handle");
 CREATE INDEX "ix_members_role_active" ON "members" ("role", "active");
+CREATE INDEX "ix_notification_audit_records_at" ON "notification_audit_records" ("at");
+CREATE UNIQUE INDEX "uq_notification_audit_records_id" ON "notification_audit_records" ("id");
+CREATE INDEX "ix_notification_delivery_state_available_at" ON "notification_delivery_state" ("available_at");
+CREATE INDEX "ix_notification_directory_entries_lookup" ON "notification_directory_entries" ("kind", "lookup_key");
 CREATE UNIQUE INDEX "uq_notification_templates_name_version" ON "notification_templates" ("name", "version");
 CREATE INDEX "ix_notification_templates_name_active" ON "notification_templates" ("name", "active");
 CREATE INDEX "ix_notifications_issue_id" ON "notifications" ("issue_id");

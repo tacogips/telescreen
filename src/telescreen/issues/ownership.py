@@ -1,6 +1,5 @@
 """Ownership rules, safe locator testing and assignee suggestions."""
 
-import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -12,6 +11,7 @@ from telescreen.core.clock import Clock
 from telescreen.core.errors import TelescreenError
 from telescreen.core.ids import new_id
 from telescreen.core.json import json_object, json_str
+from telescreen.core.ownership_match import match_rule as match_rule
 from telescreen.core.vocabulary import ActorKind, ErrorCode, SuggestionReason
 from telescreen.db.models import IssueRow, OwnershipRuleRow, PlacementPolicyRow, TeamRow
 from telescreen.masking.redact import Redactor
@@ -26,45 +26,6 @@ class RuleMatch:
 
     rule_id: str
     team_slug: str
-
-
-def _glob_regex(pattern: str) -> re.Pattern[str]:
-    """Compile the ownership glob grammar to a case-sensitive path regex."""
-    parts: list[str] = ["^"]
-    index: int = 0
-    while index < len(pattern):
-        char: str = pattern[index]
-        if char == "*" and index + 1 < len(pattern) and pattern[index + 1] == "*":
-            parts.append(".*")
-            index += 2
-        elif char == "*":
-            parts.append("[^/]*")
-            index += 1
-        elif char == "?":
-            parts.append("[^/]")
-            index += 1
-        else:
-            parts.append(re.escape(char))
-            index += 1
-    parts.append("$")
-    return re.compile("".join(parts))
-
-
-def match_rule(
-    rules: Sequence[OwnershipRuleRow], source: str, locator: str
-) -> OwnershipRuleRow | None:
-    """Return the first enabled rule matching source and display locator."""
-    ordered: Sequence[OwnershipRuleRow] = sorted(rules, key=lambda rule: (rule.position, rule.id))
-    return next(
-        (
-            rule
-            for rule in ordered
-            if rule.enabled
-            and (rule.source is None or rule.source == source)
-            and _glob_regex(rule.pattern).fullmatch(locator)
-        ),
-        None,
-    )
 
 
 @dataclass

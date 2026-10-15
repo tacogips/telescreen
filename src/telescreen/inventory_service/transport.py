@@ -15,6 +15,7 @@ from telescreen.core.vocabulary import ErrorCode
 from telescreen.ports.handoff_limits import MAX_HANDOFF_BYTES
 
 PREFIX: str = "/internal/inventory/v1"
+NOTIFICATION_PREFIX: str = "/internal/notification/v1"
 SERVICE_HEADER: str = "x-telescreen-service-token"
 
 
@@ -57,6 +58,7 @@ class ServiceHttp:
     http: httpx.AsyncClient
     base_url: str
     secret: SecretValue
+    prefix: str = PREFIX
 
     def __post_init__(self) -> None:
         """Reject ambiguous destinations and empty service credentials at startup."""
@@ -133,7 +135,7 @@ class ServiceHttp:
     ) -> T:
         """Validate response shape before a caller may acknowledge durable work."""
         response: httpx.Response = await self.request(
-            "POST", PREFIX + path, payload.encode(), authorization
+            "POST", self.prefix + path, payload.encode(), authorization
         )
         if response.status_code != 200:
             try:

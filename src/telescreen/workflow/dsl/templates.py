@@ -2,38 +2,11 @@
 
 from __future__ import annotations
 
-import re
-
-from telescreen.core.errors import TelescreenError
 from telescreen.core.json import JsonKind, JsonValue, dump_json, json_array
-from telescreen.core.vocabulary import ErrorCode
+from telescreen.core.templating import Template as Template
+from telescreen.core.templating import TemplatePart as TemplatePart
+from telescreen.core.templating import parse_template as parse_template
 from telescreen.workflow.dsl.context import RunContext
-from telescreen.workflow.dsl.model import Template, TemplatePart
-
-_TEMPLATE_PATTERN: re.Pattern[str] = re.compile(r"{{\s*([^{}]+?)\s*}}")
-_PATH_PATTERN: re.Pattern[str] = re.compile(
-    r"^[A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_-]*)*$"
-)
-
-
-def parse_template(text: str) -> Template:
-    """Parse literal text and simple context substitutions."""
-    parts: list[TemplatePart] = []
-    offset: int = 0
-    for match in _TEMPLATE_PATTERN.finditer(text):
-        if match.start() > offset:
-            parts.append(TemplatePart(literal=text[offset : match.start()]))
-        path_text: str = match.group(1).strip()
-        if _PATH_PATTERN.fullmatch(path_text) is None:
-            raise TelescreenError(ErrorCode.EXPRESSION_ERROR, "invalid template")
-        parts.append(TemplatePart(path=tuple(path_text.split("."))))
-        offset = match.end()
-    remainder: str = text[offset:]
-    if "{{" in remainder or "}}" in remainder:
-        raise TelescreenError(ErrorCode.EXPRESSION_ERROR, "invalid template")
-    if remainder:
-        parts.append(TemplatePart(literal=remainder))
-    return tuple(parts)
 
 
 def render(template: Template, ctx: RunContext) -> str:

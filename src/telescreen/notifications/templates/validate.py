@@ -3,6 +3,8 @@
 import re
 
 from telescreen.core.errors import TelescreenError
+from telescreen.core.templating import Template as Template
+from telescreen.core.templating import parse_template as parse_template
 from telescreen.core.vocabulary import NotificationEvent
 from telescreen.masking.redact import Redactor
 from telescreen.notifications.templates.builtins import BUILTIN_PREFIX, builtin_named
@@ -12,8 +14,6 @@ from telescreen.notifications.templates.model import (
     TemplateTexts,
 )
 from telescreen.notifications.templates.variables import allowed_paths
-from telescreen.workflow.dsl.model import Template
-from telescreen.workflow.dsl.templates import parse_template
 
 _NAME_PATTERN: re.Pattern[str] = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,63}$")
 SUBJECT_LIMIT: int = 200

@@ -1,4 +1,4 @@
-"""Frozen baseline execution shared by the two independent migration histories."""
+"""Frozen baseline execution shared by the independent migration histories."""
 
 import re
 from pathlib import Path
@@ -10,7 +10,10 @@ from sqlalchemy.engine import Connection
 
 def _snapshot(name: str, dialect: str) -> str:
     """Load packaged SQL; future model changes cannot alter historical revisions."""
-    if name not in ("main_0001", "inventory_0001") or dialect not in ("sqlite", "postgresql"):
+    if name not in ("main_0001", "inventory_0001", "notification_0001") or dialect not in (
+        "sqlite",
+        "postgresql",
+    ):
         raise RuntimeError("unsupported owner migration snapshot")
     return Path(__file__).with_name(f"{name}.{dialect}.sql").read_text(encoding="utf-8")
 
@@ -43,16 +46,24 @@ def drop_baseline(name: str) -> None:
 
 def append_only(table: str, *, drop: bool = False) -> None:
     """Preserve the append-only policy independently in each owner's database."""
-    if table not in ("audit_records", "data_asset_events"):
+    if table not in (
+        "audit_records",
+        "data_asset_events",
+        "inventory_audit_records",
+        "notification_audit_records",
+    ):
         raise RuntimeError("unsupported append-only table")
     connection: Connection = op.get_bind()
     if connection.dialect.name != "postgresql":
         return
-    function: str = (
-        "telescreen_reject_audit_mutation"
-        if table == "audit_records"
-        else "telescreen_reject_data_asset_event_mutation"
-    )
+    if table == "audit_records":
+        function: str = "telescreen_reject_audit_mutation"
+    elif table == "data_asset_events":
+        function = "telescreen_reject_data_asset_event_mutation"
+    elif table == "inventory_audit_records":
+        function = "telescreen_reject_inventory_audit_mutation"
+    else:
+        function = "telescreen_reject_notification_audit_mutation"
     if drop:
         connection.execute(text(f"DROP TRIGGER IF EXISTS {table}_append_only ON {table}"))
         connection.execute(text(f"DROP FUNCTION IF EXISTS {function}()"))

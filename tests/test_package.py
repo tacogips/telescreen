@@ -1,5 +1,6 @@
 """Installed package and CLI contract tests."""
 
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,16 @@ from telescreen.cli import main
 def test_greet_returns_expected_message() -> None:
     """Keep the package's established greeting API covered."""
     assert greet("uv") == "Hello, uv!"
+
+
+def test_notification_service_script_is_declared() -> None:
+    """Expose the separate notification process command in package metadata."""
+    assert (
+        tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"]["scripts"][
+            "telescreen-notification"
+        ]
+        == "telescreen.notification_service.cli:main"
+    )
 
 
 def test_bare_cli_prints_help_and_returns_usage_code() -> None:

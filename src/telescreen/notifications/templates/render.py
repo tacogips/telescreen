@@ -1,11 +1,44 @@
 """Channel-specific rendering of template text from an allow-listed context."""
 
+from telescreen.core.templating import Template as Template
+from telescreen.core.templating import parse_template as parse_template
 from telescreen.core.vocabulary import NotificationChannel, NotificationEvent
 from telescreen.notifications.templates.model import TemplateTexts
-from telescreen.notifications.templates.variables import allowed_paths, lookup
+from telescreen.notifications.templates.variables import VARIABLE_FIELDS, allowed_paths, lookup
 from telescreen.ports.notifications import NotificationContext
-from telescreen.workflow.dsl.model import Template
-from telescreen.workflow.dsl.templates import parse_template
+
+
+def channel_texts(texts: TemplateTexts, channel: NotificationChannel) -> tuple[str, str]:
+    """Select the subject and body variant used for one delivery channel."""
+    subject: str = texts.subject
+    body: str = texts.body
+    if channel is NotificationChannel.EMAIL:
+        subject = texts.email_subject if texts.email_subject is not None else subject
+        body = texts.email_body if texts.email_body is not None else body
+    elif texts.slack_body is not None:
+        body = texts.slack_body
+    return subject, body
+
+
+def field_occurrences(
+    texts: TemplateTexts, channel: NotificationChannel
+) -> tuple[tuple[str, int], ...]:
+    """Count context fields referenced in the selected subject and body templates."""
+    subject: str
+    body: str
+    subject, body = channel_texts(texts, channel)
+    paths: tuple[str, ...] = tuple(
+        ".".join(part.path)
+        for text in (subject, body)
+        for part in parse_template(text)
+        if part.literal is None
+    )
+    occurrences: list[tuple[str, int]] = []
+    for path, field_name in VARIABLE_FIELDS:
+        count: int = paths.count(path)
+        if count:
+            occurrences.append((field_name, count))
+    return tuple(occurrences)
 
 
 def render_for_channel(
@@ -20,15 +53,9 @@ def render_for_channel(
     spaces, Slack values (never literal text) are escaped, and the body is
     right-stripped so an empty optional last line disappears.
     """
-    subject_text: str = texts.subject
-    body_text: str = texts.body
-    if channel is NotificationChannel.EMAIL:
-        if texts.email_subject is not None:
-            subject_text = texts.email_subject
-        if texts.email_body is not None:
-            body_text = texts.email_body
-    elif texts.slack_body is not None:
-        body_text = texts.slack_body
+    subject_text: str
+    body_text: str
+    subject_text, body_text = channel_texts(texts, channel)
     allowed: tuple[str, ...] = allowed_paths(event)
     escape: bool = channel is NotificationChannel.SLACK
     subject: str = _render(parse_template(subject_text), context, allowed, escape)

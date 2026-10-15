@@ -100,6 +100,11 @@ class TelescreenSettings:
     inventory_service_url: str | None = None
     bureau_service_url: str | None = None
     inventory_service_token_ref: str | None = None
+    notification_service_url: str | None = None
+    notification_service_token_ref: str | None = None
+    notification_inventory_token_ref: str | None = None
+    notification_database_url: str | None = None
+    notification_replica_grace_seconds: int = 600
 
 
 def _read(env: EnvSource, name: str) -> str | None:
@@ -306,6 +311,11 @@ def load_settings(env: EnvSource) -> TelescreenSettings:
         inventory_service_url=_optional(env, "INVENTORY_SERVICE_URL"),
         bureau_service_url=_optional(env, "BUREAU_SERVICE_URL"),
         inventory_service_token_ref=_optional(env, "INVENTORY_SERVICE_TOKEN"),
+        notification_service_url=_optional(env, "NOTIFICATION_SERVICE_URL"),
+        notification_service_token_ref=_optional(env, "NOTIFICATION_SERVICE_TOKEN"),
+        notification_inventory_token_ref=_optional(env, "NOTIFICATION_INVENTORY_TOKEN"),
+        notification_database_url=_optional(env, "NOTIFICATION_DATABASE_URL"),
+        notification_replica_grace_seconds=_integer(env, "NOTIFICATION_REPLICA_GRACE_SECONDS", 600),
         fingerprint_key_ref=fingerprint_key_ref,
         police_signing_key_ref=_optional(env, "POLICE_SIGNING_KEY"),
         police_enrollment_token_ref=_optional(env, "POLICE_ENROLLMENT_TOKEN"),

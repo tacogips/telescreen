@@ -12,7 +12,12 @@ from telescreen.core.vocabulary import (
     NotificationChannel,
     NotificationEvent,
 )
-from telescreen.ports.notification_types import NotificationContext as NotificationContext
+from telescreen.ports.notification_types import (
+    NotificationContext as NotificationContext,
+)
+from telescreen.ports.notification_types import (
+    ProducerRedactionHits,
+)
 
 
 @dataclass(frozen=True)
@@ -24,6 +29,8 @@ class NotificationRequest:
     inline true uses subject and body as supplied while recording the event. The
     set name and target index identify fan-out rows, and record_unreachable asks
     the sender to persist an unreachable recipient outcome.
+
+    Optional id seeds and prior-hit counts default to the existing single-process behavior.
     """
 
     channel: NotificationChannel
@@ -41,16 +48,20 @@ class NotificationRequest:
     target_index: int | None = None
     record_unreachable: bool = False
     category: NotificationCategory | None = None
+    id_seed: str | None = None
+    prior_hits: ProducerRedactionHits | None = None
+    skip_unknown: bool = False
 
 
 @dataclass(frozen=True)
 class NotificationReceipt:
-    """Safe notification identifiers and DLP decision."""
+    """Safe notification identifiers and DLP decision; pending defaults to false."""
 
     notification_ids: tuple[str, ...]
     verdict: DlpVerdict
     queued: bool
     skipped: tuple[str, ...] = ()
+    pending: bool = False
 
 
 class NotificationSender(Protocol):
@@ -65,13 +76,15 @@ class NotificationSender(Protocol):
 
 @dataclass(frozen=True)
 class MemberNotification:
-    """One member-directed notification and its allow-listed context."""
+    """One member-directed notification with optional delivery metadata."""
 
     member_id: str
     category: NotificationCategory
     event: NotificationEvent
     context: NotificationContext
     issue_id: str | None = None
+    id_seed: str | None = None
+    prior_hits: ProducerRedactionHits | None = None
 
 
 class MemberNotifier(Protocol):

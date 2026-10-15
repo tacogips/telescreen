@@ -480,6 +480,8 @@ class EngineTaskKind(StrEnum):
     INVENTORY_DELIVERY = "inventory_delivery"
     INVENTORY_AUDIT_DELIVERY = "inventory_audit_delivery"
     RETENTION_DELIVERY = "retention_delivery"
+    NOTIFICATION_COMMAND_DELIVERY = "notification_command_delivery"
+    PROJECTION_RELAY = "projection_relay"
 
 
 class InventoryMode(StrEnum):

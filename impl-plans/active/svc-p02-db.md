@@ -1,6 +1,6 @@
 # SVC-P02 Database: Nodetto, Exports, Models, Three-Store Ownership, Revisions and Owner Histories
 
-**Status**: Not Started
+**Status**: In Progress
 **Design Reference**: design-docs/specs/design-service-split.md section 12; design-docs/specs/design-data-model.md "Service split additions"; db/schema/README.md; AGENTS.md "Database Schema (DDL)"
 **Created**: 2026-10-15
 **Last Updated**: 2026-10-15
@@ -251,4 +251,45 @@ passes (the four tables move stores but stay in the shared database).
 
 ## Progress Log
 
-(append sessions per conventions section 8)
+### Session: 2026-10-15 16:57 JST
+**Tasks Completed**: Added the 12 Nodetto table definitions in four frames and two
+same-store logical relations; generated both 74-table DDL exports; added the new ORM
+models, three-store ownership declarations, legacy revision 0010, main_0002 and
+inventory_0002 revisions, notification frozen SQL/schema snapshots, and notification
+branches in migration/adoption schema validation.
+**Tasks In Progress**: Notification owner revision; model, history, adoption, migration,
+harness and exact-count tests; required scoped/full verification.
+**Blockers**: `tests/db/test_v14_migration.py:50` asserts 62 tables after upgrading to
+head, which becomes 74 after 0010. This required shared exact-count test is outside this
+plan's `writePaths`; request a checkpoint/manifest amendment to authorize it before
+continuing.
+**Reconciliation requests**: Add `tests/db/test_v14_migration.py` to the authorized
+writePaths for this branch. Resume after the dispatch manifest is amended.
+**Hashes**: See `tmp/telescreen-svc-20261015-g1/svc-p02-db/step6/current-hashes-corrected.txt` for
+the per-file pre-edit and current hashes; DDL correction hashes are recorded in
+`tmp/telescreen-svc-20261015-g1/svc-p02-db/step6/nodetto-hashes.txt`.
+**Verification**: `mise run ddl-arrange` -> exit 2 on the first pass (log:
+`/tmp/telescreen-svc-p02-db-arrange-attempt1.log`), corrected Nodetto index references and reran
+-> exit 0 (log: `/tmp/telescreen-svc-p02-db-arrange.log`); `mise run ddl-export` -> exit 0 (log:
+`/tmp/telescreen-svc-p02-db-export.log`). `ddl-check` and Python gates were not run.
+**Notes**: The 62-table assertion is in a repository test not listed by this plan even
+though the user contract requires updating shared exact-count tests. Per the ownership
+rules, no out-of-scope edit or success-shaped verification was attempted. An initial
+generator invocation used system Python without SQLAlchemy (exit 1) before producing
+files; the generation was rerun under `uv run --frozen` and partially wrote the listed
+owner artifacts before finding the missing notification versions directory. That
+directory/revision remains unfinished. The original revisions, owner baselines and
+existing snapshots were not intentionally edited.
+
+### Owner resolution: 2026-10-15 (after session 18)
+
+The owner updated `tests/db/test_v14_migration.py:50` from 62 to 74 tables at head
+(62 existing plus the 12 tables of `0010_service_split`, matching the 74-table Nodetto
+exports). The continuation manifest also adds this file to this plan's `writePaths`, so
+adjust it again only if the final table count changes. Resume from the checkpointed
+partial work: finish the notification owner revision, the model, history, adoption,
+migration, harness and exact-count tests, then run `mise run ddl-check` and the full
+Python gates. Follow conventions section 7a: report only final passing verification
+commands, keep `priorVerification` empty, and do not list fixed findings as risks.
+`tests/e2e/test_inventory_runtime_grants.py` (integration marker, 52 main tables)
+stays owned by svc-p08 and is skipped offline.

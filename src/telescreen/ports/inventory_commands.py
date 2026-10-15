@@ -9,6 +9,7 @@ from pydantic import Field, TypeAdapter, ValidationError
 
 from telescreen.core.errors import TelescreenError
 from telescreen.core.vocabulary import ErrorCode, InventoryMode
+from telescreen.ports.directory_projection import DirectoryEntity, encode_directory_entity
 from telescreen.ports.handoff_limits import MAX_INVENTORY_ENTRIES, require_payload_size
 from telescreen.ports.inventory_types import ResourceObservation
 
@@ -20,6 +21,8 @@ class InventoryCommandKind(StrEnum):
     SWEEP = "sweep"
     LISTING = "listing"
     STOP_TRACKING = "stop_tracking"
+    ISSUE_LINK = "issue_link"
+    DIRECTORY = "directory"
 
 
 @dataclass(frozen=True)
@@ -60,8 +63,34 @@ class StopTracking:
     kind: Literal[InventoryCommandKind.STOP_TRACKING] = InventoryCommandKind.STOP_TRACKING
 
 
+@dataclass(frozen=True)
+class IssueLinkState:
+    """Push issue-to-resource enrichment state to an Inventory replica."""
+
+    issue_id: str
+    resource_key: str
+    short_id: str
+    status: str
+    owner_ref: str | None
+    present: bool
+    kind: Literal[InventoryCommandKind.ISSUE_LINK] = InventoryCommandKind.ISSUE_LINK
+
+
+@dataclass(frozen=True)
+class DirectoryUpdate:
+    """Push one revisioned directory entity through the ordered inventory stream."""
+
+    entity: DirectoryEntity
+    kind: Literal[InventoryCommandKind.DIRECTORY] = InventoryCommandKind.DIRECTORY
+
+
 type InventoryOperation = Annotated[
-    ObserveResource | CompleteSweep | CompleteListing | StopTracking,
+    ObserveResource
+    | CompleteSweep
+    | CompleteListing
+    | StopTracking
+    | IssueLinkState
+    | DirectoryUpdate,
     Field(discriminator="kind"),
 ]
 
@@ -103,6 +132,8 @@ def decode_inventory_command(payload: str) -> InventoryCommand:
 def _require_collection_sizes(command: InventoryCommand) -> None:
     """A full snapshot either fits as a whole or fails; never truncate authoritative data."""
     operation: InventoryOperation = command.operation
+    if isinstance(operation, DirectoryUpdate):
+        encode_directory_entity(operation.entity)
     sizes: tuple[int, ...] = ()
     if isinstance(operation, CompleteListing):
         sizes = (len(operation.listed_keys),)

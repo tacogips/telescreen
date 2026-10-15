@@ -35,6 +35,7 @@ from telescreen.db.models.inventory_handoff import (
     InventoryOutboxRow,
     InventoryOutboxStreamRow,
 )
+from telescreen.db.models.inventory_links import InventoryIssueLinkRow
 from telescreen.db.models.issues import (
     FindingRow,
     IssueExceptionRow,
@@ -60,10 +61,27 @@ from telescreen.db.models.notifications import (
     NotificationSettingRow,
     NotificationTemplateRow,
 )
+from telescreen.db.models.notification_handoff import (
+    InventoryNotificationOutboxRow,
+    NotificationDeliveryStateRow,
+    NotificationInboxRow,
+    NotificationOutboxRow,
+)
+from telescreen.db.models.projections import (
+    InventoryDirectoryEntryRow,
+    NotificationDirectoryEntryRow,
+    ProjectionChangeRow,
+)
 from telescreen.db.models.police import PoliceTaskRow, PoliceWorkerRow
 from telescreen.db.models.retention_handoff import (
     InventoryRetentionOutboxRow,
     RetentionNotificationReceiptRow,
+)
+from telescreen.db.models.service_audit import (
+    InventoryAuditChainHeadRow,
+    InventoryAuditRecordRow,
+    NotificationAuditChainHeadRow,
+    NotificationAuditRecordRow,
 )
 from telescreen.db.models.workflow import (
     EngineTaskRow,
@@ -83,6 +101,11 @@ __all__: list[str] = [
     "AuditRecordRow",
     "AuditReceiptRow",
     "InventoryAuditOutboxRow",
+    "InventoryAuditChainHeadRow",
+    "InventoryAuditRecordRow",
+    "InventoryDirectoryEntryRow",
+    "InventoryIssueLinkRow",
+    "InventoryNotificationOutboxRow",
     "InventoryRetentionOutboxRow",
     "RetentionNotificationReceiptRow",
     "CollectorConfigRow",
@@ -119,11 +142,18 @@ __all__: list[str] = [
     "MemberRow",
     "MemberIdentityRow",
     "NotificationRow",
+    "NotificationAuditChainHeadRow",
+    "NotificationAuditRecordRow",
+    "NotificationDeliveryStateRow",
+    "NotificationDirectoryEntryRow",
+    "NotificationInboxRow",
+    "NotificationOutboxRow",
     "NotificationSettingRow",
     "NotificationTemplateRow",
     "PoliceTaskRow",
     "PoliceWorkerRow",
     "PlacementPolicyRow",
+    "ProjectionChangeRow",
     "OwnershipRuleRow",
     "ReplayNonceRow",
     "ResourceCoverageRow",

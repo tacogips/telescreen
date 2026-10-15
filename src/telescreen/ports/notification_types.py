@@ -1,10 +1,19 @@
 """Persistence-independent template context data."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
+from typing import get_type_hints
+
+from pydantic import ConfigDict
+
+
+class _StrictWireModel:
+    """Forbid unrecognized fields on notification payload dataclasses."""
+
+    __pydantic_config__ = ConfigDict(extra="forbid")
 
 
 @dataclass(frozen=True)
-class NotificationContext:
+class NotificationContext(_StrictWireModel):
     """Allow-listed, already-masked values available to notification templates."""
 
     issue_short_id: str | None = None
@@ -42,3 +51,27 @@ class NotificationContext:
     data_locator: str | None = None
     data_deletion_due: str | None = None
     data_link: str | None = None
+
+
+@dataclass(frozen=True)
+class ContextFieldHits(_StrictWireModel):
+    """Count redaction hits associated with one allow-listed context field."""
+
+    field: str
+    count: int
+
+
+@dataclass(frozen=True)
+class ProducerRedactionHits(_StrictWireModel):
+    """Count-only record of values removed by a notification producer."""
+
+    subject: int
+    body: int
+    context: tuple[ContextFieldHits, ...] = ()
+
+
+STRING_CONTEXT_FIELDS: tuple[str, ...] = tuple(
+    item.name
+    for item in fields(NotificationContext)
+    if get_type_hints(NotificationContext)[item.name] == str | None
+)

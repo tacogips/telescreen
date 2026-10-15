@@ -18,6 +18,17 @@ from telescreen.db.schema_check import validate_owner_schema
 
 def validate_owner_state(connection: Connection, store: Store) -> None:
     """Require initialized allocation and audit state rather than silently reseeding it."""
+    if store is Store.NOTIFICATION:
+        head: tuple[int, str] | None = (
+            connection.execute(
+                text("SELECT seq, hash FROM notification_audit_chain_head WHERE id = 1")
+            )
+            .tuples()
+            .one_or_none()
+        )
+        if head is None:
+            raise RuntimeError("notification owner audit head is missing")
+        return
     counter: str = "counters" if store is Store.MAIN else "inventory_counters"
     counter_name: str = "issue_number" if store is Store.MAIN else "data_asset_number"
     master: str = "issues" if store is Store.MAIN else "data_assets"

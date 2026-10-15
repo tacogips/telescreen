@@ -383,17 +383,35 @@ available through `mise run web-ci`. The headless screenshot smoke (`cd src/web 
 screenshots`, needs a local Chrome or Chromium) builds the UI, renders its pages against
 the mock API into `tmp/ui-screenshots`, and fails on any browser error.
 
-### Independent inventory service
+### Split deployment
 
-Inventory can run as its own API and background worker with an independently owned
-database. Set `TELESCREEN_INVENTORY_SERVICE_URL` and an
-`TELESCREEN_INVENTORY_SERVICE_TOKEN` secret reference in the bureau API and engine.
-Run `telescreen-inventory serve` with its inventory database URL, bureau callback URL,
-the same service secret and fingerprint keys. Collectors deliver ordered commands over
-HTTP; inventory publishes audit and retention intents back to bureau-owned receivers.
-The public `/api/data/*` URLs and UI remain unchanged.
+Telescreen, Inventory and Notification can run as three services with separate databases.
+Inventory and Notification do not call Telescreen; Telescreen publishes directory and
+issue-link updates, and both producers publish notifications through durable commands.
+The default remains the single-process composition with notification tables in the main
+database.
 
-See the [service configuration, HTTP contract and cutover procedure](design-docs/specs/design-inventory-microservice.md).
-A fresh deployment example is available with
-`docker compose -f docker-compose.yml -f docker-compose.inventory.yml up --build`
-from `examples/compose`, after configuring its secrets and separate database password.
+Set both `TELESCREEN_INVENTORY_SERVICE_URL` and
+`TELESCREEN_NOTIFICATION_SERVICE_URL` to enable split mode. Configure
+`TELESCREEN_INVENTORY_SERVICE_TOKEN`, `TELESCREEN_NOTIFICATION_SERVICE_TOKEN` and
+`TELESCREEN_NOTIFICATION_INVENTORY_TOKEN` as secret references. Configure
+`TELESCREEN_NOTIFICATION_DATABASE_URL` only for the Notification process; in a
+single-process deployment it must match the main database URL.
+
+Run `telescreen serve`, `telescreen-inventory serve` and `telescreen-notification serve`
+as separate processes. The Inventory process serves the existing `/api/data/*` routes.
+Use the example overlay from `examples/compose`:
+`docker compose -f docker-compose.yml -f docker-compose.services.yml up --build`.
+
+| Setting | Purpose |
+| --- | --- |
+| `TELESCREEN_INVENTORY_SERVICE_URL` | Inventory service origin |
+| `TELESCREEN_NOTIFICATION_SERVICE_URL` | Notification service origin |
+| `TELESCREEN_INVENTORY_SERVICE_TOKEN` | Telescreen-to-Inventory credential reference |
+| `TELESCREEN_NOTIFICATION_SERVICE_TOKEN` | Telescreen-to-Notification credential reference |
+| `TELESCREEN_NOTIFICATION_INVENTORY_TOKEN` | Inventory-to-Notification credential reference |
+| `TELESCREEN_NOTIFICATION_DATABASE_URL` | Notification-owned database URL |
+| `TELESCREEN_NOTIFICATION_REPLICA_GRACE_SECONDS` | Recipient replica grace period (default 600) |
+
+See the [service split design and cutover procedure](design-docs/specs/design-service-split.md)
+for topology, contracts, settings and deployment details.
