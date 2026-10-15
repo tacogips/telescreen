@@ -1,6 +1,6 @@
 # SVC-P02 Database: Nodetto, Exports, Models, Three-Store Ownership, Revisions and Owner Histories
 
-**Status**: Implementation incomplete; O1 e2e expectation requires plan-owner reconciliation
+**Status**: Code complete at `c3ed4bc`; run 4 re-runs the final gates, records hashes and marks Completed
 **Design Reference**: design-docs/specs/design-service-split.md section 12; design-docs/specs/design-data-model.md "Service split additions"; db/schema/README.md; AGENTS.md "Database Schema (DDL)"
 **Created**: 2026-10-15
 **Last Updated**: 2026-10-15
@@ -65,21 +65,24 @@
 
 Read `impl-plans/conventions.md` and `db/schema/README.md` first.
 
-**Continuation scope (manifest g3, run 3).** Deliverables 1-9 are implemented in
-checkpoint `6017743` (see Progress Log). The remaining work is deliverable 10 (owner
-clarification O1, design section 12), its regression tests, and the green full suite.
-Shared tests already owned here from the g2 sweep:
+**Continuation scope (manifest g4, run 4).** Deliverables 1-10 are implemented in
+checkpoint `c3ed4bc`, including owner resolution 3 (see Progress Log). The only work left:
+1. Re-run every Verification command on the unchanged tree.
+2. Record SHA-256 hashes of the owned files that changed since `19074e9`.
+3. Tick the Completion Criteria and set Status to Completed.
 
-- `tests/db/test_v14_migration.py` (74 tables at head) and the legacy-chain migration
-  tests: edit only if `0010` changes an assertion; never weaken a guard.
-- Inventory transfer v2 (deliverable 8): `tests/db/test_inventory_transfer*.py`,
-  `tests/db/transfer_support.py`, `tests/e2e/test_inventory_store_cutover.py`.
-- `tests/inventory_service/test_config.py`: the two C9 inventory-only remote-mode tests
-  are deleted; keep the other tests unchanged.
+Do not edit source or test files unless a gate fails. If one fails, reproduce it, fix the
+root cause inside these writePaths, and never pass a notification URL to make a test pass
+(design 3, 12). Per conventions 7a, `verification` lists only final passing commands and
+`priorVerification` stays empty. Shared tests owned here (g2 sweep): the legacy-chain
+migration tests (`test_v14_migration.py`: 74 tables at head; never weaken a guard),
+transfer v2 tests with `tests/e2e/test_inventory_store_cutover.py`, and
+`tests/inventory_service/test_config.py` (the two C9 remote-mode tests are deleted).
 
-g3 sweep result: O1 changes no table count or ownership set, so no new shared test is
-needed. Do not edit `src/telescreen/cli.py`, `tests/e2e/harness.py` or any e2e test.
-The two e2e files in writePaths stay unchanged for O1.
+g3/g4 sweep result: O1 changes no table count or ownership set, so no new shared test is
+needed. `tests/e2e/test_inventory_database_config.py` already holds the owner's O1
+expectation at `c3ed4bc` (main file: MAIN + NOTIFICATION tables and both version tables;
+design 12). Keep it as is. Do not edit `src/telescreen/cli.py` or `tests/e2e/harness.py`.
 
 ## Intent and Context
 
@@ -325,32 +328,22 @@ Read `completed/v14-p02-db.md` for the Nodetto record shapes.
 - `tests/e2e/test_inventory_store_cutover.py` (single-process cutover) is green on v2.
 - `tests/inventory/core/test_import_boundaries.py` passes with deliverable 9's sets.
 - The PostgreSQL variants stay marked `integration`.
-- O1 regression tests in `tests/db/test_service_split_migration.py` (SQLite files):
-  - case (a): fresh main + separate inventory, `upgrade_configured(main, inv)` -> main has
-    all nine notification tables, `alembic_version_notification` = `notification_0001`,
-    one head row `(1, 0, '0'*64)`; the inventory file has no notification table; a
-    second call is a no-op (same versions, one head row).
-  - case (b): `upgrade(main)` to legacy head, `adopt_owner(main, Store.MAIN,
-    writers_stopped=True)`, then `upgrade_configured(main, inv)` -> stamped
-    `notification_0001`, still one head row, no table created; a second call is a no-op.
-  - partial state: case (a) setup plus a pre-created `notification_inbox` -> raises; no
-    `alembic_version_notification` row.
-  - schema mismatch: an extra column on `notification_settings` after `main_0001` -> raises;
-    none of the five tables created; no stamp.
-  - distinct notification URL whose file already holds the four tables (created by
-    `upgrade_store(..., Store.MAIN)`) -> "owner baseline requires an empty store".
-  - downgrade of case (a) via `command.downgrade(owner_config(main, Store.NOTIFICATION),
-    "base")` -> the five tables are gone, the four remain, `alembic_version_main` unchanged.
-  - `test_owned_migrations_postgres.py` (`integration`, skipped offline, not verification):
-    case (a) -> nine tables, stamped, full `validate_owner_schema(conn, Store.NOTIFICATION)` passes.
-  - `tests/db/test_owned_migrations.py::test_default_shared_migrate_requires_notification_adoption`
-    passes unchanged.
+- O1 regression tests in `tests/db/test_service_split_migration.py` (SQLite files,
+  implemented at `c3ed4bc`): case (a) fresh main + separate inventory upgraded twice
+  (nine tables, one head row, stamped, no-op second run); case (b) legacy-adopted main
+  (stamp only); partial state and schema mismatch (raise, no stamp, nothing created); a
+  distinct notification URL still refused; the co-located downgrade keeps the four tables.
+  `test_default_shared_migrate_requires_notification_adoption` passes unchanged; the
+  PostgreSQL case (a) variant stays `integration` (skipped offline, not verification).
+- `tests/e2e/test_inventory_database_config.py`: main file = MAIN + NOTIFICATION tables
+  plus both version tables; inventory file = INVENTORY tables (design 12, O1).
 
 ## Verification
 
+Run 4 does not run `ddl-arrange`/`ddl-export`: the exports are final at `c3ed4bc`. Run
+them only if `ddl-check` fails.
+
 ```bash
-mise run ddl-arrange > /tmp/telescreen-svc-p02-db-arrange.log 2>&1; echo "exit=$?"
-mise run ddl-export > /tmp/telescreen-svc-p02-db-export.log 2>&1; echo "exit=$?"
 mise run ddl-check > /tmp/telescreen-svc-p02-db-ddlcheck.log 2>&1; echo "exit=$?"
 uv run --frozen ruff format --check --no-cache src/telescreen/db tests/db tests/support tests/inventory/core tests/inventory_service/test_config.py tests/e2e/test_inventory_store_cutover.py tests/e2e/test_inventory_database_config.py
 uv run --frozen ruff check --no-cache <same paths>
@@ -359,13 +352,12 @@ uv run --frozen pytest -p no:cacheprovider tests/db tests/inventory tests/invent
 uv run --frozen pytest -p no:cacheprovider tests/db/test_service_split_migration.py tests/db/test_owned_migrations.py tests/db/test_owner_adoption.py tests/e2e/test_inventory_database_config.py tests/e2e/test_inventory_split_runtime.py tests/e2e/test_inventory_store_cutover.py 2>&1 | tee /tmp/telescreen-svc-p02-db-o1.log
 uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p02-db-typelint.log 2>&1; grep -E '^(src/telescreen/db|tests/db|tests/support|tests/inventory/core|tests/inventory_service/test_config|tests/e2e/test_inventory_(store_cutover|database_config))' /tmp/telescreen-svc-p02-db-typelint.log
 uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-svc-p02-db-pytest-all.log 2>&1; echo "exit=$?"
+git diff --quiet c3ed4bc -- src/telescreen/cli.py tests/e2e src/telescreen/db/owned_migrations/notification_0001.postgresql.sql src/telescreen/db/owned_migrations/notification_0001.sqlite.sql src/telescreen/db/owned_migrations/notification_baseline_schema.json; echo "exit=$?"
+test "$(wc -l < impl-plans/active/svc-p02-db.md)" -lt 400; echo "exit=$?"
 ```
 
-Run 3 result: O1 behavior and all migration regressions pass. The complete suite has one
-failure: an unchanged e2e assertion expects only owner MAIN tables although O1 requires
-notification history co-located in main when inventory has a separate URL. The accepted
-contract also requires no e2e diff from `6017743`; record a reconciliation request rather
-than violating either instruction.
+Each command must print `exit=0` (typelint: the grep prints nothing). The full suite log
+ends with `passed` and no `failed`/`error` count.
 
 ## Completion Criteria
 
@@ -376,39 +368,21 @@ than violating either instruction.
       prints nothing. Transfer v2 tests and the cutover e2e pass.
 - [x] `grep -n "test_remote_default_migration_creates_main_tables_only\|bureau_service_url" tests/inventory_service/test_config.py`
       prints nothing.
-- [ ] O1 (deliverable 10): the O1 regression tests pass; the three e2e tests pass with
-      `git diff 6017743 -- src/telescreen/cli.py tests/e2e` empty; `git diff 6017743 --stat`
-      shows no change to the `notification_0001.*.sql` snapshots or
-      `notification_baseline_schema.json`.
-- [ ] All verification commands exit 0, including the full suite. The Progress Log has hashes.
+- [ ] O1 (deliverable 10): the O1 regression tests and the three e2e tests pass;
+      `git diff --quiet c3ed4bc -- src/telescreen/cli.py tests/e2e` and the
+      `notification_0001.*.sql` snapshots and `notification_baseline_schema.json` exits 0.
+- [ ] All verification commands exit 0, including the full suite. The Progress Log has
+      hashes under `tmp/telescreen-svc-20261015-g4/svc-p02-db/`.
+- [ ] Status is `Completed`; this file stays under 400 lines.
 
 ## Progress Log
 
-Earlier entries (sessions 18-19, both owner resolutions): [archive](../logs/svc-p02-db-2026-10-15.md).
-Deliverables 1-9 are in checkpoint `6017743`; deliverable 10 resolves its 3 failures.
-Run 3 Step 6: O1 co-location, subset schema validation, adoption checks, narrow downgrade, and six SQLite regressions implemented.
-Passing: `mise run ddl-check`, scoped Ruff format/check, ty, typelint exit 0; O1 migration tests 7 passed; logs `/tmp/telescreen-svc-p02-db-{ddlcheck,format-final,ruff-final,ty-final,typelint-final,o1-migrations-final}.log`.
-O1 bundle: 42 passed, 1 failed, 2 skipped, exit 1; log `/tmp/telescreen-svc-p02-db-o1-final.log`; all six O1 migration cases pass.
-Full suite: 1,318 passed, 1 failed, 36 skipped, exit 1; log `/tmp/telescreen-svc-p02-db-pytest-all.log`.
-Failure: `tests/e2e/test_inventory_database_config.py::test_configured_cli_migrates_both_stores_without_runtime_secrets` expects no co-located notification tables.
-Reconciliation: O1 requires co-location, while acceptance forbids e2e diffs from `6017743`; amend that constraint or clarify expected single-process main table assertions before resuming.
-Hashes: `tmp/telescreen-svc-20261015-g3/svc-p02-db/step6/final-hashes.txt`; failed attempts and per-edit intents are under `tmp/telescreen-svc-20261015-g3/svc-p02-db/step6/`.
-Do not mark complete until the test contract is reconciled and the full suite passes; do not edit the archive.
-
-### Owner resolution 3: 2026-10-15 (after session 20)
-
-The single remaining failure was caused by the owner's own over-strict instruction in
-resolution 2 ("e2e tests pass unchanged"). With O1 the main store legitimately holds the
-co-located notification tables and `alembic_version_notification`, so the owner updated
-`tests/e2e/test_inventory_database_config.py` to expect the main plus notification
-tables in the main file and inventory tables in the inventory file. The owner also fixed
-a pre-existing `ty` error at `6017743`: `inventory/handoff/apply.py` (svc-p04 owned)
-declared the four-member operation union, while svc-p01 widened `InventoryOperation`
-with `IssueLinkState` and `DirectoryUpdate`. It now uses `InventoryOperation`, dispatches
-`StopTracking` explicitly and raises `ValueError` for the two new operations until
-svc-p04 implements them (no producer publishes them before svc-p03). Owner gates on the
-resulting checkpoint: ruff format/check, typelint (731 files), ty, `mise run ddl-check`
-and the full offline suite (1,319 passed, 36 skipped) all exit 0. Remaining work for this
-plan: re-run the final gates on the checkpoint, record hashes, mark the completion
-criteria and the plan Completed. Follow conventions 7a (only final passing commands; keep
-`priorVerification` empty; the superseded single failure is not a risk).
+Earlier entries: [sessions 18-19](../logs/svc-p02-db-2026-10-15.md) and
+[run 3 with owner resolution 3](../logs/svc-p02-db-2026-10-15-run3.md) (do not edit
+either archive). Summary: deliverables 1-10 are in checkpoint `c3ed4bc`. The owner
+updated `tests/e2e/test_inventory_database_config.py` to the O1 layout (design 12) and
+fixed the `ty` error in svc-p04's `inventory/handoff/apply.py`. Owner gates on `c3ed4bc`:
+ruff format/check, typelint (731 files), ty, `mise run ddl-check` and the full offline
+suite (1,319 passed, 36 skipped) all exit 0. Run 4 appends one session entry here
+(conventions 8, at most 10 lines) with the final gate results, log paths and the hash
+file path.

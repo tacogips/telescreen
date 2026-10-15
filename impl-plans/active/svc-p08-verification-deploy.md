@@ -166,8 +166,9 @@ Imitate:
      - 4.1 the `api_token` payload includes `label` (needed by the token actor display);
      - 15 Telescreen split mode allows `notifications.dlp`/`notifications.guard` (GitHub
        outbound guard);
-     - 12 (O1) and 17 are already corrected (session 20, manifest g3). Change them
-       only if the implemented ownership or migration behavior differs;
+     - 12 (O1, including its observable single-process table layout) and 17 are already
+       corrected (sessions 20-21, manifest g4). Change them only if the implemented
+       ownership or migration behavior differs;
      - 13 runbook commands as implemented.
    - `command.md`: "TELESCREEN_BUREAU_SERVICE_URL is no longer read". Add the final
      command list.
