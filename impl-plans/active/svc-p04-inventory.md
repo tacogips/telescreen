@@ -22,25 +22,23 @@
   - `src/telescreen/inventory_service/notify_outbox.py`
   - `src/telescreen/inventory_service/audit_drain.py`
   - `src/telescreen/inventory/handoff/apply.py`
-  - `src/telescreen/db/transfer.py`
-  - `src/telescreen/db/transfer_rows.py`
-  - `src/telescreen/db/transfer_check.py`
   - `src/telescreen/db/notification_transfer.py`
   - `src/telescreen/cli_inventory_store.py`
   - `tests/inventory_service/conftest.py`
-  - `tests/inventory_service/test_config.py`
   - `tests/inventory_service/test_runtime.py`
   - `tests/inventory_service/test_transport.py`
   - `tests/inventory_service/test_split_inventory.py`
   - `tests/inventory/handoff/test_split_operations.py`
-  - `tests/db/test_inventory_transfer.py`
-  - `tests/db/test_inventory_transfer_cli.py`
-  - `tests/db/test_inventory_transfer_postgres.py`
-  - `tests/db/transfer_support.py`
   - `tests/db/test_notification_transfer.py`
-  - `tests/e2e/test_inventory_store_cutover.py`
 - sharedPaths: none
 - artifactRoots: none
+
+**g2 ownership change.** Inventory transfer v2 (`db/transfer.py`, `transfer_rows.py`,
+`transfer_check.py`, their tests, `tests/db/transfer_support.py` and
+`tests/e2e/test_inventory_store_cutover.py`) moved to svc-p02, because svc-p02's
+revisions break transfer v1. `tests/inventory_service/test_config.py` also moved to
+svc-p02, which deletes its two inventory-only-remote tests. This plan reuses svc-p02's
+transfer helpers and puts its new config and import-gate tests in `test_split_inventory.py`.
 
 ## Intent and Context
 
@@ -52,8 +50,8 @@ R1/R5: the inventory process must not call Telescreen. Inventory work in this pl
 - dispatch overdue obligations to Notification through its own outbox, with eligibility
   checked in the committing transaction.
 
-This plan also owns the store transfer code: inventory transfer v2 and the new
-`notification-store` copy/verify (design 13 step 4).
+This plan also owns the new `notification-store` copy/verify (design 13 step 4).
+Inventory transfer v2 is svc-p02's.
 
 Imitate:
 
@@ -101,16 +99,15 @@ Imitate:
      `IssueLinkState` to the inventory `/commands` route to seed the replica and links.
    - Replace the old Bureau-callback outage scenarios with the `test_split_inventory.py`
      cases below.
-   - In `tests/inventory_service/test_config.py`, delete
-     `test_remote_default_migration_creates_main_tables_only` and
-     `test_missing_service_credentials_fail_before_resources_are_created`. They test
-     Telescreen composition; svc-p06 adds full-split equivalents to
-     `tests/e2e/test_wiring_split.py` and `test_wiring_cli.py`. Keep the inventory-runtime
-     config tests and the inventory import-gate test, updated so its forbidden list adds
-     `telescreen.notifications` and `telescreen.directory`.
-   - `tests/e2e/test_inventory_store_cutover.py` (single-process cutover) is updated for
-     transfer v2 (`inventory_0002`) and stays green. The notification-store cutover e2e
-     belongs to svc-p08.
+   - Do not edit `tests/inventory_service/test_config.py` (svc-p02 deleted its two
+     Telescreen-composition tests). Add to `test_split_inventory.py`:
+     - the config tests from the Tests section;
+     - an isolated-subprocess import gate: importing `telescreen.inventory_service.cli`
+       and `telescreen.inventory_service.app` loads none of `telescreen.wiring`,
+       `telescreen.wiring_v14`, `telescreen.notifications`, `telescreen.directory`,
+       `telescreen.issues` or `telescreen.collectors.service`. Imitate
+       `tests/inventory_service/test_config.py:81-113`.
+   - The notification-store cutover e2e belongs to svc-p08.
 2. **`app.py:build_inventory_runtime(settings, env, http, sessions=None, clock=None)`.**
    - Requirements: `inventory_database_url`, `inventory_service_token_ref`,
      `notification_service_url` and `notification_inventory_token_ref`; otherwise
@@ -141,11 +138,29 @@ Imitate:
      2. Map it with `ReplicaOwnerDirectory.member_for_owner`.
      3. Otherwise use `ReplicaOwnershipRules.match(source, locator)`.
 4. **`links.py` and `inventory/handoff/apply.py`.**
-   - `InventoryOperationApplier` applies `IssueLinkState`: upsert
-     `inventory_issue_links`; delete the row when `present=False`.
-   - `DirectoryUpdate` goes to `DirectoryReplica.apply`.
+   - `apply.py` must stay inside the gate in
+     `tests/inventory/core/test_import_boundaries.py`: it may import only
+     `telescreen.inventory`, `.core`, `.ports` and `.masking`, plus `typing`. It must not
+     import `telescreen.replica` or `telescreen.inventory_service`.
+   - Add two protocols in `apply.py`:
+     - `IssueLinkSink.apply_link(session, state: IssueLinkState) -> None`;
+     - `DirectorySink.apply_entity(session, entity: DirectoryEntity) -> None`.
+     `InventoryOperationApplier` gains `links: IssueLinkSink | None = None` and
+     `directory: DirectorySink | None = None`.
+   - `apply` dispatches every kind by `isinstance`, including an explicit `StopTracking`
+     branch; the current `else` must not swallow new kinds. A link or directory operation
+     with no sink -> `TelescreenError(VALIDATION_ERROR, "unsupported inventory operation")`,
+     so the inbox does not acknowledge it. Single-process wiring passes no sinks, and
+     Telescreen never emits these kinds in single process.
+   - `inventory_service/links.py:IssueLinkStore(IssueLinkSink)` upserts
+     `inventory_issue_links`, and deletes the row when `present=False`.
+     `ReplicaDirectorySink(DirectorySink)` calls `DirectoryReplica.apply` with
+     `for_inventory` already applied by the producer.
    - Both run inside the existing inbox transaction, so the ordering and receipts are the
      existing ones. Observation and sweep behavior is unchanged.
+   - The svc-p02 gate allows `inventory_service/` to import the five new inventory models.
+     It still forbids the original 10 inventory models outside `inventory/`. Reach those
+     only through `telescreen.inventory` services and repositories.
 5. **`audit_drain.py`.** `LocalAuditDrain.tick()`: per pending `inventory_audit_outbox`
    id, in one inventory transaction:
    1. `get_pending`;
@@ -185,13 +200,8 @@ Imitate:
 8. **`cli.py`.** Add `audit verify` (exit 0 when valid, 4 on a broken chain, and print
    only seq and counts) and `audit export` (JSON lines to stdout) using
    `INVENTORY_AUDIT_MODELS`. `serve` and `migrate` are unchanged.
-9. **Transfer v2.**
-   - `db/transfer*.py` accepts the `inventory_0002` schema. The copy moves the original 10
-     tables plus `inventory_audit_records` and the head (append-only lineage on merge: the
-     target is a subset of the source).
-   - It excludes `inventory_directory_entries` and `inventory_issue_links` (rebuilt by
-     resync).
-   - It refuses when `inventory_notification_outbox` has undelivered rows.
+9. **Notification-store transfer.** Inventory transfer v2 is done by svc-p02. Reuse its
+   row-copy helpers from `db/transfer_rows.py`; do not edit `db/transfer*.py`.
    - `db/notification_transfer.py` and `cli_inventory_store.py` add
      `telescreen notification-store copy|verify [--direction merge] --writers-stopped` for
      the four moved tables.
@@ -246,35 +256,38 @@ Other tests:
   sequence, a `present=False` removal, and `DirectoryUpdate` applied only if newer.
 - The audit drain gives a local chain that verifies, an acknowledged outbox, and a CLI
   `audit verify` exit 0.
-- Transfer: copy/verify round-trip for the notification tables; merge refused when a
-  receipt is missing; inventory transfer refuses an undelivered notification outbox;
-  manifests contain no values. The existing transfer tests are updated for
-  `inventory_0002`.
-- `tests/inventory_service/test_config.py`: a missing notification URL or inventory token
-  -> `ConfigError`, and `bureau_service_url` is not required.
+- `tests/inventory/handoff/test_split_operations.py`: a link operation on an applier with
+  no sink -> `validation_error`, and the inbox row stays unacknowledged.
+- Notification-store transfer (`tests/db/test_notification_transfer.py`): copy/verify
+  round-trip for the four moved tables; merge refused when a receipt or template version
+  is missing; manifests contain no values.
+- `test_split_inventory.py` config cases: a missing notification URL or inventory token
+  -> `ConfigError`, and `bureau_service_url` is not required. The import gate passes.
 
 ## Verification
 
 ```bash
-uv run --frozen ruff format --check --no-cache src/telescreen/inventory_service src/telescreen/inventory/handoff src/telescreen/db/transfer.py src/telescreen/db/transfer_rows.py src/telescreen/db/transfer_check.py src/telescreen/db/notification_transfer.py src/telescreen/cli_inventory_store.py tests/inventory_service tests/inventory/handoff tests/db
+uv run --frozen ruff format --check --no-cache src/telescreen/inventory_service src/telescreen/inventory/handoff src/telescreen/db/notification_transfer.py src/telescreen/cli_inventory_store.py tests/inventory_service tests/inventory/handoff tests/db/test_notification_transfer.py
 uv run --frozen ruff check --no-cache <same paths>
 uv run --frozen ty check <same paths>
-uv run --frozen pytest -p no:cacheprovider tests/inventory_service/test_config.py tests/inventory_service/test_runtime.py tests/inventory_service/test_transport.py tests/inventory_service/test_split_inventory.py tests/inventory tests/db tests/e2e/test_inventory_store_cutover.py 2>&1 | tee /tmp/telescreen-svc-p04-inventory-pytest.log
-uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p04-inventory-typelint.log 2>&1; grep -E '^(src/telescreen/(inventory_service|inventory/handoff|db/(transfer|notification_transfer)|cli_inventory_store)|tests/(inventory_service|inventory/handoff|db))' /tmp/telescreen-svc-p04-inventory-typelint.log
+uv run --frozen pytest -p no:cacheprovider tests/inventory_service/test_config.py tests/inventory_service/test_runtime.py tests/inventory_service/test_transport.py tests/inventory_service/test_split_inventory.py tests/inventory tests/db 2>&1 | tee /tmp/telescreen-svc-p04-inventory-pytest.log
+uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p04-inventory-typelint.log 2>&1; grep -E '^(src/telescreen/(inventory_service|inventory/handoff|db/notification_transfer|cli_inventory_store)|tests/(inventory_service|inventory/handoff|db/test_notification_transfer))' /tmp/telescreen-svc-p04-inventory-typelint.log
 uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-svc-p04-inventory-pytest-all.log 2>&1; echo "exit=$?"
 ```
 
-Evidence: the scoped commands exit 0 and the typelint grep is empty. The full-suite run
-is informational: only the svc-p08-owned `tests/inventory_service/test_process.py` and
-`test_postgres.py` may fail until svc-p08.
-List any failing test ids in the Progress Log.
+Evidence: the scoped commands exit 0 and the typelint grep is empty. `tests/inventory`
+includes the svc-p02 import gate and must pass. The full-suite run is informational
+because svc-p05 and svc-p06 run concurrently. Failures are acceptable only in the
+svc-p08-owned `tests/inventory_service/test_process.py`/`test_postgres.py` or in files
+owned by an in-flight wave-4 plan. List every failing test id in the Progress Log.
 
 ## Completion Criteria
 
 - [ ] `grep -rn "bureau_service_url\|/retention-status" src/telescreen/inventory_service/app.py src/telescreen/inventory_service/cli.py src/telescreen/inventory_service/worker.py` prints nothing.
       `grep -n "clients" src/telescreen/inventory_service/app.py` prints nothing.
-- [ ] `grep -rln "telescreen.wiring\|build_container\|inventory_service.wiring\|telescreen.directory" tests/inventory_service/conftest.py tests/inventory_service/test_runtime.py tests/inventory_service/test_config.py tests/inventory_service/test_split_inventory.py`
-      prints nothing, except the import-gate test's forbidden-name strings in `test_config.py`.
+- [ ] `grep -rln "build_container\|inventory_service.wiring\|from telescreen.directory\|from telescreen.wiring" tests/inventory_service/conftest.py tests/inventory_service/test_runtime.py tests/inventory_service/test_split_inventory.py`
+      prints nothing. The gate's forbidden-name strings are quoted module names, not imports.
+- [ ] `grep -n "telescreen.replica\|telescreen.inventory_service" src/telescreen/inventory/handoff/apply.py` prints nothing.
 - [ ] The R5 tests pass. Retention dispatch is one transaction (review the code path).
 - [ ] The scoped verification exits 0. The Progress Log has hashes and lists informational failures.
 

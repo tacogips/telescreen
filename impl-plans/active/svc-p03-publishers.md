@@ -67,12 +67,16 @@ Imitate:
    - `tests/directory/test_orm_write_gate.py`: an AST scan of `src/telescreen` that fails
      on Core `update(X)`, `delete(X)` or `insert(X)` for X in the watched models (`MemberRow`,
      `TeamRow`, `TeamMembershipRow`, `MemberIdentityRow`, `ApiTokenRow`, `OwnershipRuleRow`,
-     `CollectorConfigRow`, `IssueRow`).
+     `CollectorConfigRow`, `IssueRow`). Exclude `src/telescreen/db/**` (frozen migrations
+     use raw `text()` SQL). The g2 sweep confirmed that the two lines above are the only Core
+     writes on watched models today.
 2. **`projections/markers.py`.**
-   - `install_projection_markers(sessionmaker: async_sessionmaker[AsyncSession]) -> None`
-     registers a `before_flush` listener on `sessionmaker.class_.sync_session_class`, or on
-     the sync session class used by the factory; verify which mechanism works with the
-     repository's `create_sessionmaker`.
+   - `install_projection_markers(sessionmaker: async_sessionmaker[AsyncSession], clock: Clock) -> None`
+     (svc-p06 calls it with exactly these two arguments) registers a `before_flush`
+     listener on the sync session class used by that factory. Verify which mechanism works
+     with the repository's `create_sessionmaker`. The listener must affect only sessions
+     from that factory. Tests must uninstall in `finally`, so other tests' sessions are not
+     marked.
    - `uninstall_projection_markers(...)` is for tests.
    - The listener adds `ProjectionChangeRow(id=new_id(), kind, entity_ref, recorded_at)`
      for every new, deleted or dirty watched instance. For dirty instances it checks
@@ -89,8 +93,12 @@ Imitate:
    - Use the clock injected at install time.
 3. **`projections/entities.py`.** Pure async readers from main tables:
    - `read_directory_entity(session, kind, entity_id, revision) -> DirectoryEntity`
-     returns `present=False` when the row is gone. A member whose `active` is false stays
-     present with `active=False`.
+     returns `present=False` (payload None) when the row is gone. A member whose `active`
+     is false stays present with `active=False`.
+   - Use the svc-p01 field names exactly. `IdentityEntity.identity_kind` carries the
+     `MemberIdentityRow` kind value (accepted p01 constraint). `ApiTokenEntity` includes
+     `label`. Build payloads positionally or by keyword; extra fields are rejected by the
+     codec.
    - `read_issue_link(session, issue_id) -> IssueLinkState`. `short_id` comes from
      `issues.keys.short_id(number)`.
 4. **`projections/relay.py`.**

@@ -500,17 +500,20 @@ The single-process suite must stay green. Commands: `mise run ci`, `mise run ddl
 `mise run web-ci`, `uv build`, `uv run pytest -q tests/inventory_service
 tests/notification_service`.
 
-Plan shape (`svc-pNN`, disjoint writePaths). It runs in five waves: p01; p02 and p07;
-p03, p04 and p05; p06; p08. The critical path is p01 -> p02 -> p03 -> p06 -> p08. Each
-plan owns the shared exact-count/inventory tests that its change breaks.
+Plan shape (`svc-pNN`, disjoint writePaths). The plan files in `impl-plans/active/` and
+the current dispatch manifest (`telescreen-svc-20261015-g2-dispatch.json`, superseding
+g1) are authoritative for writePaths. The plans run in five waves: p01 (accepted at
+`19074e9`); p02; p03 and p07; p04, p05 and p06; p08; then serial finalization. The
+critical path is p01 -> p02 -> p07 -> p04/p05 -> p08. Each plan owns the shared
+exact-count/inventory tests that its change breaks.
 
 | Plan | Content | Depends on |
 | --- | --- | --- |
-| p01 foundation | ports codecs (4.1-4.3, including the validated `ProducerRedactionHits`/`ContextFieldHits` fields) and the `NotificationReceipt.pending`/`NotificationRequest.id_seed` fields, template imports in `notifications/templates/render.py` and `validate.py`, `core/vocabulary.py` additions (new engine task kinds), `Store.NOTIFICATION` declarations, config/topology validation, `core/templating.py`, `core/ownership_match.py`, chain-parameterized audit, `pyproject` script/wheel, README split-mode section (sole owner of root files) | - |
-| p02 db | Nodetto, exports, models, `0010`, owner histories, adoption, ownership/model/Nodetto tests | p01 |
+| p01 foundation (accepted) | ports codecs (4.1-4.3, including the validated `ProducerRedactionHits`/`ContextFieldHits` fields) and the `NotificationReceipt.pending`/`NotificationRequest.id_seed` fields, template imports in `notifications/templates/render.py` and `validate.py`, `core/vocabulary.py` additions (new engine task kinds), `Store.NOTIFICATION` declarations, config/topology validation, `core/templating.py`, `core/ownership_match.py`, `pyproject` script/wheel, README split-mode section (sole owner of root files). Constraints for later plans: `IdentityEntity` uses `identity_kind`; `NotificationContext` forbids extra fields | - |
+| p02 db | Nodetto, exports, models, `0010`, owner histories (including `notification_0001`), adoption, ownership/model/Nodetto/migration exact-count tests (74 tables at head), the inventory model import gate, and inventory transfer v2 (`db/transfer*.py`, section 13 step 4), because `0010`/`inventory_0002` break transfer v1 | p01 |
 | p03 telescreen publishers | change markers (including the two ORM-delete conversions in `directory/`), single-flight lock-before-read relay with deletion by marker id, resync command module, outbox adapters with redaction-hit counting, notification outbox delivery/recovery, HTTP clients for 4.4. Tests: two relay runs interleaved with an API-token revoke leave the replica revoked, and the same holds for an issue-link status change (deterministic SQLite interleaving; PostgreSQL variant marked `integration`); a marker committed mid-run is republished | p01, p02 |
-| p04 inventory | replica auth/adapters, issue links, local audit drain, retention dispatcher, removal of callbacks; sole owner of `db/transfer*` (inventory transfer v2 and `notification-store` copy/verify modules) | p01, p02 |
-| p05 notification service | package, inbox, replica, delivery pump, routes, audit CLI, identity-through-ports changes in `notifications/`, `DlpGate` `prior_hits` fold in `notifications/dlp.py` and `sender.py`. Test: DLP parity: the same raw sample secret in a context field, an inline body and a template-rendered field gives the same row verdict, hit_count > 0 and audit action under MASK and BLOCK, single-process vs the split adapter + inbox path in process | p01, p02 |
-| p06 telescreen split composition | `wiring*.py`, proxies, integrations, weekly move, `cli.py` registration of every new Telescreen command, no-op delivery handler | p03, p04 |
-| p07 deployment docs | compose overlay (names fixed by sections 9 and 14), examples tests, command.md, runbook section | p01 |
-| p08 verification | multi-process and PostgreSQL tests (including a multi-process DLP parity case under `TELESCREEN_DLP_POLICY=block`), leak matrix, import gates, archive plans (including `active/inventory-alert-boundaries.md`, already COMPLETED) | p04, p05, p06 |
+| p07 shared service runtime | shared directory replica store/apply (`telescreen/replica`), replica authenticator (section 7) with parity tests, chain-parameterized audit (`audit/` service, chain, verify, query, export) used by sections 8.3 and 11 | p01, p02 |
+| p04 inventory | replica-backed lookups and auth binding, issue links, local audit drain, retention dispatcher and notification outbox, removal of callbacks; `notification-store` copy/verify (`db/notification_transfer.py`, reusing p02's transfer helpers) | p01, p02, p07 |
+| p05 notification service | package, inbox, replica binding, delivery pump, routes, audit CLI, identity-through-ports changes in `notifications/`, `DlpGate` `prior_hits` fold in `notifications/dlp.py` and `sender.py`. Test: DLP parity: the same raw sample secret in a context field, an inline body and a template-rendered field gives the same row verdict, hit_count > 0 and audit action under MASK and BLOCK, single-process vs the split adapter + inbox path in process | p01, p02, p07 |
+| p06 telescreen split composition | `wiring*.py`, proxies, integrations, weekly move, `cli.py` registration of every new Telescreen command, no-op delivery handler | p01, p02, p03 |
+| p08 verification and deployment | multi-process and PostgreSQL tests (including a multi-process DLP parity case under `TELESCREEN_DLP_POLICY=block`), restricted-login grants, leak matrix, import gates, compose overlay (names fixed by sections 9 and 14), examples tests, command.md, runbook, archive plans (including `active/inventory-alert-boundaries.md`, already COMPLETED) | p04, p05, p06 |

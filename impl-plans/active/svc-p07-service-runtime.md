@@ -57,12 +57,13 @@ Imitate:
    provides:
    - `apply(session, entity: DirectoryEntity) -> bool` upserts only if
      `entity.revision > stored.revision`. Absent entities are stored as tombstones
-     (`present=False`, `payload_json` empty JSON `null`). It returns whether the entity
-     was applied.
+     (`present=False`, `lookup_key` None, `payload_json` = `encode_directory_entity(entity)`
+     of the tombstone itself). It returns whether the entity was applied.
    - `lookup_key` per kind:
      - member: handle;
      - team: slug;
-     - identity: `f"{kind}:{identity_key}"`;
+     - identity: `f"{payload.identity_kind}:{payload.identity_key}"` (`IdentityEntity`
+       uses `identity_kind`; accepted p01 constraint);
      - api_token: token_hash;
      - collector and rules: None.
    - `get(session, kind, id) -> DirectoryEntity | None` and
@@ -127,6 +128,12 @@ Imitate:
 - Default `models` arguments must keep every existing audit call site and test unchanged.
 - The identity key needs the fingerprinter. Without one (no keys configured), OIDC
   authentication fails closed (`unauthorized`).
+- Import gate (svc-p02, `tests/inventory/core/test_import_boundaries.py`): only
+  `replica/` and `audit/chain.py` may import the new inventory models
+  (`InventoryDirectoryEntryRow`, `InventoryAuditRecordRow`, `InventoryAuditChainHeadRow`,
+  ...). Put the three `*_AUDIT_MODELS` constants in `audit/chain.py`, not in
+  `service.py` or `verify.py`. Prefer the svc-p02 `DirectoryEntryModel` alias in
+  `replica/`. Run `tests/inventory` in scoped verification to prove this.
 
 ## Tests (`tests/replica`, `tests/audit`)
 
@@ -162,7 +169,7 @@ Audit:
 uv run --frozen ruff format --check --no-cache src/telescreen/replica src/telescreen/audit tests/replica tests/audit
 uv run --frozen ruff check --no-cache src/telescreen/replica src/telescreen/audit tests/replica tests/audit
 uv run --frozen ty check src/telescreen/replica src/telescreen/audit tests/replica tests/audit
-uv run --frozen pytest -p no:cacheprovider tests/replica tests/audit tests/directory tests/api 2>&1 | tee /tmp/telescreen-svc-p07-service-runtime-pytest.log
+uv run --frozen pytest -p no:cacheprovider tests/replica tests/audit tests/directory tests/api tests/inventory 2>&1 | tee /tmp/telescreen-svc-p07-service-runtime-pytest.log
 uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p07-service-runtime-typelint.log 2>&1; grep -E '^(src/telescreen/(replica|audit)|tests/(replica|audit))' /tmp/telescreen-svc-p07-service-runtime-typelint.log
 uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-svc-p07-service-runtime-pytest-all.log 2>&1; echo "exit=$?"
 ```

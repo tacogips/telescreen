@@ -105,7 +105,7 @@ Imitate:
    - `tests/e2e/test_inventory_split_runtime.py` is a single-process separate-store test.
      It is not owned here and must stay green; run it in verification.
    - The single-process inventory cutover e2e (`tests/e2e/test_inventory_store_cutover.py`)
-     is owned by svc-p04.
+     is owned by svc-p02 (inventory transfer v2, manifest g2). Run it here; do not edit it.
    - Add `tests/split/test_cutover.py` for the full-split cutover in design 13 order:
      1. a shared database with a pending queued notification, a retention receipt and a
         pending retention obligation;
@@ -166,8 +166,8 @@ Imitate:
      - 4.1 the `api_token` payload includes `label` (needed by the token actor display);
      - 15 Telescreen split mode allows `notifications.dlp`/`notifications.guard` (GitHub
        outbound guard);
-     - 17 the actual plan shape (svc-p07 shared runtime; waves p01 | p02 | p03, p07 |
-       p04, p05, p06 | p08);
+     - 17 is already corrected (session 19, manifest g2). Change it only if the
+       implemented ownership differs;
      - 13 runbook commands as implemented.
    - `command.md`: "TELESCREEN_BUREAU_SERVICE_URL is no longer read". Add the final
      command list.

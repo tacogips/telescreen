@@ -38,6 +38,23 @@
   - `tests/db/test_migration.py`
   - `tests/db/test_frozen_legacy_migrations.py`
   - `tests/db/test_service_split_migration.py`
+  - `tests/db/test_v14_migration.py`
+  - `tests/db/test_v11_migration.py`
+  - `tests/db/test_v12_migration.py`
+  - `tests/db/test_v13_migration.py`
+  - `tests/db/test_inventory_audit_migration.py`
+  - `tests/db/test_inventory_counter_migration.py`
+  - `tests/db/test_inventory_handoff_migration.py`
+  - `tests/db/test_retention_handoff_migration.py`
+  - `src/telescreen/db/transfer.py`
+  - `src/telescreen/db/transfer_rows.py`
+  - `src/telescreen/db/transfer_check.py`
+  - `tests/db/test_inventory_transfer.py`
+  - `tests/db/test_inventory_transfer_cli.py`
+  - `tests/db/test_inventory_transfer_postgres.py`
+  - `tests/db/transfer_support.py`
+  - `tests/e2e/test_inventory_store_cutover.py`
+  - `tests/inventory_service/test_config.py`
   - `tests/support/db.py`
   - `tests/support/owned_postgres.py`
   - `tests/inventory/core/test_import_boundaries.py`
@@ -47,6 +64,25 @@
 - artifactRoots: none
 
 Read `impl-plans/conventions.md` and `db/schema/README.md` first.
+
+**Continuation scope (manifest g2, pre-dispatch sweep).** The g2 sweep found tests that
+this plan's revisions break and that g1 left outside its paths. They are now owned here:
+
+- `tests/db/test_v14_migration.py` (74 tables at head; owner already updated it).
+- The legacy-chain tests `test_v11/v12/v13_migration.py` and the four
+  `test_*_migration.py` handoff/counter/audit tests upgrade to `head` and downgrade
+  through `0010`. Edit them only if `0010` changes an assertion; never weaken a guard.
+- Inventory transfer v1 hard-codes legacy `0009_inventory_counter` and owner baseline
+  `inventory_0001` (`db/transfer_check.py:61-68`, `db/transfer.py:33-39`). After `0010`
+  and `inventory_0002`, `tests/db/test_inventory_transfer*.py` and
+  `tests/e2e/test_inventory_store_cutover.py` fail. Inventory transfer v2 therefore moves
+  here from svc-p04 (deliverable 8).
+- `tests/inventory_service/test_config.py::test_remote_default_migration_creates_main_tables_only`
+  expects `tables_for(Store.MAIN)` after a main owner migrate, which now creates
+  `main_database_tables()` (54). That test and
+  `test_missing_service_credentials_fail_before_resources_are_created` cover the
+  inventory-only remote mode removed by C9. Delete both. svc-p06 adds full-split equivalents. Keep
+  the other two tests in the file unchanged.
 
 ## Intent and Context
 
@@ -74,8 +110,8 @@ Read `completed/v14-p02-db.md` for the Nodetto record shapes.
 
 ## Non-goals
 
-- No repositories or services. Do not touch `db/transfer*` (svc-p04) or `cli.py`
-  (svc-p06; it adds `--store notification`).
+- No repositories or services. Do not touch `db/notification_transfer.py` or
+  `cli_inventory_store.py` (svc-p04), or `cli.py` (svc-p06; it adds `--store notification`).
 - Never edit `0001`-`0009`, `main_0001.py`, `inventory_0001.py`, the four existing
   `*_0001.*.sql` snapshots or `baseline_schema.json`.
 
@@ -184,6 +220,35 @@ Read `completed/v14-p02-db.md` for the Nodetto record shapes.
    - In `tests/db/test_owned_migrations.py` and `test_owned_migrations_postgres.py`, the
      exact table-set assertion for a main owner store created by `main_0001`+`main_0002`
      is `set(main_database_tables())`, because the baseline keeps the retained tables.
+8. **Inventory transfer v2 (design 13 step 4; moved from svc-p04).**
+   - `transfer_check.py`: the source must be at legacy `0010_service_split` and the target
+     owner at `inventory_0002`. Keep the exact error texts' style (static, value-free).
+   - `transfer.py`/`transfer_rows.py`: copy the original 10 inventory tables plus
+     `inventory_audit_records` and `inventory_audit_chain_head`. On a fresh shared source
+     the audit pair holds only the genesis head. Merge/rollback requires the target audit
+     rows to be a prefix-subset of the source (append-only lineage). Exclude
+     `inventory_directory_entries` and `inventory_issue_links` (rebuilt by
+     `projections resync`). Refuse (no writes) when `inventory_notification_outbox` has rows
+     with `delivered_at IS NULL` on either side.
+   - The report `schema_revision` becomes `inventory_0002`. Keep batch size 500, the locks,
+     trigger handling and value-free manifests unchanged.
+   - Export the row-copy helpers that svc-p04's `notification_transfer.py` will reuse
+     without renaming existing public names.
+9. **Inventory model import gate (`tests/inventory/core/test_import_boundaries.py`).**
+   - `test_every_database_table_has_one_explicit_owner`: the union of the three stores
+     equals `Base.metadata.tables`; the sets are pairwise disjoint; `store_for` maps every
+     NOTIFICATION table to `Store.NOTIFICATION`; the inventory mapper-name set equals the
+     10 existing names plus `InventoryDirectoryEntryRow`, `InventoryIssueLinkRow`,
+     `InventoryAuditRecordRow`, `InventoryAuditChainHeadRow` and
+     `InventoryNotificationOutboxRow`.
+   - Keep the existing 10 names forbidden everywhere outside `inventory/`, `db/` and the
+     two data routers, exactly as today.
+   - The five new names may also be imported by `inventory_service/` (svc-p04),
+     `replica/` (svc-p07) and `audit/chain.py` (svc-p07 audit model constants). Express
+     this as a second frozenset with its own allow-list. Do not widen the rule for the
+     original 10.
+   - `test_inventory_depends_only_on_owned_models` (`telescreen/inventory/**`) keeps its
+     `_ALLOWED` module prefixes. svc-p04 must keep `inventory/handoff/apply.py` within them.
 
 ## Key Pitfalls
 
@@ -223,6 +288,13 @@ Read `completed/v14-p02-db.md` for the Nodetto record shapes.
   - A notification store missing `notification_inbox` -> adoption refused.
 - `migrate.upgrade_configured` with adopted main/inventory but unadopted notification ->
   `ConfigError`.
+- Inventory transfer v2: the existing copy/verify/rollback/retry/keyset tests pass against
+  a `0010` source and an `inventory_0002` target; an undelivered
+  `inventory_notification_outbox` row -> refused with no target writes; a source with
+  replica rows -> copied target has no replica rows; the CLI test asserts
+  `"schema_revision":"inventory_0002"` and no values in the output.
+- `tests/e2e/test_inventory_store_cutover.py` (single-process cutover) is green on v2.
+- `tests/inventory/core/test_import_boundaries.py` passes with deliverable 9's sets.
 - The PostgreSQL variants stay marked `integration`.
 
 ## Verification
@@ -231,23 +303,30 @@ Read `completed/v14-p02-db.md` for the Nodetto record shapes.
 mise run ddl-arrange > /tmp/telescreen-svc-p02-db-arrange.log 2>&1; echo "exit=$?"
 mise run ddl-export > /tmp/telescreen-svc-p02-db-export.log 2>&1; echo "exit=$?"
 mise run ddl-check > /tmp/telescreen-svc-p02-db-ddlcheck.log 2>&1; echo "exit=$?"
-uv run --frozen ruff format --check --no-cache src/telescreen/db tests/db tests/support
-uv run --frozen ruff check --no-cache src/telescreen/db tests/db tests/support
-uv run --frozen ty check src/telescreen/db tests/db tests/support
-uv run --frozen pytest -p no:cacheprovider tests/db tests/inventory tests/e2e/test_inventory_database_config.py tests/e2e/test_inventory_split_runtime.py tests/e2e/test_inventory_store_cutover.py 2>&1 | tee /tmp/telescreen-svc-p02-db-pytest.log
-uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p02-db-typelint.log 2>&1; grep -E '^(src/telescreen/db|tests/db|tests/support)' /tmp/telescreen-svc-p02-db-typelint.log
+uv run --frozen ruff format --check --no-cache src/telescreen/db tests/db tests/support tests/inventory/core tests/inventory_service/test_config.py tests/e2e/test_inventory_store_cutover.py tests/e2e/test_inventory_database_config.py
+uv run --frozen ruff check --no-cache <same paths>
+uv run --frozen ty check <same paths>
+uv run --frozen pytest -p no:cacheprovider tests/db tests/inventory tests/inventory_service/test_config.py tests/e2e/test_inventory_database_config.py tests/e2e/test_inventory_split_runtime.py tests/e2e/test_inventory_store_cutover.py 2>&1 | tee /tmp/telescreen-svc-p02-db-pytest.log
+uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p02-db-typelint.log 2>&1; grep -E '^(src/telescreen/db|tests/db|tests/support|tests/inventory/core|tests/inventory_service/test_config|tests/e2e/test_inventory_(store_cutover|database_config))' /tmp/telescreen-svc-p02-db-typelint.log
 uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-svc-p02-db-pytest-all.log 2>&1; echo "exit=$?"
 ```
 
 Evidence: every command exits 0, the typelint grep prints nothing, and the full suite
-passes (the four tables move stores but stay in the shared database).
+passes (the four tables move stores but stay in the shared database). p02 runs alone in
+its wave, so a full-suite failure is this plan's to fix. If the failing test is outside
+`writePaths`, record a Reconciliation request with the test id and stop. Do not report
+success.
 
 ## Completion Criteria
 
 - [ ] 12 tables exist in Nodetto, the exports, the models, `0010` and the owner histories.
       `ddl-check` exits 0.
 - [ ] `git diff --stat` shows no change to existing revisions, snapshots or `baseline_schema.json`.
-- [ ] All verification commands exit 0. The Progress Log has hashes.
+- [ ] `grep -n "0009_inventory_counter\|inventory_0001" src/telescreen/db/transfer_check.py`
+      prints nothing. Transfer v2 tests and the cutover e2e pass.
+- [ ] `grep -n "test_remote_default_migration_creates_main_tables_only\|bureau_service_url" tests/inventory_service/test_config.py`
+      prints nothing.
+- [ ] All verification commands exit 0, including the full suite. The Progress Log has hashes.
 
 ## Progress Log
 

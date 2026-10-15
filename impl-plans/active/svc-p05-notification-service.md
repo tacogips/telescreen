@@ -224,13 +224,22 @@ Imitate:
 Updated `tests/notifications/v12`/`v13` tests: the defaults keep the existing assertions
 passing. Adjust only the fakes and constructor calls.
 
+g2 sweep: these unowned callers construct `NotificationService`, `PreferenceService`,
+`PreferenceRepository` or `DlpGate` and must pass **unchanged**:
+`tests/notifications/test_notifications.py`, `tests/notifications/v14`,
+`tests/inventory/retention/conftest.py`, `tests/api/v12_routers/test_routers.py`,
+`tests/notifications/v13/test_weekly.py` (moved by svc-p06),
+`notifications/templates/service.py` and `notifications/guard.py`. Keep every existing
+positional constructor order. New parameters go last with defaults. If one of them cannot
+pass unchanged, stop and file a Reconciliation request.
+
 ## Verification
 
 ```bash
 uv run --frozen ruff format --check --no-cache src/telescreen/notification_service src/telescreen/notifications src/telescreen/api/routers/notification_settings.py tests/notification_service tests/notifications
 uv run --frozen ruff check --no-cache src/telescreen/notification_service src/telescreen/notifications src/telescreen/api/routers/notification_settings.py tests/notification_service tests/notifications
 uv run --frozen ty check src/telescreen/notification_service src/telescreen/notifications src/telescreen/api/routers/notification_settings.py tests/notification_service tests/notifications
-uv run --frozen pytest -p no:cacheprovider tests/notification_service tests/notifications tests/e2e/test_flow_v12_notifications.py 2>&1 | tee /tmp/telescreen-svc-p05-notification-service-pytest.log
+uv run --frozen pytest -p no:cacheprovider tests/notification_service tests/notifications tests/inventory/retention tests/api/v12_routers tests/e2e/test_flow_v12_notifications.py 2>&1 | tee /tmp/telescreen-svc-p05-notification-service-pytest.log
 uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p05-notification-service-typelint.log 2>&1; grep -E '^(src/telescreen/(notification_service|notifications|api/routers/notification_settings)|tests/(notification_service|notifications))' /tmp/telescreen-svc-p05-notification-service-typelint.log
 uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-svc-p05-notification-service-pytest-all.log 2>&1; echo "exit=$?"
 ```
