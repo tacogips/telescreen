@@ -293,4 +293,11 @@ owned by an in-flight wave-4 plan. List every failing test id in the Progress Lo
 
 ## Progress Log
 
+### Owner note: 2026-10-15 (after session 20)
+
+`inventory/handoff/apply.py` now types `operation` as `InventoryOperation`, dispatches
+`StopTracking` explicitly and raises `ValueError` for `IssueLinkState` and
+`DirectoryUpdate` (an owner fix for a `ty` error after svc-p01 widened the union).
+Replace that `else` branch with the real issue-link and directory application.
+
 (append sessions per conventions section 8)

@@ -104,4 +104,9 @@ def upgrade_configured(
     else:
         upgrade_store(database_url, Store.MAIN, revision)
         upgrade_store(inventory_database_url or database_url, Store.INVENTORY, revision)
-        upgrade_store(notification_database_url or database_url, Store.NOTIFICATION, revision)
+        if notification_database_url is None or notification_database_url == database_url:
+            notification_config: Config = owner_config(database_url, Store.NOTIFICATION)
+            notification_config.attributes["colocated_notification"] = True
+            command.upgrade(notification_config, revision)
+        else:
+            upgrade_store(notification_database_url, Store.NOTIFICATION, revision)

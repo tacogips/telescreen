@@ -91,11 +91,15 @@ def _serial_default(connection: Connection, table: str, column: str, value: str 
     )
 
 
-def validate_owner_schema(connection: Connection, store: Store) -> None:
+def validate_owner_schema(
+    connection: Connection, store: Store, tables: tuple[str, ...] | None = None
+) -> None:
     """Refuse missing, altered or partially upgraded owner tables without writing data."""
     metadata: MetaData = baseline_metadata(store)
     inspector: Inspector = inspect(connection)
-    names: tuple[str, ...] = snapshot_tables(f"{store}_0001", connection.dialect.name)
+    names: tuple[str, ...] = (
+        snapshot_tables(f"{store}_0001", connection.dialect.name) if tables is None else tables
+    )
     if not set(names) <= set(inspector.get_table_names()):
         raise RuntimeError("owner schema is missing baseline tables")
     for name in names:
@@ -156,8 +160,15 @@ def validate_owner_schema(connection: Connection, store: Store) -> None:
                 )
             ):
                 raise RuntimeError(f"owner schema named constraint differs: {name}")
-    if connection.dialect.name == "postgresql":
+    if tables is None and connection.dialect.name == "postgresql":
         _validate_trigger(connection, store)
+
+
+def validate_notification_owner_schema(
+    connection: Connection, tables: tuple[str, ...] | None = None
+) -> None:
+    """Validate notification-owned tables without importing ownership into migrations."""
+    validate_owner_schema(connection, Store.NOTIFICATION, tables)
 
 
 def _validate_trigger(connection: Connection, store: Store) -> None:

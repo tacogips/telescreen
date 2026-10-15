@@ -10,6 +10,7 @@ from telescreen.ports.inventory_commands import (
     CompleteListing,
     CompleteSweep,
     InventoryCommand,
+    InventoryOperation,
     ObserveResource,
     StopTracking,
 )
@@ -24,9 +25,7 @@ class InventoryOperationApplier:
 
     async def apply(self, session: AsyncSession, command: InventoryCommand) -> None:
         """Use the receiving transaction for inventory changes and lifecycle history."""
-        operation: ObserveResource | CompleteSweep | CompleteListing | StopTracking = (
-            command.operation
-        )
+        operation: InventoryOperation = command.operation
         if isinstance(operation, ObserveResource):
             await self.observer.apply_observation(
                 session, operation.observation, operation.inventory_mode
@@ -47,10 +46,13 @@ class InventoryOperationApplier:
                 mode=operation.inventory_mode,
                 recorded_at=command.occurred_at,
             )
-        else:
+        elif isinstance(operation, StopTracking):
             await self.reconciler.stop_tracking(
                 session,
                 operation.collector_config_id,
                 operation.actor_ref,
                 recorded_at=command.occurred_at,
             )
+        else:
+            # Issue link and directory operations are applied by svc-p04-inventory.
+            raise ValueError("inventory operation is not supported by this receiver")

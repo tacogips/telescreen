@@ -27,13 +27,20 @@ def test_configured_cli_migrates_both_stores_without_runtime_secrets(
     monkeypatch.setenv("TELESCREEN_INVENTORY_DATABASE_URL", f"sqlite+aiosqlite:///{inventory_path}")
     assert main(["migrate"]) == 0
     assert main(["migrate"]) == 0
-    for path, store in ((main_path, Store.MAIN), (inventory_path, Store.INVENTORY)):
+    # Single process mode keeps the notification store co-located in main (design
+    # section 12, owner clarification O1).
+    expected: tuple[tuple[Path, tuple[Store, ...]], ...] = (
+        (main_path, (Store.MAIN, Store.NOTIFICATION)),
+        (inventory_path, (Store.INVENTORY,)),
+    )
+    for path, stores in expected:
         engine: Engine = sync_engine(f"sqlite:///{path}")
         try:
             with engine.connect() as connection:
                 assert set(inspect(connection).get_table_names()) == {
-                    *tables_for(store),
-                    f"alembic_version_{store}",
+                    table
+                    for store in stores
+                    for table in (*tables_for(store), f"alembic_version_{store}")
                 }
         finally:
             engine.dispose()

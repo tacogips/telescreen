@@ -1,6 +1,6 @@
 # SVC-P02 Database: Nodetto, Exports, Models, Three-Store Ownership, Revisions and Owner Histories
 
-**Status**: In Progress
+**Status**: Implementation incomplete; O1 e2e expectation requires plan-owner reconciliation
 **Design Reference**: design-docs/specs/design-service-split.md section 12; design-docs/specs/design-data-model.md "Service split additions"; db/schema/README.md; AGENTS.md "Database Schema (DDL)"
 **Created**: 2026-10-15
 **Last Updated**: 2026-10-15
@@ -361,20 +361,20 @@ uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p02-db-typelint.l
 uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-svc-p02-db-pytest-all.log 2>&1; echo "exit=$?"
 ```
 
-Evidence: every command exits 0, the typelint grep prints nothing, and the full suite
-passes (the four tables move stores but stay in the shared database). p02 runs alone in
-its wave, so a full-suite failure is this plan's to fix. If the failing test is outside
-`writePaths`, record a Reconciliation request with the test id and stop. Do not report
-success.
+Run 3 result: O1 behavior and all migration regressions pass. The complete suite has one
+failure: an unchanged e2e assertion expects only owner MAIN tables although O1 requires
+notification history co-located in main when inventory has a separate URL. The accepted
+contract also requires no e2e diff from `6017743`; record a reconciliation request rather
+than violating either instruction.
 
 ## Completion Criteria
 
-- [ ] 12 tables exist in Nodetto, the exports, the models, `0010` and the owner histories.
+- [x] 12 tables exist in Nodetto, the exports, the models, `0010` and the owner histories.
       `ddl-check` exits 0.
-- [ ] `git diff --stat` shows no change to existing revisions, snapshots or `baseline_schema.json`.
-- [ ] `grep -n "0009_inventory_counter\|inventory_0001" src/telescreen/db/transfer_check.py`
+- [x] `git diff --stat` shows no change to existing revisions, snapshots or `baseline_schema.json`.
+- [x] `grep -n "0009_inventory_counter\|inventory_0001" src/telescreen/db/transfer_check.py`
       prints nothing. Transfer v2 tests and the cutover e2e pass.
-- [ ] `grep -n "test_remote_default_migration_creates_main_tables_only\|bureau_service_url" tests/inventory_service/test_config.py`
+- [x] `grep -n "test_remote_default_migration_creates_main_tables_only\|bureau_service_url" tests/inventory_service/test_config.py`
       prints nothing.
 - [ ] O1 (deliverable 10): the O1 regression tests pass; the three e2e tests pass with
       `git diff 6017743 -- src/telescreen/cli.py tests/e2e` empty; `git diff 6017743 --stat`
@@ -386,6 +386,29 @@ success.
 
 Earlier entries (sessions 18-19, both owner resolutions): [archive](../logs/svc-p02-db-2026-10-15.md).
 Deliverables 1-9 are in checkpoint `6017743`; deliverable 10 resolves its 3 failures.
-Run 3: hashes go under `tmp/telescreen-svc-20261015-g3/svc-p02-db/`. Append one entry of at
-most 8 lines (file must stay under 400): tasks, final passing commands with exit codes and
-log paths (conventions 7a), Reconciliation requests. Do not edit the archive.
+Run 3 Step 6: O1 co-location, subset schema validation, adoption checks, narrow downgrade, and six SQLite regressions implemented.
+Passing: `mise run ddl-check`, scoped Ruff format/check, ty, typelint exit 0; O1 migration tests 7 passed; logs `/tmp/telescreen-svc-p02-db-{ddlcheck,format-final,ruff-final,ty-final,typelint-final,o1-migrations-final}.log`.
+O1 bundle: 42 passed, 1 failed, 2 skipped, exit 1; log `/tmp/telescreen-svc-p02-db-o1-final.log`; all six O1 migration cases pass.
+Full suite: 1,318 passed, 1 failed, 36 skipped, exit 1; log `/tmp/telescreen-svc-p02-db-pytest-all.log`.
+Failure: `tests/e2e/test_inventory_database_config.py::test_configured_cli_migrates_both_stores_without_runtime_secrets` expects no co-located notification tables.
+Reconciliation: O1 requires co-location, while acceptance forbids e2e diffs from `6017743`; amend that constraint or clarify expected single-process main table assertions before resuming.
+Hashes: `tmp/telescreen-svc-20261015-g3/svc-p02-db/step6/final-hashes.txt`; failed attempts and per-edit intents are under `tmp/telescreen-svc-20261015-g3/svc-p02-db/step6/`.
+Do not mark complete until the test contract is reconciled and the full suite passes; do not edit the archive.
+
+### Owner resolution 3: 2026-10-15 (after session 20)
+
+The single remaining failure was caused by the owner's own over-strict instruction in
+resolution 2 ("e2e tests pass unchanged"). With O1 the main store legitimately holds the
+co-located notification tables and `alembic_version_notification`, so the owner updated
+`tests/e2e/test_inventory_database_config.py` to expect the main plus notification
+tables in the main file and inventory tables in the inventory file. The owner also fixed
+a pre-existing `ty` error at `6017743`: `inventory/handoff/apply.py` (svc-p04 owned)
+declared the four-member operation union, while svc-p01 widened `InventoryOperation`
+with `IssueLinkState` and `DirectoryUpdate`. It now uses `InventoryOperation`, dispatches
+`StopTracking` explicitly and raises `ValueError` for the two new operations until
+svc-p04 implements them (no producer publishes them before svc-p03). Owner gates on the
+resulting checkpoint: ruff format/check, typelint (731 files), ty, `mise run ddl-check`
+and the full offline suite (1,319 passed, 36 skipped) all exit 0. Remaining work for this
+plan: re-run the final gates on the checkpoint, record hashes, mark the completion
+criteria and the plan Completed. Follow conventions 7a (only final passing commands; keep
+`priorVerification` empty; the superseded single failure is not a risk).
