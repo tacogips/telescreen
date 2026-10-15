@@ -48,21 +48,22 @@ These plans come from `design-docs/specs/design-service-split.md` (R1-R8, D1-D5)
 | Wave | Plans |
 | --- | --- |
 | 1 | [svc-p01-foundation](active/svc-p01-foundation.md) (integration-accepted at `19074e9`) |
-| 2 | [svc-p02-db](active/svc-p02-db.md) |
-| 3 | [svc-p03-publishers](active/svc-p03-publishers.md), [svc-p07-service-runtime](active/svc-p07-service-runtime.md) |
-| 4 | [svc-p04-inventory](active/svc-p04-inventory.md), [svc-p05-notification-service](active/svc-p05-notification-service.md), [svc-p06-composition](active/svc-p06-composition.md) |
-| 5 | [svc-p08-verification-deploy](active/svc-p08-verification-deploy.md) |
+| 2 | [svc-p02-db](active/svc-p02-db.md) (integration-accepted, checkpoint `8b09786`) |
+| 3 (g5 wave A) | [svc-p03-publishers](active/svc-p03-publishers.md), [svc-p07-service-runtime](active/svc-p07-service-runtime.md) (code complete; re-verify) |
+| 4 (g5 wave B) | [svc-p04-inventory](active/svc-p04-inventory.md), [svc-p05-notification-service](active/svc-p05-notification-service.md), [svc-p06-composition](active/svc-p06-composition.md) |
+| 5 (g5 wave C) | [svc-p08-verification-deploy](active/svc-p08-verification-deploy.md) |
 
 The current dispatch manifest is
-[`telescreen-svc-20261015-g4`](active/telescreen-svc-20261015-g4-dispatch.json) (run 4,
-base `c3ed4bc`). It supersedes g3 (run 3, base `6017743`), g2 (run 2, base `19074e9`)
-and g1. g4 keeps g3's plans, write paths and DAG and records svc-p01 as an accepted
-dependency at `c3ed4bc`. svc-p02 is code complete at `c3ed4bc` and only re-runs its final
-gates and marks itself Completed. Earlier svc-p02 log entries are in
+[`telescreen-svc-20261016-g5`](active/telescreen-svc-20261016-g5-dispatch.json) (run 5,
+base `8b09786`). It supersedes g4 (run 4, base `c3ed4bc`), g3 (run 3, base `6017743`),
+g2 (run 2, base `19074e9`) and g1. g5 keeps g4's plans, write paths and DAG. It records
+svc-p01 and svc-p02 as accepted dependencies at `8b09786`. svc-p03 and svc-p07 are code
+complete at `8b09786`; they only re-run their final gates, record hashes and go through
+review. Earlier svc-p02 log entries are in
 [`logs/svc-p02-db-2026-10-15.md`](logs/svc-p02-db-2026-10-15.md) and
 [`logs/svc-p02-db-2026-10-15-run3.md`](logs/svc-p02-db-2026-10-15-run3.md). Serial
 finalization after the fanout archives these plans and the completed
-`inventory-alert-boundaries.md` to `completed/`, the four manifests to
+`inventory-alert-boundaries.md` to `completed/`, the five manifests to
 `completed/dispatch/`, and updates this index.
 
 The [inventory and alert boundary plan](active/inventory-alert-boundaries.md) is complete:

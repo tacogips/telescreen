@@ -1,0 +1,428 @@
+{
+  "taskId": "telescreen-svc-20261016-g5",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/service-split",
+  "baseBranch": "feat/service-split",
+  "remote": "origin",
+  "originalHead": "8b0978675aee12715a6685bbd432e1a33775a8b0",
+  "originalHeadNotes": "Continuation run 5 (session 22) base 8b09786 on feat/service-split: svc-p01-foundation and svc-p02-db integration-accepted; svc-p03-publishers and svc-p07-service-runtime code complete and marked Completed at 8b09786, but their wave-3 review was interrupted (agent exit under host memory pressure; no review finding exists against them); owner gates green on 8b09786 (ruff format/check, typelint 752 files, ty, ddl-check, pytest 1333 passed / 37 skipped). The planning commit on top of 8b09786 adds this manifest, the design section 17 pointer to g5, the run 5 re-verify sections in svc-p03 and svc-p07, the svc-p08 docs note and the index update. Fanout runs against that planning commit.",
+  "evidenceRoot": "tmp/telescreen-svc-20261016-g5",
+  "evidenceRootNotes": "Untracked (gitignored by **/tmp); never staged or committed. Use tmp/telescreen-svc-20261016-g5/<planId>/attempt-<n>/. Command logs go to /tmp/telescreen-svc-<planId-suffix>-*.log (conventions section 7). svc-p03 and svc-p07 may read their g4 hash files under tmp/telescreen-svc-20261015-g4/ (if present) but write only under the g5 root.",
+  "supersedes": "telescreen-svc-20261015-g4",
+  "acceptedDependencies": [
+    {
+      "planId": "svc-p01-foundation",
+      "commit": "8b09786",
+      "acceptedAtCommit": "19074e9",
+      "planPath": "impl-plans/active/svc-p01-foundation.md",
+      "notes": "Integration-accepted in session 18; recorded as accepted at checkpoint 8b09786; not redispatched. Standing constraints: IdentityEntity uses identity_kind; NotificationContext forbids extra fields (also tightens RetentionCommand decoding)."
+    },
+    {
+      "planId": "svc-p02-db",
+      "commit": "8b09786",
+      "acceptedAtCommit": "8b09786",
+      "planPath": "impl-plans/active/svc-p02-db.md",
+      "notes": "Integration-accepted in session 21 (final gates at c3ed4bc, checkpoint 8b09786); not redispatched. Its writePaths (Nodetto, exports, models, 0010, owner histories, ownership, transfer v2, tests/db/**, tests/support/**, tests/inventory/core/test_import_boundaries.py, tests/inventory/core/test_master_authority.py, tests/inventory_service/test_config.py, tests/e2e/test_inventory_store_cutover.py, tests/e2e/test_inventory_database_config.py) are owned by no g5 plan: a needed edit there is a Reconciliation request for serial finalization. Standing constraints: 74 tables (MAIN 50, INVENTORY 15, NOTIFICATION 9); outside inventory/ and db/ only inventory_service/, replica/ and audit/chain.py may import the five new inventory models, and no module outside inventory/, db/ and the two data routers may import the original 10 inventory models. The plan file is at 398 lines and must not be edited."
+    }
+  ],
+  "designDocPaths": [
+    "design-docs/specs/design-service-split.md",
+    "design-docs/specs/design-service-split-requirements.md",
+    "design-docs/specs/architecture.md",
+    "design-docs/specs/command.md",
+    "design-docs/specs/design-api-and-ui.md",
+    "design-docs/specs/design-data-model.md",
+    "design-docs/specs/design-inventory-microservice.md",
+    "design-docs/user-qa/pending-service-split-tradeoffs.md",
+    "design-docs/user-qa/README.md"
+  ],
+  "planIndexPath": "impl-plans/README.md",
+  "conventionsPath": "impl-plans/conventions.md",
+  "waves": [
+    {"id": "A", "plans": ["svc-p03-publishers", "svc-p07-service-runtime"], "notes": "Re-verify wave: final gates, hashes and reviews on the 8b09786 code; fix only real findings."},
+    {"id": "B", "plans": ["svc-p04-inventory", "svc-p05-notification-service", "svc-p06-composition"], "dependsOn": ["A"]},
+    {"id": "C", "plans": ["svc-p08-verification-deploy"], "dependsOn": ["B"]},
+    {"id": "finalize", "serial": true, "dependsOn": ["C"]}
+  ],
+  "sharedFileOwnership": {
+    "rule": "Write paths are disjoint across all six dispatched plans and the accepted svc-p01 and svc-p02 paths; every sharedPaths list is empty. Each plan edits only its own plan file and Progress Log. Workers never edit this manifest, the g1/g2/g3/g4 manifests, impl-plans/README.md, impl-plans/logs/** or another plan's files, and never run git checkout/restore/stash/reset/clean/commit/add/push. Per-edit discipline: fresh read before each edit, pre/post SHA-256 hashes and an immutable intent snapshot under the evidence root, drift check (an owned file whose hash changed outside the worker's own edits is a Reconciliation request, never an overwrite); repairs after the wave join are serial.",
+    "dependencies": "No dependency or lockfile change. pyproject.toml and README.md were changed by the accepted svc-p01; no plan runs uv lock or edits src/web/package.json or src/web/bun.lock.",
+    "reconciliation": "A defect in a file owned by another plan, or a needed edit to an svc-p01 path, is a Reconciliation request in the Progress Log for the serial finalization, never a cross-plan edit.",
+    "g2Sweep": "Before dispatch the tests were grepped for exact table counts, ownership/store lists, route and RBAC tables, import and AST gates, leak/examples inventories, container attributes and CLI monkeypatches. Result: svc-p02 gains tests/db/test_v14_migration.py, the seven legacy-chain migration tests, inventory transfer v2 (db/transfer*.py, its tests, transfer_support.py and tests/e2e/test_inventory_store_cutover.py, moved from svc-p04 because 0010/inventory_0002 break transfer v1) and tests/inventory_service/test_config.py (its main-owner table-set test breaks at 54 tables); svc-p06 gains tests/e2e/test_cli_v12.py and test_cli_event_loop.py. No RBAC or route-table change is planned; src/web is unchanged (C6); leak sinks enumerate tables dynamically.",
+    "g3Sweep": "Rechecked at 6017743 (only svc-p02 paths changed since the g2 planning commit 8d6ec31). Importers of modules changed by later plans: tests/inventory_service/{conftest,test_runtime,test_transport}.py (svc-p04), test_config.py (svc-p02), tests/e2e/test_wiring_v13.py and tests/notifications/v13/test_weekly.py (svc-p06), tests/inventory/retention/** (constructor-compat pin in svc-p05; notifications/retention.py unchanged per svc-p04). tests/inventory/core/test_database_boundary.py, tests/inventory/actors/test_inventory_actors.py and tests/issues/v14_asset_owner/test_resolver.py import issues/asset_owner.py and directory/inventory_actors.py, which no plan edits. Exact-count/ownership tests (tests/db/**, tests/support/**, tests/inventory/core/test_import_boundaries.py) are svc-p02's; tests/leak/** is svc-p08's; tests/integrations/test_router.py is svc-p06's. tests/core/split/test_lazy_notifications.py (accepted svc-p01) must stay green unedited: svc-p05's notifications/dlp.py must not import sender/email/slack/delivery. svc-p02 O1 changes no table count or ownership set. Result: no writePaths extension is needed; plans, writePaths and DAG equal g2.",
+    "g4Sweep": "Rechecked at c3ed4bc. Since the g3 planning commit only svc-p02 paths, tests/e2e/test_inventory_database_config.py (svc-p02) and src/telescreen/inventory/handoff/apply.py (svc-p04) changed. Importers of apply.py: tests/inventory/handoff/conftest.py and pg_fixture.py, src/telescreen/wiring_v14.py and inventory_service/app.py (svc-p04). svc-p04 adds the links/directory sink fields with None defaults, so the unowned handoff fixtures and wiring_v14.py keep working unedited; svc-p04 keeps the owner fix (operation typed as InventoryOperation, explicit StopTracking branch) and replaces only the ValueError branch. Unowned single-process e2e tests (test_inventory_split_runtime.py, inventory_split_flow.py, test_retention_handoff_runtime.py, test_inventory_audit_runtime.py, harness.py) use wiring/wiring_v14 and audit.verify.verify_chain; svc-p07 keeps the main-chain defaults and svc-p06 does not edit wiring_v14.py, so they stay green unedited. test_route_permissions_v13.py, test_route_permissions_v14.py and tests/api/v12_rbac/rbac_world.py are unaffected (no route or RBAC change in single process). Result: no writePaths extension is needed; plans, writePaths and DAG equal g3. Only svc-p02 acceptance and verification move from the 6017743 baseline to c3ed4bc.",
+    "g5Sweep": "Rechecked at 8b09786. Between c3ed4bc and 8b09786 the source and test changes are only in svc-p03 paths (projections/*, integrations/notification_{client,delivery,outbox,publish}.py, collectors/inventory_publish.py, directory/{identities,repository}.py, tests/projections, tests/notification_outbox, tests/directory/test_orm_write_gate.py) and svc-p07 paths (replica/*, audit/{chain,export,service,verify}.py, tests/replica). No module outside those packages imports telescreen.projections, telescreen.replica or integrations.notification_* (grep -rlnE over src and tests matches only their own files and tests). Wave B imports them read-only. The svc-p02 import gate (tests/inventory/core/test_import_boundaries.py) already allows inventory_service/ to import the five new inventory models; svc-p04 must reach the original 10 inventory models only through telescreen.inventory services (its deliverable 4 says so). svc-p02's accepted writePaths are unowned in g5. Result: no writePaths extension is needed; plans, writePaths and DAG equal g4 minus the accepted svc-p02 entry."
+  },
+  "serialFinalization": {
+    "when": "After svc-p08-verification-deploy is integration-accepted.",
+    "steps": [
+      "Resolve any Reconciliation requests recorded in the svc plan Progress Logs (for example svc-p06 keeping inventory_service/clients.py, or README.md command names owned by the accepted svc-p01).",
+      "Set every svc plan Status to Completed with 0 open Completion Criteria boxes; git mv the eight svc plans and inventory-alert-boundaries.md to impl-plans/completed/, and the g1, g2, g3, g4 and g5 manifests to impl-plans/completed/dispatch/ (impl-plans/logs/svc-p02-db-2026-10-15.md and svc-p02-db-2026-10-15-run3.md stay and their links are updated to ../completed/svc-p02-db.md).",
+      "Update impl-plans/README.md: the service split section says complete and links to ./completed/; no active svc entry remains.",
+      "Set the service split Status lines to implemented in architecture.md, design-data-model.md, design-api-and-ui.md and design-service-split-requirements.md. design-docs/user-qa/pending-service-split-tradeoffs.md stays pending.",
+      "Rerun on the final tree: mise run ci; mise run ddl-check; mise run web-ci; uv build --out-dir /tmp/telescreen-svc-final-dist. Record exit codes and log paths.",
+      "Only if every gate exits 0: commit on feat/service-split (no secrets, no tmp/ or dist/ files, no unrelated files) and git push origin feat/service-split (never main)."
+    ]
+  },
+  "reviewContext": {
+    "issueReference": "No GitHub issue. workflowInput 'Split Telescreen, Inventory and Notification into independently deployable services', continuation run 5 (workflowExecutionId opus-luna-design-and-implement-review-loop-session-22, base 8b09786); requirements design-docs/specs/design-service-split-requirements.md (R1-R8, D1-D5); accepted design design-docs/specs/design-service-split.md (C1-C9; section 12 owner clarification O1; section 17 points to g5, accepted in the session 22 design review).",
+    "userProblem": "Inventory was extracted as a service but still calls back into Telescreen for authentication, issue enrichment, actor names, assignee fallback, audit and retention delivery, and notification runs inside the main process sharing the caller transaction and main store. The owner wants Telescreen, Inventory and Notification each deployable as a microservice, with Inventory and Notification never calling Telescreen.",
+    "requiredOutcomes": [
+      "Inventory serves all /api/data/* routes with unchanged responses and permissions, authenticates OIDC bearers and API tokens from its own directory replica (D1, C4), serves issue enrichment from a pushed issue-link projection (D3), keeps its own audit chain (D5), and publishes overdue notifications while Telescreen is stopped; no inventory code path calls Telescreen.",
+      "A new telescreen-notification process with its own store, migrations, delivery pump, templates, preferences, DLP (producer redaction hits folded into DlpGate), replica recipient resolution and audit chain; Telescreen and Inventory hold no SMTP/Slack credentials in split mode.",
+      "Every notification producer in Telescreen and Inventory publishes versioned NotificationCommands through a durable outbox committed with producer state; deterministic notification row ids; idempotent applied/duplicate/deferred receipts.",
+      "db/ownership.py declares three disjoint stores (MAIN 50, INVENTORY 15, NOTIFICATION 9 tables; 74 total); Nodetto, exports, models, legacy revision 0010, owner histories main_0002, inventory_0002, notification_0001 with adoption; inventory transfer v2 and notification-store copy/verify cutover.",
+      "Import gates and multi-process TCP tests prove dependency directions, outage/replay recovery and DLP parity; the leak matrix covers replicas, outboxes, wire bodies, logs and audit exports; restricted-login PostgreSQL tests deny cross-store SQL (integration, skipped offline).",
+      "The single-process default composition passes the full existing suite unchanged; mise run ci, ddl-check, web-ci and uv build pass; README, design docs, command docs and compose overlay docker-compose.services.yml updated."
+    ],
+    "nonGoals": [
+      "Splitting collection from issues, a message broker or service mesh, or executing a production migration (requirements section 6).",
+      "A notification-history list API or UI (C6); src/web does not change.",
+      "Keeping the bde11e7 inventory-only remote mode (C9): supported topologies are single process and full split.",
+      "Dependency or lockfile changes; re-implementing or redispatching svc-p01 or svc-p02."
+    ],
+    "constraints": [
+      "AGENTS.md / CLAUDE.md: English only, no emojis, python-coding-standards, plans under 400 lines, Python files under 1000 lines.",
+      "Strict typing enforced by tools/typelint.py, ruff ANN/PGH and ty; no Any, object, dict or **kwargs; dataclasses or enums; no type-ignore; tooling not weakened.",
+      "Raw detected values, raw item keys and source content never enter any table, log, outbox, replica, wire message, notification, export or API response; only masked forms, hit counts and keyed fingerprints.",
+      "At-least-once delivery with idempotent receipts, durable outboxes committed with producer state, no distributed transactions, no in-memory callbacks.",
+      "DDL: Nodetto JSONL first, then ddl-arrange, ddl-export, models, new Alembic and owner-history revisions; never edit existing revisions or packaged baselines.",
+      "Default uv run pytest passes offline; integration and live tests skip and are never listed as verification or risks (conventions 7a).",
+      "Commit and push only to feat/service-split."
+    ],
+    "designDecisionsAndRationale": [
+      "D1 + C4: Inventory and Notification verify OIDC bearers and API tokens against a pushed directory replica via ReplicaAuthenticator, with error codes identical to api/common/auth.py.",
+      "D2: Telescreen publishes revisioned DirectoryEntity values (counters.directory_revision, only-if-newer apply, tombstones) through flush markers and a serialized lock-before-read relay that deletes markers by id; Inventory receives no email/slack fields.",
+      "D3: IssueLinkState and DirectoryUpdate are additive InventoryCommand kinds on the existing ordered outbox/inbox; the inventory applier receives them through injected sinks so telescreen.inventory keeps its import gate.",
+      "D4: producers redact inline text and context strings and send count-only ProducerRedactionHits; Notification folds them into DlpGate so verdicts match single process.",
+      "D5: per-store audit chains through AuditChainModels; Inventory drains its audit outbox locally; audit verify/export CLIs per service.",
+      "C1/R5: /retention-status is removed; Inventory checks retention eligibility in the same transaction that writes the notification command, reusing the obligation id as event_id for cross-cutover dedup.",
+      "C5: notifications/weekly.py moves to issues/weekly_report.py and stays a Telescreen producer.",
+      "Shared replica/audit runtime is a separate plan (svc-p07) so svc-p04 and svc-p05 run in parallel; inventory transfer v2 sits with svc-p02 because svc-p02's revisions break transfer v1."
+    ],
+    "intentionalTradeoffs": [
+      "Replicas are eventually consistent: an unknown recipient within notification_replica_grace_seconds (default 600) is deferred with no writes; after grace it is recorded as SKIPPED recipient_unknown.",
+      "Five owner-review defaults (replicated API tokens, shared identity key, pending receipts, CLI audit path, two topologies) apply while pending in design-docs/user-qa/pending-service-split-tradeoffs.md.",
+      "TELESCREEN_BUREAU_SERVICE_URL stays parseable in core/config.py (svc-p01 path) but is no longer read; command.md documents it (svc-p08).",
+      "Wave B full-suite runs in svc-p04/p05/p06 are informational for tests/inventory_service/** and files owned by in-flight wave B plans; scoped runs are the gate. svc-p03 and svc-p07 (wave A) require a green full suite."
+    ],
+    "supportedEdgeCases": [
+      "Relay and concurrent API token revoke or issue status change (deterministic SQLite after_read schedule; PostgreSQL two-connection variant marked integration).",
+      "Lost reply after applied command returns duplicate with no duplicate rows; reused event id with a different digest is a conflict.",
+      "Notification, Inventory or Telescreen stopped while producers commit; restart applies commands once and in order.",
+      "Superseded retention obligation produces no command and an overdue_superseded audit; owner fallback via issue link plus identity, then ownership rules team.",
+      "Cutover: copied retention receipt makes the overdue command a duplicate; copied queued notifications without delivery state are seeded and delivered once; inventory transfer refuses an undelivered inventory notification outbox.",
+      "Setting only one service URL, or a single-process notification database URL different from main, is a ConfigError before any resource opens."
+    ],
+    "outOfScopeEdgeCases": [
+      "Live Mailpit/Keycloak/PostgreSQL checks (owner-only, examples/compose/dev-services.yml).",
+      "Production data migration execution.",
+      "Mixed topologies with only one extracted service."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-service-split.md",
+      "design-docs/specs/design-service-split-requirements.md",
+      "design-docs/user-qa/pending-service-split-tradeoffs.md",
+      "impl-plans/conventions.md",
+      "impl-plans/README.md",
+      "src/telescreen/ports/directory_projection.py",
+      "src/telescreen/ports/notification_commands.py",
+      "src/telescreen/ports/notifications.py",
+      "src/telescreen/inventory_service/app.py",
+      "src/telescreen/inventory/handoff/apply.py",
+      "src/telescreen/notifications/retention.py",
+      "src/telescreen/notifications/dlp.py",
+      "src/telescreen/db/ownership.py",
+      "src/telescreen/db/transfer_check.py",
+      "src/telescreen/wiring.py",
+      "tests/inventory/core/test_import_boundaries.py"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "svc-p03-publishers",
+      "planPath": "impl-plans/active/svc-p03-publishers.md",
+      "wave": "A",
+      "dependsOn": [],
+      "writePaths": [
+        "impl-plans/active/svc-p03-publishers.md",
+        "src/telescreen/projections",
+        "src/telescreen/integrations/notification_outbox.py",
+        "src/telescreen/integrations/notification_delivery.py",
+        "src/telescreen/integrations/notification_publish.py",
+        "src/telescreen/integrations/notification_client.py",
+        "src/telescreen/collectors/inventory_publish.py",
+        "src/telescreen/directory/identities.py",
+        "src/telescreen/directory/repository.py",
+        "tests/projections",
+        "tests/notification_outbox",
+        "tests/directory/test_orm_write_gate.py"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "impl-plans/active/svc-p03-publishers.md", "intendedEdit": "Run 5 re-verify only (see the plan's 'Run 5 Re-verify Scope' section): append one Progress Log session entry of at most 12 lines with commands, exit codes, log paths, pass/skip counts, the g5 hash file path and whether any owned file changed; keep Status Completed and the Completion Criteria ticked; keep the file under 400 lines."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Deliverables 1-10: ORM-only directory writes plus AST write gate (excluding src/telescreen/db), flush markers installed by install_projection_markers(sessionmaker, clock), entity readers using identity_kind and api_token label, serialized relay (counter lock before state read, delete markers by id, after_read test seam), resync, InventoryPublisher.emit_operation, notification outbox, outbox sender/member notifier with redaction-hit counting, command delivery handler/recovery/no-op, notification HTTP clients.",
+        "Deterministic SQLite relay-plus-revoke and issue-status schedules pass with unweakened assertions; PostgreSQL variant marked integration.",
+        "Sample secret in context is absent from the outbox payload with a hit count; grep for telescreen.notifications or telescreen.inventory. in projections and integrations/notification_*.py prints nothing; full suite passes.",
+        "Run 5 re-verify: the code is complete at 8b09786 and is not re-implemented. Every verification command exits 0 on the g5 planning-commit tree. Any source or test change only fixes a gate failure or a review finding, at its root cause inside these writePaths, and is listed in addressedFeedback. Final SHA-256 hashes of every owned file changed since c3ed4bc are recorded in tmp/telescreen-svc-20261016-g5/svc-p03-publishers/owned-file-sha256.txt. One new Progress Log entry; Status Completed; priorVerification empty (conventions 7a); plan file under 400 lines."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/projections src/telescreen/integrations src/telescreen/collectors/inventory_publish.py src/telescreen/directory tests/projections tests/notification_outbox tests/directory > /tmp/telescreen-svc-p03-publishers-g5-format.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/projections src/telescreen/integrations src/telescreen/collectors/inventory_publish.py src/telescreen/directory tests/projections tests/notification_outbox tests/directory > /tmp/telescreen-svc-p03-publishers-g5-ruff.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/projections src/telescreen/integrations src/telescreen/collectors/inventory_publish.py src/telescreen/directory tests/projections tests/notification_outbox tests/directory > /tmp/telescreen-svc-p03-publishers-g5-ty.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/projections tests/notification_outbox tests/directory tests/collectors tests/inventory 2>&1 | tee /tmp/telescreen-svc-p03-publishers-g5-pytest.log",
+        "export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p03-publishers-g5-typelint.log 2>&1; ! grep -E '^(src/telescreen/(projections|integrations/notification_|directory)|tests/(projections|notification_outbox|directory))' /tmp/telescreen-svc-p03-publishers-g5-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-svc-p03-publishers-g5-pytest-all.log 2>&1",
+        "! grep -rn 'telescreen.notifications\\|telescreen.inventory\\.' src/telescreen/projections src/telescreen/integrations/notification_outbox.py src/telescreen/integrations/notification_delivery.py src/telescreen/integrations/notification_publish.py src/telescreen/integrations/notification_client.py",
+        "git diff --stat 8b09786 -- src/telescreen/projections src/telescreen/integrations/notification_outbox.py src/telescreen/integrations/notification_delivery.py src/telescreen/integrations/notification_publish.py src/telescreen/integrations/notification_client.py src/telescreen/collectors/inventory_publish.py src/telescreen/directory/identities.py src/telescreen/directory/repository.py tests/projections tests/notification_outbox tests/directory/test_orm_write_gate.py > /tmp/telescreen-svc-p03-publishers-g5-diffstat.log 2>&1",
+        "test \"$(wc -l < impl-plans/active/svc-p03-publishers.md)\" -lt 400"
+      ]
+    },
+    {
+      "planId": "svc-p07-service-runtime",
+      "planPath": "impl-plans/active/svc-p07-service-runtime.md",
+      "wave": "A",
+      "dependsOn": [],
+      "writePaths": [
+        "impl-plans/active/svc-p07-service-runtime.md",
+        "src/telescreen/replica",
+        "src/telescreen/audit/service.py",
+        "src/telescreen/audit/chain.py",
+        "src/telescreen/audit/verify.py",
+        "src/telescreen/audit/query.py",
+        "src/telescreen/audit/export.py",
+        "tests/replica",
+        "tests/audit"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "impl-plans/active/svc-p07-service-runtime.md", "intendedEdit": "Run 5 re-verify only (see the plan's 'Run 5 Re-verify Scope' section): append one Progress Log session entry of at most 12 lines with commands, exit codes, log paths, pass/skip counts, the g5 hash file path and whether any owned file changed; keep Status Completed and the Completion Criteria ticked; keep the file under 400 lines."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Deliverables 1-6: DirectoryReplica (strict > revision guard, encoded tombstones, identity lookup key from identity_kind), ReplicaAuthenticator (same Principal and error codes as api/common/auth.py; OIDC fails closed without a fingerprinter), replica directory ports, ReplicaOwnershipRules, AuditChainModels with MAIN/INVENTORY/NOTIFICATION constants in audit/chain.py and main defaults, export_chain, parity fixture.",
+        "Parity tests cover auth, recipients, actors, owners and rules; existing tests/audit/test_audit.py unchanged and green; the svc-p02 inventory model import gate stays green.",
+        "grep for telescreen.directory or telescreen.issues in src/telescreen/replica prints nothing; full suite passes.",
+        "Run 5 re-verify: the code is complete at 8b09786 and is not re-implemented. Every verification command exits 0 on the g5 planning-commit tree. Any source or test change only fixes a gate failure or a review finding, at its root cause inside these writePaths, and is listed in addressedFeedback. tests/audit/test_audit.py stays byte-identical to 8b09786. Final SHA-256 hashes of every owned file changed since c3ed4bc are recorded in tmp/telescreen-svc-20261016-g5/svc-p07-service-runtime/owned-file-sha256.txt. One new Progress Log entry; Status Completed; priorVerification empty (conventions 7a); plan file under 400 lines."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/replica src/telescreen/audit tests/replica tests/audit > /tmp/telescreen-svc-p07-service-runtime-g5-format.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/replica src/telescreen/audit tests/replica tests/audit > /tmp/telescreen-svc-p07-service-runtime-g5-ruff.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/replica src/telescreen/audit tests/replica tests/audit > /tmp/telescreen-svc-p07-service-runtime-g5-ty.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/replica tests/audit tests/directory tests/api tests/inventory 2>&1 | tee /tmp/telescreen-svc-p07-service-runtime-g5-pytest.log",
+        "export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p07-service-runtime-g5-typelint.log 2>&1; ! grep -E '^(src/telescreen/(replica|audit)|tests/(replica|audit))' /tmp/telescreen-svc-p07-service-runtime-g5-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-svc-p07-service-runtime-g5-pytest-all.log 2>&1",
+        "! grep -rn 'telescreen.directory\\|telescreen.issues' src/telescreen/replica",
+        "git diff --quiet 8b09786 -- tests/audit/test_audit.py",
+        "git diff --stat 8b09786 -- src/telescreen/replica src/telescreen/audit/service.py src/telescreen/audit/chain.py src/telescreen/audit/verify.py src/telescreen/audit/query.py src/telescreen/audit/export.py tests/replica tests/audit > /tmp/telescreen-svc-p07-service-runtime-g5-diffstat.log 2>&1",
+        "test \"$(wc -l < impl-plans/active/svc-p07-service-runtime.md)\" -lt 400"
+      ]
+    },
+    {
+      "planId": "svc-p04-inventory",
+      "planPath": "impl-plans/active/svc-p04-inventory.md",
+      "wave": "B",
+      "dependsOn": ["svc-p07-service-runtime"],
+      "writePaths": [
+        "impl-plans/active/svc-p04-inventory.md",
+        "src/telescreen/inventory_service/app.py",
+        "src/telescreen/inventory_service/cli.py",
+        "src/telescreen/inventory_service/worker.py",
+        "src/telescreen/inventory_service/lookups.py",
+        "src/telescreen/inventory_service/links.py",
+        "src/telescreen/inventory_service/dispatch.py",
+        "src/telescreen/inventory_service/notify_outbox.py",
+        "src/telescreen/inventory_service/audit_drain.py",
+        "src/telescreen/inventory/handoff/apply.py",
+        "src/telescreen/db/notification_transfer.py",
+        "src/telescreen/cli_inventory_store.py",
+        "tests/inventory_service/conftest.py",
+        "tests/inventory_service/test_runtime.py",
+        "tests/inventory_service/test_transport.py",
+        "tests/inventory_service/test_split_inventory.py",
+        "tests/inventory/handoff/test_split_operations.py",
+        "tests/db/test_notification_transfer.py"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "src/telescreen/inventory/handoff/apply.py", "intendedEdit": "Add IssueLinkSink/DirectorySink protocols and optional applier fields; explicit isinstance dispatch for every kind; no import of telescreen.replica or telescreen.inventory_service (svc-p02 gate). Keep the owner fix landed at c3ed4bc (operation typed as InventoryOperation, explicit StopTracking branch) and replace only its ValueError branch with the sink dispatch (TelescreenError VALIDATION_ERROR when a sink is None). New sink fields default to None so tests/inventory/handoff/conftest.py, pg_fixture.py and wiring_v14.py stay unedited."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "build_inventory_runtime requires the inventory DB URL, inventory token, notification URL and notification inventory token, never reads bureau_service_url, authenticates via ReplicaAuthenticator, serves enrichment from issue links and the replica, removes /retention-status and stops importing inventory_service/clients.py.",
+        "Retention dispatch checks eligibility, writes the NotificationCommand (event_id = obligation id), appends audit and acknowledges in one inventory transaction; deferred keeps the row pending; no request goes to a Telescreen URL.",
+        "Local audit drain and audit verify/export CLI; notification-store copy/verify with value-free manifests and merge subset checks, reusing svc-p02 transfer helpers.",
+        "Scoped tests import no telescreen.wiring*, build_container, inventory_service.wiring, bureau or telescreen.directory; apply.py stays inside the inventory import gate; scoped verification exits 0 (wave B full-suite run is informational and recorded in the Progress Log)."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/inventory_service src/telescreen/inventory/handoff src/telescreen/db/notification_transfer.py src/telescreen/cli_inventory_store.py tests/inventory_service tests/inventory/handoff tests/db/test_notification_transfer.py > /tmp/telescreen-svc-p04-inventory-format.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/inventory_service src/telescreen/inventory/handoff src/telescreen/db/notification_transfer.py src/telescreen/cli_inventory_store.py tests/inventory_service tests/inventory/handoff tests/db/test_notification_transfer.py > /tmp/telescreen-svc-p04-inventory-ruff.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/inventory_service src/telescreen/inventory/handoff src/telescreen/db/notification_transfer.py src/telescreen/cli_inventory_store.py tests/inventory_service tests/inventory/handoff tests/db/test_notification_transfer.py > /tmp/telescreen-svc-p04-inventory-ty.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/inventory_service/test_config.py tests/inventory_service/test_runtime.py tests/inventory_service/test_transport.py tests/inventory_service/test_split_inventory.py tests/inventory tests/db 2>&1 | tee /tmp/telescreen-svc-p04-inventory-pytest.log",
+        "export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p04-inventory-typelint.log 2>&1; ! grep -E '^(src/telescreen/(inventory_service|inventory/handoff|db/notification_transfer|cli_inventory_store)|tests/(inventory_service|inventory/handoff|db/test_notification_transfer))' /tmp/telescreen-svc-p04-inventory-typelint.log",
+        "! grep -rn 'bureau_service_url\\|/retention-status' src/telescreen/inventory_service/app.py src/telescreen/inventory_service/cli.py src/telescreen/inventory_service/worker.py",
+        "! grep -n 'clients' src/telescreen/inventory_service/app.py",
+        "! grep -n 'telescreen.replica\\|telescreen.inventory_service' src/telescreen/inventory/handoff/apply.py"
+      ]
+    },
+    {
+      "planId": "svc-p05-notification-service",
+      "planPath": "impl-plans/active/svc-p05-notification-service.md",
+      "wave": "B",
+      "dependsOn": ["svc-p07-service-runtime"],
+      "writePaths": [
+        "impl-plans/active/svc-p05-notification-service.md",
+        "src/telescreen/notification_service",
+        "src/telescreen/api/routers/notification_settings.py",
+        "src/telescreen/notifications/sender.py",
+        "src/telescreen/notifications/dlp.py",
+        "src/telescreen/notifications/preferences.py",
+        "src/telescreen/notifications/member_send.py",
+        "src/telescreen/notifications/tester.py",
+        "src/telescreen/notifications/prior_hits.py",
+        "tests/notification_service",
+        "tests/notifications/v12",
+        "tests/notifications/v13/fakes.py",
+        "tests/notifications/v13/test_preferences.py",
+        "tests/notifications/v13/test_router.py",
+        "tests/notifications/v13/test_sender.py",
+        "tests/notifications/v13/test_tester_guard.py"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "src/telescreen/api/routers/notification_settings.py", "intendedEdit": "Replace the two session.get(MemberRow, ...) reads with PreferenceService.member_contact; keep NotificationSettingsRouterDeps, paths, permissions, responses and the FORBIDDEN 'member principal is unavailable' error unchanged."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "telescreen-notification process: cli (serve, migrate with adopt, send-test, audit verify/export), build_notification_runtime (credentials resolved only here), NotificationInbox (producer-scoped operations, duplicate/conflict, write-free deferred within grace, atomic apply), DeliveryPump, create_notification_app with credential-scoped middleware and public settings/templates routers.",
+        "DLP prior-hit fold: parity tests pass under MASK and BLOCK for context, inline and v1 bodies; prior_hits=0 paths byte-for-byte unchanged; BLOCK body stays [BLOCKED BY DLP].",
+        "Every new constructor parameter has a default equal to today's behavior, so unowned callers (tests/notifications/test_notifications.py, tests/notifications/v14, tests/inventory/retention, tests/api/v12_routers, tests/notifications/v13/test_weekly.py) pass unchanged.",
+        "grep -n MemberRow src/telescreen/api/routers/notification_settings.py prints nothing; settings GET/PUT work on a notification-only store; import gate subprocess finds no forbidden module.",
+        "uv run --frozen python -m telescreen.notification_service --help exits 0; scoped verification exits 0 (wave B full-suite run is informational and recorded)."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/notification_service src/telescreen/notifications src/telescreen/api/routers/notification_settings.py tests/notification_service tests/notifications > /tmp/telescreen-svc-p05-notification-service-format.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/notification_service src/telescreen/notifications src/telescreen/api/routers/notification_settings.py tests/notification_service tests/notifications > /tmp/telescreen-svc-p05-notification-service-ruff.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/notification_service src/telescreen/notifications src/telescreen/api/routers/notification_settings.py tests/notification_service tests/notifications > /tmp/telescreen-svc-p05-notification-service-ty.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/notification_service tests/notifications tests/inventory/retention tests/api/v12_routers tests/e2e/test_flow_v12_notifications.py tests/core/split/test_lazy_notifications.py 2>&1 | tee /tmp/telescreen-svc-p05-notification-service-pytest.log",
+        "export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p05-notification-service-typelint.log 2>&1; ! grep -E '^(src/telescreen/(notification_service|notifications|api/routers/notification_settings)|tests/(notification_service|notifications))' /tmp/telescreen-svc-p05-notification-service-typelint.log",
+        "export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python -m telescreen.notification_service --help > /tmp/telescreen-svc-p05-notification-service-help.log 2>&1",
+        "! grep -n MemberRow src/telescreen/api/routers/notification_settings.py"
+      ]
+    },
+    {
+      "planId": "svc-p06-composition",
+      "planPath": "impl-plans/active/svc-p06-composition.md",
+      "wave": "B",
+      "dependsOn": ["svc-p03-publishers"],
+      "writePaths": [
+        "impl-plans/active/svc-p06-composition.md",
+        "src/telescreen/wiring.py",
+        "src/telescreen/wiring_builders.py",
+        "src/telescreen/wiring_v12.py",
+        "src/telescreen/wiring_v13.py",
+        "src/telescreen/wiring_inventory_parts.py",
+        "src/telescreen/wiring_notify_local.py",
+        "src/telescreen/wiring_split.py",
+        "src/telescreen/inventory_service/wiring.py",
+        "src/telescreen/inventory_service/bureau.py",
+        "src/telescreen/inventory_service/clients.py",
+        "tests/e2e/test_inventory_client.py",
+        "src/telescreen/integrations/inventory_client.py",
+        "src/telescreen/integrations/status.py",
+        "src/telescreen/integrations/tests.py",
+        "src/telescreen/issues/weekly_report.py",
+        "src/telescreen/notifications/weekly.py",
+        "src/telescreen/cli.py",
+        "src/telescreen/cli_v12.py",
+        "tests/e2e/test_wiring_split.py",
+        "tests/e2e/test_wiring_v12.py",
+        "tests/e2e/test_wiring_v13.py",
+        "tests/e2e/test_wiring_v14.py",
+        "tests/e2e/test_wiring_cli.py",
+        "tests/e2e/test_cli_v12.py",
+        "tests/e2e/test_cli_event_loop.py",
+        "tests/e2e/test_route_permissions.py",
+        "tests/e2e/test_api_routes.py",
+        "tests/integrations/test_integrations.py",
+        "tests/integrations/test_router.py",
+        "tests/notifications/v13/test_weekly.py",
+        "tests/issues/test_weekly_report.py"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "src/telescreen/inventory_service/clients.py", "intendedEdit": "Delete only when grep -rn inventory_service.clients src tests shows no importer other than the file itself; otherwise keep it and file a Reconciliation request (svc-p04 removes the app.py import in parallel)."},
+        {"path": "src/telescreen/notifications/weekly.py", "intendedEdit": "Delete after moving its contents unchanged to src/telescreen/issues/weekly_report.py (C5)."},
+        {"path": "tests/notifications/v13/test_weekly.py", "intendedEdit": "Move to tests/issues/test_weekly_report.py."},
+        {"path": "tests/e2e/test_cli_event_loop.py", "intendedEdit": "Edit only if a kept cli.py name changes signature; cli._build_cli_container, _run_async_command and close_container must stay."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "build_container calls topology_of first; single-process composition is behavior-identical with notification parts built lazily in wiring_notify_local.py; container.v12.notifications and container.v12.templates keep their names and single-process objects; split composition in wiring_split.py binds the outbox adapters, relay, markers, command delivery and notification proxy, and never resolves slack_bot_token_ref or smtp_password_ref.",
+        "Remote inventory keeps only publisher, delivery, recovery and the /api/data proxy via integrations/inventory_client.py; build_proxy_router defaults paths to INVENTORY_PROXY_PATHS; Bureau callbacks removed.",
+        "grep '^from telescreen.notifications' in wiring.py, wiring_v12.py, wiring_v13.py shows only notifications.dlp/guard; the split import gate passes; weekly.py moved to issues/weekly_report.py; CLI migrate --store notification, projections resync and split notify test behave as specified.",
+        "Scoped verification exits 0 (wave B full-suite run is informational only for tests/inventory_service/** and files owned by in-flight svc-p04/svc-p05, listed in the Progress Log)."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/wiring.py src/telescreen/wiring_builders.py src/telescreen/wiring_v12.py src/telescreen/wiring_v13.py src/telescreen/wiring_inventory_parts.py src/telescreen/wiring_notify_local.py src/telescreen/wiring_split.py src/telescreen/inventory_service/wiring.py src/telescreen/inventory_service/bureau.py src/telescreen/integrations/inventory_client.py src/telescreen/integrations/status.py src/telescreen/integrations/tests.py src/telescreen/issues/weekly_report.py src/telescreen/cli.py src/telescreen/cli_v12.py tests/e2e tests/integrations tests/issues/test_weekly_report.py > /tmp/telescreen-svc-p06-composition-format.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/wiring.py src/telescreen/wiring_builders.py src/telescreen/wiring_v12.py src/telescreen/wiring_v13.py src/telescreen/wiring_inventory_parts.py src/telescreen/wiring_notify_local.py src/telescreen/wiring_split.py src/telescreen/inventory_service/wiring.py src/telescreen/inventory_service/bureau.py src/telescreen/integrations/inventory_client.py src/telescreen/integrations/status.py src/telescreen/integrations/tests.py src/telescreen/issues/weekly_report.py src/telescreen/cli.py src/telescreen/cli_v12.py tests/e2e tests/integrations tests/issues/test_weekly_report.py > /tmp/telescreen-svc-p06-composition-ruff.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/wiring.py src/telescreen/wiring_builders.py src/telescreen/wiring_v12.py src/telescreen/wiring_v13.py src/telescreen/wiring_inventory_parts.py src/telescreen/wiring_notify_local.py src/telescreen/wiring_split.py src/telescreen/inventory_service/wiring.py src/telescreen/inventory_service/bureau.py src/telescreen/integrations/inventory_client.py src/telescreen/integrations/status.py src/telescreen/integrations/tests.py src/telescreen/issues/weekly_report.py src/telescreen/cli.py src/telescreen/cli_v12.py tests/e2e tests/integrations tests/issues/test_weekly_report.py tests/leak/flows_v12.py > /tmp/telescreen-svc-p06-composition-ty.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/e2e/test_wiring_split.py tests/e2e/test_wiring_v12.py tests/e2e/test_wiring_v13.py tests/e2e/test_wiring_v14.py tests/e2e/test_wiring_cli.py tests/e2e/test_cli_v12.py tests/e2e/test_cli_event_loop.py tests/e2e/test_route_permissions.py tests/e2e/test_route_permissions_v13.py tests/e2e/test_route_permissions_v14.py tests/e2e/test_api_routes.py tests/e2e/test_inventory_client.py tests/e2e/test_inventory_split_runtime.py tests/e2e/test_inventory_store_cutover.py tests/integrations tests/issues tests/test_package.py 2>&1 | tee /tmp/telescreen-svc-p06-composition-pytest.log",
+        "export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p06-composition-typelint.log 2>&1; ! grep -E '^(src/telescreen/(wiring|integrations|issues/weekly_report|cli|inventory_service/(wiring|bureau))|tests/(e2e/test_wiring_split|integrations|issues/test_weekly_report))' /tmp/telescreen-svc-p06-composition-typelint.log",
+        "! grep -n '^from telescreen.notifications' src/telescreen/wiring.py src/telescreen/wiring_v12.py src/telescreen/wiring_v13.py | grep -v 'notifications\\.dlp\\|notifications\\.guard'",
+        "test ! -e src/telescreen/notifications/weekly.py && test -f src/telescreen/issues/weekly_report.py",
+        "test \"$(wc -l < src/telescreen/wiring.py)\" -lt 1000"
+      ]
+    },
+    {
+      "planId": "svc-p08-verification-deploy",
+      "planPath": "impl-plans/active/svc-p08-verification-deploy.md",
+      "wave": "C",
+      "dependsOn": ["svc-p04-inventory", "svc-p05-notification-service", "svc-p06-composition"],
+      "writePaths": [
+        "impl-plans/active/svc-p08-verification-deploy.md",
+        "tests/split",
+        "tests/inventory_service/test_process.py",
+        "tests/inventory_service/test_postgres.py",
+        "tests/e2e/test_inventory_runtime_grants.py",
+        "tests/leak",
+        "tests/examples/test_examples.py",
+        "examples/compose/docker-compose.services.yml",
+        "examples/compose/docker-compose.inventory.yml",
+        "examples/compose/.env.example",
+        "examples/compose/README.md",
+        "design-docs/specs/design-service-split.md",
+        "design-docs/specs/design-service-split-verification.md",
+        "design-docs/specs/command.md",
+        "design-docs/specs/design-inventory-microservice.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "examples/compose/docker-compose.inventory.yml", "intendedEdit": "Delete; replaced by docker-compose.services.yml."},
+        {"path": "design-docs/specs/design-service-split.md", "intendedEdit": "Status IMPLEMENTED; corrections in 4.1 (api_token label), 15 (notifications.dlp/guard allowed), 13 (runbook commands as implemented). Sections 12 (O1) and 17 (g5 pointer, run 5) are already current; change them only if the implemented behavior differs."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "tests/split multi-process suite (three uvicorn processes over TCP, three SQLite files, fake SMTP recorder, in-process Slack check) passes all R1-R8 flows: per-service auth, collection to inventory, issue link push, directory replication, overdue with Telescreen stopped, producer deterministic ids, proxied settings/templates, outage and replay in each direction, multi-process DLP parity, full-split cutover; no orphan processes.",
+        "tests/inventory_service/test_process.py and test_postgres.py rewritten for full split and green; restricted-login grants for single-process and full-split roles (integration, skipped offline); split leak matrix and isolated-process import gates pass.",
+        "docker-compose.services.yml added with only Telescreen publishing ports and SMTP/Slack only on notification; docker-compose.inventory.yml removed; tests/examples green; verification doc and design corrections written.",
+        "mise run ci, mise run ddl-check, mise run web-ci and uv build --out-dir exit 0 with logs recorded; no production code edited (defects become Reconciliation requests)."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache tests/split tests/inventory_service tests/e2e tests/leak tests/examples > /tmp/telescreen-svc-p08-verification-deploy-format.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache tests/split tests/inventory_service tests/e2e tests/leak tests/examples > /tmp/telescreen-svc-p08-verification-deploy-ruff.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check tests/split tests/inventory_service tests/e2e tests/leak tests/examples > /tmp/telescreen-svc-p08-verification-deploy-ty.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/split tests/inventory_service tests/notification_service tests/leak tests/examples tests/e2e 2>&1 | tee /tmp/telescreen-svc-p08-verification-deploy-pytest.log",
+        "mise run ci > /tmp/telescreen-svc-p08-verification-deploy-ci.log 2>&1",
+        "mise run ddl-check > /tmp/telescreen-svc-p08-verification-deploy-ddl.log 2>&1",
+        "mise run web-ci > /tmp/telescreen-svc-p08-verification-deploy-web.log 2>&1",
+        "uv build --out-dir /tmp/telescreen-svc-p08-verification-deploy-dist > /tmp/telescreen-svc-p08-verification-deploy-build.log 2>&1",
+        "export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p08-verification-deploy-typelint.log 2>&1",
+        "test ! -e examples/compose/docker-compose.inventory.yml && test -f examples/compose/docker-compose.services.yml"
+      ]
+    }
+  ]
+}

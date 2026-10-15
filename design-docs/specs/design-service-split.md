@@ -540,12 +540,12 @@ The single-process suite must stay green. Commands: `mise run ci`, `mise run ddl
 tests/notification_service`.
 
 Plan shape (`svc-pNN`, disjoint writePaths). The plan files in `impl-plans/active/` and
-the current dispatch manifest (`telescreen-svc-20261015-g4-dispatch.json`, superseding
-g3 with the same plans, writePaths and DAG, extended only with shared exact-count or
-inventory tests) are authoritative for writePaths. The plans run in five waves: p01
-(accepted at `19074e9`, recorded as an accepted dependency at checkpoint `c3ed4bc`); p02
-(code complete at `c3ed4bc`; final gates and Completed status only); p03 and p07; p04,
-p05 and p06; p08; then serial finalization. The
+the current dispatch manifest (`telescreen-svc-20261016-g5-dispatch.json`, superseding
+g4 with the same plans, writePaths and DAG, extended only with shared exact-count or
+inventory tests) are authoritative for writePaths. p01 (accepted at `19074e9`) and p02
+(integration-accepted) are recorded as accepted dependencies at checkpoint `8b09786`.
+The remaining plans run in waves: p03 and p07 (code complete at `8b09786`; re-verify
+only: final gates, hashes and reviews); p04, p05 and p06; p08; then serial finalization. The
 critical path is p01 -> p02 -> p07 -> p04/p05 -> p08. Each plan owns the shared
 exact-count/inventory tests that its change breaks.
 
