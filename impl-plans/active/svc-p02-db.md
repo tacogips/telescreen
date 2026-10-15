@@ -372,3 +372,42 @@ Python gates. Follow conventions section 7a: report only final passing verificat
 commands, keep `priorVerification` empty, and do not list fixed findings as risks.
 `tests/e2e/test_inventory_runtime_grants.py` (integration marker, 52 main tables)
 stays owned by svc-p08 and is skipped offline.
+
+### Step 6 continuation: 2026-10-15
+**Completed**: Notification owner history/adoption, 74-table ownership and harness
+assertions, transfer v2 lineage and pending-outbox checks, and the 0010 migration test.
+**Verification**: ddl-arrange/export/check, scoped Ruff format/lint, ty and typelint pass;
+39 migration/adoption regressions pass. Full `uv run --frozen pytest -p no:cacheprovider`
+has 1,310 passed, 36 skipped and 3 failures: configured CLI migration, configured split
+runtime and SQLite cutover require a Notification database URL. Logs are under
+`/tmp/telescreen-svc-p02-db-*final*.log`; final source hashes are in
+`tmp/telescreen-svc-20261015-g2/svc-p02-db/step6/final-hashes.txt`.
+**Reconciliation request**: Notification URL is parsed in `core/config.py`, but
+`cli.py` does not pass it to `upgrade_configured`; `tests/e2e/harness.py` and its
+database-config test also do not provide it. These paths are outside this plan's
+writePaths and require svc-p07 configuration wiring or a dispatch amendment. Resume
+after that wiring is integrated, then rerun the full suite and cutover tests.
+**Status**: Implementation remains incomplete pending the required green full suite;
+do not archive or mark the completion criteria complete yet.
+
+### Owner resolution 2: 2026-10-15 (after session 19)
+
+The three full-suite failures (`tests/e2e/test_inventory_database_config.py`,
+`tests/e2e/test_inventory_split_runtime.py[configured]`,
+`tests/e2e/test_inventory_store_cutover.py` SQLite) are not a missing notification URL.
+The owner reproduced the first: main and inventory URLs are distinct, notification is
+unset, so `upgrade_configured` runs `notification_0001` on the main store where
+`main_0001` already created `notifications`, `notification_templates`,
+`notification_settings` and `retention_notification_receipts`; `create_baseline` then
+raises "owner baseline requires an empty store". Design section 3 forbids a distinct
+notification URL in single process mode, so passing one from `cli.py` or the harness is
+the wrong fix. Implement design section 12 "Co-located notification history" (owner
+clarification O1) inside this plan's paths (`db/migrate.py`,
+`db/owned_migrations/baseline.py`, `notification_0001.py`, `db/adopt.py`): when the
+notification store is the main store, validate the four co-located tables against the
+packaged notification baseline schema, create only the five notification-only tables,
+seed the notification audit head and stamp `notification_0001` in one transaction.
+Add a regression test in `tests/db/test_service_split_migration.py` (fresh main plus
+separate inventory, upgrade twice, and an existing adopted main store). Then run the
+full suite; all three tests must pass unchanged. Do not edit `cli.py`,
+`tests/e2e/harness.py` or e2e tests. Follow conventions 7a.

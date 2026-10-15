@@ -8,8 +8,8 @@ from sqlalchemy import inspect, text
 from sqlalchemy.exc import ProgrammingError
 
 from telescreen.db.adopt import adopt_owner
-from telescreen.db.migrate import owner_config, upgrade, upgrade_configured
-from telescreen.db.ownership import Store, tables_for
+from telescreen.db.migrate import owner_config, upgrade, upgrade_store
+from telescreen.db.ownership import Store, main_database_tables, tables_for
 from tests.support.owned_postgres import OwnedPostgres, owned_postgres
 
 __all__: list[str] = ["owned_postgres"]
@@ -19,16 +19,14 @@ pytestmark: list[pytest.MarkDecorator] = [pytest.mark.asyncio, pytest.mark.integ
 async def test_full_owner_migrations_use_only_their_own_credentials(
     owned_postgres: OwnedPostgres,
 ) -> None:
-    """Both complete histories repeat under restricted roles and cannot cross schemas."""
-    await asyncio.to_thread(
-        upgrade_configured, owned_postgres.main_url, owned_postgres.inventory_url
-    )
+    """All three complete histories repeat under restricted roles and cannot cross schemas."""
     for url, store in (
         (owned_postgres.main_url, Store.MAIN),
         (owned_postgres.inventory_url, Store.INVENTORY),
+        (owned_postgres.notification_url, Store.NOTIFICATION),
     ):
-        await asyncio.to_thread(adopt_owner, url, store, writers_stopped=True)
-    for engine, store, schema, forbidden_schema, forbidden_table, protected in (
+        await asyncio.to_thread(upgrade_store, url, store)
+    for engine, store, schema, forbidden_schema, forbidden_table, protected, expected in (
         (
             owned_postgres.main,
             Store.MAIN,
@@ -36,6 +34,7 @@ async def test_full_owner_migrations_use_only_their_own_credentials(
             owned_postgres.inventory_schema,
             "data_assets",
             "audit_records",
+            main_database_tables(),
         ),
         (
             owned_postgres.inventory,
@@ -44,6 +43,16 @@ async def test_full_owner_migrations_use_only_their_own_credentials(
             owned_postgres.main_schema,
             "members",
             "data_asset_events",
+            tables_for(Store.INVENTORY),
+        ),
+        (
+            owned_postgres.notification,
+            Store.NOTIFICATION,
+            owned_postgres.notification_schema,
+            owned_postgres.main_schema,
+            "members",
+            "notification_audit_records",
+            tables_for(Store.NOTIFICATION),
         ),
     ):
         async with engine.connect() as connection:
@@ -51,7 +60,7 @@ async def test_full_owner_migrations_use_only_their_own_credentials(
             names: set[str] = await connection.run_sync(
                 lambda sync: set(inspect(sync).get_table_names())
             )
-            assert names == {*tables_for(store), f"alembic_version_{store}"}
+            assert names == {*expected, f"alembic_version_{store}"}
             assert (
                 await connection.scalar(
                     text(
@@ -86,6 +95,9 @@ async def test_legacy_history_and_checked_adoption_under_postgres_owner(
         assert await connection.scalar(
             text("SELECT version_num FROM alembic_version_inventory")
         ) == ("inventory_0001")
+        assert await connection.scalar(
+            text("SELECT version_num FROM alembic_version_notification")
+        ) == ("notification_0001")
 
 
 @pytest.mark.parametrize(

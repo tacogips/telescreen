@@ -87,9 +87,9 @@ def adopt_connection(connection: Connection, database_url: str, store: Store) ->
     if version is None and (
         "alembic_version" not in names
         or connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one_or_none()
-        != "0009_inventory_counter"
+        != "0010_service_split"
     ):
-        raise RuntimeError("owner adoption requires legacy revision 0009_inventory_counter")
+        raise RuntimeError("owner adoption requires legacy revision 0010_service_split")
     validate_owner_schema(connection, store)
     validate_owner_state(connection, store)
     config: Config = owner_config(database_url, store)

@@ -22,11 +22,14 @@ class OwnedPostgres:
 
     main: AsyncEngine
     inventory: AsyncEngine
+    notification: AsyncEngine
     admin: AsyncEngine
     main_schema: str
     inventory_schema: str
+    notification_schema: str
     main_url: str = field(repr=False)
     inventory_url: str = field(repr=False)
+    notification_url: str = field(repr=False)
 
 
 @pytest_asyncio.fixture
@@ -52,17 +55,22 @@ async def owned_postgres() -> AsyncIterator[OwnedPostgres]:
     password: str = new_id().replace("-", "")
     main_schema: str = f"ts_main_{suffix}"
     inventory_schema: str = f"ts_inventory_{suffix}"
+    notification_schema: str = f"ts_notification_{suffix}"
     main_url: str = url.set(username=main_schema, password=password).render_as_string(
         hide_password=False
     )
     inventory_url: str = url.set(username=inventory_schema, password=password).render_as_string(
         hide_password=False
     )
+    notification_url: str = url.set(
+        username=notification_schema, password=password
+    ).render_as_string(hide_password=False)
     main: AsyncEngine = create_async_engine(main_url)
     inventory: AsyncEngine = create_async_engine(inventory_url)
+    notification: AsyncEngine = create_async_engine(notification_url)
     try:
         async with admin.begin() as connection:
-            for schema in (main_schema, inventory_schema):
+            for schema in (main_schema, inventory_schema, notification_schema):
                 await connection.execute(
                     text(f"CREATE ROLE \"{schema}\" LOGIN PASSWORD '{password}'")
                 )
@@ -72,14 +80,25 @@ async def owned_postgres() -> AsyncIterator[OwnedPostgres]:
                 )
         await asyncio.to_thread(upgrade_store, main_url, Store.MAIN)
         await asyncio.to_thread(upgrade_store, inventory_url, Store.INVENTORY)
+        await asyncio.to_thread(upgrade_store, notification_url, Store.NOTIFICATION)
         yield OwnedPostgres(
-            main, inventory, admin, main_schema, inventory_schema, main_url, inventory_url
+            main,
+            inventory,
+            notification,
+            admin,
+            main_schema,
+            inventory_schema,
+            notification_schema,
+            main_url,
+            inventory_url,
+            notification_url,
         )
     finally:
         await main.dispose()
         await inventory.dispose()
+        await notification.dispose()
         async with admin.begin() as connection:
-            for schema in (main_schema, inventory_schema):
+            for schema in (main_schema, inventory_schema, notification_schema):
                 await connection.execute(text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
                 await connection.execute(text(f'DROP ROLE IF EXISTS "{schema}"'))
         await admin.dispose()

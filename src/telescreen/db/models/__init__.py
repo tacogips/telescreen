@@ -56,23 +56,23 @@ from telescreen.db.models.issues_v13 import (
     SavedViewStarRow,
 )
 from telescreen.db.models.mapreduce import MapItemRow, MapJobRow, MapPartitionRow
-from telescreen.db.models.notifications import (
-    NotificationRow,
-    NotificationSettingRow,
-    NotificationTemplateRow,
-)
 from telescreen.db.models.notification_handoff import (
     InventoryNotificationOutboxRow,
     NotificationDeliveryStateRow,
     NotificationInboxRow,
     NotificationOutboxRow,
 )
+from telescreen.db.models.notifications import (
+    NotificationRow,
+    NotificationSettingRow,
+    NotificationTemplateRow,
+)
+from telescreen.db.models.police import PoliceTaskRow, PoliceWorkerRow
 from telescreen.db.models.projections import (
     InventoryDirectoryEntryRow,
     NotificationDirectoryEntryRow,
     ProjectionChangeRow,
 )
-from telescreen.db.models.police import PoliceTaskRow, PoliceWorkerRow
 from telescreen.db.models.retention_handoff import (
     InventoryRetentionOutboxRow,
     RetentionNotificationReceiptRow,

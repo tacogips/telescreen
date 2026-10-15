@@ -15,9 +15,9 @@ def upgrade() -> None:
     """Create notification-owned tables, seed its audit head and install protection."""
     create_baseline(revision)
     op.execute(
-        text("INSERT INTO notification_audit_chain_head (id, seq, hash) VALUES (1, 0, :hash)").bindparams(
-            hash="0" * 64
-        )
+        text(
+            "INSERT INTO notification_audit_chain_head (id, seq, hash) VALUES (1, 0, :hash)"
+        ).bindparams(hash="0" * 64)
     )
     append_only("notification_audit_records")
 

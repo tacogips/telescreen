@@ -89,9 +89,10 @@ def upgrade_configured(
     elif (inventory_database_url is None or inventory_database_url == database_url) and (
         notification_database_url is None or notification_database_url == database_url
     ):
-        main_history, inventory_history, notification_history = asyncio.run(
-            _owner_history_state(database_url)
-        )
+        owner_history: tuple[bool, bool, bool] = asyncio.run(_owner_history_state(database_url))
+        main_history: bool = owner_history[0]
+        inventory_history: bool = owner_history[1]
+        notification_history: bool = owner_history[2]
         if main_history or inventory_history or notification_history:
             if not notification_history:
                 raise ConfigError("notification history requires adoption")

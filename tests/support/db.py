@@ -12,8 +12,8 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import StaticPool
 
 from telescreen.db.base import Base
-from telescreen.db.models import AuditChainHeadRow, CounterRow
-from telescreen.db.ownership import Store, tables_for
+from telescreen.db.models import AuditChainHeadRow, CounterRow, NotificationAuditChainHeadRow
+from telescreen.db.ownership import Store, main_database_tables, tables_for
 from telescreen.db.session import create_sessionmaker
 
 
@@ -42,11 +42,17 @@ async def make_sqlite_harness(
     async with engine.begin() as connection:
         await connection.run_sync(
             Base.metadata.create_all,
-            tables=[Base.metadata.tables[name] for name in tables_for(store)]
+            tables=[
+                Base.metadata.tables[name]
+                for name in (main_database_tables() if store is Store.MAIN else tables_for(store))
+            ]
             if store is not None
             else None,
         )
-    if store is not Store.INVENTORY:
+    if store is Store.NOTIFICATION:
+        async with sessions.begin() as session:
+            session.add(NotificationAuditChainHeadRow(id=1, seq=0, hash="0" * 64))
+    elif store is not Store.INVENTORY:
         async with sessions.begin() as session:
             session.add(CounterRow(name="issue_number", value=0))
             session.add(AuditChainHeadRow(id=1, seq=0, hash="0" * 64))

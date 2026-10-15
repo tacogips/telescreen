@@ -51,23 +51,41 @@ async def location(connection: AsyncConnection) -> tuple[str, ...]:
 
 
 def validate_inventory(connection: Connection) -> None:
-    """Require a known migration state, exact baseline schema and safe allocation state."""
+    """Require transfer-v2 source or target history and safe allocation state."""
     lock_owner_tables(connection, Store.INVENTORY)
     names: set[str] = set(inspect(connection).get_table_names())
     if "alembic_version_inventory" in names:
         owner: str | None = connection.execute(
             text("SELECT version_num FROM alembic_version_inventory")
         ).scalar_one_or_none()
-        if owner != "inventory_0001":
-            raise RuntimeError("inventory transfer requires owner baseline inventory_0001")
+        if owner != "inventory_0002":
+            raise RuntimeError("inventory transfer requires owner revision inventory_0002")
     elif (
         "alembic_version" not in names
         or connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one_or_none()
-        != "0009_inventory_counter"
+        != "0010_service_split"
     ):
-        raise RuntimeError("inventory transfer requires legacy revision 0009_inventory_counter")
+        raise RuntimeError("inventory transfer requires legacy revision 0010_service_split")
+    required: set[str] = {
+        "inventory_audit_records",
+        "inventory_audit_chain_head",
+        "inventory_directory_entries",
+        "inventory_issue_links",
+        "inventory_notification_outbox",
+    }
+    if not required <= names:
+        raise RuntimeError("inventory transfer requires inventory revision 0002 tables")
     validate_owner_schema(connection, Store.INVENTORY)
     validate_owner_state(connection, Store.INVENTORY)
+
+
+async def refuse_pending_notifications(connection: AsyncConnection) -> None:
+    """Require queued inventory notifications to be delivered before either transfer side."""
+    pending: int = await connection.scalar(
+        text("SELECT count(*) FROM inventory_notification_outbox WHERE delivered_at IS NULL")
+    )
+    if pending:
+        raise RuntimeError("inventory transfer requires delivered notification outbox")
 
 
 async def require_lineage(
@@ -99,3 +117,39 @@ async def require_lineage(
             ("id", "payload_json", "recorded_at"),
             acknowledged=True,
         )
+    await require_subset(
+        source,
+        target,
+        metadata.tables["inventory_audit_records"],
+        tuple(metadata.tables["inventory_audit_records"].c.keys()),
+    )
+    source_head: tuple[int, str] = (
+        (
+            await source.execute(
+                text("SELECT seq, hash FROM inventory_audit_chain_head WHERE id = 1")
+            )
+        )
+        .tuples()
+        .one()
+    )
+    target_head: tuple[int, str] = (
+        (
+            await target.execute(
+                text("SELECT seq, hash FROM inventory_audit_chain_head WHERE id = 1")
+            )
+        )
+        .tuples()
+        .one()
+    )
+    if target_head[0] > source_head[0]:
+        raise RuntimeError("inventory source would rewind audit head")
+    if target_head[0] == 0:
+        if target_head[1] != "0" * 64:
+            raise RuntimeError("inventory audit head conflicts with source lineage")
+    else:
+        source_hash: str | None = await source.scalar(
+            text("SELECT hash FROM inventory_audit_records WHERE seq = :seq"),
+            {"seq": target_head[0]},
+        )
+        if source_hash != target_head[1]:
+            raise RuntimeError("inventory audit head conflicts with source lineage")

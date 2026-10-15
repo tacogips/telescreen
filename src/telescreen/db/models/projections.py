@@ -6,7 +6,6 @@ from sqlalchemy import Boolean, DateTime, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from telescreen.db.base import Base
-from telescreen.db.models.inventory_links import InventoryIssueLinkRow
 
 
 class ProjectionChangeRow(Base, kw_only=True):

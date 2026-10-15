@@ -20,9 +20,8 @@ from telescreen.db.models import (
     InventoryInboxRow,
 )
 from telescreen.db.ownership import Store
-from telescreen.db.schema_check import baseline_metadata
 from telescreen.db.session import create_sessionmaker
-from telescreen.db.transfer import TransferReport, manifest, transfer_inventory
+from telescreen.db.transfer import TransferReport, manifest, transfer_inventory, transfer_metadata
 from telescreen.db.transfer_rows import TableDigest
 from tests.db.transfer_support import NOW, seed_inventory
 from tests.inventory.retention.helpers import _asset
@@ -30,7 +29,7 @@ from tests.inventory.retention.helpers import _asset
 
 @dataclass(frozen=True)
 class TransferWorld:
-    """A legacy shared source and an empty independently migrated inventory target."""
+    """A legacy 0010 shared source and an empty inventory_0002 target."""
 
     source: AsyncEngine
     target: AsyncEngine
@@ -72,7 +71,7 @@ async def world(tmp_path: Path) -> AsyncIterator[TransferWorld]:
 async def contents(engine: AsyncEngine) -> tuple[TableDigest, ...]:
     """Read a deterministic snapshot for mutation/failure assertions."""
     async with engine.connect() as connection:
-        return await manifest(connection, baseline_metadata())
+        return await manifest(connection, transfer_metadata())
 
 
 @pytest.mark.asyncio
@@ -82,8 +81,14 @@ async def test_copy_retry_verify_and_rollback_preserve_all_owner_state(
     """Rollback includes new assets and revisions, physical value deletion and acknowledgment."""
     before: tuple[TableDigest, ...] = await contents(world.source)
     report: TransferReport = await world.copy()
+    assert report.schema_revision == "inventory_0002"
     assert report.copied and report.tables == before
-    assert all(table.rows > 0 for table in report.tables)
+    assert all(
+        table.rows > 0 for table in report.tables if table.table != "inventory_audit_records"
+    )
+    assert (
+        next(table for table in report.tables if table.table == "inventory_audit_records").rows == 1
+    )
     assert await contents(world.source) == before
     assert (await world.copy()).copied is False
     assert (await world.copy(verify=True)).tables == before
@@ -114,8 +119,96 @@ async def test_copy_retry_verify_and_rollback_preserve_all_owner_state(
         )
         assert (
             await connection.scalar(text("SELECT version_num FROM alembic_version"))
-            == "0009_inventory_counter"
+            == "0010_service_split"
         )
+
+
+@pytest.mark.asyncio
+async def test_transfer_excludes_replicas_and_refuses_pending_notifications(
+    world: TransferWorld,
+) -> None:
+    """Transfer requires a drained notification outbox and rebuilds replica projections."""
+    async with world.source.begin() as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO inventory_directory_entries "
+                "(kind, id, revision, present, lookup_key, payload_json, applied_at) "
+                "VALUES ('member', 'replica-id', 1, 1, 'lookup', '{}', :at)"
+            ),
+            {"at": NOW.isoformat()},
+        )
+        await connection.execute(
+            text(
+                "INSERT INTO inventory_issue_links "
+                "(issue_id, resource_key, short_id, status, owner_ref) "
+                "VALUES ('issue-id', 'resource-key', 'short-id', 'open', NULL)"
+            )
+        )
+        await connection.execute(
+            text(
+                "INSERT INTO inventory_notification_outbox "
+                "(id, payload_json, recorded_at, delivered_at) VALUES ('pending', '{}', :at, NULL)"
+            ),
+            {"at": NOW.isoformat()},
+        )
+    target_before: tuple[TableDigest, ...] = await contents(world.target)
+    with pytest.raises(RuntimeError, match="delivered notification outbox"):
+        await world.copy()
+    assert await contents(world.target) == target_before
+    async with world.target.connect() as connection:
+        assert await connection.scalar(text("SELECT count(*) FROM data_assets")) == 0
+    async with world.source.begin() as connection:
+        await connection.execute(text("DELETE FROM inventory_notification_outbox"))
+    assert (await world.copy()).copied
+    async with world.target.connect() as connection:
+        assert (
+            await connection.scalar(text("SELECT count(*) FROM inventory_directory_entries")) == 0
+        )
+        assert await connection.scalar(text("SELECT count(*) FROM inventory_issue_links")) == 0
+
+
+@pytest.mark.asyncio
+async def test_transfer_refuses_pending_notifications_on_target_without_writes(
+    world: TransferWorld,
+) -> None:
+    """A destination with queued Inventory notifications is never overwritten."""
+    async with world.target.begin() as connection:
+        await connection.execute(
+            text(
+                "INSERT INTO inventory_notification_outbox "
+                "(id, payload_json, recorded_at, delivered_at) VALUES ('pending', '{}', :at, NULL)"
+            ),
+            {"at": NOW.isoformat()},
+        )
+    target_before: tuple[TableDigest, ...] = await contents(world.target)
+    with pytest.raises(RuntimeError, match="delivered notification outbox"):
+        await world.copy()
+    assert await contents(world.target) == target_before
+    async with world.target.connect() as connection:
+        assert (
+            await connection.scalar(text("SELECT count(*) FROM inventory_notification_outbox")) == 1
+        )
+
+
+@pytest.mark.asyncio
+async def test_rollback_refuses_audit_history_that_is_not_source_prefix(
+    world: TransferWorld,
+) -> None:
+    """Append-only audit rows and the head must remain in source lineage during rollback."""
+    await world.copy()
+    async with world.target.begin() as connection:
+        await connection.execute(
+            text("UPDATE inventory_audit_records SET hash = :hash WHERE seq = 1"),
+            {"hash": "b" * 64},
+        )
+        await connection.execute(
+            text("UPDATE inventory_audit_chain_head SET hash = :hash WHERE id = 1"),
+            {"hash": "b" * 64},
+        )
+    with pytest.raises(
+        RuntimeError, match="conflicts with source lineage|conflicts with target history"
+    ):
+        await world.copy(merge=True)
 
 
 @pytest.mark.asyncio

@@ -8,11 +8,13 @@ from alembic import command
 from sqlalchemy import Column, Engine, Integer, inspect, text
 from sqlalchemy import create_engine as sync_engine
 
+from telescreen.core.errors import ConfigError
+from telescreen.db.adopt import adopt_owner
 from telescreen.db.base import Base
 from telescreen.db.migrate import owner_config, upgrade, upgrade_configured, upgrade_store
 from telescreen.db.models import InventoryCounterRow
 from telescreen.db.owned_migrations import baseline
-from telescreen.db.ownership import Store, tables_for
+from telescreen.db.ownership import Store, main_database_tables, tables_for
 
 
 @pytest.mark.parametrize("store", list(Store))
@@ -26,11 +28,14 @@ def test_owner_upgrade_repeat_and_downgrade(tmp_path: Path, store: Store) -> Non
     try:
         assert InventoryCounterRow.__tablename__ == "inventory_counters"
         with engine.connect() as connection:
+            expected_tables: tuple[str, ...] = (
+                main_database_tables() if store is Store.MAIN else tables_for(store)
+            )
             assert set(inspect(connection).get_table_names()) == {
-                *tables_for(store),
+                *expected_tables,
                 f"alembic_version_{store}",
             }
-            for name in tables_for(store):
+            for name in expected_tables:
                 expected_columns: set[tuple[str, bool]] = {
                     (column.name, bool(column.nullable))
                     for column in Base.metadata.tables[name].columns
@@ -50,9 +55,18 @@ def test_owner_upgrade_repeat_and_downgrade(tmp_path: Path, store: Store) -> Non
                 }
                 assert actual_indexes == expected_indexes
             if store is Store.MAIN:
-                assert connection.execute(text("SELECT value FROM counters")).scalar_one() == 0
+                assert (
+                    connection.execute(
+                        text("SELECT value FROM counters WHERE name = 'issue_number'")
+                    ).scalar_one()
+                    == 0
+                )
                 assert connection.execute(
                     text("SELECT hash FROM audit_chain_head")
+                ).scalar_one() == ("0" * 64)
+            elif store is Store.NOTIFICATION:
+                assert connection.execute(
+                    text("SELECT hash FROM notification_audit_chain_head")
                 ).scalar_one() == ("0" * 64)
             else:
                 assert (
@@ -67,22 +81,39 @@ def test_owner_upgrade_repeat_and_downgrade(tmp_path: Path, store: Store) -> Non
         engine.dispose()
 
 
-def test_default_shared_migrate_continues_the_two_owner_histories(tmp_path: Path) -> None:
+def test_default_shared_migrate_continues_all_three_owner_histories(tmp_path: Path) -> None:
     """An adopted or newly composed shared owner deployment must not replay legacy creation."""
     path: Path = tmp_path / "owned-shared.db"
     url: str = f"sqlite+aiosqlite:///{path}"
-    upgrade_store(url, Store.MAIN)
-    upgrade_store(url, Store.INVENTORY)
+    upgrade(url)
+    for store in Store:
+        adopt_owner(url, store, writers_stopped=True)
     upgrade_configured(url)
     upgrade_configured(url, url)
     engine: Engine = sync_engine(f"sqlite:///{path}")
     try:
-        assert "alembic_version" not in inspect(engine).get_table_names()
-        assert {"alembic_version_main", "alembic_version_inventory"} <= set(
-            inspect(engine).get_table_names()
-        )
+        assert "alembic_version" in inspect(engine).get_table_names()
+        with engine.connect() as connection:
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
+                "0010_service_split"
+            )
+        assert {
+            "alembic_version_main",
+            "alembic_version_inventory",
+            "alembic_version_notification",
+        } <= set(inspect(engine).get_table_names())
     finally:
         engine.dispose()
+
+
+def test_default_shared_migrate_requires_notification_adoption(tmp_path: Path) -> None:
+    """Existing MAIN and Inventory owner histories cannot silently skip Notification."""
+    path: Path = tmp_path / "notification-unadopted.db"
+    url: str = f"sqlite+aiosqlite:///{path}"
+    upgrade_store(url, Store.MAIN)
+    upgrade_store(url, Store.INVENTORY)
+    with pytest.raises(ConfigError, match="notification history requires adoption"):
+        upgrade_configured(url)
 
 
 def test_owner_histories_can_share_a_database_without_sharing_versions(tmp_path: Path) -> None:
@@ -98,10 +129,15 @@ def test_owner_histories_can_share_a_database_without_sharing_versions(tmp_path:
         command.downgrade(owner_config(url, Store.INVENTORY), "base")
         upgrade_store(url, Store.MAIN)
         with engine.connect() as connection:
-            assert connection.execute(text("SELECT value FROM counters")).scalar_one() == 42
+            assert (
+                connection.execute(
+                    text("SELECT value FROM counters WHERE name = 'issue_number'")
+                ).scalar_one()
+                == 42
+            )
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version_main")
-            ).scalar_one() == ("main_0001")
+            ).scalar_one() == ("main_0002")
             assert not set(tables_for(Store.INVENTORY)).intersection(
                 inspect(connection).get_table_names()
             )
@@ -123,7 +159,7 @@ def test_owner_baseline_refuses_implicit_legacy_adoption(tmp_path: Path, store: 
             assert set(tables_for(store)) <= set(inspect(connection).get_table_names())
             assert connection.execute(
                 text("SELECT version_num FROM alembic_version")
-            ).scalar_one() == ("0009_inventory_counter")
+            ).scalar_one() == ("0010_service_split")
     finally:
         engine.dispose()
 

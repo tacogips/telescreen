@@ -413,6 +413,16 @@ relations only within a store), then `ddl-arrange`, `ddl-export`, models, then n
   owner-history upgrades require notification adoption first, with an explicit error.
 - Split main stores keep the four moved tables unused and ungranted (as inventory tables
   were).
+- Co-located notification history (owner clarification O1, 2026-10-15). When the
+  notification store is the main store (notification URL unset or equal to main) but
+  owner histories are used (for example an inventory-only separate database in single
+  process mode), `main_0001` has already created the four moved tables. The configured
+  upgrade then applies `notification_0001` by validating those four tables against the
+  packaged baseline schema exactly as `--adopt` does, creating only the five
+  notification-only tables, seeding the audit head and stamping, in one transaction. This
+  is not silent adoption of an unknown store: the tables were created by the main history
+  in the same database. A distinct notification URL remains rejected in single process
+  mode; no notification URL is required for that mode.
 
 Restricted-login PostgreSQL tests (marked `integration`) grant each runtime role DML on
 only its store's tables. They deny cross-store reads/writes, version tables and trigger DDL.

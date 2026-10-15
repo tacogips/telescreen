@@ -110,7 +110,7 @@ CREATE TABLE notification_audit_records (
 	prev_hash VARCHAR(64) NOT NULL, 
 	hash VARCHAR(64) NOT NULL, 
 	PRIMARY KEY (seq), 
-	UNIQUE (id)
+	CONSTRAINT uq_notification_audit_records_id UNIQUE (id)
 );
 
 CREATE INDEX ix_notification_audit_records_at ON notification_audit_records (at);

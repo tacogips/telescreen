@@ -36,7 +36,7 @@
         },
         {
           "name": "subject",
-          "kind": "String",
+          "kind": "Text",
           "length": null,
           "nullable": false,
           "primary_key": false,
@@ -46,7 +46,7 @@
         },
         {
           "name": "body",
-          "kind": "String",
+          "kind": "Text",
           "length": null,
           "nullable": false,
           "primary_key": false,
@@ -286,7 +286,7 @@
         },
         {
           "name": "subject",
-          "kind": "String",
+          "kind": "Text",
           "length": null,
           "nullable": false,
           "primary_key": false,
@@ -296,7 +296,7 @@
         },
         {
           "name": "body",
-          "kind": "String",
+          "kind": "Text",
           "length": null,
           "nullable": false,
           "primary_key": false,
@@ -306,7 +306,7 @@
         },
         {
           "name": "email_subject",
-          "kind": "String",
+          "kind": "Text",
           "length": null,
           "nullable": true,
           "primary_key": false,
@@ -316,7 +316,7 @@
         },
         {
           "name": "email_body",
-          "kind": "String",
+          "kind": "Text",
           "length": null,
           "nullable": true,
           "primary_key": false,
@@ -326,7 +326,7 @@
         },
         {
           "name": "slack_body",
-          "kind": "String",
+          "kind": "Text",
           "length": null,
           "nullable": true,
           "primary_key": false,
@@ -631,7 +631,7 @@
         },
         {
           "name": "payload_json",
-          "kind": "String",
+          "kind": "Text",
           "length": null,
           "nullable": false,
           "primary_key": false,
@@ -748,7 +748,7 @@
         },
         {
           "name": "summary",
-          "kind": "String",
+          "kind": "Text",
           "length": null,
           "nullable": false,
           "primary_key": false,
@@ -758,7 +758,7 @@
         },
         {
           "name": "details_json",
-          "kind": "String",
+          "kind": "Text",
           "length": null,
           "nullable": false,
           "primary_key": false,
@@ -789,7 +789,7 @@
       ],
       "uniques": [
         {
-          "name": null,
+          "name": "uq_notification_audit_records_id",
           "columns": [
             "id"
           ]

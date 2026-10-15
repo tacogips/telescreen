@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import DateTime, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from telescreen.db.base import Base
@@ -13,9 +13,10 @@ class InventoryAuditRecordRow(Base, kw_only=True):
     """A sequence-numbered Inventory audit record."""
 
     __tablename__ = "inventory_audit_records"
+    __table_args__ = (UniqueConstraint("id", name="uq_inventory_audit_records_id"),)
 
     seq: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
-    id: Mapped[str] = mapped_column(String(36), unique=True)
+    id: Mapped[str] = mapped_column(String(36))
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     actor_kind: Mapped[str] = mapped_column(String(32))
     actor_ref: Mapped[str] = mapped_column(String(256))
@@ -42,9 +43,10 @@ class NotificationAuditRecordRow(Base, kw_only=True):
     """A sequence-numbered Notification audit record."""
 
     __tablename__ = "notification_audit_records"
+    __table_args__ = (UniqueConstraint("id", name="uq_notification_audit_records_id"),)
 
     seq: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
-    id: Mapped[str] = mapped_column(String(36), unique=True)
+    id: Mapped[str] = mapped_column(String(36))
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     actor_kind: Mapped[str] = mapped_column(String(32))
     actor_ref: Mapped[str] = mapped_column(String(256))
@@ -71,7 +73,5 @@ type AuditRecordModel = (
     type[AuditRecordRow] | type[InventoryAuditRecordRow] | type[NotificationAuditRecordRow]
 )
 type AuditHeadModel = (
-    type[AuditChainHeadRow]
-    | type[InventoryAuditChainHeadRow]
-    | type[NotificationAuditChainHeadRow]
+    type[AuditChainHeadRow] | type[InventoryAuditChainHeadRow] | type[NotificationAuditChainHeadRow]
 )

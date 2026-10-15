@@ -44,10 +44,14 @@ def test_adopt_and_repeat_preserve_records_and_allocations(tmp_path: Path, store
         upgrade_store(url, store)
         with engine.connect() as connection:
             assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-                "0009_inventory_counter"
+                "0010_service_split"
             )
             assert connection.scalar(text(f"SELECT version_num FROM alembic_version_{store}")) == (
-                f"{store}_0001"
+                "main_0002"
+                if store is Store.MAIN
+                else "inventory_0002"
+                if store is Store.INVENTORY
+                else "notification_0001"
             )
             assert connection.execute(text("SELECT id, number, name FROM data_assets")).one() == (
                 "master-id",
@@ -70,6 +74,11 @@ def test_adopt_and_repeat_preserve_records_and_allocations(tmp_path: Path, store
         (Store.MAIN, "ALTER TABLE members ADD COLUMN future_probe INTEGER", "columns differ"),
         (Store.INVENTORY, "DELETE FROM inventory_counters", "allocation state"),
         (Store.MAIN, "UPDATE audit_chain_head SET hash = 'invalid'", "audit head"),
+        (
+            Store.NOTIFICATION,
+            "DELETE FROM notification_audit_chain_head",
+            "notification owner audit head is missing",
+        ),
         (
             Store.INVENTORY,
             "UPDATE alembic_version SET version_num = '0008_retention_handoff'",

@@ -23,6 +23,7 @@ from telescreen.db.models import InventoryCounterRow
         ("0006_inventory_handoff", 57, "inventory_inbox", "inventory_audit_outbox"),
         ("0007_inventory_audit", 59, "inventory_audit_outbox", "inventory_retention_outbox"),
         ("0008_retention_handoff", 61, "inventory_retention_outbox", "inventory_counters"),
+        ("0009_inventory_counter", 62, "inventory_counters", "notification_audit_records"),
     ),
 )
 def test_historical_targets_have_only_their_released_additions(
@@ -42,9 +43,9 @@ def test_historical_targets_have_only_their_released_additions(
             assert (
                 "revision_id"
                 in {column["name"] for column in inspect(engine).get_columns("data_field_values")}
-            ) == (revision == "0008_retention_handoff")
+            ) == (revision in ("0008_retention_handoff", "0009_inventory_counter"))
         upgrade(url)
-        assert len(set(inspect(engine).get_table_names()) - {"alembic_version"}) == 62
+        assert len(set(inspect(engine).get_table_names()) - {"alembic_version"}) == 74
     finally:
         engine.dispose()
 

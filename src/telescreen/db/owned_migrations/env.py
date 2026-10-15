@@ -14,7 +14,11 @@ config: Config = context.config
 def migrate(connection: Connection) -> None:
     """Use a separate version table even when owners share one physical database."""
     version_table: str | None = config.get_main_option("owner_version_table")
-    if version_table not in ("alembic_version_main", "alembic_version_inventory"):
+    if version_table not in (
+        "alembic_version_main",
+        "alembic_version_inventory",
+        "alembic_version_notification",
+    ):
         raise RuntimeError("an explicit owner version table is required")
     context.configure(connection=connection, version_table=version_table)
     with context.begin_transaction():

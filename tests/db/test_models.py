@@ -3,13 +3,19 @@
 from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy import Boolean, DateTime, Float, Integer, func, insert, select
+from sqlalchemy import Boolean, DateTime, Float, Integer, func, insert, inspect, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 from telescreen.db.base import Base
-from telescreen.db.models import AuditChainHeadRow, CounterRow, FindingRow
+from telescreen.db.models import (
+    AuditChainHeadRow,
+    CounterRow,
+    FindingRow,
+    NotificationAuditChainHeadRow,
+)
+from telescreen.db.ownership import NOTIFICATION_TABLES, Store
 from tests.support.db import SqliteHarness, make_sqlite_harness
 
 EXPECTED_TABLES: set[str] = {
@@ -78,13 +84,26 @@ EXPECTED_TABLES: set[str] = {
     "data_asset_items",
     "data_fields",
     "data_field_values",
+    # Service split
+    "notification_outbox",
+    "notification_inbox",
+    "notification_delivery_state",
+    "projection_changes",
+    "inventory_directory_entries",
+    "notification_directory_entries",
+    "inventory_issue_links",
+    "inventory_audit_records",
+    "inventory_audit_chain_head",
+    "notification_audit_records",
+    "notification_audit_chain_head",
+    "inventory_notification_outbox",
 }
 
 
 def test_metadata_has_the_exact_table_contract() -> None:
     """Expose every planned table in the ORM metadata."""
     assert set(Base.metadata.tables) == EXPECTED_TABLES
-    assert len(Base.metadata.tables) == 62
+    assert len(Base.metadata.tables) == 74
 
 
 @pytest.mark.asyncio
@@ -170,3 +189,37 @@ async def test_harness_seeds_shared_rows_and_finding_uniqueness() -> None:
         with pytest.raises(IntegrityError):
             await session.flush()
     await harness.close()
+
+
+@pytest.mark.asyncio
+async def test_main_and_notification_harnesses_create_their_declared_schemas() -> None:
+    """MAIN retains notification tables in process; split Notification owns nine tables."""
+    main: SqliteHarness = await make_sqlite_harness(store=Store.MAIN)
+    notification: SqliteHarness = await make_sqlite_harness(store=Store.NOTIFICATION)
+    try:
+        async with main.engine.connect() as connection:
+            main_names: set[str] = await connection.run_sync(
+                lambda sync: set(inspect(sync).get_table_names())
+            )
+            assert "notifications" in main_names
+            assert len(main_names) == 54
+        async with notification.engine.connect() as connection:
+            names: set[str] = await connection.run_sync(
+                lambda sync: set(inspect(sync).get_table_names())
+            )
+            assert names == set(NOTIFICATION_TABLES)
+            head: tuple[int, str] | None = (
+                (
+                    await connection.execute(
+                        select(
+                            NotificationAuditChainHeadRow.seq, NotificationAuditChainHeadRow.hash
+                        )
+                    )
+                )
+                .tuples()
+                .one_or_none()
+            )
+            assert head == (0, "0" * 64)
+    finally:
+        await main.close()
+        await notification.close()

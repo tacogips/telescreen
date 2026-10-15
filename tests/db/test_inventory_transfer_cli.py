@@ -21,7 +21,7 @@ async def test_real_copy_verify_and_merge_cli(
     assert await asyncio.to_thread(main, ["inventory-store", "verify", "--writers-stopped"]) == 1
     assert await asyncio.to_thread(main, ["inventory-store", "copy", "--writers-stopped"]) == 0
     output: str = capsys.readouterr().out
-    assert '"copied":true' in output and '"schema_revision":"inventory_0001"' in output
+    assert '"copied":true' in output and '"schema_revision":"inventory_0002"' in output
     assert "original-revision" not in output and "Café" not in output
     assert "sqlite" not in output
     assert await asyncio.to_thread(main, ["inventory-store", "verify", "--writers-stopped"]) == 0

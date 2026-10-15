@@ -8,10 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_en
 from sqlalchemy.pool import NullPool
 
 from telescreen.core.errors import ConfigError
+from telescreen.db.base import Base
 from telescreen.db.owned_migrations.baseline import snapshot_tables
-from telescreen.db.schema_check import baseline_metadata
 from telescreen.db.transfer_check import (
     location,
+    refuse_pending_notifications,
     require_lineage,
     validate_inventory,
     validate_urls,
@@ -28,18 +29,35 @@ class TransferReport:
     tables: tuple[TableDigest, ...]
 
 
+def transfer_metadata() -> MetaData:
+    """Return model metadata; copy selection remains the frozen v1 tables plus audit pair."""
+    return Base.metadata
+
+
 async def manifest(connection: AsyncConnection, metadata: MetaData) -> tuple[TableDigest, ...]:
-    """Cover every frozen inventory-owned table, including handoff and allocation state."""
-    names: tuple[str, ...] = snapshot_tables("inventory_0001", connection.dialect.name)
+    """Cover copied inventory state while excluding rebuilt replicas and notification work."""
+    names: tuple[str, ...] = _transfer_tables(connection.dialect.name)
     return tuple([await digest(connection, metadata.tables[name]) for name in sorted(names)])
+
+
+def _transfer_tables(dialect: str) -> tuple[str, ...]:
+    """Return the original ten inventory tables plus their transferred audit chain."""
+    baseline: tuple[str, ...] = snapshot_tables("inventory_0001", dialect)
+    return baseline + ("inventory_audit_records", "inventory_audit_chain_head")
 
 
 async def _replace(source: AsyncConnection, target: AsyncConnection, metadata: MetaData) -> None:
     """Replace inventory data in one target transaction; restore trigger policy before commit."""
-    names: tuple[str, ...] = snapshot_tables("inventory_0001", target.dialect.name)
+    names: tuple[str, ...] = _transfer_tables(target.dialect.name)
     if target.dialect.name == "postgresql":
         await target.execute(
             text("ALTER TABLE data_asset_events DISABLE TRIGGER data_asset_events_append_only")
+        )
+        await target.execute(
+            text(
+                "ALTER TABLE inventory_audit_records "
+                "DISABLE TRIGGER inventory_audit_records_append_only"
+            )
         )
     for name in reversed(names):
         await target.execute(delete(metadata.tables[name]))
@@ -75,6 +93,12 @@ async def _replace(source: AsyncConnection, target: AsyncConnection, metadata: M
         await target.execute(
             text("ALTER TABLE data_asset_events ENABLE TRIGGER data_asset_events_append_only")
         )
+        await target.execute(
+            text(
+                "ALTER TABLE inventory_audit_records "
+                "ENABLE TRIGGER inventory_audit_records_append_only"
+            )
+        )
 
 
 async def _transfer(
@@ -90,15 +114,19 @@ async def _transfer(
             if connection.dialect.name == "sqlite":
                 await connection.exec_driver_sql("BEGIN IMMEDIATE")
             await connection.run_sync(validate_inventory)
-        metadata: MetaData = baseline_metadata()
+        await refuse_pending_notifications(source)
+        await refuse_pending_notifications(target)
+        metadata: MetaData = transfer_metadata()
         expected: tuple[TableDigest, ...] = await manifest(source, metadata)
         before: tuple[TableDigest, ...] = await manifest(target, metadata)
         if expected == before:
-            return TransferReport("inventory_0001", False, expected)
+            return TransferReport("inventory_0002", False, expected)
         if verify_only:
             raise RuntimeError("inventory store manifests differ")
         if not replace and any(
-            table.rows for table in before if table.table != "inventory_counters"
+            table.rows
+            for table in before
+            if table.table not in ("inventory_counters", "inventory_audit_chain_head")
         ):
             raise RuntimeError(
                 "inventory copy requires an empty target or an identical completed copy"
@@ -110,7 +138,7 @@ async def _transfer(
                 "inventory transfer verification failed; target transaction rolled back"
             )
         await target.run_sync(validate_inventory)
-        return TransferReport("inventory_0001", True, expected)
+        return TransferReport("inventory_0002", True, expected)
 
 
 async def transfer_inventory(

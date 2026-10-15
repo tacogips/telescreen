@@ -9,7 +9,9 @@ from telescreen.db.models import (
     DataAssetEventRow,
     DataAssetItemRow,
     DataFieldValueRow,
+    InventoryAuditChainHeadRow,
     InventoryAuditOutboxRow,
+    InventoryAuditRecordRow,
     InventoryCounterRow,
     InventoryInboxRow,
     InventoryInboxStreamRow,
@@ -81,6 +83,27 @@ async def seed_inventory(engine: AsyncEngine) -> None:
                 recorded_at=NOW,
             )
         )
+        audit_hash: str = "a" * 64
+        session.add(
+            InventoryAuditRecordRow(
+                seq=1,
+                id="inventory-audit-1",
+                at=NOW,
+                actor_kind="system",
+                actor_ref="system",
+                action="inventory.test_seeded",
+                target_kind="test",
+                target_id="test-id",
+                summary="Test seed",
+                details_json="{}",
+                prev_hash="0" * 64,
+                hash=audit_hash,
+            )
+        )
+        head: InventoryAuditChainHeadRow | None = await session.get(InventoryAuditChainHeadRow, 1)
+        assert head is not None
+        head.seq = 1
+        head.hash = audit_hash
         counter: InventoryCounterRow | None = await session.get(
             InventoryCounterRow, "data_asset_number"
         )
