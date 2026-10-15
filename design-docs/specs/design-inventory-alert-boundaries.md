@@ -1,5 +1,10 @@
 # Inventory and alert management boundaries
 
+Independent process deployment is now specified and implemented by the
+[inventory microservice extension](design-inventory-microservice.md). This document
+records the underlying ownership, replay and migration invariants.
+
+
 Status: implemented and verified, 2026-10-14. This design extends the v1.4 inventory
 baseline. The [completion audit](design-inventory-boundary-verification.md) records
 requirement-level evidence, final checks and supported operating constraints.

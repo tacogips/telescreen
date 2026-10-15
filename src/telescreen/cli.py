@@ -44,6 +44,9 @@ def _parser() -> argparse.ArgumentParser:
     )
     commands.add_parser("serve").add_argument("--host", default="0.0.0.0")
     commands.choices["serve"].add_argument("--port", type=int, default=8000)
+    inventory: argparse.ArgumentParser = commands.add_parser("inventory-serve")
+    inventory.add_argument("--host", default="0.0.0.0")
+    inventory.add_argument("--port", type=int, default=8001)
     worker: argparse.ArgumentParser = commands.add_parser("worker")
     worker.add_argument("--once", action="store_true")
     migrate: argparse.ArgumentParser = commands.add_parser("migrate")
@@ -261,30 +264,53 @@ def main(argv: Sequence[str] | None = None) -> int:
         configure_logging(settings.log_level, redactor)
         install_excepthook(redactor)
         if arguments.command == "migrate":
-            if settings.database_url is None:
-                raise ConfigError("TELESCREEN_DATABASE_URL is required")
-            from telescreen.db.migrate import upgrade_configured
+            from telescreen.db.migrate import upgrade_configured, upgrade_store
             from telescreen.db.ownership import Store
 
+            selected_store: Store | None = (
+                Store(arguments.store)
+                if arguments.store is not None
+                else Store.MAIN
+                if settings.inventory_service_url
+                else None
+            )
+            selected_url: str | None = (
+                settings.inventory_database_url or settings.database_url
+                if selected_store is Store.INVENTORY
+                else settings.database_url
+            )
+            if selected_url is None:
+                raise ConfigError("selected store database URL is required")
             if arguments.adopt:
                 if arguments.store is None or arguments.revision != "head":
                     raise ConfigError("owner adoption requires --store and the baseline head")
                 from telescreen.db.adopt import adopt_owner
 
-                store: Store = Store(arguments.store)
-                selected_url: str = (
-                    settings.inventory_database_url or settings.database_url
-                    if store is Store.INVENTORY
-                    else settings.database_url
+                adopt_owner(
+                    selected_url, Store(arguments.store), writers_stopped=arguments.writers_stopped
                 )
-                adopt_owner(selected_url, store, writers_stopped=arguments.writers_stopped)
+            elif selected_store is not None:
+                upgrade_store(selected_url, selected_store, arguments.revision)
             else:
                 upgrade_configured(
-                    settings.database_url,
-                    settings.inventory_database_url,
-                    arguments.revision,
-                    Store(arguments.store) if arguments.store is not None else None,
+                    selected_url, settings.inventory_database_url, arguments.revision
                 )
+            return 0
+        if arguments.command == "inventory-serve":
+            from telescreen.inventory_service.app import (
+                build_inventory_runtime,
+                create_inventory_app,
+            )
+
+            inventory_http: httpx.AsyncClient = httpx.AsyncClient()
+            try:
+                inventory_app: FastAPI = create_inventory_app(
+                    build_inventory_runtime(settings, env, inventory_http), inventory_http
+                )
+            except Exception:
+                asyncio.run(inventory_http.aclose())
+                raise
+            uvicorn.run(inventory_app, host=arguments.host, port=arguments.port, log_config=None)
             return 0
         if arguments.command == "serve":
             return _serve(settings, env, arguments.host, arguments.port)

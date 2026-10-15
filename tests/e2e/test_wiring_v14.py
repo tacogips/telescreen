@@ -18,6 +18,7 @@ from telescreen.inventory.reconcile import InventoryReconcilerImpl
 from telescreen.inventory.retention import DataOverdueHandler, DataOverdueProvider
 from telescreen.ports.workflow import TaskHandler
 from telescreen.wiring import Container, build_container, close_container
+from telescreen.wiring_v14 import WiringV14
 from telescreen.workflow.mapreduce.reduce import MapReduceHandler
 from tests.support.db import SqliteHarness, make_sqlite_harness
 
@@ -43,6 +44,7 @@ async def test_v14_wiring_binds_services_and_resolves_static_routes() -> None:
     )
     container: Container = build_container(settings, _TestEnv(), outbound, database.sessions)
     try:
+        assert isinstance(container.v14, WiringV14)
         assert isinstance(container.v14.observer, InventoryObserverImpl)
         assert isinstance(container.v14.reconciler, InventoryReconcilerImpl)
         assert container.issue_service.inventory is container.v14.publisher

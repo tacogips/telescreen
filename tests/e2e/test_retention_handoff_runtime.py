@@ -18,6 +18,7 @@ from telescreen.db.models import (
 )
 from telescreen.notifications.email import SmtplibTransport
 from telescreen.ports.retention import RetentionCommand, RetentionReceipt
+from telescreen.wiring_v14 import WiringV14
 from tests.e2e.harness import E2EWorld, OutboundRecorder, bearer, make_world
 
 
@@ -49,6 +50,7 @@ async def test_due_date_edit_commits_during_notification_outage_and_recovers_lat
 
     monkeypatch.setattr(SmtplibTransport, "send", capture)
     try:
+        assert isinstance(world.container.v14, WiringV14)
         async with world.database.sessions.begin() as session:
             session.add(
                 MemberRow(

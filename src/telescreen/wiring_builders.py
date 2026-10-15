@@ -53,6 +53,17 @@ def build_primitives(
     inventory_sessions: async_sessionmaker[AsyncSession] | None = None,
 ) -> RuntimePrimitives:
     """Build database, masking, audit and guarded search primitives."""
+    if settings.inventory_service_url is not None:
+        from telescreen.inventory_service.transport import ServiceHttp
+        from telescreen.inventory_service.wiring import service_secret
+
+        ServiceHttp(
+            http,
+            settings.inventory_service_url,
+            service_secret(settings.inventory_service_token_ref, env),
+        )
+        if inventory_sessions is not None:
+            raise ConfigError("remote inventory cannot use an injected inventory session")
     if settings.database_url is None:
         raise ConfigError("TELESCREEN_DATABASE_URL is required")
     configured_keys: tuple[tuple[int, str], ...]
@@ -78,7 +89,8 @@ def build_primitives(
     if inventory_sessions is not None:
         selected_inventory = inventory_sessions
     elif (
-        settings.inventory_database_url is not None
+        settings.inventory_service_url is None
+        and settings.inventory_database_url is not None
         and settings.inventory_database_url != settings.database_url
     ):
         inventory_engine = create_engine(settings.inventory_database_url)

@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from fastapi import APIRouter
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from telescreen.api.common.context import ApiContext
 from telescreen.api.routers.data_asset_detail import (
     DataAssetDetailRouterDeps,
     build_data_asset_detail_router,
@@ -19,8 +18,6 @@ from telescreen.api.routers.data_fields import DataFieldsRouterDeps, build_data_
 from telescreen.audit.receiver import AuditCommandReceiver
 from telescreen.audit.service import AuditLogService
 from telescreen.collectors.inventory_publish import InventoryPublisher
-from telescreen.core.clock import Clock
-from telescreen.core.config import TelescreenSettings
 from telescreen.directory.inventory_actors import InventoryActorDirectory
 from telescreen.directory.inventory_context import IdentityActorLookup, IdentityAssigneeLookup
 from telescreen.integrations.inventory_audit_delivery import (
@@ -52,35 +49,9 @@ from telescreen.inventory.retention_outbox import InventoryRetentionLookup, Rete
 from telescreen.inventory.values import ValueService, ValueValidator
 from telescreen.issues.asset_context import IssueAssetLookup, IssueAssetOwnerLookup
 from telescreen.issues.asset_owner import IssueAssetOwnerResolver
-from telescreen.masking.fingerprint import Fingerprinter
-from telescreen.masking.redact import Redactor
 from telescreen.notifications.retention import RetentionNotificationReceiver
-from telescreen.ports.collectors import CollectorConfigReader
-from telescreen.ports.directory import ActorDirectory, OwnerDirectory, RecipientResolver
-from telescreen.ports.issues import ResourceIssueReader
-from telescreen.ports.notifications import MemberNotifier, NotificationSender
-from telescreen.ports.workflow import ScheduleProvider, TaskHandler, TaskQueue
-
-
-@dataclass(frozen=True)
-class WiringV14Parts:
-    """Runtime dependencies needed by v1.4 inventory wiring."""
-
-    sessions: async_sessionmaker[AsyncSession]
-    clock: Clock
-    settings: TelescreenSettings
-    redactor: Redactor
-    fingerprinter: Fingerprinter
-    collector_configs: CollectorConfigReader
-    issue_reader: ResourceIssueReader
-    actors: ActorDirectory
-    recipients: RecipientResolver
-    owners: OwnerDirectory
-    members: MemberNotifier
-    sender: NotificationSender
-    queue: TaskQueue
-    context: ApiContext
-    inventory_sessions: async_sessionmaker[AsyncSession] | None = None
+from telescreen.ports.workflow import ScheduleProvider, TaskHandler
+from telescreen.wiring_inventory_parts import WiringV14Parts
 
 
 @dataclass(frozen=True)

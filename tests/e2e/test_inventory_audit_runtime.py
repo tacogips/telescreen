@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from telescreen.audit.verify import verify_chain
 from telescreen.db.models import AuditRecordRow, DataFieldRow, InventoryAuditOutboxRow
 from telescreen.ports.audit_commands import AuditCommand, AuditReceipt
+from telescreen.wiring_v14 import WiringV14
 from tests.e2e.harness import E2EWorld, OutboundRecorder, bearer, make_world
 
 
@@ -29,6 +30,7 @@ async def test_inventory_commits_during_audit_outage_and_chain_catches_up(tmp_pa
     """An actual worker retries the audit entry without rolling back the field definition."""
     world: E2EWorld = await make_world(tmp_path, (), OutboundRecorder(), independent_sessions=True)
     try:
+        assert isinstance(world.container.v14, WiringV14)
         world.container.worker.registry.register(
             replace(world.container.v14.audit_delivery_handler, receiver=UnavailableAudit())
         )

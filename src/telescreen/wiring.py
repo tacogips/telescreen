@@ -1,9 +1,11 @@
 """Application composition root for Telescreen services."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import httpx
 from fastapi import APIRouter
@@ -60,6 +62,12 @@ from telescreen.evidence.image import LlmImageEvidenceScanner
 from telescreen.evidence.query import EvidenceQueryImpl
 from telescreen.evidence.service import EvidenceService
 from telescreen.evidence.store import LocalFileEvidenceStore
+from telescreen.inventory_service.transport import ServiceHttp
+from telescreen.inventory_service.wiring import (
+    RemoteInventoryWiring,
+    build_remote_inventory,
+    service_secret,
+)
 from telescreen.issues.ingest import IngestService
 from telescreen.issues.repository import IssueRepository
 from telescreen.issues.scan import ResourceScannerImpl
@@ -93,6 +101,7 @@ from telescreen.wiring_collectors import (
     build_webhook_secrets,
     drive_channel_key,
 )
+from telescreen.wiring_inventory_parts import WiringV14Parts
 from telescreen.wiring_v11 import (
     DirectoryV11,
     Health,
@@ -105,7 +114,9 @@ from telescreen.wiring_v11 import (
 )
 from telescreen.wiring_v12 import WiringV12, WiringV12Parts, build_v12
 from telescreen.wiring_v13 import IssueEventFanout, WiringV13, WiringV13Parts, build_v13
-from telescreen.wiring_v14 import WiringV14, WiringV14Parts, build_v14
+
+if TYPE_CHECKING:
+    from telescreen.wiring_v14 import WiringV14
 from telescreen.workflow.engine.child import ChildRunFinishedHandler
 from telescreen.workflow.engine.definitions import WorkflowService
 from telescreen.workflow.engine.engine import AdvanceStepHandler, RunEngine, TimerFiredHandler
@@ -191,7 +202,7 @@ class Container:
     owns_engine: bool
     v12: WiringV12
     v13: WiringV13
-    v14: WiringV14
+    v14: WiringV14 | RemoteInventoryWiring
     inventory_sessions: async_sessionmaker[AsyncSession]
     inventory_engine: AsyncEngine | None
 
@@ -317,25 +328,37 @@ def build_container(
         primitives.indexer,
         primitives.clock,
     )
-    v14: WiringV14 = build_v14(
-        WiringV14Parts(
-            primitives.sessions,
-            primitives.clock,
-            settings,
-            primitives.redactor,
-            primitives.fingerprinter,
-            collector_repository,
-            issue_service,
-            DirectoryActorDirectory(),
-            resolver,
-            directory_v11.owners,
-            notification_service,
-            notification_service,
-            queue,
-            ctx,
-            inventory_sessions=primitives.inventory_sessions,
-        )
+    v14_parts: WiringV14Parts = WiringV14Parts(
+        primitives.sessions,
+        primitives.clock,
+        settings,
+        primitives.redactor,
+        primitives.fingerprinter,
+        collector_repository,
+        issue_service,
+        DirectoryActorDirectory(),
+        resolver,
+        directory_v11.owners,
+        notification_service,
+        notification_service,
+        queue,
+        ctx,
+        inventory_sessions=primitives.inventory_sessions,
     )
+    v14: WiringV14 | RemoteInventoryWiring
+    if settings.inventory_service_url:
+        v14 = build_remote_inventory(
+            v14_parts,
+            ServiceHttp(
+                http,
+                settings.inventory_service_url,
+                service_secret(settings.inventory_service_token_ref, env),
+            ),
+        )
+    else:
+        from telescreen.wiring_v14 import build_v14
+
+        v14 = build_v14(v14_parts)
     issue_service.inventory = v14.publisher
     collector: CollectorService = CollectorService(
         collector_registry,

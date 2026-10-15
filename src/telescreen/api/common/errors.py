@@ -52,7 +52,11 @@ def http_status_for(code: ErrorCode) -> int:
         return 415
     if code is ErrorCode.RATE_LIMITED:
         return 429
-    if code in (ErrorCode.EVIDENCE_SCANNER_UNAVAILABLE, ErrorCode.IDP_UNAVAILABLE):
+    if code in (
+        ErrorCode.EVIDENCE_SCANNER_UNAVAILABLE,
+        ErrorCode.IDP_UNAVAILABLE,
+        ErrorCode.SERVICE_UNAVAILABLE,
+    ):
         return 503
     return 500
 

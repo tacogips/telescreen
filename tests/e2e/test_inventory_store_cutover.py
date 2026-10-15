@@ -33,6 +33,7 @@ from telescreen.integrations.inventory_outbox import InventoryOutbox
 from telescreen.notifications.email import SmtplibTransport
 from telescreen.ports.inventory_commands import InventoryCommand
 from telescreen.ports.workflow import ClaimedTask
+from telescreen.wiring_v14 import WiringV14
 from tests.e2e.harness import E2EWorld, OutboundRecorder, bearer, make_world
 from tests.inventory.handoff.test_delivery import observed
 from tests.support.owned_postgres import OwnedPostgres, owned_postgres
@@ -97,6 +98,7 @@ async def cutover_flow(
         )
         assert response.status_code == 201, response.text
         master_id = response.json()["id"]
+        assert isinstance(old.container.v14, WiringV14)
         await old.container.v14.overdue_handler.handle(
             ClaimedTask("check", EngineTaskKind.DATA_OVERDUE_CHECK, "due", json_null(), 1, 5, "due")
         )

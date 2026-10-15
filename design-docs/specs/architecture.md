@@ -494,3 +494,10 @@ gitleaks pre-commit hook does not flag committed sources.
 | `design-docs/specs/notes.md` | Engine rationale vs Airflow/n8n/Kestra, riela mapping, tooling notes |
 
 ---
+
+## Independently deployed inventory
+
+The [inventory microservice](design-inventory-microservice.md) extends the existing
+ownership boundary with an independent API/worker process, authenticated HTTP adapters
+and public data API forwarding. The bureau owns collection, identity, audit and
+notification delivery; remote composition has no inventory database connection.

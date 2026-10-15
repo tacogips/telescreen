@@ -12,27 +12,7 @@ from telescreen.core.permissions import Permission, effective_token_permissions,
 from telescreen.core.vocabulary import ApiScope, ErrorCode, ExternalAuthKind, PrincipalKind, Role
 from telescreen.db.models import ApiTokenRow, MemberRow
 from telescreen.ports.identity import MemberAuth, VerifiedToken
-
-
-@dataclass(frozen=True)
-class Principal:
-    """Authenticated API identity and its granted permissions."""
-
-    kind: PrincipalKind
-    token_id: str | None
-    member_id: str | None
-    role: Role | None
-    permissions: frozenset[Permission]
-
-    def allows(self, permission: Permission) -> bool:
-        """Return whether this principal holds a permission."""
-        return permission in self.permissions
-
-    def actor_ref(self) -> str:
-        """Return a stable, non-secret audit reference."""
-        if self.member_id is not None:
-            return f"member:{self.member_id}"
-        return f"token:{self.token_id}"
+from telescreen.ports.principal import Principal
 
 
 def hash_token(token: str) -> str:
@@ -100,6 +80,8 @@ async def _authenticate_api_token(ctx: ApiContext, token: str) -> Principal:
 
 async def authenticate(ctx: ApiContext, request: Request) -> Principal:
     """Authenticate a bearer API token or IdP access token without exposing it."""
+    if ctx.authentication is not None:
+        return await ctx.authentication(request)
     authorization: str | None = request.headers.get("authorization")
     if authorization is None or not authorization.startswith("Bearer "):
         raise TelescreenError(ErrorCode.UNAUTHORIZED, "authentication required")

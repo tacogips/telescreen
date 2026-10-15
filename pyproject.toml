@@ -32,6 +32,7 @@ Repository = "https://github.com/user/repo"
 
 [project.scripts]
 "telescreen" = "telescreen.cli:main"
+"telescreen-inventory" = "telescreen.inventory_service.cli:main"
 
 [dependency-groups]
 dev = [

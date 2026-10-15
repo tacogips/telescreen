@@ -190,3 +190,12 @@ pytest: `asyncio_mode = "auto"`, marker `integration`, `pythonpath = ["tools", "
 mise tasks added: `web-install`, `web-typecheck`, `web-test`, `web-build`, `web-ci`.
 
 ---
+
+## Independent inventory service
+
+Use `telescreen migrate --store main` for the bureau database and
+`telescreen migrate --store inventory` for the inventory database. The latter needs only
+`TELESCREEN_INVENTORY_DATABASE_URL`. Run inventory with `telescreen-inventory serve`,
+then configure the bureau API and engine to use its service URL and shared service
+secret reference. See [deployment, cutover and HTTP contracts](design-inventory-microservice.md)
+for all settings and the separate-database Compose overlay.

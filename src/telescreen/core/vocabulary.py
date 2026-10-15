@@ -758,6 +758,7 @@ class ErrorCode(StrEnum):
     LIMIT_EXCEEDED = "limit_exceeded"
     NOT_PROVISIONED = "not_provisioned"
     IDENTITY_CONFLICT = "identity_conflict"
+    SERVICE_UNAVAILABLE = "service_unavailable"
     IDP_UNAVAILABLE = "idp_unavailable"
     INVALID_TOKEN = "invalid_token"
     CHAIN_BROKEN = "chain_broken"

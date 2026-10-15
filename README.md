@@ -382,3 +382,18 @@ PostgreSQL or Meilisearch are marked `integration` and run only when
 available through `mise run web-ci`. The headless screenshot smoke (`cd src/web && bun run
 screenshots`, needs a local Chrome or Chromium) builds the UI, renders its pages against
 the mock API into `tmp/ui-screenshots`, and fails on any browser error.
+
+### Independent inventory service
+
+Inventory can run as its own API and background worker with an independently owned
+database. Set `TELESCREEN_INVENTORY_SERVICE_URL` and an
+`TELESCREEN_INVENTORY_SERVICE_TOKEN` secret reference in the bureau API and engine.
+Run `telescreen-inventory serve` with its inventory database URL, bureau callback URL,
+the same service secret and fingerprint keys. Collectors deliver ordered commands over
+HTTP; inventory publishes audit and retention intents back to bureau-owned receivers.
+The public `/api/data/*` URLs and UI remain unchanged.
+
+See the [service configuration, HTTP contract and cutover procedure](design-docs/specs/design-inventory-microservice.md).
+A fresh deployment example is available with
+`docker compose -f docker-compose.yml -f docker-compose.inventory.yml up --build`
+from `examples/compose`, after configuring its secrets and separate database password.

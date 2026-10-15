@@ -63,6 +63,11 @@ archived under `completed/dispatch/`.
 
 ## Completed Plans
 
+The [inventory microservice extraction](completed/inventory-microservice.md) is complete:
+independent API/worker deployment, owner database and authenticated HTTP adapters,
+verified with real TCP processes, PostgreSQL, full backend/web CI and packaged artifacts.
+See its [completion audit](../design-docs/specs/design-inventory-microservice-verification.md).
+
 ### v1.4 (data inventory: R1-R9 of `design-docs/specs/design-v1-4-data-inventory-requirements.md`)
 
 Created 2026-10-13 on `feat/data-inventory` from `design-docs/specs/design-v1-4-data-inventory.md`
