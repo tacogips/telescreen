@@ -423,6 +423,30 @@ relations only within a store), then `ddl-arrange`, `ddl-export`, models, then n
   is not silent adoption of an unknown store: the tables were created by the main history
   in the same database. A distinct notification URL remains rejected in single process
   mode; no notification URL is required for that mode.
+  Scope of O1 (re-review, run 3): `db/migrate.py` selects the co-located path from
+  configuration only, never from table presence. It applies to the configured upgrade
+  (no `--store`) when the inventory URL differs from main and the notification URL is
+  unset or equal to main, after `main` has been upgraded in that run (fresh or adopted
+  main store). Unchanged paths: a single shared URL with existing owner histories still
+  raises "notification history requires adoption"; an explicit `--store notification`
+  upgrade and every distinct notification URL (split mode) still require an empty store
+  or `--adopt`. Within the selected O1 path the co-located upgrade has two cases, both in
+  one transaction:
+  (a) fresh main created by `main_0001` (no legacy `alembic_version`): validate the four
+  co-located tables against the packaged notification baseline, create only the five
+  notification-only tables, seed the audit head, install the append-only trigger and stamp;
+  (b) main adopted from legacy `0010_service_split` (legacy `alembic_version` is
+  `0010_service_split`, so all nine tables and the seeded head already exist): run the
+  same checks as `--store notification --adopt` (schema of all nine tables and the
+  `Store.NOTIFICATION` owner state, including the head), create and seed nothing, and
+  stamp `notification_0001`.
+  Any other state (for example only some of the five notification-only tables present)
+  and any validation mismatch raise and roll back without a stamp. In both cases the
+  downgrade of `notification_0001` on a database that also holds `alembic_version_main`
+  drops only the five notification-only tables and the append-only trigger; the four
+  co-located tables stay with the main history. The svc-p02-db regression test in
+  `tests/db/test_service_split_migration.py` covers case (a) upgraded twice and case (b),
+  each with a separate inventory database.
 
 Restricted-login PostgreSQL tests (marked `integration`) grant each runtime role DML on
 only its store's tables. They deny cross-store reads/writes, version tables and trigger DDL.
@@ -511,9 +535,10 @@ The single-process suite must stay green. Commands: `mise run ci`, `mise run ddl
 tests/notification_service`.
 
 Plan shape (`svc-pNN`, disjoint writePaths). The plan files in `impl-plans/active/` and
-the current dispatch manifest (`telescreen-svc-20261015-g2-dispatch.json`, superseding
-g1) are authoritative for writePaths. The plans run in five waves: p01 (accepted at
-`19074e9`); p02; p03 and p07; p04, p05 and p06; p08; then serial finalization. The
+the current dispatch manifest (`telescreen-svc-20261015-g3-dispatch.json`, superseding
+g2 with the same plans, writePaths and DAG, extended only with shared exact-count or
+inventory tests) are authoritative for writePaths. The plans run in five waves: p01
+(accepted at `19074e9`, recorded as an accepted dependency at checkpoint `6017743`); p02; p03 and p07; p04, p05 and p06; p08; then serial finalization. The
 critical path is p01 -> p02 -> p07 -> p04/p05 -> p08. Each plan owns the shared
 exact-count/inventory tests that its change breaks.
 

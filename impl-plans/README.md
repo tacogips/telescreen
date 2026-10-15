@@ -54,12 +54,14 @@ These plans come from `design-docs/specs/design-service-split.md` (R1-R8, D1-D5)
 | 5 | [svc-p08-verification-deploy](active/svc-p08-verification-deploy.md) |
 
 The current dispatch manifest is
-[`telescreen-svc-20261015-g2`](active/telescreen-svc-20261015-g2-dispatch.json) (run 2,
-base `19074e9`). It supersedes `telescreen-svc-20261015-g1`, which run 1 blocked on
-svc-p02's write paths. g2 records svc-p01 as an accepted dependency and moves inventory
-transfer v2 to svc-p02. Serial finalization after the fanout archives these plans and the
-completed `inventory-alert-boundaries.md` to `completed/`, both manifests to
-`completed/dispatch/`, and updates this index.
+[`telescreen-svc-20261015-g3`](active/telescreen-svc-20261015-g3-dispatch.json) (run 3,
+base `6017743`). It supersedes `telescreen-svc-20261015-g2` (run 2, base `19074e9`),
+which superseded g1. g3 keeps g2's plans, write paths and DAG, records svc-p01 as an
+accepted dependency at `6017743`, and adds svc-p02 deliverable 10 (owner clarification
+O1, co-located notification history). Earlier svc-p02 log entries are in
+[`logs/svc-p02-db-2026-10-15.md`](logs/svc-p02-db-2026-10-15.md). Serial finalization
+after the fanout archives these plans and the completed `inventory-alert-boundaries.md`
+to `completed/`, the three manifests to `completed/dispatch/`, and updates this index.
 
 The [inventory and alert boundary plan](active/inventory-alert-boundaries.md) is complete:
 independent persistence, durable handoffs, inventory master authority, owner migrations

@@ -65,37 +65,29 @@
 
 Read `impl-plans/conventions.md` and `db/schema/README.md` first.
 
-**Continuation scope (manifest g2, pre-dispatch sweep).** The g2 sweep found tests that
-this plan's revisions break and that g1 left outside its paths. They are now owned here:
+**Continuation scope (manifest g3, run 3).** Deliverables 1-9 are implemented in
+checkpoint `6017743` (see Progress Log). The remaining work is deliverable 10 (owner
+clarification O1, design section 12), its regression tests, and the green full suite.
+Shared tests already owned here from the g2 sweep:
 
-- `tests/db/test_v14_migration.py` (74 tables at head; owner already updated it).
-- The legacy-chain tests `test_v11/v12/v13_migration.py` and the four
-  `test_*_migration.py` handoff/counter/audit tests upgrade to `head` and downgrade
-  through `0010`. Edit them only if `0010` changes an assertion; never weaken a guard.
-- Inventory transfer v1 hard-codes legacy `0009_inventory_counter` and owner baseline
-  `inventory_0001` (`db/transfer_check.py:61-68`, `db/transfer.py:33-39`). After `0010`
-  and `inventory_0002`, `tests/db/test_inventory_transfer*.py` and
-  `tests/e2e/test_inventory_store_cutover.py` fail. Inventory transfer v2 therefore moves
-  here from svc-p04 (deliverable 8).
-- `tests/inventory_service/test_config.py::test_remote_default_migration_creates_main_tables_only`
-  expects `tables_for(Store.MAIN)` after a main owner migrate, which now creates
-  `main_database_tables()` (54). That test and
-  `test_missing_service_credentials_fail_before_resources_are_created` cover the
-  inventory-only remote mode removed by C9. Delete both. svc-p06 adds full-split equivalents. Keep
-  the other two tests in the file unchanged.
+- `tests/db/test_v14_migration.py` (74 tables at head) and the legacy-chain migration
+  tests: edit only if `0010` changes an assertion; never weaken a guard.
+- Inventory transfer v2 (deliverable 8): `tests/db/test_inventory_transfer*.py`,
+  `tests/db/transfer_support.py`, `tests/e2e/test_inventory_store_cutover.py`.
+- `tests/inventory_service/test_config.py`: the two C9 inventory-only remote-mode tests
+  are deleted; keep the other tests unchanged.
+
+g3 sweep result: O1 changes no table count or ownership set, so no new shared test is
+needed. Do not edit `src/telescreen/cli.py`, `tests/e2e/harness.py` or any e2e test.
+The two e2e files in writePaths stay unchanged for O1.
 
 ## Intent and Context
 
 Create the 12 new tables and declare three disjoint stores. Move four tables to
 `Store.NOTIFICATION`. Add the legacy revision `0010_service_split` and the owner histories
 `main_0002`, `inventory_0002` and a new packaged baseline `notification_0001`, with
-adoption. The DDL order is mandatory:
-
-1. Nodetto JSONL edited directly;
-2. `mise run ddl-arrange`;
-3. `mise run ddl-export`;
-4. models;
-5. revisions.
+adoption. The DDL order is mandatory: Nodetto JSONL edited directly, `mise run
+ddl-arrange`, `mise run ddl-export`, models, then revisions.
 
 Imitate these existing files:
 
@@ -249,23 +241,60 @@ Read `completed/v14-p02-db.md` for the Nodetto record shapes.
      original 10.
    - `test_inventory_depends_only_on_owned_models` (`telescreen/inventory/**`) keeps its
      `_ALLOWED` module prefixes. svc-p04 must keep `inventory/handoff/apply.py` within them.
+10. **Co-located notification history (O1, design 12; run 3).** Root cause of the three
+    full-suite failures: with distinct main and inventory URLs and no notification URL,
+    `upgrade_configured` runs `notification_0001` on the main store, where `create_baseline`
+    raises "owner baseline requires an empty store".
+    - **Selection (configuration only).** In `migrate.py:upgrade_configured`, only the
+      final branch (inventory URL distinct from main) with `notification_database_url` None
+      or equal to `database_url` upgrades NOTIFICATION through a config from `owner_config`
+      with `config.attributes["colocated_notification"] = True`, after MAIN and INVENTORY.
+      Every other path is unchanged: the shared single-URL branch (including the
+      "notification history requires adoption" `ConfigError`), `store=` calls, a distinct
+      notification URL and the legacy `upgrade`. Never infer co-location from table
+      presence.
+    - **Revision.** `versions/notification/notification_0001.py` upgrade: if the attribute
+      is not exactly `True`, keep today's behavior (`create_baseline`, head seed, trigger).
+      Otherwise call one helper in `owned_migrations/baseline.py`, for example
+      `create_colocated_notification() -> None`, that reads the attribute through
+      `context.config.attributes` with an `is True` check (typelint: no `Any` leaks) and
+      decides the case:
+      - case (a) fresh `main_0001` main: the four co-located tables exist, none of the five
+        notification-only tables exist, and there is no legacy `alembic_version` row
+        `0010_service_split`. Order: subset-validate the four tables (no trigger check),
+        then execute only the snapshot statements whose target table (`CREATE TABLE <t>` or
+        `CREATE INDEX ... ON <t>`) is one of the five, seed the head `(1, 0, '0'*64)`, and
+        last `append_only("notification_audit_records")`.
+      - case (b) main adopted from legacy `0010_service_split` (legacy `alembic_version` is
+        `0010_service_split`, all nine tables exist): run
+        `validate_owner_schema(connection, Store.NOTIFICATION)` and
+        `adopt.validate_owner_state(connection, Store.NOTIFICATION)`; create, seed and
+        install nothing.
+      - any other state (some of the five present, four missing, legacy at another
+        revision): raise a static, value-free `RuntimeError`.
+      Alembic stamps `notification_0001` only after `upgrade()` returns, in the same
+      `env.py` transaction. Validate before any DDL so a failure leaves no writes on SQLite.
+    - **Validation helper.** `schema_check.py` gains a table-subset form, for example
+      `validate_owner_schema(connection, store, tables=...)`, defaulting to every table of
+      the store, so existing callers are unchanged. The subset form checks only the named
+      tables and never calls `_validate_trigger` (on PostgreSQL it would `CAST` the absent
+      `notification_audit_records` and raise UndefinedTable). The full-store default, used by
+      existing callers and case (b), keeps today's PostgreSQL trigger check. `adopt.py` may
+      expose a helper for case (b), but adoption behavior stays the same.
+    - **Downgrade.** If `alembic_version_main` exists in the same database, drop only the
+      five notification-only tables (reverse snapshot order) and the append-only trigger.
+      Otherwise keep `drop_baseline`.
+    - Do not edit the `notification_0001.*.sql` snapshots, `notification_baseline_schema.json`,
+      `main_0001`/`inventory_0001` or any legacy revision.
 
 ## Key Pitfalls
 
 - `store_for` must still raise for unknown tables. Every model table must be declared;
   `tests/db/test_models.py` enforces this.
-- **Corrected (F5).** Legacy revisions use frozen metadata: `0001_initial.py:14` uses
-  `metadata_for(1)`. `test_frozen_legacy_migrations.py::test_legacy_migrations_do_not_import_live_models`
-  forbids importing `telescreen.db.models` in any legacy revision. Therefore:
-  - `0010_service_split.py` declares its 12 tables with explicit `op.create_table` and `sa.*`
-    column DDL, matching the models exactly. It never imports `telescreen.db.models`.
-  - It stays idempotent: create only if missing, insert seeds only if missing.
-  - In `tests/db/test_frozen_legacy_migrations.py::test_historical_targets`, the final
-    legacy table count becomes 74 (it was 62). Add a row for `0009_inventory_counter`
-    with 62 tables if the test lists per-revision counts.
-- The SQLite trigger is not installed (consistent with existing practice).
-- The audit models must not share index names with `audit_records`.
-- Do not create relations across stores in Nodetto.
+- (F5, done) `0010_service_split.py` uses explicit `op.create_table` DDL, never imports
+  `telescreen.db.models`, and stays idempotent; the final legacy table count is 74.
+- No SQLite trigger; audit index names are table-prefixed; no cross-store Nodetto relations.
+- O1: never pass a notification URL from `cli.py` or the harness (design section 3).
 
 ## Tests
 
@@ -296,6 +325,26 @@ Read `completed/v14-p02-db.md` for the Nodetto record shapes.
 - `tests/e2e/test_inventory_store_cutover.py` (single-process cutover) is green on v2.
 - `tests/inventory/core/test_import_boundaries.py` passes with deliverable 9's sets.
 - The PostgreSQL variants stay marked `integration`.
+- O1 regression tests in `tests/db/test_service_split_migration.py` (SQLite files):
+  - case (a): fresh main + separate inventory, `upgrade_configured(main, inv)` -> main has
+    all nine notification tables, `alembic_version_notification` = `notification_0001`,
+    one head row `(1, 0, '0'*64)`; the inventory file has no notification table; a
+    second call is a no-op (same versions, one head row).
+  - case (b): `upgrade(main)` to legacy head, `adopt_owner(main, Store.MAIN,
+    writers_stopped=True)`, then `upgrade_configured(main, inv)` -> stamped
+    `notification_0001`, still one head row, no table created; a second call is a no-op.
+  - partial state: case (a) setup plus a pre-created `notification_inbox` -> raises; no
+    `alembic_version_notification` row.
+  - schema mismatch: an extra column on `notification_settings` after `main_0001` -> raises;
+    none of the five tables created; no stamp.
+  - distinct notification URL whose file already holds the four tables (created by
+    `upgrade_store(..., Store.MAIN)`) -> "owner baseline requires an empty store".
+  - downgrade of case (a) via `command.downgrade(owner_config(main, Store.NOTIFICATION),
+    "base")` -> the five tables are gone, the four remain, `alembic_version_main` unchanged.
+  - `test_owned_migrations_postgres.py` (`integration`, skipped offline, not verification):
+    case (a) -> nine tables, stamped, full `validate_owner_schema(conn, Store.NOTIFICATION)` passes.
+  - `tests/db/test_owned_migrations.py::test_default_shared_migrate_requires_notification_adoption`
+    passes unchanged.
 
 ## Verification
 
@@ -307,6 +356,7 @@ uv run --frozen ruff format --check --no-cache src/telescreen/db tests/db tests/
 uv run --frozen ruff check --no-cache <same paths>
 uv run --frozen ty check <same paths>
 uv run --frozen pytest -p no:cacheprovider tests/db tests/inventory tests/inventory_service/test_config.py tests/e2e/test_inventory_database_config.py tests/e2e/test_inventory_split_runtime.py tests/e2e/test_inventory_store_cutover.py 2>&1 | tee /tmp/telescreen-svc-p02-db-pytest.log
+uv run --frozen pytest -p no:cacheprovider tests/db/test_service_split_migration.py tests/db/test_owned_migrations.py tests/db/test_owner_adoption.py tests/e2e/test_inventory_database_config.py tests/e2e/test_inventory_split_runtime.py tests/e2e/test_inventory_store_cutover.py 2>&1 | tee /tmp/telescreen-svc-p02-db-o1.log
 uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p02-db-typelint.log 2>&1; grep -E '^(src/telescreen/db|tests/db|tests/support|tests/inventory/core|tests/inventory_service/test_config|tests/e2e/test_inventory_(store_cutover|database_config))' /tmp/telescreen-svc-p02-db-typelint.log
 uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-svc-p02-db-pytest-all.log 2>&1; echo "exit=$?"
 ```
@@ -326,88 +376,16 @@ success.
       prints nothing. Transfer v2 tests and the cutover e2e pass.
 - [ ] `grep -n "test_remote_default_migration_creates_main_tables_only\|bureau_service_url" tests/inventory_service/test_config.py`
       prints nothing.
+- [ ] O1 (deliverable 10): the O1 regression tests pass; the three e2e tests pass with
+      `git diff 6017743 -- src/telescreen/cli.py tests/e2e` empty; `git diff 6017743 --stat`
+      shows no change to the `notification_0001.*.sql` snapshots or
+      `notification_baseline_schema.json`.
 - [ ] All verification commands exit 0, including the full suite. The Progress Log has hashes.
 
 ## Progress Log
 
-### Session: 2026-10-15 16:57 JST
-**Tasks Completed**: Added the 12 Nodetto table definitions in four frames and two
-same-store logical relations; generated both 74-table DDL exports; added the new ORM
-models, three-store ownership declarations, legacy revision 0010, main_0002 and
-inventory_0002 revisions, notification frozen SQL/schema snapshots, and notification
-branches in migration/adoption schema validation.
-**Tasks In Progress**: Notification owner revision; model, history, adoption, migration,
-harness and exact-count tests; required scoped/full verification.
-**Blockers**: `tests/db/test_v14_migration.py:50` asserts 62 tables after upgrading to
-head, which becomes 74 after 0010. This required shared exact-count test is outside this
-plan's `writePaths`; request a checkpoint/manifest amendment to authorize it before
-continuing.
-**Reconciliation requests**: Add `tests/db/test_v14_migration.py` to the authorized
-writePaths for this branch. Resume after the dispatch manifest is amended.
-**Hashes**: See `tmp/telescreen-svc-20261015-g1/svc-p02-db/step6/current-hashes-corrected.txt` for
-the per-file pre-edit and current hashes; DDL correction hashes are recorded in
-`tmp/telescreen-svc-20261015-g1/svc-p02-db/step6/nodetto-hashes.txt`.
-**Verification**: `mise run ddl-arrange` -> exit 2 on the first pass (log:
-`/tmp/telescreen-svc-p02-db-arrange-attempt1.log`), corrected Nodetto index references and reran
--> exit 0 (log: `/tmp/telescreen-svc-p02-db-arrange.log`); `mise run ddl-export` -> exit 0 (log:
-`/tmp/telescreen-svc-p02-db-export.log`). `ddl-check` and Python gates were not run.
-**Notes**: The 62-table assertion is in a repository test not listed by this plan even
-though the user contract requires updating shared exact-count tests. Per the ownership
-rules, no out-of-scope edit or success-shaped verification was attempted. An initial
-generator invocation used system Python without SQLAlchemy (exit 1) before producing
-files; the generation was rerun under `uv run --frozen` and partially wrote the listed
-owner artifacts before finding the missing notification versions directory. That
-directory/revision remains unfinished. The original revisions, owner baselines and
-existing snapshots were not intentionally edited.
-
-### Owner resolution: 2026-10-15 (after session 18)
-
-The owner updated `tests/db/test_v14_migration.py:50` from 62 to 74 tables at head
-(62 existing plus the 12 tables of `0010_service_split`, matching the 74-table Nodetto
-exports). The continuation manifest also adds this file to this plan's `writePaths`, so
-adjust it again only if the final table count changes. Resume from the checkpointed
-partial work: finish the notification owner revision, the model, history, adoption,
-migration, harness and exact-count tests, then run `mise run ddl-check` and the full
-Python gates. Follow conventions section 7a: report only final passing verification
-commands, keep `priorVerification` empty, and do not list fixed findings as risks.
-`tests/e2e/test_inventory_runtime_grants.py` (integration marker, 52 main tables)
-stays owned by svc-p08 and is skipped offline.
-
-### Step 6 continuation: 2026-10-15
-**Completed**: Notification owner history/adoption, 74-table ownership and harness
-assertions, transfer v2 lineage and pending-outbox checks, and the 0010 migration test.
-**Verification**: ddl-arrange/export/check, scoped Ruff format/lint, ty and typelint pass;
-39 migration/adoption regressions pass. Full `uv run --frozen pytest -p no:cacheprovider`
-has 1,310 passed, 36 skipped and 3 failures: configured CLI migration, configured split
-runtime and SQLite cutover require a Notification database URL. Logs are under
-`/tmp/telescreen-svc-p02-db-*final*.log`; final source hashes are in
-`tmp/telescreen-svc-20261015-g2/svc-p02-db/step6/final-hashes.txt`.
-**Reconciliation request**: Notification URL is parsed in `core/config.py`, but
-`cli.py` does not pass it to `upgrade_configured`; `tests/e2e/harness.py` and its
-database-config test also do not provide it. These paths are outside this plan's
-writePaths and require svc-p07 configuration wiring or a dispatch amendment. Resume
-after that wiring is integrated, then rerun the full suite and cutover tests.
-**Status**: Implementation remains incomplete pending the required green full suite;
-do not archive or mark the completion criteria complete yet.
-
-### Owner resolution 2: 2026-10-15 (after session 19)
-
-The three full-suite failures (`tests/e2e/test_inventory_database_config.py`,
-`tests/e2e/test_inventory_split_runtime.py[configured]`,
-`tests/e2e/test_inventory_store_cutover.py` SQLite) are not a missing notification URL.
-The owner reproduced the first: main and inventory URLs are distinct, notification is
-unset, so `upgrade_configured` runs `notification_0001` on the main store where
-`main_0001` already created `notifications`, `notification_templates`,
-`notification_settings` and `retention_notification_receipts`; `create_baseline` then
-raises "owner baseline requires an empty store". Design section 3 forbids a distinct
-notification URL in single process mode, so passing one from `cli.py` or the harness is
-the wrong fix. Implement design section 12 "Co-located notification history" (owner
-clarification O1) inside this plan's paths (`db/migrate.py`,
-`db/owned_migrations/baseline.py`, `notification_0001.py`, `db/adopt.py`): when the
-notification store is the main store, validate the four co-located tables against the
-packaged notification baseline schema, create only the five notification-only tables,
-seed the notification audit head and stamp `notification_0001` in one transaction.
-Add a regression test in `tests/db/test_service_split_migration.py` (fresh main plus
-separate inventory, upgrade twice, and an existing adopted main store). Then run the
-full suite; all three tests must pass unchanged. Do not edit `cli.py`,
-`tests/e2e/harness.py` or e2e tests. Follow conventions 7a.
+Earlier entries (sessions 18-19, both owner resolutions): [archive](../logs/svc-p02-db-2026-10-15.md).
+Deliverables 1-9 are in checkpoint `6017743`; deliverable 10 resolves its 3 failures.
+Run 3: hashes go under `tmp/telescreen-svc-20261015-g3/svc-p02-db/`. Append one entry of at
+most 8 lines (file must stay under 400): tasks, final passing commands with exit codes and
+log paths (conventions 7a), Reconciliation requests. Do not edit the archive.
