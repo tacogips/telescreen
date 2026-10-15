@@ -26,6 +26,7 @@ Store questions, pending decisions, and items awaiting user approval.
 - [qa-on-demand-reveal.md](./qa-on-demand-reveal.md) - Live reveal of matched values (resolved: rejected; deep links only)
 - [qa-automated-remediation-scopes.md](./qa-automated-remediation-scopes.md) - Write scopes for automated remediation (resolved: rejected; read-only)
 - [pending-custom-push-resource-identity.md](./pending-custom-push-resource-identity.md) - `/scan` and `/findings` key the same custom locator differently (pending; v1.4 keeps the current behavior)
+- [pending-service-split-tradeoffs.md](./pending-service-split-tradeoffs.md) - Service split defaults: replicated API tokens, shared identity key, pending receipts, CLI audit path, two topologies (pending owner review; defaults apply)
 
 ## Adding New Items
 

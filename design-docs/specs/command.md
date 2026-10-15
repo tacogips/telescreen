@@ -191,6 +191,29 @@ mise tasks added: `web-install`, `web-typecheck`, `web-test`, `web-build`, `web-
 
 ---
 
+## Service split (designed)
+
+Full split requires both `TELESCREEN_INVENTORY_SERVICE_URL` and
+`TELESCREEN_NOTIFICATION_SERVICE_URL`. Setting only one is a configuration error.
+
+New commands:
+
+- `telescreen-notification serve|migrate [--adopt --writers-stopped]|send-test|audit verify|audit export`
+- `telescreen-inventory audit verify|export`
+- `telescreen projections resync`
+- `telescreen notification-store copy|verify [--direction merge] --writers-stopped`
+
+New settings:
+
+- `TELESCREEN_NOTIFICATION_SERVICE_URL`
+- `TELESCREEN_NOTIFICATION_SERVICE_TOKEN`
+- `TELESCREEN_NOTIFICATION_INVENTORY_TOKEN`
+- `TELESCREEN_NOTIFICATION_DATABASE_URL`
+- `TELESCREEN_NOTIFICATION_REPLICA_GRACE_SECONDS` (default 600)
+
+`TELESCREEN_BUREAU_SERVICE_URL` is removed. See the [service split](design-service-split.md)
+sections 13-14 for the cutover order and per-process settings.
+
 ## Independent inventory service
 
 Use `telescreen migrate --store main` for the bureau database and

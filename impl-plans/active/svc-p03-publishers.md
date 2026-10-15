@@ -1,0 +1,257 @@
+# SVC-P03 Telescreen Publishers: Change Markers, Relay, Resync, Notification Outbox Adapters and Clients
+
+**Status**: Not Started
+**Design Reference**: design-docs/specs/design-service-split.md sections 4.1-4.4, 5, 6, 10, 16
+**Created**: 2026-10-15
+**Last Updated**: 2026-10-15
+
+## Plan Metadata
+
+- planId: `svc-p03-publishers`
+- planPath: `impl-plans/active/svc-p03-publishers.md`
+- wave: 3
+- dependsOn: `svc-p01-foundation`, `svc-p02-db`
+- writePaths:
+  - `impl-plans/active/svc-p03-publishers.md`
+  - `src/telescreen/projections`
+  - `src/telescreen/integrations/notification_outbox.py`
+  - `src/telescreen/integrations/notification_delivery.py`
+  - `src/telescreen/integrations/notification_publish.py`
+  - `src/telescreen/integrations/notification_client.py`
+  - `src/telescreen/collectors/inventory_publish.py`
+  - `src/telescreen/directory/identities.py`
+  - `src/telescreen/directory/repository.py`
+  - `tests/projections`
+  - `tests/notification_outbox`
+  - `tests/directory/test_orm_write_gate.py`
+- sharedPaths: none
+- artifactRoots: none
+
+## Intent and Context
+
+Everything Telescreen needs to *publish* in split mode lives here. Wiring is svc-p06 and is
+not done here. The components are:
+
+1. The flush-marker listener.
+2. The serialized relay that turns markers into revisioned `DirectoryEntity` and
+   `IssueLinkState` commands.
+3. The resync function.
+4. Outbox adapters implementing `NotificationSender`/`MemberNotifier`, with redaction-hit
+   counting.
+5. The delivery handler and recovery provider for `notification_outbox`.
+6. HTTP clients for the 4.4 reads and `/commands`.
+
+Imitate:
+
+- `collectors/inventory_publish.py:InventoryPublisher._emit` (outbox row plus engine task
+  in the caller transaction);
+- `integrations/inventory_outbox.py` and `integrations/inventory_delivery.py`
+  (`InventoryDeliveryHandler`, `InventoryRecoveryProvider`);
+- `inventory_service/clients.py:InventoryClient` (typed `ServiceHttp.post`);
+- `directory/actors.py`, `directory/resolver.py` for reading directory rows.
+
+## Non-goals
+
+- No wiring, CLI registration or settings parsing (svc-p06).
+- No consumer-side code (svc-p04/p05/p07).
+- Do not change single-process behavior: the listener is installed only by an explicit
+  call that svc-p06 makes in split mode.
+
+## Deliverables and File-Level Changes
+
+1. **ORM-only writes.**
+   - `directory/identities.py:196`: replace `delete(MemberIdentityRow)` with
+     `await session.delete(row)`.
+   - `directory/repository.py:72`: replace the Core delete of `TeamMembershipRow` with
+     loading the rows and calling `session.delete` for each. Behavior is unchanged.
+   - `tests/directory/test_orm_write_gate.py`: an AST scan of `src/telescreen` that fails
+     on Core `update(X)`, `delete(X)` or `insert(X)` for X in the watched models (`MemberRow`,
+     `TeamRow`, `TeamMembershipRow`, `MemberIdentityRow`, `ApiTokenRow`, `OwnershipRuleRow`,
+     `CollectorConfigRow`, `IssueRow`).
+2. **`projections/markers.py`.**
+   - `install_projection_markers(sessionmaker: async_sessionmaker[AsyncSession]) -> None`
+     registers a `before_flush` listener on `sessionmaker.class_.sync_session_class`, or on
+     the sync session class used by the factory; verify which mechanism works with the
+     repository's `create_sessionmaker`.
+   - `uninstall_projection_markers(...)` is for tests.
+   - The listener adds `ProjectionChangeRow(id=new_id(), kind, entity_ref, recorded_at)`
+     for every new, deleted or dirty watched instance. For dirty instances it checks
+     whether a projected attribute changed, using `sqlalchemy.inspect(obj).attrs[name].history.has_changes()`.
+   - Projected attributes:
+     - `IssueRow`: `resource_key`, `number`, `status`, `owner_ref`;
+     - `MemberRow`: `handle`, `display_name`, `active`, `role`, `email`, `slack_user_id`;
+     - all columns of the other watched models.
+   - `kind` is `issue_link` for `IssueRow` and `directory` otherwise. `entity_ref` is
+     `"<entity kind>:<id>"`:
+     - a team membership marks `team:<team_id>`;
+     - an ownership rule marks `ownership_rules:rules`;
+     - a collector config marks `collector:<id>`.
+   - Use the clock injected at install time.
+3. **`projections/entities.py`.** Pure async readers from main tables:
+   - `read_directory_entity(session, kind, entity_id, revision) -> DirectoryEntity`
+     returns `present=False` when the row is gone. A member whose `active` is false stays
+     present with `active=False`.
+   - `read_issue_link(session, issue_id) -> IssueLinkState`. `short_id` comes from
+     `issues.keys.short_id(number)`.
+4. **`projections/relay.py`.**
+   - `ProjectionRelayProvider(ScheduleProvider)` enqueues `EngineTaskKind.PROJECTION_RELAY`
+     with idempotency key `projection-relay:<minute>` when markers exist.
+   - `ProjectionRelayHandler(TaskHandler)`. **Ordering rule (design section 5, DR-2)**:
+     one transaction, executed in this exact order:
+     1. `SELECT ... FOR UPDATE` on `counters` row `directory_revision`. On SQLite the
+        transaction begins with a write (for example `UPDATE counters SET value=value WHERE
+        name='directory_revision'`), so it holds the database write lock.
+     2. Select up to 200 markers ordered by `recorded_at, id`, and keep their ids.
+     3. Deduplicate them by (kind, entity_ref).
+     4. Read the current state of each entity.
+     5. Allocate `revision = counter + 1 ...` for each directory entity.
+     6. Write `DirectoryUpdate` (with `for_inventory(entity)`) through
+        `InventoryPublisher.emit_operation(session, "directory", op)`.
+     7. Write `IssueLinkState` through `emit_operation(session, f"issue-link:{issue_id}", op)`.
+     8. Write one `NotificationCommand` per batch, containing `DirectoryOperation`s with
+        full entities, through `NotificationOutboxPublisher`. Split the command into
+        commands of at most 8 operations, and include only member, team, identity and
+        api_token kinds.
+     9. Update the counter.
+     10. `DELETE FROM projection_changes WHERE id IN (<kept ids>)`, by marker id.
+
+     Return `TaskResult.done()` and re-enqueue if more markers remain.
+   - Test seam (F4): the handler has an optional field
+     `after_read: Callable[[AsyncSession], Awaitable[None]] | None = None`, invoked with the
+     run's own session immediately after step 4 (state read) and before step 5. Production
+     wiring never sets it.
+5. **`projections/resync.py`.**
+   `resync(sessions, clock, batch=500) -> int` inserts one marker per directory entity
+   (members, teams, identities, tokens, the rules singleton, collectors) and per issue,
+   committing in batches. It returns the count. svc-p06 registers the CLI.
+6. **`collectors/inventory_publish.py`.** Add a public
+   `emit_operation(session, stream_id, operation) -> None` that delegates to `_emit`.
+   Existing methods are unchanged.
+7. **`integrations/notification_outbox.py`.** `NotificationOutbox` has
+   `append(session, command)`, `pending_ids`, `get_pending` and `acknowledge`. It stores
+   `encode_notification_command` output in `NotificationOutboxRow`. Imitate
+   `inventory/retention_outbox.py:RetentionOutbox`.
+8. **`integrations/notification_publish.py`.** `OutboxNotificationSender` and
+   `OutboxMemberNotifier` implement the ports. Each call does the following:
+   1. **Recipient check.** Use the injected `RecipientResolver`. Raise
+      `recipient_unknown` exactly where `NotificationService._check_recipients` would:
+      when `not record_unreachable` and no category filter applies.
+      `OutboxMemberNotifier` checks that the member id exists through
+      `OwnerDirectory.member_ref`; if it does not, raise `recipient_unknown`.
+   2. **Redaction.** Use the injected `Redactor`. Redact the inline subject and body, and
+      every `str` field of the context (rebuild with `dataclasses.replace`). Record
+      `ProducerRedactionHits(subject, body, context=((field, count), ...))` with only
+      non-zero entries.
+   3. **Publish.** Build `NotificationCommand(event_id=new_id(), occurred_at=clock.now(),
+      operations=(op,))`, append it through `NotificationOutbox`, and enqueue
+      `TaskSpec(NOTIFICATION_COMMAND_DELIVERY, event_id, json_null(), now,
+      f"notification-command:{event_id}")`.
+   4. **Receipt.** Return `NotificationReceipt(notification_ids, DlpVerdict.PASS,
+      queued=True, skipped=(), pending=True)`. The ids are
+      `notification_row_id(operation_seed(event_id, 0), i)` for each recipient index
+      (members: index 0).
+
+   `NotificationOutboxPublisher` (the same module) is used by the relay.
+9. **`integrations/notification_delivery.py`.**
+   - `NotificationCommandDeliveryHandler(TaskHandler, kind=NOTIFICATION_COMMAND_DELIVERY)`
+     posts to `/commands`. On `applied` or `duplicate` it acknowledges. On `deferred` it
+     retries after 30 s. On a transport error it retries with backoff, mirroring
+     `InventoryDeliveryHandler`.
+   - `NotificationRecoveryProvider` re-enqueues pending rows.
+   - `NotificationDeliveryNoop(TaskHandler, kind=NOTIFICATION_DELIVERY)` returns
+     `TaskResult.done()`. It completes legacy delivery tasks in split mode (design 10).
+10. **`integrations/notification_client.py`.** Each class uses
+    `ServiceHttp(prefix=NOTIFICATION_PREFIX)`:
+    - `NotificationCommandClient.receive(command) -> NotificationCommandReceipt`;
+    - `TemplateCatalogClient.lookup(session, name) -> TemplateInfo | None`, implementing the
+      `TemplateCatalog` protocol; the session is ignored;
+    - `RemoteNotificationTester.send_test(channel, member_id) -> TestOutcome`;
+    - `ChannelStatusClient.status() -> ChannelStatus`.
+
+    Transport errors become `TelescreenError(SERVICE_UNAVAILABLE or the existing code used
+    by the inventory proxy)`. Do not invent a new `ErrorCode`.
+
+## Key Pitfalls
+
+- Never read entity state before taking the counter lock. Never delete markers by entity
+  ref (DR-2).
+- The relay is the only writer of the `directory` and `issue-link:*` streams.
+- Never put raw text into a command. Inline text and context strings are always redacted
+  first. Hits are counts only.
+- The listener must not run SQL, and must not use `session.execute` or `merge` in
+  `before_flush`. Adding objects is the only allowed action.
+- Bulk `session.delete` of team memberships must keep the `put team members` semantics
+  (`directory/repository.py`).
+- Do not import `telescreen.notifications.*` or `telescreen.inventory.*` in these modules.
+  The R7 gate checks them in svc-p08.
+
+## Tests (`tests/projections`, `tests/notification_outbox`, `tests/directory`)
+
+Markers and relay:
+
+- Updating a member's `display_name` adds 1 marker. Updating only `last_sign_in_at` adds 0
+  markers. Updating only `IssueRow.last_seen` adds 0. Changing the issue status adds 1.
+- A rolled-back transaction leaves no markers.
+- The relay drains markers and publishes inventory (without email) and notification (with
+  email) payloads with increasing revisions, then deletes the markers.
+- **Relay plus revoke (DR-2), deterministic SQLite schedule (F4).** SQLite allows one
+  writer and `tests/support/db.py` uses one shared in-memory connection, so never await a
+  second writer while run A holds the write lock. Instead:
+  1. With markers installed, create an API token and let the marker commit.
+  2. Run A with `after_read` set. The hook revokes the token through the ORM **in run A's
+     own session**, which adds a new marker after step 2's id snapshot.
+  3. Assert that run A publishes the token as not revoked at revision N, deletes only the
+     pre-snapshot marker (by id), keeps the hook-inserted marker, and commits.
+  4. Run B without a hook publishes revoked at revision N+1 and deletes the remaining marker.
+  5. Apply both commands in both orders (A then B, B then A) to a small in-test
+     only-if-newer state holder: a frozen dataclass plus a `revision` comparison. svc-p07's
+     `DirectoryReplica` is built in parallel in wave 3, so it cannot be used here. The final
+     state is revoked in both orders.
+  6. Assert that no markers remain.
+- The same schedule for an `IssueLinkState` status change: the hook changes the issue
+  status in run A's session. The final applied status equals the latest, and stream
+  sequences are A < B.
+- A PostgreSQL variant marked `integration` runs true two-connection concurrency: run A
+  blocks on the counter row lock while run B holds it, and the revision/state freshness
+  assertions are the same.
+- Never weaken these assertions. If the hook schedule cannot be expressed, write a
+  Reconciliation request instead.
+- `resync` on 3 members and 2 issues gives the expected marker count.
+
+Outbox adapters, delivery and clients:
+
+- An outbox adapter request with context `issue_title` containing a runtime-assembled
+  sample secret (`tests.support.samples`) gives an outbox payload without the raw value,
+  and `redaction.context` contains `("issue_title", 1)`.
+- An unknown ref without `record_unreachable` -> `recipient_unknown` and nothing written.
+- Receipt ids equal `notification_row_id(...)`, and `pending=True`.
+- Delivery handler with an `httpx.MockTransport`:
+  - `applied` -> acknowledged;
+  - `deferred` -> retry;
+  - 500 -> retry;
+  - malformed body -> retry, with no content in the log.
+- `tests/directory/test_orm_write_gate.py` passes after the two conversions.
+
+## Verification
+
+```bash
+uv run --frozen ruff format --check --no-cache src/telescreen/projections src/telescreen/integrations src/telescreen/collectors/inventory_publish.py src/telescreen/directory tests/projections tests/notification_outbox tests/directory
+uv run --frozen ruff check --no-cache <same paths>
+uv run --frozen ty check <same paths>
+uv run --frozen pytest -p no:cacheprovider tests/projections tests/notification_outbox tests/directory tests/collectors tests/inventory 2>&1 | tee /tmp/telescreen-svc-p03-publishers-pytest.log
+uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p03-publishers-typelint.log 2>&1; grep -E '^(src/telescreen/(projections|integrations/notification_|directory)|tests/(projections|notification_outbox|directory))' /tmp/telescreen-svc-p03-publishers-typelint.log
+uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-svc-p03-publishers-pytest-all.log 2>&1; echo "exit=$?"
+```
+
+Evidence: every command exits 0 and the typelint grep is empty. The full suite passes:
+nothing is wired yet.
+
+## Completion Criteria
+
+- [ ] Deliverables 1-10 are present. The DR-2 concurrency tests pass.
+- [ ] `grep -rn "telescreen.notifications\|telescreen.inventory\." src/telescreen/projections src/telescreen/integrations/notification_*.py` prints nothing.
+- [ ] Verification exits 0. The Progress Log has hashes.
+
+## Progress Log
+
+(append sessions per conventions section 8)

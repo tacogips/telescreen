@@ -1,6 +1,8 @@
 # Service split: Telescreen, Inventory and Notification (requirements)
 
-Status: ACCEPTED REQUIREMENTS, 2026-10-15 (owner investigation and decisions)
+Status: ACCEPTED REQUIREMENTS, 2026-10-15 (owner investigation and decisions). The
+design author's evidence corrections C1-C9 are recorded in
+[design-service-split.md](design-service-split.md) section 2.
 
 ## Overview
 

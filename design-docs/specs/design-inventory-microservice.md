@@ -1,6 +1,19 @@
 # Inventory microservice
 
-Status: IMPLEMENTED, 2026-10-15
+Status: IMPLEMENTED, 2026-10-15. Partly superseded by the
+[service split](design-service-split.md) (designed 2026-10-15). In the full split:
+
+- The Bureau callbacks (`/authenticate`, `/issues`, `/actors`, `/assignee`, `/audit`,
+  `/retention`), the `/retention-status` endpoint and `TELESCREEN_BUREAU_SERVICE_URL` are
+  removed.
+- Inventory authenticates against its directory replica, reads the issue-link
+  projection, appends to its own audit chain and sends overdue notifications to the
+  Notification service.
+- A remote Inventory requires a remote Notification service, and
+  `docker-compose.services.yml` replaces `docker-compose.inventory.yml`.
+
+The `/commands` contract, the public proxy, owner migrations and the transfer runbook
+below remain valid.
 
 ## Overview
 

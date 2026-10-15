@@ -306,6 +306,29 @@ Item fingerprints are `HMAC(HMAC(identity key v1, "telescreen:data-item:v1"), re
 - `data_field.created`, `data_field.updated`, `data_field.reordered`;
 - `data_field.archived`, `data_field.unarchived`, `data_field.deleted`.
 
+### Service split additions (revision `0010_service_split`, designed)
+
+See [service split](design-service-split.md) section 12. Four tables move to
+`Store.NOTIFICATION`: `notifications`, `notification_templates`, `notification_settings`
+and `retention_notification_receipts`. Their columns are unchanged. New tables:
+
+| Store | Table | Columns | Notes |
+|-------|-------|---------|-------|
+| main | `notification_outbox` | id, payload_json, recorded_at, delivered_at nullable | Versioned `NotificationCommand`; written in the producer transaction (split mode only) |
+| main | `projection_changes` | id, kind (`directory`, `issue_link`), entity_ref, recorded_at | Flush-time markers drained by the relay |
+| inventory | `inventory_directory_entries` | kind, id (PK), revision, present, lookup_key nullable (indexed with kind), payload_json, applied_at | Replica without delivery addresses |
+| inventory | `inventory_issue_links` | issue_id (PK), resource_key (indexed), short_id, status, owner_ref nullable | Latest pushed state per issue |
+| inventory | `inventory_audit_records`, `inventory_audit_chain_head` | as `audit_records`/`audit_chain_head` | Own append-only chain |
+| inventory | `inventory_notification_outbox` | id, payload_json, recorded_at, delivered_at nullable | Retention commands to Notification |
+| notification | `notification_inbox` | id (event id), payload_sha256, applied_at | Idempotent command receipts |
+| notification | `notification_directory_entries` | as the inventory replica | Includes delivery addresses |
+| notification | `notification_delivery_state` | notification_id (PK), attempt, max_attempts, available_at, leased_until nullable | Split-mode delivery queue |
+| notification | `notification_audit_records`, `notification_audit_chain_head` | as `audit_records`/`audit_chain_head` | Own append-only chain |
+
+`counters` gains the `directory_revision` seed. The owner histories add `main_0002`,
+`inventory_0002` and the baseline `notification_0001`. Existing revisions and baselines
+are unchanged.
+
 ### Schema source of truth (Nodetto)
 
 Since v1.3 the DDL is designed in the Nodetto desktop app. The ERD document

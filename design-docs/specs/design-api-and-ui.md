@@ -184,6 +184,23 @@ UI: a "Data" area (`/data`, `/data/new`, `/data/:id`), Settings > Field schema
 (`/settings/data-fields`), the issue detail asset link, the dashboard overdue tile and the
 collector inventory mode (`design-v1-4-data-inventory.md` section 10).
 
+### Service split (designed)
+
+See [service split](design-service-split.md). Public paths, payloads and permissions are
+unchanged in both topologies. In the full split, Telescreen proxies:
+
+- `/api/data/*` to Inventory;
+- `/api/auth/me/notification-settings` and `/api/notification-templates[/...]` to
+  Notification.
+
+Each service authenticates the forwarded bearer against its own directory replica.
+`/api/integrations` takes the email/Slack `configured` flags and test sends from
+Notification. In split mode the UI audit page shows Telescreen actions only. Inventory and
+Notification audit chains are verified and exported through their CLIs. Internal
+versioned contracts are `/internal/inventory/v1/commands` and
+`/internal/notification/v1/{commands,test,templates/lookup,channels,health}`. `src/web`
+does not change.
+
 ### Evidence
 
 - Upload is a raw request body (`application/octet-stream`), read in memory up to

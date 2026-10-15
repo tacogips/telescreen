@@ -40,6 +40,22 @@ Large features are split into multiple related plans with cross-references.
 All plans share `impl-plans/conventions.md` (ownership, typing, verification and
 progress-log rules).
 
+### Service split (svc, created 2026-10-15)
+
+These plans come from `design-docs/specs/design-service-split.md` (R1-R8, D1-D5) on
+`feat/service-split`. Plans in the same wave have disjoint write paths.
+
+| Wave | Plans |
+| --- | --- |
+| 1 | [svc-p01-foundation](active/svc-p01-foundation.md) |
+| 2 | [svc-p02-db](active/svc-p02-db.md) |
+| 3 | [svc-p03-publishers](active/svc-p03-publishers.md), [svc-p07-service-runtime](active/svc-p07-service-runtime.md) |
+| 4 | [svc-p04-inventory](active/svc-p04-inventory.md), [svc-p05-notification-service](active/svc-p05-notification-service.md), [svc-p06-composition](active/svc-p06-composition.md) |
+| 5 | [svc-p08-verification-deploy](active/svc-p08-verification-deploy.md) |
+
+Serial finalization after the fanout archives these plans and the completed
+`inventory-alert-boundaries.md` to `completed/`, and updates this index.
+
 The [inventory and alert boundary plan](active/inventory-alert-boundaries.md) is complete:
 independent persistence, durable handoffs, inventory master authority, owner migrations
 and verified cutover/rollback. Its [completion audit](../design-docs/specs/design-inventory-boundary-verification.md)

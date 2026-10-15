@@ -489,6 +489,8 @@ gitleaks pre-commit hook does not flag committed sources.
 | `design-docs/specs/design-v1-3-sentry-parity.md` | v1.3: stream tabs, query language, saved views, bulk and merge, archive and escalating, issue detail, alert rules, notification settings and weekly report, dashboard, organization pages, UX polish, leak matrix, v1.3 plan shape |
 | `design-docs/specs/design-v1-4-data-inventory-requirements.md` | v1.4 accepted requirements R1-R9, safety constraints, out of scope, acceptance, and the design author's evidence re-check (section 7) |
 | `design-docs/specs/design-v1-4-data-inventory.md` | v1.4: data asset register, inventory modes, lifecycle events, item and value diffs, ingest and police 1.2 changes, field schema and values, retention, API, UI, leak matrix, v1.4 plan shape |
+| `design-docs/specs/design-service-split-requirements.md` | Accepted requirements R1-R8 and owner decisions D1-D5 for three deployable services |
+| `design-docs/specs/design-service-split.md` | Telescreen/Inventory/Notification split: topology, directory/issue-link/notification contracts, staleness, auth, per-service audit, three stores, cutover, gates |
 | `design-docs/specs/design-api-and-ui.md` | REST API, auth, Assistant MCP/chat, evidence API, UI |
 | `design-docs/specs/command.md` | CLI, environment variables, exit codes, dependencies |
 | `design-docs/specs/notes.md` | Engine rationale vs Airflow/n8n/Kestra, riela mapping, tooling notes |
@@ -501,3 +503,18 @@ The [inventory microservice](design-inventory-microservice.md) extends the exist
 ownership boundary with an independent API/worker process, authenticated HTTP adapters
 and public data API forwarding. The bureau owns collection, identity, audit and
 notification delivery; remote composition has no inventory database connection.
+
+## Independently deployed services
+
+The [service split](design-service-split.md) replaces the inventory-only remote mode with
+two topologies: single process (default, unchanged) and full split (Telescreen,
+Inventory, Notification, three stores: `Store.MAIN`, `Store.INVENTORY`,
+`Store.NOTIFICATION`). Allowed runtime calls are Telescreen -> Inventory,
+Telescreen -> Notification and Inventory -> Notification. Inventory and Notification never
+call Telescreen.
+
+Telescreen stays the identity owner. It pushes a revisioned directory projection and
+per-issue link state through durable outboxes. Each service verifies OIDC and API tokens
+against its replica, and owns its own audit chain. Notification producers keep the
+`NotificationSender`/`MemberNotifier` ports; in split mode those ports are bound to
+outbox adapters whose receipts are `pending` (section 10 of the split design).
