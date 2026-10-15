@@ -110,3 +110,9 @@ class InventoryPublisher:
                 f"inventory-command:{command.event_id}",
             ),
         )
+
+    async def emit_operation(
+        self, session: AsyncSession, stream_id: str, operation: InventoryOperation
+    ) -> None:
+        """Publish an already typed operation on a producer-owned stream."""
+        await self._emit(session, stream_id, operation)

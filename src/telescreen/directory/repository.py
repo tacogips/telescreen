@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 from sqlalchemy.engine import Row, ScalarResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -69,7 +69,15 @@ class DirectoryRepository:
         self, session: AsyncSession, team_id: str, member_ids: Sequence[str]
     ) -> None:
         """Replace the complete team membership set."""
-        await session.execute(delete(TeamMembershipRow).where(TeamMembershipRow.team_id == team_id))
+        memberships: list[TeamMembershipRow] = list(
+            (
+                await session.scalars(
+                    select(TeamMembershipRow).where(TeamMembershipRow.team_id == team_id)
+                )
+            ).all()
+        )
+        for membership in memberships:
+            await session.delete(membership)
         session.add_all(
             TeamMembershipRow(
                 team_id=team_id, member_id=member_id, origin=MembershipOrigin.MANUAL.value

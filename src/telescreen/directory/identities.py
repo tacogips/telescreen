@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.core.clock import Clock
@@ -193,7 +193,7 @@ class IdentityService:
             raise TelescreenError(ErrorCode.NOT_FOUND, "member identity not found")
         if row.origin != IdentityOrigin.MANUAL.value:
             raise TelescreenError(ErrorCode.CONFLICT, "derived identities cannot be removed")
-        await session.execute(delete(MemberIdentityRow).where(MemberIdentityRow.id == row.id))
+        await session.delete(row)
         await self.audit.append(
             session,
             AuditEntry(

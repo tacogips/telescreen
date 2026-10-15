@@ -1,6 +1,6 @@
 # SVC-P02 Database: Nodetto, Exports, Models, Three-Store Ownership, Revisions and Owner Histories
 
-**Status**: Code complete at `c3ed4bc`; run 4 re-runs the final gates, records hashes and marks Completed
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-service-split.md section 12; design-docs/specs/design-data-model.md "Service split additions"; db/schema/README.md; AGENTS.md "Database Schema (DDL)"
 **Created**: 2026-10-15
 **Last Updated**: 2026-10-15
@@ -368,12 +368,12 @@ ends with `passed` and no `failed`/`error` count.
       prints nothing. Transfer v2 tests and the cutover e2e pass.
 - [x] `grep -n "test_remote_default_migration_creates_main_tables_only\|bureau_service_url" tests/inventory_service/test_config.py`
       prints nothing.
-- [ ] O1 (deliverable 10): the O1 regression tests and the three e2e tests pass;
+- [x] O1 (deliverable 10): the O1 regression tests and the three e2e tests pass;
       `git diff --quiet c3ed4bc -- src/telescreen/cli.py tests/e2e` and the
       `notification_0001.*.sql` snapshots and `notification_baseline_schema.json` exits 0.
-- [ ] All verification commands exit 0, including the full suite. The Progress Log has
+- [x] All verification commands exit 0, including the full suite. The Progress Log has
       hashes under `tmp/telescreen-svc-20261015-g4/svc-p02-db/`.
-- [ ] Status is `Completed`; this file stays under 400 lines.
+- [x] Status is `Completed`; this file stays under 400 lines.
 
 ## Progress Log
 
@@ -386,3 +386,13 @@ ruff format/check, typelint (731 files), ty, `mise run ddl-check` and the full o
 suite (1,319 passed, 36 skipped) all exit 0. Run 4 appends one session entry here
 (conventions 8, at most 10 lines) with the final gate results, log paths and the hash
 file path.
+
+### Session: 2026-10-15 10:17
+**Tasks Completed**: Re-ran all final gates on the c3ed4bc source; O1 and DDL criteria pass.
+**Tasks In Progress**: None.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: impl-plans/active/svc-p02-db.md before=1a60af92b0e80e4235cdb5ed7bf9ef1d78d5193ea26d19e9a576782903cea810; final hashes are in tmp/telescreen-svc-20261015-g4/svc-p02-db/owned-file-sha256.txt.
+**Verification**: ddl-check, scoped format/ruff/ty, and typelint exit 0 (logs: /tmp/telescreen-svc-p02-db-{ddlcheck,format,ruff,ty,typelint}.log).
+**Verification**: scoped pytest 195 passed/24 skipped; O1 pytest 43 passed/2 skipped; full pytest 1,319 passed/36 skipped; all exit 0 (logs: /tmp/telescreen-svc-p02-db-{pytest,o1,pytest-all}.log).
+**Notes**: O1 diff and ownership guards exit 0; plan has fewer than 400 lines; source and tests unchanged.

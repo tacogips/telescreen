@@ -1,9 +1,9 @@
 # SVC-P03 Telescreen Publishers: Change Markers, Relay, Resync, Notification Outbox Adapters and Clients
 
-**Status**: Not Started
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-service-split.md sections 4.1-4.4, 5, 6, 10, 16
 **Created**: 2026-10-15
-**Last Updated**: 2026-10-15
+**Last Updated**: 2026-10-16
 
 ## Plan Metadata
 
@@ -243,23 +243,60 @@ Outbox adapters, delivery and clients:
 ## Verification
 
 ```bash
-uv run --frozen ruff format --check --no-cache src/telescreen/projections src/telescreen/integrations src/telescreen/collectors/inventory_publish.py src/telescreen/directory tests/projections tests/notification_outbox tests/directory
-uv run --frozen ruff check --no-cache <same paths>
-uv run --frozen ty check <same paths>
-uv run --frozen pytest -p no:cacheprovider tests/projections tests/notification_outbox tests/directory tests/collectors tests/inventory 2>&1 | tee /tmp/telescreen-svc-p03-publishers-pytest.log
-uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p03-publishers-typelint.log 2>&1; grep -E '^(src/telescreen/(projections|integrations/notification_|directory)|tests/(projections|notification_outbox|directory))' /tmp/telescreen-svc-p03-publishers-typelint.log
-uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-svc-p03-publishers-pytest-all.log 2>&1; echo "exit=$?"
+set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/projections src/telescreen/integrations src/telescreen/collectors/inventory_publish.py src/telescreen/directory tests/projections tests/notification_outbox tests/directory > /tmp/telescreen-svc-p03-format-final-r2.log 2>&1
+set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/projections src/telescreen/integrations src/telescreen/collectors/inventory_publish.py src/telescreen/directory tests/projections tests/notification_outbox tests/directory > /tmp/telescreen-svc-p03-ruff-final-r2.log 2>&1
+set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/projections src/telescreen/integrations src/telescreen/collectors/inventory_publish.py src/telescreen/directory tests/projections tests/notification_outbox tests/directory > /tmp/telescreen-svc-p03-ty-final-r2.log 2>&1
+set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/projections tests/notification_outbox tests/directory tests/collectors tests/inventory 2>&1 | tee /tmp/telescreen-svc-p03-pytest-scoped-final.log
+export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p03-typelint-clean-check.log 2>&1
+! grep -rn 'telescreen.notifications\|telescreen.inventory\.' src/telescreen/projections src/telescreen/integrations/notification_outbox.py src/telescreen/integrations/notification_delivery.py src/telescreen/integrations/notification_publish.py src/telescreen/integrations/notification_client.py > /tmp/telescreen-svc-p03-import-gate-final.log 2>&1
+set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-svc-p03-publishers-pytest-all-final.log 2>&1
 ```
 
-Evidence: every command exits 0 and the typelint grep is empty. The full suite passes:
-nothing is wired yet.
+Evidence: all commands above exit 0. Scoped tests pass 218 tests; the full suite passes
+1,333 tests. Wiring remains assigned to downstream plans.
 
 ## Completion Criteria
 
-- [ ] Deliverables 1-10 are present. The DR-2 concurrency tests pass.
-- [ ] `grep -rn "telescreen.notifications\|telescreen.inventory\." src/telescreen/projections src/telescreen/integrations/notification_*.py` prints nothing.
-- [ ] Verification exits 0. The Progress Log has hashes.
+- [x] Deliverables 1-10 are present. The DR-2 concurrency tests pass.
+- [x] `grep -rn "telescreen.notifications\|telescreen.inventory\." src/telescreen/projections src/telescreen/integrations/notification_*.py` prints nothing.
+- [x] Verification exits 0. The Progress Log has hashes.
 
 ## Progress Log
 
 (append sessions per conventions section 8)
+
+### Session 1 — 2026-10-16
+
+- Implemented deliverables 1-10 in this plan's writePaths, including ORM-only directory
+  writes, scoped flush markers, entity readers, lock-before-read relay, resync, notification
+  outbox adapters, redaction-hit counting, delivery recovery/no-op, and HTTP clients.
+- Added deterministic SQLite relay/revoke and issue-status schedules, an integration-marked
+  PostgreSQL concurrency variant, notification redaction/delivery tests, and the ORM write AST
+  gate. The sample secret is absent from outbox payloads; the dependency grep is empty.
+- Final scoped suite: 218 passed, 10 skipped. Final full suite: 1,333 passed, 37 skipped.
+  The initial full-suite attempt exposed missing local annotations in the new tests; these
+  were added, and the final full-suite rerun passed. Final format, Ruff, ty and typelint gates
+  pass. See the complete command logs in Verification above.
+- Source/test SHA-256 values (before -> after):
+  - `src/telescreen/collectors/inventory_publish.py`: `b83c05d99008b90df7ddc34472a68121c5bc354a87d416a576df95a56628ed1e` -> `25245c9ecd7a7c23a44f513d2f6f536a81aff16d3c7c053d35a1b4292cfbca69`
+  - `src/telescreen/directory/identities.py`: `6f2d71c4ebc72710f39ea62b73084c4624ead37c5366ab6a26ab386d1d284cab` -> `79275b0dd3c13c596e5e24c7dcc6a34eb8a24370a3deb8fadce53ff7149e9146`
+  - `src/telescreen/directory/repository.py`: `014aaf12873d4bb34517d6b599f06c83cd6a3fc70e47eae9139031362a0413ba` -> `c9870f4110de5dd21435acd179de1037c00a0b8610ae5390dafaf3427ad6dbf4`
+  - `src/telescreen/integrations/notification_client.py`: absent -> `f4f58961e76ed703d54ed188ba502964280036cc2608a662f56e455c5a44e44f`
+  - `src/telescreen/integrations/notification_delivery.py`: absent -> `a3bc8b686a8c781c746dbbd85868d0adf3b30d951128aa93ad7b22c439281f02`
+  - `src/telescreen/integrations/notification_outbox.py`: absent -> `36ab72c8540e8a48fa1928f14f531bdf69c9fb38954727146b82647906a6d44f`
+  - `src/telescreen/integrations/notification_publish.py`: absent -> `57ea2d8bfe78d5511f2c6b05ce628d5f3ec8d6bb7a8c591ab56ef1d44f6d3cb9`
+  - `src/telescreen/projections/entities.py`: absent -> `24e2ea060cdd75b0c7fdf8465ed737a88df308602602b2a2192276d912a2dc9a`
+  - `src/telescreen/projections/markers.py`: absent -> `a0bc9accd6e65bdd098a2fdea2ea6c8bce5113c91834eb7bb9da0f296cf88554`
+  - `src/telescreen/projections/relay.py`: absent -> `b50eef403438f806f869c7c8d0744d0fec1eb986239cd3dc04e7d97e97b673c0`
+  - `src/telescreen/projections/resync.py`: absent -> `d58a0ab6bce5089bc84ffb95e876f082a48cf0f200d3c8bbf67678d2ea4572ab`
+  - `tests/directory/test_orm_write_gate.py`: absent -> `fefe440ac786e0a5fa9b2b4431931e0e0a3b1d85e869520e7f1db8a2bba8447f`
+  - `tests/notification_outbox/test_delivery.py`: absent -> `1669526d57bb3ecf9872921b6c7417b3815997b1b7a02a1a977ae61b245e413b`
+  - `tests/notification_outbox/test_publish.py`: absent -> `cce8fc126acd4a5c4f71a3ea96c42de68a120cf4104f5353654d6e7e569cf537`
+  - `tests/projections/test_markers.py`: absent -> `f78fea6e5757a95e7970d018f62c0457c6eff06302d41f63bb679a71ca0872d4`
+  - `tests/projections/test_relay.py`: absent -> `d5618f155f0d142464c524c3d9fd95d275cd62a1ccd28f2492df07811c6cac1f`
+  - `tests/projections/test_relay_postgres.py`: absent -> `d747631d96988ae12f3caae0a5eb81b0ae416c96c6ea265f75ead86c3f597664`
+- The plan SHA-256 before this progress update was
+  `bbc3c1f88549ef128136743c51dcd1b3d544ddf2ab427dba327442ea7f4eae4a`; final plan hash is
+  recorded in `tmp/telescreen-svc-20261015-g4/svc-p03-publishers/file-hashes-final.txt`.
+- No p03 review findings or repair requests were supplied at implementation entry. Formal
+  integrity/adversarial and serial integration reviews, commit, and push remain downstream.

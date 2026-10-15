@@ -5,9 +5,15 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from telescreen.audit.chain import GENESIS_HASH, compute_hash
+from telescreen.audit.chain import (
+    GENESIS_HASH,
+    MAIN_AUDIT_MODELS,
+    AuditChainModels,
+    AuditHeadValue,
+    AuditRecordValue,
+    compute_hash,
+)
 from telescreen.core.clock import ensure_utc
-from telescreen.db.models import AuditChainHeadRow, AuditRecordRow
 
 
 @dataclass(frozen=True)
@@ -19,18 +25,20 @@ class ChainVerification:
     checked: int
 
 
-async def verify_chain(session: AsyncSession) -> ChainVerification:
+async def verify_chain(
+    session: AsyncSession, models: AuditChainModels = MAIN_AUDIT_MODELS
+) -> ChainVerification:
     """Recompute the audit chain in bounded pages and verify its head pointer."""
     previous_hash: str = GENESIS_HASH
     expected_seq: int = 1
     checked: int = 0
     while True:
-        rows: list[AuditRecordRow] = list(
+        rows: list[AuditRecordValue] = list(
             (
                 await session.scalars(
-                    select(AuditRecordRow)
-                    .where(AuditRecordRow.seq >= expected_seq)
-                    .order_by(AuditRecordRow.seq)
+                    select(models.record)
+                    .where(models.record.seq >= expected_seq)
+                    .order_by(models.record.seq)
                     .limit(1000)
                 )
             ).all()
@@ -60,8 +68,8 @@ async def verify_chain(session: AsyncSession) -> ChainVerification:
             expected_seq += 1
         if len(rows) < 1000:
             break
-    head: AuditChainHeadRow | None = await session.scalar(
-        select(AuditChainHeadRow).where(AuditChainHeadRow.id == 1)
+    head: AuditHeadValue | None = await session.scalar(
+        select(models.head).where(models.head.id == 1)
     )
     if head is None:
         return ChainVerification(checked == 0, None if checked == 0 else 1, checked)
