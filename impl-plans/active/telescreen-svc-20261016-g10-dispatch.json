@@ -1,0 +1,184 @@
+{
+  "taskId": "telescreen-svc-20261016-g10",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "feat/service-split",
+  "baseBranch": "feat/service-split",
+  "remote": "origin",
+  "originalHead": "31909033fef076e826061ec91a1e23a9abf11bdb",
+  "originalHeadNotes": "Continuation run 10 (final; session 27; workflowExecutionId opus-luna-design-and-implement-review-loop-session-27; intake comm-001115), base 3190903 on feat/service-split. svc-p01 to svc-p07 are integration-accepted. svc-p08 has the shared harness, seed helpers, the stopped-Telescreen flow and the replay flow (both pass), plus cutover and leak-matrix tests that fail on two test-design errors (owner resolution 3). Only the 'Run 10 Scope' section of its plan (R10.1-R10.4) remains. Owner gates on 3190903: mise run ci 1397 passed / 35 skipped, ddl-check, web-ci and uv build all green. The planning commit on top of 3190903 contains: this manifest; design-service-split.md (status line and section 17: flow (c) queued/member:alice seed and receipt-id alignment, leak non-vacuity rule, g10 pointer), accepted by design review comm-001117; the svc-p08 plan rewrite (Run 10 Scope); the run 8-9 archive impl-plans/logs/svc-p08-verification-deploy-2026-10-16-run9.md; and the impl-plans/README.md index update. Fanout runs against that planning commit.",
+  "evidenceRoot": "tmp/telescreen-svc-20261016-g10",
+  "evidenceRootNotes": "Untracked (gitignored by **/tmp); never staged or committed. Use tmp/telescreen-svc-20261016-g10/<planId>/attempt-<n>/. Command logs go to /tmp/telescreen-svc-p08-verification-deploy-g10-*.log (conventions section 7).",
+  "supersedes": "telescreen-svc-20261016-g9",
+  "acceptedDependencies": [
+    {"planId": "svc-p01-foundation", "commit": "3190903", "acceptedAtCommit": "19074e9", "planPath": "impl-plans/active/svc-p01-foundation.md", "notes": "Integration-accepted (session 18); not redispatched."},
+    {"planId": "svc-p02-db", "commit": "3190903", "acceptedAtCommit": "8b09786", "planPath": "impl-plans/active/svc-p02-db.md", "notes": "Integration-accepted (session 21); not redispatched. Its paths (Nodetto, exports, models, migrations, owner histories, ownership, transfer v2, tests/db/**, tests/support/**) belong to no g10 plan. The Nodetto layout fix is done in serial finalization. The plan file is at 398 lines; do not edit it except the Status line in finalization."},
+    {"planId": "svc-p03-publishers", "commit": "3190903", "acceptedAtCommit": "a5392d9", "planPath": "impl-plans/active/svc-p03-publishers.md", "notes": "Integration-accepted (session 23); not redispatched."},
+    {"planId": "svc-p04-inventory", "commit": "3190903", "acceptedAtCommit": "aaa2c4c", "planPath": "impl-plans/active/svc-p04-inventory.md", "notes": "Integration-accepted (session 24); not redispatched."},
+    {"planId": "svc-p05-notification-service", "commit": "3190903", "acceptedAtCommit": "aaa2c4c", "planPath": "impl-plans/active/svc-p05-notification-service.md", "notes": "Integration-accepted (session 24); not redispatched. DeliveryPump and NotificationDeliveryHandler fail a member row terminally with recipient_unknown when the replica lacks the member; svc-p08 R10.1 step 4 handles this by test and runbook ordering, not by a production change."},
+    {"planId": "svc-p06-composition", "commit": "3190903", "acceptedAtCommit": "aaa2c4c", "planPath": "impl-plans/active/svc-p06-composition.md", "notes": "Integration-accepted (session 24); not redispatched."},
+    {"planId": "svc-p07-service-runtime", "commit": "3190903", "acceptedAtCommit": "a5392d9", "planPath": "impl-plans/active/svc-p07-service-runtime.md", "notes": "Integration-accepted (session 23); not redispatched."}
+  ],
+  "designDocPaths": [
+    "design-docs/specs/design-service-split.md",
+    "design-docs/specs/design-service-split-requirements.md",
+    "design-docs/specs/design-service-split-verification.md",
+    "design-docs/specs/architecture.md",
+    "design-docs/specs/command.md",
+    "design-docs/specs/design-api-and-ui.md",
+    "design-docs/specs/design-data-model.md",
+    "design-docs/specs/design-inventory-microservice.md",
+    "design-docs/user-qa/pending-service-split-tradeoffs.md"
+  ],
+  "planIndexPath": "impl-plans/README.md",
+  "conventionsPath": "impl-plans/conventions.md",
+  "waves": [
+    {"id": "E", "plans": ["svc-p08-verification-deploy"], "notes": "Every dependency is accepted. svc-p08 follows its 'Run 10 Scope' section (R10.1-R10.4), then test-integrity, adversarial and integration review. Single plan, so host memory is not a concern."},
+    {"id": "finalize", "serial": true, "dependsOn": ["E"]}
+  ],
+  "sharedFileOwnership": {
+    "rule": "Only svc-p08 is dispatched. Its writePaths are disjoint from all accepted plan paths, and sharedPaths is empty. The worker edits only its writePaths and its own Progress Log. It never edits: this manifest, the g1-g9 manifests, impl-plans/README.md, impl-plans/logs/**, README.md, src/**, db/**, impl-plans/active/inventory-alert-boundaries.md, or another plan's files. It never runs git checkout, restore, stash, reset, clean, commit, add or push. Per-edit discipline: read the file fresh before each edit; record pre/post SHA-256 hashes and an immutable intent snapshot under the evidence root; check for drift. If an owned file's hash changed outside the worker's own edits, write a Reconciliation request and never overwrite it.",
+    "dependencies": "No dependency or lockfile change. Do not run uv lock or edit pyproject.toml, uv.lock, src/web/package.json or src/web/bun.lock.",
+    "reconciliation": "A defect in production code or in an accepted plan's file is a Reconciliation request in the svc-p08 Progress Log, reproduced by a failing test id. Owner diagnosis rule: serial finalization reproduces it and fixes the root cause in the owning plan's paths; workers never make cross-plan edits. Directory-stream GAP/conflict retries are expected behavior, not a defect. The copied-row recipient_unknown race in R10.1 step 4 is resolved inside svc-p08 writePaths (test order plus design section 13/17 and command.md runbook text) and is also recorded in the Progress Log.",
+    "g10Sweep": "Rechecked at 3190903. Run 9 changed only svc-p08 paths (tests/split/support.py, test_replay_process.py, test_cutover_process.py, tests/leak/test_leak_matrix_split.py, design-service-split-verification.md, its plan). Same svc-p08 writePaths as g9."
+  },
+  "serialFinalization": {
+    "when": "After svc-p08-verification-deploy is integration-accepted.",
+    "steps": [
+      "Resolve any Reconciliation requests recorded in the svc plan Progress Logs (reproduce first; fix at the root cause).",
+      "Nodetto layout fix (design-service-split.md section 12). It is still pending at 3190903; the JSONL was last changed in 19074e9. This edit is visual only. In db/schema/telescreen.nodetto.jsonl, change only the x/y of the 12 service-split erd.table elements and the width/height of the frames f-projections, f-inventory-links, f-notification-handoff and f-service-audit. Each table must lie inside the frame of its model module: projections.py -> f-projections; inventory_links.py -> f-inventory-links; notification_handoff.py -> f-notification-handoff; service_audit.py -> f-service-audit. Then run mise run ddl-arrange and mise run ddl-export. git diff --exit-code db/schema/telescreen.postgresql.sql db/schema/telescreen.sqlite.sql must exit 0. Add one test to tests/db/test_nodetto_schema.py. For each of the 12 tables, it asserts that the table's x and y lie inside the expected frame and that x + width <= frame x + frame width. Keep the module-to-frame map as a tuple of pairs, because typelint forbids dict types. uv run --frozen pytest -p no:cacheprovider tests/db/test_nodetto_schema.py and mise run ddl-check must both exit 0. Leave the 11 older frameless inventory handoff tables unchanged.",
+      "Set every svc plan Status to Completed with 0 open Completion Criteria boxes. git mv the eight svc plans to impl-plans/completed/. git mv the g1 to g10 manifests to impl-plans/completed/dispatch/. impl-plans/active/inventory-alert-boundaries.md stays in active/ (out of scope). The impl-plans/logs/*.md files stay where they are; update their svc plan links to ../completed/<plan>.md, and update the svc-p08 plan's log links accordingly. Then grep -rn 'active/svc-p0\\|active/telescreen-svc-' over impl-plans, design-docs, README.md and tests must return no stale link.",
+      "Update impl-plans/README.md: the service split section says complete, links to ./completed/ and names g10 as the final manifest. No active svc entry remains.",
+      "Update README.md 'Split deployment' only where it is stale: the compose file is examples/compose/docker-compose.services.yml, and the notification-store copy and verify cutover is linked to design-service-split.md section 13.",
+      "Status lines: design-service-split.md -> 'Status: IMPLEMENTED, <date>'. design-api-and-ui.md 'Service split (designed)' and design-data-model.md 'Service split additions (... designed)' -> implemented. architecture.md service split paragraph and design-service-split-requirements.md status -> implemented. Add a status note to design-inventory-microservice.md only if it still names docker-compose.inventory.yml as current. design-docs/user-qa/pending-service-split-tradeoffs.md stays pending.",
+      "Rerun on the final tree: mise run ci; mise run ddl-check; mise run web-ci; uv build --out-dir /tmp/telescreen-svc-final-dist; and uv run --frozen pytest -p no:cacheprovider -q tests/inventory_service tests/notification_service tests/split tests/leak. Record exit codes, passed/skipped counts and full log paths. Passed must be at least 1397.",
+      "Only if every gate exits 0: commit on feat/service-split (no secrets, no tmp/ or dist/ files, no unrelated files) and git push origin feat/service-split (never main)."
+    ]
+  },
+  "reviewContext": {
+    "issueReference": "No GitHub issue. workflowInput 'Split Telescreen, Inventory and Notification into independently deployable services', continuation run 10 (workflowExecutionId opus-luna-design-and-implement-review-loop-session-27, base 3190903, intake comm-001115). Requirements: design-docs/specs/design-service-split-requirements.md (R1-R8, D1-D5). Accepted design: design-docs/specs/design-service-split.md (C1-C9, O1; run 10 section 17 edits), accepted by design review comm-001117 with no findings.",
+    "userProblem": "The owner wants Telescreen, Inventory and Notification each deployable as a microservice, with Inventory and Notification never calling Telescreen. The implementation is done; only the cutover delivery/dedup proof, the leak-matrix non-vacuity fix and the final gates remain.",
+    "requiredOutcomes": [
+      "R1R8 (a) replay and (b) stopped-Telescreen: already passing; must stay green in the 3x repeat gate.",
+      "R1R8 (c): after notification-store copy and verify, the copied queued member:alice notification is delivered exactly once, and the inventory retention command whose event id equals a copied receipt id returns DUPLICATE with no second notification.",
+      "The leak matrix enumerates db/ownership.py tables_for for all three stores and scans every row, the process logs, the API bodies, the SMTP DATA and both audit exports, with no raw or JSON-escaped sample. Non-vacuity: ingest 200, a findings row with a masked snippet, scan_jobs.findings_count > 0.",
+      "mise run ci, ddl-check, web-ci and uv build pass, and the plans and manifests are archived."
+    ],
+    "nonGoals": [
+      "No production code, DDL or migration change in svc-p08.",
+      "No positive ProducerRedactionHits or dlp_hit_count requirement.",
+      "No new multi-process cases for OIDC parity, DLP parity, the settings proxy or collection.",
+      "No live PostgreSQL, Mailpit or Keycloak checks (owner-run).",
+      "No re-implementation or redispatch of svc-p01 to svc-p07.",
+      "No archiving of impl-plans/active/inventory-alert-boundaries.md."
+    ],
+    "constraints": [
+      "English only, no emojis. Plans under 400 lines. Python files under 1000 lines.",
+      "Strict typing (typelint, ruff ANN/PGH, ty). No Any, object, dict or **kwargs, and no type-ignore.",
+      "Raw detected values, raw item keys and source content never enter any table, log, outbox, replica, wire message, notification, export or API response.",
+      "Default uv run pytest passes offline. Process tests use ephemeral ports, bounded polling (at most 90 s), append-mode logs, readiness waits after every (re)start, outbox drain before stopping a producer, and termination in finally.",
+      "Conventions 7a: only final passing commands; priorVerification empty; addressedFeedback only fixed findings.",
+      "Commit and push only to feat/service-split."
+    ],
+    "designDecisionsAndRationale": [
+      "D1-D5 and C1-C9/O1 of design-service-split.md stand unchanged. Cross-service delivery is at least once through durable outboxes and idempotent inbox receipts.",
+      "NotificationStatus has no pending value; unsent monolith rows are queued, and senders store handle-based member refs (owner resolution 3).",
+      "Retention dedup works because event_id = retention_event_id(asset, due field, due revision) equals the copied receipt id (sections 8 and 9).",
+      "Producers redact content before building commands, so ProducerRedactionHits of zero is correct; non-vacuity is proven at ingest (owner resolution 3).",
+      "Notification fails a member row with recipient_unknown if its replica lacks the member. If reproduced in R10.1, the cutover seeds the replica by resync before the stopped-writer copy; notification-store copy keeps notification_directory_entries."
+    ],
+    "intentionalTradeoffs": [
+      "Process tests wait up to 90 s per condition (cron minute alignment plus delivery backoff); the 3x repeat gate detects flakiness.",
+      "PostgreSQL restricted-login and live Mailpit/Keycloak checks stay owner-run, because agents have no TELESCREEN_TEST_* variables."
+    ],
+    "supportedEdgeCases": [
+      "Copied queued member row with an empty Notification replica at start (R10.1 step 4).",
+      "Overdue cron fires once per cron minute, so it is enabled only by restarting Inventory after the asset and replica exist.",
+      "Copied retention receipt makes the inventory command a DUPLICATE before an inbox claim (notification_service/inbox.py:62-74).",
+      "A store table missing from its SQLite file fails the leak matrix."
+    ],
+    "outOfScopeEdgeCases": [
+      "Restricted-login PostgreSQL cross-store denial and live Mailpit/Keycloak delivery (owner-run; skipped offline).",
+      "Multi-process OIDC parity, DLP parity, settings proxy and collection flows.",
+      "Directory-stream GAP/conflict retry counts (expected behavior; tests wait for state only).",
+      "The 11 older frameless inventory handoff tables in the Nodetto layout."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-service-split.md",
+      "impl-plans/active/svc-p08-verification-deploy.md",
+      "impl-plans/conventions.md",
+      "tests/split/support.py",
+      "tests/split/test_cutover_process.py",
+      "tests/split/test_cutover.py",
+      "tests/leak/test_leak_matrix_split.py",
+      "tests/leak/flows_split.py",
+      "src/telescreen/db/ownership.py",
+      "src/telescreen/db/notification_transfer.py",
+      "src/telescreen/notification_service/worker.py",
+      "src/telescreen/notification_service/inbox.py",
+      "src/telescreen/notifications/delivery.py",
+      "src/telescreen/replica/directory.py",
+      "src/telescreen/inventory/retention.py",
+      "src/telescreen/ports/retention.py"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "svc-p08-verification-deploy",
+      "planPath": "impl-plans/active/svc-p08-verification-deploy.md",
+      "wave": "E",
+      "dependsOn": [],
+      "writePaths": [
+        "impl-plans/active/svc-p08-verification-deploy.md",
+        "tests/split",
+        "tests/inventory_service/test_process.py",
+        "tests/inventory_service/test_postgres.py",
+        "tests/e2e/test_inventory_runtime_grants.py",
+        "tests/leak",
+        "tests/examples/test_examples.py",
+        "examples/compose/docker-compose.services.yml",
+        "examples/compose/docker-compose.inventory.yml",
+        "examples/compose/.env.example",
+        "examples/compose/README.md",
+        "design-docs/specs/design-service-split.md",
+        "design-docs/specs/design-service-split-verification.md",
+        "design-docs/specs/command.md",
+        "design-docs/specs/design-inventory-microservice.md"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "tests/split/test_cutover_process.py", "intendedEdit": "R10.1: queued status and member:alice seed, copied receipt/queued carrier assertions, exactly-once delivery, unchanged dedup; replica-first order only if the recipient_unknown race is reproduced."},
+        {"path": "tests/leak/test_leak_matrix_split.py", "intendedEdit": "R10.2: drop the ProducerRedactionHits assertion and its helper/imports; add findings masked_snippet and scan_jobs.findings_count > 0 non-vacuity; keep all sink scans and the missing-table test."},
+        {"path": "design-docs/specs/design-service-split.md", "intendedEdit": "Only if R10.1 step 4 applies: section 13 steps 4-6 and section 17 flow (c) replica-first ordering. Finalization sets IMPLEMENTED."},
+        {"path": "design-docs/specs/command.md", "intendedEdit": "Only if R10.1 step 4 applies: the ordered cutover sentence near the split deployment command list."},
+        {"path": "design-docs/specs/design-service-split-verification.md", "intendedEdit": "R10.3: run 10 wording; R3, R5 and R7 rows cite final passing tests and g10 logs; 3x gate result."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "tests/split/test_cutover_process.py seeds status queued with recipient_ref member:alice, asserts the copied receipt and queued row exist in the notification store after copy, delivers the row exactly once (status sent, one SMTP message, still one after 5 s) and proves retention dedup (outbox row delivered, no inbox row, no new data_overdue row).",
+        "tests/leak/test_leak_matrix_split.py no longer references ProducerRedactionHits, MemberSendOperation or decode_notification_command; it asserts a findings row with a non-empty masked_snippet for the ingested issue and scan_jobs.findings_count > 0, and keeps every raw and JSON-escaped sink scan.",
+        "The focused process suite passes 3 consecutive times offline with 0 skipped, and no service process survives (pgrep check).",
+        "The full verification list exits 0 on the final source (mise run ci passed >= 1397). git diff --quiet HEAD -- src db exits 0. Every tests/split and tests/leak file is under 1000 lines and the plan under 400.",
+        "The verification doc is updated and hashes are recorded under tmp/telescreen-svc-20261016-g10/svc-p08-verification-deploy/. Status is Completed and priorVerification is empty."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache tests/split tests/inventory_service tests/e2e tests/leak tests/examples > /tmp/telescreen-svc-p08-verification-deploy-g10-format.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache tests/split tests/inventory_service tests/e2e tests/leak tests/examples > /tmp/telescreen-svc-p08-verification-deploy-g10-ruff.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check tests/split tests/inventory_service tests/e2e tests/leak tests/examples > /tmp/telescreen-svc-p08-verification-deploy-g10-ty.log 2>&1",
+        "export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p08-verification-deploy-g10-typelint.log 2>&1; ! grep -E \"^($(pwd)/)?tests/(split|leak|inventory_service)\" /tmp/telescreen-svc-p08-verification-deploy-g10-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; for i in 1 2 3; do uv run --frozen pytest -p no:cacheprovider -q tests/split/test_replay_process.py tests/split/test_stopped_telescreen_process.py tests/split/test_cutover_process.py tests/leak/test_leak_matrix_split.py tests/inventory_service/test_process.py > /tmp/telescreen-svc-p08-verification-deploy-g10-process-$i.log 2>&1 || exit 1; done",
+        "! pgrep -f 'telescreen.(inventory_service|notification_service) serve'",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/split tests/inventory_service tests/notification_service tests/leak tests/examples tests/e2e 2>&1 | tee /tmp/telescreen-svc-p08-verification-deploy-g10-pytest.log",
+        "mise run ci > /tmp/telescreen-svc-p08-verification-deploy-g10-ci.log 2>&1",
+        "mise run ddl-check > /tmp/telescreen-svc-p08-verification-deploy-g10-ddl.log 2>&1",
+        "mise run web-ci > /tmp/telescreen-svc-p08-verification-deploy-g10-web.log 2>&1",
+        "uv build --out-dir /tmp/telescreen-svc-p08-verification-deploy-g10-dist > /tmp/telescreen-svc-p08-verification-deploy-g10-build.log 2>&1",
+        "git diff --quiet HEAD -- src db",
+        "! grep -n 'ProducerRedactionHits\\|decode_notification_command' tests/leak/test_leak_matrix_split.py",
+        "! grep -n 'status=\"pending\"' tests/split/test_cutover_process.py",
+        "! grep -n 'pytest.mark.skip\\|pytest.skip(\\|skipif' tests/split/test_replay_process.py tests/split/test_stopped_telescreen_process.py tests/split/test_cutover_process.py tests/leak/test_leak_matrix_split.py tests/inventory_service/test_process.py",
+        "for f in tests/split/*.py tests/leak/*.py; do test \"$(wc -l < \"$f\")\" -lt 1000 || exit 1; done",
+        "test \"$(wc -l < impl-plans/active/svc-p08-verification-deploy.md)\" -lt 400"
+      ]
+    }
+  ]
+}

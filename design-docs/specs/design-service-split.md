@@ -1,6 +1,6 @@
 # Service split: Telescreen, Inventory and Notification
 
-Status: Implementation in progress (run 9, final: only svc-p08 replay and cutover flows, the leak matrix and the final gates remain), 2026-10-16
+Status: Implementation in progress (run 10, final: only the svc-p08 cutover flow, the leak matrix non-vacuity fix and the final gates remain), 2026-10-16
 Requirements: [design-service-split-requirements.md](design-service-split-requirements.md)
 (R1-R8, owner decisions D1-D5). Builds on [inventory microservice](design-inventory-microservice.md),
 [inventory/alert boundaries](design-inventory-alert-boundaries.md) and the
@@ -581,8 +581,11 @@ waits until its outboxes are drained (the replica waits do this for Telescreen, 
 worker drives delivery). Concurrent directory-stream deliveries can arrive out of order;
 the inbox answers GAP (recorded as `conflict`) and the task retries about 5 s later. This
 is expected behavior, not a defect (svc-p08 owner resolution 2). Flow (b) passes at
-`f2c6707` (`tests/split/test_stopped_telescreen_process.py`); run 9 adds (a), (c) and the
-leak matrix.
+`f2c6707` (`tests/split/test_stopped_telescreen_process.py`) and flow (a) at `3190903`
+(`tests/split/test_replay_process.py`). Run 10 finishes (c)
+(`tests/split/test_cutover_process.py`) and the leak matrix
+(`tests/leak/test_leak_matrix_split.py`); svc-p08 owner resolution 3 found only
+test-design errors there, so no production change is expected.
 
 - (a) **Producer outage/replay.** Telescreen -> Inventory: stop Inventory, commit an
   issue change that produces an `IssueLinkState`, restart, run the engine, and assert
@@ -599,10 +602,13 @@ leak matrix.
   transport, with no Telescreen process running.
 - (c) **Cutover delivery and dedup.** The entry points are `telescreen notification-store
   copy/verify --writers-stopped` (section 13 step 4) and the Notification inbox check
-  against `retention_notification_receipts`. A copied `pending` notification row is
-  delivered exactly once by the Notification worker after cutover. An Inventory retention
-  command whose `event_id` equals a copied receipt id returns `DUPLICATE` and creates no
-  second notification row.
+  against `retention_notification_receipts`. `NotificationStatus` has no `pending` value:
+  an unsent monolith row is `queued`. The copied unsent row is seeded with
+  `status='queued'` and the handle-based member reference `member:alice` that senders
+  store. It is delivered exactly once by the Notification worker after cutover (one
+  fake-transport delivery, row `sent`). The seeded retention obligation id equals the
+  copied receipt id (section 8: `event_id` = obligation id), so the Inventory retention
+  command returns `DUPLICATE` and creates no second notification row.
 
 **Leak matrix (section 16).** The runtime-assembled raw samples travel through issue
 titles, comments, workflow inline text, asset locators and context fields. The scan then
@@ -612,20 +618,27 @@ outbox and inbox payload column; every HTTP request and response body captured b
 tests; all process logs; and `telescreen-inventory audit export` and
 `telescreen-notification audit export` output. Telescreen has no audit export command, so
 its chain is covered by the main-store table scan and `/api/audit/search`. No raw sample
-may appear anywhere.
+may appear anywhere, either raw or JSON-escaped.
+
+Non-vacuity does not rely on `ProducerRedactionHits`: content is redacted before a
+producer builds its command, so a zero producer count is correct. The test instead
+proves that the sample entered the system and was handled. The ingest/scan request that
+carries the runtime sample returns 200. A finding or issue exists that holds only the
+masked representation. Where a path keeps counts (the collection run `findings_count`
+or the notification `dlp_hit_count`), the count is positive.
 
 Plan shape (`svc-pNN`, disjoint writePaths). The plan files in `impl-plans/active/` and
-the current dispatch manifest (`telescreen-svc-20261016-g9-dispatch.json`, superseding
-g8 with the same svc-p08 writePaths) are authoritative for writePaths. p01-p07
+the current dispatch manifest (`telescreen-svc-20261016-g10-dispatch.json`, superseding
+g9 with the same svc-p08 writePaths) are authoritative for writePaths. p01-p07
 are integration-accepted and are recorded as accepted dependencies at checkpoint
-`f2c6707`; they are not redispatched. The remaining work runs in waves:
+`3190903`; they are not redispatched. The remaining work runs in waves:
 
-1. p08 (the remaining run 8 acceptance flows (a) and (c) and the leak matrix above,
-   then the final gates).
-2. Serial finalization. It archives the svc plans and the g1-g9 manifests to
+1. p08 (the remaining acceptance flow (c) and the leak matrix above, as specified by
+   svc-p08 owner resolution 3, then the 3x process suite and the final gates).
+2. Serial finalization. It archives the svc plans and the g1-g10 manifests to
    `impl-plans/completed/`, and updates `impl-plans/README.md`, `README.md` and the
    status lines of this design and its related specs. It also applies the Nodetto
-   layout fix (section 12), which is not yet applied at `f2c6707` (the Nodetto JSONL
+   layout fix (section 12), which is not yet applied at `3190903` (the Nodetto JSONL
    was last changed in run 1), because the Nodetto document and `tests/db/**` are paths
    of the accepted p02. `impl-plans/active/inventory-alert-boundaries.md` is not a svc
    plan and stays where it is.
