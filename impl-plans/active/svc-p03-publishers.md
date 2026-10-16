@@ -260,6 +260,7 @@ Evidence: all commands above exit 0. Scoped tests pass 218 tests; the full suite
 - [x] Deliverables 1-10 are present. The DR-2 concurrency tests pass.
 - [x] `grep -rn "telescreen.notifications\|telescreen.inventory\." src/telescreen/projections src/telescreen/integrations/notification_*.py` prints nothing.
 - [x] Verification exits 0. The Progress Log has hashes.
+- [x] Run 5 re-verification passed every g5 gate on checkpoint `47e933b4e8a1ad516203f92ae5b3a53c2e548167`; final hashes are in `tmp/telescreen-svc-20261016-g5/svc-p03-publishers/owned-file-sha256.txt`.
 
 ## Run 5 Re-verify Scope (manifest `telescreen-svc-20261016-g5`, wave A)
 
@@ -312,3 +313,11 @@ The code is complete at `8b09786`. The wave-3 review was interrupted, and no fin
   recorded in `tmp/telescreen-svc-20261015-g4/svc-p03-publishers/file-hashes-final.txt`.
 - No p03 review findings or repair requests were supplied at implementation entry. Formal
   integrity/adversarial and serial integration reviews, commit, and push remain downstream.
+
+### Session 2 — 2026-10-16 (g5 re-verification)
+
+- Re-verified checkpoint `47e933b4e8a1ad516203f92ae5b3a53c2e548167`; no source or test files changed. Review feedback and findings were empty; priorVerification remains empty.
+- Scoped pytest passed 218 tests (10 integration skips); full pytest passed 1,333 tests (37 skips). Logs: `/tmp/telescreen-svc-p03-publishers-g5-pytest.log` and `/tmp/telescreen-svc-p03-publishers-g5-pytest-all.log`.
+- Format, Ruff, ty, typelint path filter, import gate, diffstat and plan line-count gates exited 0; logs: `/tmp/telescreen-svc-p03-publishers-g5-{format,ruff,ty,typelint,import-gate,diffstat}.log`.
+- Owned-file SHA-256 values for all files changed since `c3ed4bc` are recorded in `tmp/telescreen-svc-20261016-g5/svc-p03-publishers/owned-file-sha256.txt`; plan remains under 400 lines.
+- Formal test-integrity/adversarial and integration review, commit, and push are downstream workflow steps.

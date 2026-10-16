@@ -216,3 +216,11 @@ The code is complete at `8b09786`. The wave-3 review was interrupted, and no fin
 - `! grep -rn 'telescreen.directory\\|telescreen.issues' src/telescreen/replica` -> exit 0, no matches (log: `/tmp/telescreen-svc-p07-service-runtime-import-grep.log`).
 - `uv run --frozen pytest -p no:cacheprovider` -> exit 0, 1333 passed / 37 skipped (log: `/tmp/telescreen-svc-p07-service-runtime-pytest-all-final.log`).
 **Notes**: Earlier shared-tree suite attempts exposed an in-progress sibling projection test marker and seven sibling typelint annotations; those were corrected within sibling-owned paths before the final full-suite run. `tests/audit/test_audit.py` is unchanged.
+
+### Session: 2026-10-16 g5 re-verify
+**Tasks Completed**: Re-verified the unchanged implementation on planning commit `47e933b`; all assigned gates passed. **Tasks In Progress**: None. **Blockers**: None. **Reconciliation requests**: None. **priorVerification**: empty.
+**Hashes**: `tmp/telescreen-svc-20261016-g5/svc-p07-service-runtime/owned-file-sha256.txt` (final SHA-256 for every owned path changed since `c3ed4bc`).
+**Verification**:
+- Format, Ruff, `ty`, typelint (752 files), replica import guard, audit test unchanged, diffstat and plan length: exit 0; g5 logs at `/tmp/telescreen-svc-p07-service-runtime-g5-{format,ruff,ty,typelint,import-grep,diffstat}.log` (audit/plan checks emitted exit status).
+- Scoped pytest: exit 0, 152 passed / 10 skipped; `/tmp/telescreen-svc-p07-service-runtime-g5-pytest.log`.
+- Full pytest: exit 0, 1333 passed / 37 skipped; `/tmp/telescreen-svc-p07-service-runtime-g5-pytest-all.log`.
