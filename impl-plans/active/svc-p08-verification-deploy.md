@@ -307,3 +307,77 @@ finding). Run 8 Scope R8.2, R8.4 and R8.5 carried into R9.2-R9.4 with pinned fac
 `inventory_delivery`, `inventory_issue_links` has no sequence column (compare
 `inventory_inbox_streams.last_sequence` with the producer `inventory_outbox.sequence`),
 and issues need a collector plus a detectable ingest sample.
+
+### Run 9 implementation session 1 (2026-10-16)
+
+- Added `seed_member`, `seed_issue`, and public `ServiceStack.main_runtime()` to
+  `tests/split/support.py`. Added Notification and Inventory outage/replay cases in
+  `tests/split/test_replay_process.py`, the process cutover case in
+  `tests/split/test_cutover_process.py`, and replaced the old leak-test wrapper with a
+  three-store `ServiceStack` flow in `tests/leak/test_leak_matrix_split.py`.
+- Updated `design-docs/specs/design-service-split-verification.md` to map R1/R3/R5/R7 to
+  the run 9 tests and evidence. No production, DDL, or migration files changed.
+- `tests/split/test_replay_process.py` passed on the final test source (2 passed, 0
+  skipped) in `/tmp/telescreen-svc-p08-verification-deploy-g9-replay-final-source.log`.
+  It checks the member id in the command, the handle-based `member:alice` notification
+  row, one inbox receipt, duplicate delivery, and the Inventory stream sequence. The
+  earlier incorrect outbox payload offset remains documented in the failed rerun log.
+- `tests/leak/test_leak_matrix_split.py::test_split_leak_matrix_fails_when_owned_table_is_missing`
+  passed. The process matrix ran through sink scanning, then failed the required positive
+  `ProducerRedactionHits` assertion: API workflow inline text is redacted before the
+  producer creates its command, and all observed counts are zero. Raw inline source text
+  is rejected by the workflow source scanner. Reconciliation request: identify a safe,
+  in-scope process carrier that yields positive producer redaction metadata without
+  persisting raw or escaped sample content. Evidence:
+  `/tmp/telescreen-svc-p08-verification-deploy-g9-replay-leak-rerun.log`.
+- `tests/split/test_cutover_process.py::test_notification_cutover_process_delivers_once_and_deduplicates_retention`
+  failed its required delivery of the copied pending notification. The Notification
+  delivery pump schedules only `queued` rows, while the specified cutover seed and copy
+  preserve `status='pending'`. The test also confirms that member notification references
+  are handle based (`member:alice`), while the requested seed shape used `member:<alice
+  id>`. Reconciliation request: define or implement the approved migration mapping and
+  recipient reference semantics in the owning production plan; svc-p08 cannot edit those
+  paths. Evidence: `/tmp/telescreen-svc-p08-verification-deploy-g9-focused-initial.log`.
+- The required three-consecutive process suite and final full verification list remain
+  incomplete because the cutover and leak-matrix non-vacuity gates fail. The first combined
+  run reported 4 failed and 1 passed in 521.11 s; the corrected replay/leak rerun reported
+  2 failed and 2 passed in 395.86 s. These are retained as failed run evidence, not passing
+  verification. The corrected Inventory replay passed individually (1 passed in 201.56 s).
+- Final-source reruns: replay passed 2 tests in 284.40 s;
+  `test_cutover_process.py` plus `test_leak_matrix_split.py` reported 2 failed and 1 passed
+  in 226.27 s, reproducing the copied-pending delivery and zero-redaction-carrier blockers.
+  The completed process check found no surviving Inventory or Notification service
+  process. `git diff --quiet HEAD -- src db`, the no-skip scan, and plan/Python line bounds
+  exited 0. Final source and verification log hashes are recorded in
+  `tmp/telescreen-svc-20261016-g9/svc-p08-verification-deploy/attempt-1/source-and-verification.sha256`.
+- Final scoped format, Ruff, `ty`, and typelint commands all exited 0; logs are
+  `/tmp/telescreen-svc-p08-verification-deploy-g9-{format,ruff,ty,typelint}.log`.
+  The no-service-process check, source/DDL diff check, skip-marker check and line limits
+  also exited 0. The required 3x process gate, scoped/full pytest, `mise run ci`, DDL,
+  web CI and build gates are not certified: cutover and leak matrix still fail, and
+  `artifactRoots` is empty for the plan's build-output commands. Current status remains
+  In Progress; this implementation does not claim acceptance or workflow finalization.
+
+### Owner resolution 3: 2026-10-16 (after session 26)
+
+Neither remaining failure needs a production change; both are test-design errors.
+
+1. Cutover: `NotificationStatus` has no `pending` value (queued, sent, failed, blocked,
+   skipped). Unsent rows are `queued` in the monolith, and the Notification worker
+   (`notification_service/worker.py`) schedules copied `queued` rows. Seed the copied
+   pending notification with `status='queued'`, and use the real handle-based member
+   reference (`member:alice`), which is what senders store. Then assert it is delivered
+   once after cutover and that the copied `retention_notification_receipts` deduplicate
+   the retention obligation.
+2. Leak matrix non-vacuity: a zero `ProducerRedactionHits` count is correct, because
+   content is redacted before the producer builds its command. Do not require positive
+   producer hits. Prove non-vacuity instead by showing the raw sample entered the system
+   and was handled: the ingest/scan request with the runtime sample returns 200, a
+   finding/issue exists with only the masked representation, and (where a path keeps
+   counts) detector or DLP hit counts are positive. Then scan every table of the three
+   stores, wire bodies, process logs and audit exports for the raw and JSON-escaped
+   sample, as already implemented.
+
+Then run the 3x process suite and the full verification list on final source.
+For build-output commands, write to /tmp paths (no artifactRoots needed) or list them
+as artifactRoots in the plan. Conventions 7a.

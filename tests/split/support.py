@@ -432,6 +432,10 @@ class ServiceStack:
             ),
         )
 
+    def main_runtime(self) -> tuple[tuple[str, str], ...]:
+        """Return the Telescreen API and worker environment with service endpoints."""
+        return self._main_runtime()
+
     def _process(self, name: str) -> subprocess.Popen[bytes] | None:
         if name == "api":
             return self.api_process
@@ -464,3 +468,105 @@ class ServiceStack:
             pair for pair in values if pair[0] not in extra_keys
         )
         return retained + extra
+
+
+async def seed_member(
+    stack: ServiceStack, http: httpx.AsyncClient, handle: str, bodies: list[str]
+) -> str:
+    """Create a member and wait until both independent directory replicas contain it."""
+    assert stack.admin_token is not None
+    api_url: str = f"http://127.0.0.1:{stack.api_port}"
+    response: httpx.Response = await http.post(
+        f"{api_url}/api/members",
+        headers={"Authorization": f"Bearer {stack.admin_token}"},
+        json={
+            "handle": handle,
+            "display_name": handle.title(),
+            "email": f"{handle}@example.invalid",
+            "slack_user_id": None,
+        },
+    )
+    bodies.append(response.text)
+    assert response.status_code == 201, response.text
+    member_id: str = response.json()["id"]
+    _ = run_cli(("telescreen", "projections", "resync"), stack.main_runtime())
+    wait_for(
+        lambda: (
+            scalar_int(
+                stack.inventory_path,
+                "SELECT count(*) FROM inventory_directory_entries "
+                "WHERE kind='member' AND id=? AND present=1",
+                (member_id,),
+            )
+            == 1
+        ),
+        90,
+        f"Inventory directory replica did not receive {handle}",
+    )
+    wait_for(
+        lambda: (
+            scalar_int(
+                stack.notification_path,
+                "SELECT count(*) FROM notification_directory_entries "
+                "WHERE kind='member' AND id=? AND present=1",
+                (member_id,),
+            )
+            == 1
+        ),
+        90,
+        f"Notification directory replica did not receive {handle}",
+    )
+    return member_id
+
+
+async def seed_issue(
+    stack: ServiceStack, http: httpx.AsyncClient, text: str, bodies: list[str]
+) -> str:
+    """Create a custom collector, ingest detectable text, and resolve its issue id."""
+    assert stack.admin_token is not None
+    api_url: str = f"http://127.0.0.1:{stack.api_port}"
+    headers: tuple[tuple[str, str], ...] = (("Authorization", f"Bearer {stack.admin_token}"),)
+    collector: httpx.Response = await http.post(
+        f"{api_url}/api/collectors",
+        headers=headers,
+        json={
+            "name": "p08-process-seed",
+            "kind": "custom",
+            "trigger_mode": "event",
+            "cron": None,
+            "sweep_cron": None,
+            "selector_json": "{}",
+            "credential_ref": None,
+            "enabled": True,
+        },
+    )
+    bodies.append(collector.text)
+    assert collector.status_code in (200, 201), collector.text
+    accepted: httpx.Response = await http.post(
+        f"{api_url}/api/ingest/v1/scan",
+        headers=headers,
+        json={
+            "source": "custom:p08-process-seed",
+            "resources": [
+                {
+                    "locator": "p08-process-seed.txt",
+                    "segments": [{"locator": "line:1", "text": text}],
+                }
+            ],
+        },
+    )
+    bodies.append(accepted.text)
+    assert accepted.status_code == 200, accepted.text
+    issue_ids: list[str] = accepted.json()["issue_ids"]
+    assert issue_ids
+    listed: httpx.Response = await http.get(
+        f"{api_url}/api/issues", headers=headers, params={"period": "all"}
+    )
+    bodies.append(listed.text)
+    assert listed.status_code == 200, listed.text
+    issue_id: str = issue_ids[0]
+    matching: tuple[str, ...] = tuple(
+        item["id"] for item in listed.json()["items"] if item["id"] == issue_id
+    )
+    assert matching == (issue_id,)
+    return issue_id
