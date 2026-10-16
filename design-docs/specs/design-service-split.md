@@ -493,17 +493,21 @@ Shared or inventory-only split deployment -> full split:
 3. Run `telescreen migrate` (0010 or `main_0002`), then
    `telescreen migrate --store inventory` (`inventory_0002`). Create the notification
    store with `telescreen-notification migrate`.
-4. Run `telescreen notification-store copy --writers-stopped`, then
-   `telescreen notification-store verify --writers-stopped`. These reuse the
-   `db/transfer*` row copy and value-free manifests for the four moved tables. For shared
-   -> split inventory, run the existing `inventory-store copy/verify`. Inventory transfer
-   gains `inventory_0002` support: replicas and the notification outbox are excluded (and
-   must be empty or delivered), and inventory audit tables copy with append-only lineage.
-5. Start Notification, then Inventory. Run `telescreen projections resync` and check both
-   health watermarks.
-6. Configure both service URLs and tokens on Telescreen API and engine, then restart
-   writers. Copied queued notifications are delivered by Notification. Pending retention
-   obligations are deduplicated against the copied `retention_notification_receipts`.
+4. Start Notification, Inventory, the Telescreen API and worker with their service URLs
+   and tokens configured. Run `telescreen projections resync`; wait until both service
+   replicas contain the current directory and the projection outbox is drained. This
+   seeds Notification's recipient resolver before any copied queued member row is visible.
+5. Stop all writers again. Run `telescreen notification-store copy --writers-stopped`,
+   then `telescreen notification-store verify --writers-stopped`. These reuse the
+   `db/transfer*` row copy and value-free manifests for the four moved tables; the copy
+   preserves `notification_directory_entries`. For shared -> split inventory, run the
+   existing `inventory-store copy/verify`. Inventory transfer gains `inventory_0002`
+   support: replicas and the notification outbox are excluded (and must be empty or
+   delivered), and inventory audit tables copy with append-only lineage.
+6. Restart Notification, Inventory, the Telescreen API and worker, then wait for each
+   process to become ready before enabling normal writes. Copied queued notifications
+   are delivered by Notification. Pending retention obligations are deduplicated against
+   the copied `retention_notification_receipts`.
 
 Rollback to single process: stop writers, then run
 `notification-store copy --direction merge` and verify. Merge refuses if target receipts
@@ -600,8 +604,12 @@ test-design errors there, so no production change is expected.
   makes Inventory publish an `inventory_notification_outbox` command, which Notification
   applies (inbox receipt plus `data_overdue` notification row) and delivers to the fake
   transport, with no Telescreen process running.
-- (c) **Cutover delivery and dedup.** The entry points are `telescreen notification-store
-  copy/verify --writers-stopped` (section 13 step 4) and the Notification inbox check
+- (c) **Cutover delivery and dedup.** Seed the Inventory and Notification directory
+  replicas with `projections resync` before stopping writers and copying notification
+  state (section 13 steps 4-5); the copy preserves `notification_directory_entries`, so
+  the Notification pump cannot fail the copied member row with `recipient_unknown`.
+  The entry points are `telescreen notification-store copy/verify --writers-stopped`
+  (section 13 step 5) and the Notification inbox check
   against `retention_notification_receipts`. `NotificationStatus` has no `pending` value:
   an unsent monolith row is `queued`. The copied unsent row is seeded with
   `status='queued'` and the handle-based member reference `member:alice` that senders

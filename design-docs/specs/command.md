@@ -226,6 +226,7 @@ for all settings and the separate-database Compose overlay.
 
 Full split deployment uses [`docker-compose.services.yml`](../../examples/compose/docker-compose.services.yml)
 with separate main, inventory and notification PostgreSQL stores. The ordered cutover is
-`migrate`, `notification-store copy`, `notification-store verify`, `inventory-store copy`,
-`inventory-store verify`, then `projections resync`; see section 13 of
+`migrate`, start the services and run `projections resync` until replicas are current,
+stop writers, run `notification-store copy` and `verify`, run `inventory-store copy` and
+`verify`, then restart services; see section 13 of
 [design-service-split.md](design-service-split.md).

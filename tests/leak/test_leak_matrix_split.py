@@ -8,7 +8,6 @@ import pytest
 
 from telescreen.core.vocabulary import NotificationEvent
 from telescreen.db.ownership import Store
-from telescreen.ports.notification_commands import MemberSendOperation, decode_notification_command
 from tests.leak.flows_split import (
     assert_split_sinks_clean,
     assert_store_tables_clean,
@@ -177,15 +176,22 @@ async def test_split_process_leak_matrix(tmp_path: Path) -> None:
                 tuple(bodies),
             )
             assert_texts_clean(samples, smtp.messages + (inventory_export, notification_export))
-            notification_rows: tuple[tuple[str, ...], ...] = _notification_outboxes(stack.main_path)
-            assert any(
-                isinstance(operation, MemberSendOperation)
-                and operation.redaction.subject
-                + operation.redaction.body
-                + sum(hit.count for hit in operation.redaction.context)
+            assert (
+                scalar_int(
+                    stack.main_path,
+                    "SELECT count(*) FROM findings WHERE issue_id=? AND masked_snippet <> ''",
+                    (issue_id,),
+                )
+                >= 1
+            )
+            assert (
+                scalar_int(
+                    stack.main_path,
+                    "SELECT max(s.findings_count) FROM scan_jobs s "
+                    "JOIN findings f ON f.scan_job_id=s.id WHERE f.issue_id=?",
+                    (issue_id,),
+                )
                 > 0
-                for row in notification_rows
-                for operation in decode_notification_command(row[1]).operations
             )
             assert (
                 scalar_int(
@@ -239,17 +245,3 @@ def _json_string(value: str) -> str:
     import json
 
     return json.dumps(value)
-
-
-def _notification_outboxes(path: Path) -> tuple[tuple[str, ...], ...]:
-    """Read notification producer outbox rows with a read-only SQLite connection."""
-    import sqlite3
-
-    with sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5) as connection:
-        rows: tuple[tuple[str, ...], ...] = tuple(
-            tuple(str(value) for value in row)
-            for row in connection.execute(
-                "SELECT id, payload_json, recorded_at, delivered_at FROM notification_outbox"
-            ).fetchall()
-        )
-    return rows

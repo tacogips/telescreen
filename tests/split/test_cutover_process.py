@@ -1,6 +1,7 @@
 """Prove notification-store cutover delivery and retained-obligation dedup over TCP."""
 
 import asyncio
+import sqlite3
 import subprocess
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -14,7 +15,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from telescreen.core.vocabulary import DataAssetState
+from telescreen.core.vocabulary import DataAssetState, DlpVerdict, NotificationStatus
 from telescreen.db.models import (
     DataAssetRow,
     DataFieldRow,
@@ -38,7 +39,7 @@ from tests.split.support import (
 async def test_notification_cutover_process_delivers_once_and_deduplicates_retention(
     tmp_path: Path,
 ) -> None:
-    """Copy pending notification state, then prove a copied receipt suppresses a replay."""
+    """Copy queued notification state, then prove a copied receipt suppresses a replay."""
     stack: ServiceStack = ServiceStack.create(tmp_path)
     smtp: SmtpRecorder = SmtpRecorder(stack.smtp_port)
     processes: list[subprocess.Popen[bytes]] = []
@@ -82,14 +83,14 @@ async def test_notification_cutover_process_delivers_once_and_deduplicates_reten
                 )
                 session.add(
                     NotificationRow(
-                        id="p08-cutover-pending-00000000000001",
+                        id="p08-cutover-queued-00000000000001",
                         channel="email",
-                        recipient_ref=f"member:{alice_id}",
-                        subject="P08 copied pending notification",
+                        recipient_ref="member:alice",
+                        subject="P08 copied queued notification",
                         body="Safe cutover message",
-                        dlp_verdict="clear",
+                        dlp_verdict=DlpVerdict.PASS.value,
                         dlp_hit_count=0,
-                        status="pending",
+                        status=NotificationStatus.QUEUED.value,
                         delivery_attempts=0,
                         run_id=None,
                         issue_id=None,
@@ -194,14 +195,6 @@ async def test_notification_cutover_process_delivers_once_and_deduplicates_reten
             await main_engine.dispose()
             await inventory_engine.dispose()
         _ = run_cli(("telescreen.notification_service", "migrate"), stack.notification_env)
-        copy_env: tuple[tuple[str, str], ...] = main_only + (
-            (
-                "TELESCREEN_NOTIFICATION_DATABASE_URL",
-                f"sqlite+aiosqlite:///{stack.notification_path}",
-            ),
-        )
-        _ = run_cli(("telescreen", "notification-store", "copy", "--writers-stopped"), copy_env)
-        _ = run_cli(("telescreen", "notification-store", "verify", "--writers-stopped"), copy_env)
         stack.admin_token = run_cli(
             (
                 "telescreen",
@@ -237,23 +230,108 @@ async def test_notification_cutover_process_delivers_once_and_deduplicates_reten
             wait_for(
                 lambda: (
                     scalar_int(
+                        stack.inventory_path,
+                        "SELECT count(*) FROM inventory_directory_entries "
+                        "WHERE kind='member' AND id=? AND present=1",
+                        (alice_id,),
+                    )
+                    == 1
+                    and scalar_int(
                         stack.notification_path,
-                        "SELECT count(*) FROM notifications WHERE id=? AND status='sent'",
-                        ("p08-cutover-pending-00000000000001",),
+                        "SELECT count(*) FROM notification_directory_entries "
+                        "WHERE kind='member' AND id=? AND present=1",
+                        (alice_id,),
                     )
                     == 1
                 ),
                 90,
-                "copied pending notification was not delivered",
+                "directory replicas did not receive alice before notification copy",
             )
+            wait_for(
+                lambda: scalar_int(stack.main_path, "SELECT count(*) FROM projection_changes") == 0,
+                90,
+                "directory projection outbox did not drain before notification copy",
+            )
+            stack.stop_all()
+            copy_env: tuple[tuple[str, str], ...] = main_only + (
+                (
+                    "TELESCREEN_NOTIFICATION_DATABASE_URL",
+                    f"sqlite+aiosqlite:///{stack.notification_path}",
+                ),
+            )
+            _ = run_cli(("telescreen", "notification-store", "copy", "--writers-stopped"), copy_env)
+            _ = run_cli(
+                ("telescreen", "notification-store", "verify", "--writers-stopped"), copy_env
+            )
+            assert (
+                scalar_int(
+                    stack.notification_path,
+                    "SELECT count(*) FROM retention_notification_receipts WHERE id=?",
+                    (event_id,),
+                )
+                == 1
+            )
+            assert (
+                scalar_int(
+                    stack.notification_path,
+                    "SELECT count(*) FROM notifications WHERE id=? AND status='queued'",
+                    ("p08-cutover-queued-00000000000001",),
+                )
+                == 1
+            )
+            notification = stack.start("notification")
+            inventory = stack.start("inventory")
+            api = stack.start("api")
+            worker = stack.start("worker")
+            processes.extend((notification, inventory, api, worker))
+            await wait_ready(
+                http,
+                f"http://127.0.0.1:{stack.notification_port}/internal/notification/v1/health",
+                notification,
+                "notification-process-token",
+            )
+            await wait_ready(
+                http,
+                f"http://127.0.0.1:{stack.inventory_port}/internal/inventory/v1/health",
+                inventory,
+                "inventory-process-token",
+            )
+            await wait_ready(http, f"http://127.0.0.1:{stack.api_port}/api/health", api)
+            _ = run_cli(("telescreen", "projections", "resync"), stack.main_runtime())
+            try:
+                wait_for(
+                    lambda: (
+                        scalar_int(
+                            stack.notification_path,
+                            "SELECT count(*) FROM notifications WHERE id=? AND status='sent'",
+                            ("p08-cutover-queued-00000000000001",),
+                        )
+                        == 1
+                    ),
+                    90,
+                    "copied queued notification was not delivered",
+                )
+            except AssertionError as error:
+                diagnostic: str = _notification_diagnostic(
+                    stack.notification_path, "p08-cutover-queued-00000000000001"
+                )
+                raise AssertionError(f"{error}; {diagnostic}") from error
             wait_for(
                 lambda: len(smtp.messages) == 1,
                 90,
-                "SMTP did not receive the copied pending notification",
+                "SMTP did not receive the copied queued notification",
             )
-            assert smtp.messages[0].count("P08 copied pending notification") == 1
+            assert smtp.messages[0].count("P08 copied queued notification") == 1
             await asyncio.sleep(5)
             assert len(smtp.messages) == 1
+            assert (
+                scalar_int(
+                    stack.notification_path,
+                    "SELECT count(*) FROM notifications WHERE id=? AND status='sent'",
+                    ("p08-cutover-queued-00000000000001",),
+                )
+                == 1
+            )
             before_overdue: int = scalar_int(
                 stack.notification_path,
                 "SELECT count(*) FROM notifications WHERE event_kind='data_overdue'",
@@ -305,3 +383,18 @@ async def test_notification_cutover_process_delivers_once_and_deduplicates_reten
     finally:
         stack.stop_all()
         smtp.close()
+
+
+def _notification_diagnostic(path: Path, notification_id: str) -> str:
+    """Describe delivery state without exposing notification content."""
+    with sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5) as connection:
+        row: tuple[str | None, str | None] | None = connection.execute(
+            "SELECT status, error_code FROM notifications WHERE id=?", (notification_id,)
+        ).fetchone()
+    status: str = row[0] if row is not None and row[0] is not None else "missing"
+    error_code: str = row[1] if row is not None and row[1] is not None else "none"
+    directory_entries: int = scalar_int(path, "SELECT count(*) FROM notification_directory_entries")
+    return (
+        f"notification status={status}, error_code={error_code}, "
+        f"notification_directory_entries={directory_entries}"
+    )
