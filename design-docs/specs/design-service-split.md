@@ -1,6 +1,6 @@
 # Service split: Telescreen, Inventory and Notification
 
-Status: Implementation in progress (run 8: only svc-p08 cross-process R1-R8 and leak matrices remain), 2026-10-16
+Status: Implementation in progress (run 9, final: only svc-p08 replay and cutover flows, the leak matrix and the final gates remain), 2026-10-16
 Requirements: [design-service-split-requirements.md](design-service-split-requirements.md)
 (R1-R8, owner decisions D1-D5). Builds on [inventory microservice](design-inventory-microservice.md),
 [inventory/alert boundaries](design-inventory-alert-boundaries.md) and the
@@ -576,6 +576,13 @@ receipt polling with finite timeouts, and every process terminated in `finally`.
 live in `tests/split/` and `tests/leak/`, one module per topic, each under 1000 lines.
 Stopping a process means terminating it and starting a new process on the same SQLite
 file and port settings. Exactly-once is asserted from stored state, not from logs.
+Each test waits for readiness after every (re)start and, before stopping a producer,
+waits until its outboxes are drained (the replica waits do this for Telescreen, whose
+worker drives delivery). Concurrent directory-stream deliveries can arrive out of order;
+the inbox answers GAP (recorded as `conflict`) and the task retries about 5 s later. This
+is expected behavior, not a defect (svc-p08 owner resolution 2). Flow (b) passes at
+`f2c6707` (`tests/split/test_stopped_telescreen_process.py`); run 9 adds (a), (c) and the
+leak matrix.
 
 - (a) **Producer outage/replay.** Telescreen -> Inventory: stop Inventory, commit an
   issue change that produces an `IssueLinkState`, restart, run the engine, and assert
@@ -608,18 +615,20 @@ its chain is covered by the main-store table scan and `/api/audit/search`. No ra
 may appear anywhere.
 
 Plan shape (`svc-pNN`, disjoint writePaths). The plan files in `impl-plans/active/` and
-the current dispatch manifest (`telescreen-svc-20261016-g8-dispatch.json`, superseding
-g7 with the same plans, writePaths and DAG) are authoritative for writePaths. p01-p07
+the current dispatch manifest (`telescreen-svc-20261016-g9-dispatch.json`, superseding
+g8 with the same svc-p08 writePaths) are authoritative for writePaths. p01-p07
 are integration-accepted and are recorded as accepted dependencies at checkpoint
-`aaa2c4c`; they are not redispatched. The remaining work runs in waves:
+`f2c6707`; they are not redispatched. The remaining work runs in waves:
 
-1. p08 (the run 8 acceptance flows and leak matrix above, then the final gates).
-2. Serial finalization. It archives the svc plans and the g1-g8 manifests to
+1. p08 (the remaining run 8 acceptance flows (a) and (c) and the leak matrix above,
+   then the final gates).
+2. Serial finalization. It archives the svc plans and the g1-g9 manifests to
    `impl-plans/completed/`, and updates `impl-plans/README.md`, `README.md` and the
    status lines of this design and its related specs. It also applies the Nodetto
-   layout fix (section 12), which is not yet applied at `aaa2c4c` (the Nodetto JSONL
+   layout fix (section 12), which is not yet applied at `f2c6707` (the Nodetto JSONL
    was last changed in run 1), because the Nodetto document and `tests/db/**` are paths
-   of the accepted p02.
+   of the accepted p02. `impl-plans/active/inventory-alert-boundaries.md` is not a svc
+   plan and stays where it is.
 
 The critical path is p01 -> p02 -> p07 -> p04/p05 -> p08. Each plan owns the shared
 exact-count/inventory tests that its change breaks.
@@ -633,4 +642,4 @@ exact-count/inventory tests that its change breaks.
 | p04 inventory | replica-backed lookups and auth binding, issue links, local audit drain, retention dispatcher and notification outbox, removal of callbacks; `notification-store` copy/verify (`db/notification_transfer.py`, reusing p02's transfer helpers) | p01, p02, p07 |
 | p05 notification service | package, inbox, replica binding, delivery pump, routes, audit CLI, identity-through-ports changes in `notifications/`, `DlpGate` `prior_hits` fold in `notifications/dlp.py` and `sender.py`. Test: DLP parity: the same raw sample secret in a context field, an inline body and a template-rendered field gives the same row verdict, hit_count > 0 and audit action under MASK and BLOCK, single-process vs the split adapter + inbox path in process | p01, p02, p07 |
 | p06 telescreen split composition | `wiring*.py`, proxies, integrations, weekly move, `cli.py` registration and dispatch of every new Telescreen command (`telescreen notification-store` is parsed by p04's `cli_inventory_store.add_commands` and must be routed to `cli_inventory_store.run_notification` (the `inventory-store` branch at `cli.py:337` calls `run`); at `a5392d9` it falls through to exit 2. The p06 CLI test asserts that `notification-store verify` reaches `run_notification`), no-op delivery handler | p01, p02, p03 |
-| p08 verification and deployment | multi-process and PostgreSQL tests (including a multi-process DLP parity case under `TELESCREEN_DLP_POLICY=block`), restricted-login grants, leak matrix, import gates, compose overlay (names fixed by sections 9 and 14), examples tests, command.md, runbook, archive plans (including `active/inventory-alert-boundaries.md`, already COMPLETED) | p04, p05, p06 |
+| p08 verification and deployment | multi-process and PostgreSQL tests (including a multi-process DLP parity case under `TELESCREEN_DLP_POLICY=block`), restricted-login grants, leak matrix, import gates, compose overlay (names fixed by sections 9 and 14), examples tests, command.md, runbook (plan archiving is serial finalization) | p04, p05, p06 |
