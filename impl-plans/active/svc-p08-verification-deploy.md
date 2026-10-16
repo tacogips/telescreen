@@ -269,3 +269,56 @@ Record source hashes under `tmp/telescreen-svc-20261016-g8/svc-p08-verification-
 The run 7 entries (sessions 7 and 8 and the owner resolution) are archived in
 [`../logs/svc-p08-verification-deploy-2026-10-16.md`](../logs/svc-p08-verification-deploy-2026-10-16.md).
 Append run 8 sessions below, following conventions section 8.
+
+### Run 8 implementation session 1 (2026-10-16)
+
+- Added `tests/split/support.py` with free-port, CLI, append-log process, readiness,
+  shutdown, SQLite read-only probes, bounded polling, `ServiceStack`, and threaded SMTP
+  recorder. `tests/inventory_service/test_process.py` now imports the shared process helpers.
+- Added the Inventory-while-Telescreen-stopped case. Its current-source process run reached
+  the member projection wait and failed after 90 s. Main `inventory_outbox` contained
+  directory stream sequences 2-5 (API token, ownership rules, member, identity), while the
+  Inventory inbox cursor remained at 3; the member and identity rows were absent. The HTTP
+  receiver returned 200, but the corresponding delivery tasks remained retryable with
+  `last_error_code='conflict'`. This blocks the rest of the flow before overdue delivery.
+- **Reconciliation request:** diagnose and fix the Inventory directory stream delivery gap
+  in the owning production relay/delivery code, outside svc-p08 writePaths. Reproduce with
+  `tests/split/test_stopped_telescreen_process.py::test_inventory_serves_and_delivers_with_telescreen_stopped`.
+  Resume svc-p08 after that test's member and identity projections reach Inventory and
+  Notification. Do not change production files in this plan.
+- Extended `flows_split.py` to scan every `tables_for(Store)` row for raw and JSON-escaped
+  samples and added a missing-table assertion. The prior process/leak focused run passes:
+  `/tmp/p08-leak-helper-test.log` (3 passed).
+- Failed exploratory process logs (kept because the test was corrected between attempts):
+  `/tmp/p08-stopped-process-attempt1.log` (422 invalid field value),
+  `/tmp/p08-stopped-process-attempt2.log` (same), and
+  `/tmp/p08-stopped-process-attempt3.log` (member projection absent after 30 s).
+  The final-source reproduction is `/tmp/p08-stopped-process-attempt4.log` (member
+  projection absent after 90 s). Focused lint/type gates passed for current split/leak
+  files: format `/tmp/telescreen-svc-p08-verification-deploy-g8-format.log`, Ruff
+  `/tmp/telescreen-svc-p08-verification-deploy-g8-ruff.log`, ty
+  `/tmp/telescreen-svc-p08-verification-deploy-g8-ty.log`, typelint
+  `/tmp/telescreen-svc-p08-verification-deploy-g8-typelint.log`. The ownership-table
+  behavioral run is `/tmp/p08-leak-helper-test.log` (3 passed). `pgrep` found no surviving
+  service process, `git diff --quiet HEAD -- src db` exited 0, and the plan and all
+  split/leak Python files are below their line limits. Source hashes and complete logs
+  are under `tmp/telescreen-svc-20261016-g8/svc-p08-verification-deploy/attempt-1/`.
+  Full required verification is deferred until reconciliation.
+
+### Owner resolution 2: 2026-10-16 (after session 25)
+
+The requested production fix is not needed. The owner reproduced the run with kept
+databases: directory stream deliveries run concurrently, so sequence 5 can reach
+Inventory before 4; the inbox correctly answers GAP (recorded as `conflict`) and the
+task retries 5 seconds later (logs show applied retries at :44, :49, :54). Delivery is
+driven by the Telescreen worker, so a test must wait for the producer outboxes to drain
+(the replica waits do this) before stopping Telescreen. The other failure was the test
+calling Inventory right after `stack.restart("inventory")`; the owner added a
+`wait_ready` on the Inventory health endpoint there.
+`tests/split/test_stopped_telescreen_process.py` now passes (1 passed, 78 s): Inventory
+serves `/api/data/*` and delivers an overdue notification through Notification to SMTP
+while Telescreen's API and worker are stopped. Remaining scope: the other two
+P08-R1R8-MATRIX flows (cross-process delivery/replay with a stopped receiver;
+cutover delivery/dedup) and the complete P08-LEAK-MATRIX, then the full verification
+list. Always wait for readiness after (re)starting a process and for outboxes to
+drain before stopping a producer. Conventions 7a.

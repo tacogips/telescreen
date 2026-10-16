@@ -1,83 +1,19 @@
 """Real TCP/process proof for all three independently deployed services."""
 
 import asyncio
-import os
-import socket
 import subprocess
-import sys
-import time
 from pathlib import Path
 
 import httpx
 import pytest
 
-from tests.leak.flows_split import assert_split_sinks_clean
+from telescreen.db.ownership import Store
+from tests.leak.flows_split import assert_split_sinks_clean, assert_store_tables_clean
+from tests.split.support import free_port as _port
+from tests.split.support import run_cli as _run
+from tests.split.support import start_service as _start
+from tests.split.support import wait_ready as _ready
 from tests.support.samples import Sample, all_samples, aws_access_key_id
-
-
-def _port() -> int:
-    """Select an available loopback port for an isolated subprocess."""
-    with socket.socket() as listener:
-        listener.bind(("127.0.0.1", 0))
-        return int(listener.getsockname()[1])
-
-
-def _run(command: tuple[str, ...], values: tuple[tuple[str, str], ...]) -> str:
-    """Run a bounded owner CLI command and return its captured standard output."""
-    result: subprocess.CompletedProcess[str] = subprocess.run(
-        (sys.executable, "-m", *command),
-        env={key: value for key, value in os.environ.items() if not key.startswith("TELESCREEN_")}
-        | dict(values),
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=30,
-    )
-    assert result.returncode == 0, result.stderr
-    return result.stdout.strip()
-
-
-def _start(
-    command: tuple[str, ...], values: tuple[tuple[str, str], ...], log: Path
-) -> subprocess.Popen[bytes]:
-    """Start one service and retain output for a failure diagnosis."""
-    with log.open("wb") as output:
-        return subprocess.Popen(
-            (sys.executable, "-m", *command),
-            env={
-                key: value for key, value in os.environ.items() if not key.startswith("TELESCREEN_")
-            }
-            | dict(values),
-            stdout=output,
-            stderr=subprocess.STDOUT,
-        )
-
-
-async def _ready(
-    http: httpx.AsyncClient,
-    url: str,
-    process: subprocess.Popen[bytes],
-    service_token: str | None = None,
-) -> None:
-    """Poll a live process and health endpoint with a bounded startup deadline."""
-    deadline: float = time.monotonic() + 30
-    while time.monotonic() < deadline:
-        assert process.poll() is None, "service exited before readiness"
-        try:
-            response: httpx.Response = await http.get(
-                url,
-                headers=(
-                    {"x-telescreen-service-token": service_token}
-                    if service_token is not None
-                    else {}
-                ),
-            )
-            if response.status_code == 200:
-                return
-        except httpx.HTTPError:
-            pass
-        await asyncio.sleep(0.1)
-    raise AssertionError(f"service did not become ready: {url}")
 
 
 async def run_three_processes_with_leak_probe(tmp_path: Path) -> None:
@@ -267,6 +203,14 @@ async def run_three_processes_with_leak_probe(tmp_path: Path) -> None:
                 (tmp_path / "main.db", tmp_path / "inventory.db", tmp_path / "notification.db"),
                 log_paths,
                 (response.text, detail.text, collector.text, accepted.text, rejected.text),
+            )
+            assert_store_tables_clean(
+                all_samples(),
+                (
+                    (Store.MAIN, tmp_path / "main.db"),
+                    (Store.INVENTORY, tmp_path / "inventory.db"),
+                    (Store.NOTIFICATION, tmp_path / "notification.db"),
+                ),
             )
     finally:
         for process in processes:
