@@ -1,6 +1,6 @@
 # SVC-P08 Verification and Deployment: Multi-Process Tests, Restricted Logins, Leak Matrix, Compose, Docs
 
-**Status**: In Progress (review repair; full R1-R8 process matrix pending)
+**Status**: In Progress (run 8: R8.1-R8.5 below are the only remaining work)
 **Design Reference**: design-docs/specs/design-service-split.md sections 13-17; design-docs/specs/design-service-split-requirements.md section 7
 **Created**: 2026-10-15
 **Last Updated**: 2026-10-16
@@ -59,129 +59,9 @@ Imitate:
 
 ## Deliverables
 
-1. **`tests/split/` multi-process suite.** `support.py` starts `telescreen serve` (API
-   plus an engine loop, or `telescreen worker` as a second process if that is the existing
-   pattern), `telescreen-inventory serve` and `telescreen-notification serve`.
-   - Each process gets free ports and its own env: three database URLs, tokens via `env:`
-     refs, OIDC test issuer settings from `tests.support.oidc`, and fingerprint/identity
-     keys.
-   - Notification uses a fake SMTP server: a minimal line-based SMTP recorder thread in
-     `support.py`, because the stdlib `smtpd` was removed in Python 3.12 and no
-     dependency may be added. Point `TELESCREEN_SMTP_HOST`/`PORT` at it and set
-     `TELESCREEN_SMTP_STARTTLS=false`.
-   - `SlackNotifier.api_base` has no setting and none may be added. Verify Slack delivery
-     in `tests/split/test_slack_inprocess.py`: build `build_notification_runtime(...,
-     http=httpx.AsyncClient(transport=MockTransport))`, apply an overdue command for a
-     team, run one delivery-pump tick, and assert a masked Slack post.
-   - Every process is terminated in `finally`. Logs go to `/tmp/telescreen-svc-p08-*`.
-   - Migrate each store with the CLIs first.
-   - Mark the module `@pytest.mark.slow` only if that marker already exists; otherwise
-     leave it unmarked.
-
-   Test cases (`test_split_flows.py`):
-
-   - **Auth per service.** The same OIDC bearer is accepted by all three services after
-     `projections resync`. A revoked API token is rejected by Inventory and Notification
-     after the relay runs.
-   - **Collection -> inventory.** Push ingest gives an asset through the proxy.
-   - **Issue link push.** Asset detail open issues follow an issue status change.
-   - **Directory replication.** The display name changes in an Inventory actor display.
-   - **Overdue.** With Telescreen **stopped**, inventory overdue publication reaches
-     Notification and the fake SMTP/Slack records a masked message (R1/R5).
-   - **Producers.** Issue mention, workflow notify and alert notifications produce
-     deterministic ids on Notification rows.
-   - **Settings and templates through the Telescreen proxy.** Same status codes and
-     permissions as single process for viewer and responder.
-   - **Outage and replay.**
-     - Notification stopped while producers commit; restart -> the commands are applied
-       once.
-     - Inventory stopped while links queue; restart -> they are applied in order.
-     - Telescreen stopped -> Inventory and Notification keep serving.
-   - **DLP parity, multi-process.** With `TELESCREEN_DLP_POLICY=block`, an alert whose
-     issue title carries a sample secret -> the Notification row is `blocked` and no fake
-     delivery happens. The single-process equivalent is also `blocked`.
-2. **Rewrite `tests/inventory_service/test_process.py` and `test_postgres.py`** for full
-   split mode (Notification required); they must be green.
-   - At `a5392d9` both files are owner placeholders. `test_process.py` has a module-level
-     `pytest.mark.skip`, and `test_postgres.py` calls `pytest.skip(...)` at import time.
-     Remove both skips. `test_process.py` must then run and pass offline, so record its
-     passed count. `test_postgres.py` keeps only the `integration` marker plus the
-     `TELESCREEN_TEST_DATABASE_URL` skip.
-   - The cutover below needs `telescreen notification-store`, which svc-p06 routes to
-     `cli_inventory_store.run_notification` in run 7. If it still exits 2, write a
-     Reconciliation request.
-   - `tests/e2e/test_inventory_split_runtime.py` is a single-process separate-store test.
-     It is not owned here and must stay green; run it in verification.
-   - The single-process inventory cutover e2e (`tests/e2e/test_inventory_store_cutover.py`)
-     is owned by svc-p02 (inventory transfer v2, manifest g2). Run it here; do not edit it.
-   - Add `tests/split/test_cutover.py` for the full-split cutover in design 13 order:
-     1. a shared database with a pending queued notification, a retention receipt and a
-        pending retention obligation;
-     2. `migrate`, then `notification-store copy`/`verify`, then inventory copy;
-     3. start the services, run `projections resync`;
-     4. assert that the queued notification is delivered once and that the obligation with
-        a copied receipt is a `duplicate` (no second send).
-3. **Restricted logins (R6, F5).** Extend `tests/e2e/test_inventory_runtime_grants.py`
-   (or add `tests/split/test_store_grants.py`) with these PostgreSQL non-owner roles:
-   - **single process:** the main role is granted DML on `main_database_tables()` (the
-     main owner tables plus the four retained notification tables the single-process main
-     database hosts), and the inventory role on `tables_for(INVENTORY)`. The
-     single-process API, worker, retention and notification flows work;
-   - **full split:** three roles, each granted DML only on `tables_for(store)`.
-
-   For each role, assert:
-   - each role denies cross-store SELECT/INSERT;
-   - each role denies `alembic_version_*` and trigger DDL;
-   - the API, inventory and notification flows work with their role.
-
-   Marked `integration`.
-4. **Leak matrix.** `tests/leak/flows_split.py` and `test_leak_matrix_split.py`. Embed
-   runtime-assembled sample secrets in an issue title, workflow inline text, a comment and
-   an asset locator. Run the split flows, then scan:
-   - every row of `notification_outbox`, `inventory_notification_outbox`,
-     `projection_changes`, `inventory_directory_entries`, `notification_directory_entries`,
-     `inventory_issue_links`, `notification_inbox`, both new audit tables, the
-     `inventory_outbox` payloads and `notifications`;
-   - captured HTTP request/response bodies (`httpx` event hooks or the fake servers);
-   - process logs;
-   - audit exports.
-
-   No raw sample may appear. Only masked forms and hit counts.
-5. **Import gates.** `tests/split/test_import_gates.py` uses isolated subprocesses:
-   - `python -m telescreen.inventory_service --help` and `build_inventory_runtime` import
-     none of `telescreen.wiring`, `telescreen.issues`, `telescreen.collectors`,
-     `telescreen.workflow`, `telescreen.alerts`, `telescreen.directory` or
-     `telescreen.notifications`;
-   - the same checks for `telescreen.notification_service` (plus `telescreen.inventory`);
-   - the Police SDK imports no `telescreen.`.
-6. **Compose (R8).** Add `examples/compose/docker-compose.services.yml`: three
-   `postgres` services, three migrate one-shots (`telescreen migrate --store main`,
-   `telescreen-inventory migrate`, `telescreen-notification migrate`), `inventory`,
-   `notification`, and an override of the Telescreen app/worker environment.
-   - Only the Telescreen app publishes `ports:`.
-   - Secrets use `secrets:` files and `env:`/`file:` refs, with placeholders only.
-   - SMTP/Slack settings appear only on `notification`.
-   - Delete `docker-compose.inventory.yml`. Update `.env.example` (new password
-     placeholders) and `examples/compose/README.md`.
-   - `tests/examples/test_examples.py` parses the YAML and asserts the three databases and
-     three processes, that only Telescreen has `ports`, that no SMTP/Slack variables
-     appear outside `notification`, and that no literal secrets appear.
-7. **Docs.**
-   - `design-docs/specs/design-service-split-verification.md`: a requirement-by-requirement
-     evidence table with commands and results.
-   - `design-service-split.md`:
-     - status IMPLEMENTED;
-     - 4.1 the `api_token` payload includes `label` (needed by the token actor display);
-     - 15 Telescreen split mode allows `notifications.dlp`/`notifications.guard` (GitHub
-       outbound guard);
-     - 12 (O1, including its observable single-process table layout, and the run 7
-       Nodetto layout rule) and 17 are already corrected (sessions 20-24, manifest g7).
-       Change them only if the implemented ownership or migration behavior differs. The
-       Nodetto layout fix itself belongs to serial finalization, not to this plan;
-     - 13 runbook commands as implemented.
-   - `command.md`: "TELESCREEN_BUREAU_SERVICE_URL is no longer read". Add the final
-     command list.
-   - `design-inventory-microservice.md`: compose file name.
+Deliverables 1-7 as planned in runs 1-7 are archived in full in
+[`../logs/svc-p08-verification-deploy-2026-10-16.md`](../logs/svc-p08-verification-deploy-2026-10-16.md).
+Deliverables 2-7 are done. Run 8 replaces deliverable 1 with the "Run 8 Scope" section below.
 
 ## Key Pitfalls
 
@@ -192,109 +72,200 @@ Imitate:
   not a risk.
 - Sample secrets come only from `tests.support.samples`. gitleaks blocks literals.
 
-## Verification
+## Run 8 Scope (manifest g8, base aaa2c4c) - authoritative
 
-```bash
-uv run --frozen ruff format --check --no-cache tests/split tests/inventory_service tests/e2e tests/leak tests/examples
-uv run --frozen ruff check --no-cache tests/split tests/inventory_service tests/e2e tests/leak tests/examples
-uv run --frozen ty check tests/split tests/inventory_service tests/e2e tests/leak tests/examples
-uv run --frozen pytest -p no:cacheprovider tests/split tests/inventory_service tests/notification_service tests/leak tests/examples tests/e2e tests/e2e/test_inventory_split_runtime.py 2>&1 | tee /tmp/telescreen-svc-p08-verification-deploy-pytest.log
-mise run ci > /tmp/telescreen-svc-p08-verification-deploy-ci.log 2>&1; echo "exit=$?"
-mise run ddl-check > /tmp/telescreen-svc-p08-verification-deploy-ddl.log 2>&1; echo "exit=$?"
-mise run web-ci > /tmp/telescreen-svc-p08-verification-deploy-web.log 2>&1; echo "exit=$?"
-uv build --out-dir /tmp/telescreen-svc-p08-verification-deploy-dist > /tmp/telescreen-svc-p08-verification-deploy-build.log 2>&1; echo "exit=$?"
-uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p08-verification-deploy-typelint.log 2>&1; echo "exit=$?"
-```
+Deliverables 2-7 are done (see the log archive). Run 8 does only the owner-resolution
+work (design section 17 "Run 8 acceptance flows" and "Leak matrix"). Deliverable 1 cases
+outside that list (OIDC parity, DLP parity, settings proxy, collection) stay covered by
+the existing component and in-process tests (`tests/notification_service/test_dlp_parity.py`,
+the p07 replica-authenticator parity tests, `tests/e2e/test_wiring_split.py`). Run 8 adds
+no new process cases for them.
 
-If `mise run ci` runs `uv build` into the repository, record that and use the `--out-dir`
-command as the build evidence. Evidence: every command exits 0, and the full suite (via
-`mise run ci`) is green offline.
+### R8.1 Shared harness `tests/split/support.py` (new, under 400 lines)
+
+- Move `_port`, `_run`, `_start` and `_ready` from `tests/inventory_service/test_process.py`
+  into public helpers: `free_port() -> int`, `run_cli(command, values) -> str`,
+  `start_service(command, values, log) -> subprocess.Popen[bytes]`,
+  `wait_ready(http, url, process, service_token)`, and `stop_service(process)`
+  (terminate, then wait 10 s, then kill and wait 5 s). `test_process.py` imports them, and
+  its existing test keeps passing.
+- `start_service` must open the log in **append** mode (`"ab"`). Today `_start` uses `"wb"`,
+  which loses the pre-restart log on restart, and the leak scan needs both halves.
+- `ServiceStack` (dataclass): the three SQLite paths, four ports, per-service env tuples
+  (copy the shapes at test_process.py:94-134), the log paths and the live processes, plus
+  `start(name)`, `stop(name)`, `restart(name, extra_env)` and `stop_all()`. Every test
+  calls `stop_all()` in `finally`. The Inventory env adds `TELESCREEN_WORKER_POLL_SECONDS=0.1`
+  and `TELESCREEN_DATA_OVERDUE_CRON` (`""` = disabled, `"* * * * *"` = enabled).
+- `SmtpRecorder`: a stdlib `socketserver.ThreadingTCPServer` on `127.0.0.1:0` that speaks
+  just enough SMTP (220 greeting; EHLO/HELO; MAIL; RCPT; DATA ending at `.`; QUIT) and
+  stores each DATA text in a lock-guarded list. Notification env:
+  `TELESCREEN_SMTP_HOST=127.0.0.1`, `TELESCREEN_SMTP_PORT=<port>`,
+  `TELESCREEN_SMTP_FROM=telescreen@example.invalid`, `TELESCREEN_SMTP_STARTTLS=false`
+  (keys from `core/config.py:354-359`; read `notifications/email.py` for anything else the
+  sender needs). Shut it down in `finally`. Add no dependency.
+- Read-only probes: `sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5)`. Add
+  `fetch_rows(path, table) -> tuple[tuple[str, ...], ...]` (every value via `str`; bytes
+  decoded with `errors="replace"`) and `scalar_int(path, sql, params) -> int`. Never write
+  to a store whose owning process is running.
+- `wait_for(check, timeout, what)`: poll every 0.2 s up to `timeout` (at most 90 s), then
+  raise `AssertionError(what)`. No fixed sleep longer than 1 s.
+- Seeding over HTTP through the Telescreen API with the CLI admin token:
+  `POST /api/members` (`handle`, `display_name`, `email` as `<handle>@example.invalid`,
+  `slack_user_id: null`; see `api/routers/directory.py:226`), then `telescreen projections
+  resync`, then `wait_for` until the member id is present in both
+  `inventory_directory_entries` and `notification_directory_entries`. Create the issue via
+  `POST /api/ingest/v1/scan` (as at test_process.py:217-245), then read its id from
+  `GET /api/issues`.
+
+### R8.2 `tests/split/test_replay_process.py` (R1R8 a)
+
+- `test_notification_outage_replays_once`: start the stack and the SMTP recorder, seed member
+  `alice` and an issue, then stop Notification. Post `POST /api/issues/{id}/comments` with
+  a body mentioning `@alice` (producer `issues/activity/mentions.py`). `wait_for` a
+  `notification_outbox` row that is still undelivered and whose delivery engine task has
+  attempt >= 1 (it failed while Notification was down). Restart Notification on the same
+  port, then `wait_for` every `notification_outbox` row to be delivered. Assert:
+  - each outbox event id has exactly one `notification_inbox` row;
+  - exactly one `notifications` row for alice has the mention event kind;
+  - re-POSTing that outbox row's stored payload to `NOTIFICATION_PREFIX + "/commands"`
+    (`notification_service/app.py:292`) with `x-telescreen-service-token` set to the
+    Telescreen notification token (the producer is chosen by token, app.py:295-302)
+    returns `"duplicate"`, and the inbox and notification row counts do not change.
+- `test_inventory_outage_replays_once`: seed as above, then stop Inventory and change the
+  issue status (`PATCH /api/issues/{id}`, using a valid status from `core.vocabulary`).
+  `wait_for` a pending `IssueLinkState` row in `inventory_outbox` with a failed delivery
+  attempt. Restart Inventory, then `wait_for` delivery. Assert that `inventory_issue_links`
+  holds exactly one row for the issue, with the new status and the highest published
+  stream sequence, and that each delivered event id has exactly one `inventory_inbox` row.
+- Pitfalls. Command delivery retries back off: notification `2**attempt` s, inventory
+  `10*2**(attempt-1)` s (`workflow/queue/worker.py:113`). Restart the receiver as soon as
+  the first failure is visible, so the replay arrives within the 90 s deadline. Do not
+  call the proxy (`/api/data/*`, notification settings) while the receiver is stopped.
+
+### R8.3 `tests/split/test_stopped_telescreen_process.py` (R1R8 b)
+
+- Start the stack with the overdue cron disabled. Seed `alice`. Through the Telescreen
+  proxy, create the `deletion_due` (DATE, role `deletion_due`) and `owner` (REFERENCE, role
+  `owner`) fields, then an asset whose `deletion_due` is `(date.today() - 7 days)` (the
+  processes use the real clock) and whose `owner` is `member:<alice id>` (imitate
+  `tests/inventory_service/test_runtime.py:_seed_overdue_asset`).
+- Stop the Telescreen API and worker, and assert `poll()` is not None for both. Restart
+  Inventory with cron `"* * * * *"`: `publish_due` fires on its first tick, but only once
+  per cron minute, so the cron must not be enabled before the asset exists.
+- Assert, with no Telescreen process alive:
+  - direct `GET http://127.0.0.1:<inventory>/api/data/assets` and `/api/data/assets/{id}`,
+    with `Authorization: Bearer <admin token>` and `x-telescreen-service-token`, return 200
+    and include the asset;
+  - the `inventory_notification_outbox` row is delivered;
+  - Notification has one `notifications` row of event kind `data_overdue` for alice with
+    status sent;
+  - the SMTP recorder holds exactly one message to `alice@example.invalid`;
+  - `inventory_audit_records` contains `data_asset.overdue_notified`.
+
+### R8.4 `tests/split/test_cutover_process.py` (R1R8 c; keep `test_cutover.py` unchanged)
+
+The flow is inventory-only split to full split (runbook section 13), so the inventory
+store is already separate:
+
+1. `telescreen migrate` on the shared `main.db` (single process; no notification URL);
+   `telescreen-inventory migrate` on `inventory.db`.
+2. Writers are stopped. Seed with the test's own async engine:
+   - `main.db` gets a `MemberRow` alice with a fixed id, a `pending` `NotificationRow` for
+     `member:<alice id>` (shape from `test_cutover.py`), and a
+     `RetentionNotificationReceiptRow` with id `X = retention_event_id(asset_id, field_id,
+     revision_id)` (`ports/retention.py:32`);
+   - `inventory.db` gets the `deletion_due` and `owner` fields, the asset and its values,
+     with fixed ids, the past date and owner alice (imitate
+     `tests/inventory/retention/helpers.py:_field` and `_asset`).
+3. `telescreen-notification migrate`, then `telescreen notification-store copy
+   --writers-stopped` and `verify --writers-stopped`; both exit 0.
+4. Start Notification (with SMTP), Inventory (cron disabled), and the Telescreen API and
+   worker in split mode. Run resync and wait for the replicas.
+5. Assert that the copied row is delivered exactly once: its status is sent, and the
+   recorder holds exactly one message with its subject. That count is unchanged after
+   5 further pump intervals.
+6. Restart Inventory with the cron enabled. `wait_for` the `inventory_notification_outbox`
+   row `X` to be delivered. Notification answered `DUPLICATE` through the receipt check at
+   `notification_service/inbox.py:62-74`. Assert:
+   - no `notification_inbox` row `X`;
+   - the `data_overdue` notification count is unchanged;
+   - the SMTP count is unchanged.
+7. Not vacuous: assert that row `X` exists in the outbox, which proves the command was
+   actually sent.
+
+### R8.5 Leak matrix: `tests/leak/flows_split.py` and `test_leak_matrix_split.py`
+
+- Add `assert_store_tables_clean(samples, stores: tuple[tuple[Store, Path], ...])`:
+  - for each `(Store.MAIN, main.db)`, `(Store.INVENTORY, inventory.db)` and
+    `(Store.NOTIFICATION, notification.db)` pair, take the names from
+    `db/ownership.py:tables_for(store)`, which is never a hardcoded list;
+  - assert that every name exists in `sqlite_master`, so a new table that the flow cannot
+    reach still fails;
+  - scan every value of every row for `sample.value` and its JSON-escaped form
+    (`json.dumps(value)[1:-1]`).
+- Add `assert_texts_clean(samples, texts)`, using the same two forms, for logs, API bodies,
+  SMTP DATA and audit exports. Keep the existing `assert_split_sinks_clean` raw-byte scan.
+- `test_leak_matrix_split.py`: one stack, distinct runtime samples from
+  `tests.support.samples`, carried by:
+  - the ingest text, which becomes the issue title;
+  - a comment mentioning `@alice`;
+  - a workflow notify step with an inline body (imitate
+    `tests/leak/flows_v12.py:notification_set_flow`; create, activate and run it on the
+    issue);
+  - the rejected asset locator (422).
+- After every outbox is delivered:
+  - run `python -m telescreen.inventory_service audit export` and
+    `python -m telescreen.notification_service audit export` via `run_cli`; each output
+    must be non-empty;
+  - scan all tables, the four process logs, every API body the test received, the SMTP
+    DATA and both exports.
+- Not vacuous:
+  - at least one `notification_outbox` payload, decoded with the
+    `telescreen.ports.notification_commands` codec, has an operation whose `redaction`
+    (`ProducerRedactionHits`) count is positive;
+  - the mention notification row exists.
+
+### Invariants and non-goals for run 8
+
+- No production code, DDL, Alembic or owner-baseline edit. Run `git diff --quiet HEAD --
+  src db` at the end; it must exit 0. A product defect is a Reconciliation request,
+  reproduced with a failing test id.
+- Do not edit `design-service-split.md` status lines, `impl-plans/README.md`, `README.md`
+  or any manifest. Serial finalization does that.
+- Every file under `tests/split` and `tests/leak` stays under 1000 lines, and this plan
+  stays under 400. No `pytest.skip` or `skipif` in the new process modules. Typelint rules
+  apply (no `Any`, `object` or dict types; dataclasses for records).
+- Update `design-docs/specs/design-service-split-verification.md`: map rows R1, R3, R5
+  and R7 to the new test ids and final logs, and remove the "pending" wording only where
+  a new test now covers it.
+
+## Verification (run 8; logs `/tmp/telescreen-svc-p08-verification-deploy-g8-*.log`)
+
+Use `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1` for every command. Each must exit 0:
+
+1. `uv run --frozen ruff format --check --no-cache tests/split tests/inventory_service tests/e2e tests/leak tests/examples`
+2. `uv run --frozen ruff check --no-cache tests/split tests/inventory_service tests/e2e tests/leak tests/examples`
+3. `uv run --frozen ty check tests/split tests/inventory_service tests/e2e tests/leak tests/examples`
+4. `uv run --frozen python tools/typelint.py > <log> 2>&1`, with no line matching `tests/(split|leak|inventory_service)`.
+5. `for i in 1 2 3; do uv run --frozen pytest -p no:cacheprovider -q tests/split/test_replay_process.py tests/split/test_stopped_telescreen_process.py tests/split/test_cutover_process.py tests/leak/test_leak_matrix_split.py tests/inventory_service/test_process.py || exit 1; done`. Each run passes with 0 skipped; this checks for flakiness.
+6. `! pgrep -f 'telescreen.(inventory_service|notification_service) serve'`, which proves there are no orphan processes.
+7. `uv run --frozen pytest -p no:cacheprovider tests/split tests/inventory_service tests/notification_service tests/leak tests/examples tests/e2e`
+8. `mise run ci`. Record the passed and skipped counts; passed must be at least 1397 plus the new tests.
+9. `mise run ddl-check`; `mise run web-ci`; `uv build --out-dir /tmp/telescreen-svc-p08-verification-deploy-g8-dist`.
+10. `git diff --quiet HEAD -- src db`; `test "$(wc -l < impl-plans/active/svc-p08-verification-deploy.md)" -lt 400`; `wc -l tests/split/*.py tests/leak/*.py`, where every file is under 1000 lines.
+
+Record source hashes under `tmp/telescreen-svc-20261016-g8/svc-p08-verification-deploy/attempt-<n>/`.
 
 ## Completion Criteria
 
-- [ ] Full R1-R8 multi-process acceptance flows pass, including token/OIDC parity, producer outage/replay in both directions, DLP delivery parity, overdue with Telescreen stopped, complete three-store cutover/deduplication, and the full leak sink matrix.
-- [x] `mise run ci`, `mise run ddl-check`, `mise run web-ci` and `uv build --out-dir` exit 0 on the final implementation source. Logs are recorded below.
-- [x] Three-store Compose topology validation passes; `docker-compose.inventory.yml` is removed.
-- [x] `tests/inventory_service/test_process.py` has no skip placeholder and passes offline; `test_postgres.py` is integration-marked with the configured database fixture gate.
-- [x] Verification document, accepted design corrections and deployment documentation are written; source hashes are recorded.
+- [ ] R8.1-R8.5 are implemented, and command 5 passes three times in a row offline.
+- [ ] The leak matrix enumerates `tables_for` for all three stores and scans logs, API bodies, SMTP DATA and both audit exports.
+- [ ] Verification commands 1-10 exit 0 on the final source, with logs and hashes recorded.
+- [ ] The verification document has been updated. Status is Completed, `priorVerification` is empty, and only final passing commands are listed (conventions 7a).
+- [x] Compose topology, the rewritten `test_process.py`/`test_postgres.py`, the docs and the design corrections are done (run 7).
 
 ## Progress Log
 
-(append sessions per conventions section 8)
-
-
-### Session 7 implementation (2026-10-16)
-
-Status remains In Progress because full R1-R8 acceptance flows are not yet implemented.
-No production code or DDL changed.
-
-Implemented in this plan:
-
-- Rewrote `tests/inventory_service/test_process.py` to migrate and start Telescreen API,
-  Telescreen worker, Inventory and Notification against three SQLite files. It runs
-  `projections resync`, creates an API token through the CLI, registers/reads an Inventory
-  asset through the TCP proxy, checks a runtime sample is rejected without echo, scans all
-  three database files, service logs and API responses, and terminates every process in
-  `finally`.
-- Added `tests/split/test_import_gates.py`, `tests/split/test_cutover.py`,
-  `tests/leak/flows_split.py` and `tests/leak/test_leak_matrix_split.py`.
-- Rewrote `tests/inventory_service/test_postgres.py` as an integration-marked three-role
-  ownership/grant test. It was skipped offline because `TELESCREEN_TEST_DATABASE_URL` is
-  not set; no live grant result is claimed.
-- Added `examples/compose/docker-compose.services.yml` with three owner databases and
-  three service processes, deleted `docker-compose.inventory.yml`, and updated the example
-  validator, `.env.example` and README.
-- Added `design-docs/specs/design-service-split-verification.md`; updated the service-split
-  design status, token projection label and allowed DLP/guard imports; corrected the
-  command and inventory deployment documents.
-
-Source hash manifest: `tmp/telescreen-svc-20261016-g7/svc-p08-verification-deploy/attempt-1/source-hashes.final.sha256`.
-
-Verification commands (final source unless otherwise noted):
-
-- `uv run --frozen ruff format --check --no-cache tests/split tests/inventory_service tests/e2e tests/leak tests/examples` — exit 0, 68 files; `/tmp/telescreen-svc-p08-verification-deploy-g7-final-format.log`.
-- `uv run --frozen ruff check --no-cache tests/split tests/inventory_service tests/e2e tests/leak tests/examples` — exit 0; `/tmp/telescreen-svc-p08-verification-deploy-g7-final-ruff.log`.
-- `uv run --frozen ty check tests/split tests/inventory_service tests/e2e tests/leak tests/examples` — exit 0; `/tmp/telescreen-svc-p08-verification-deploy-g7-final-ty.log`.
-- `uv run --frozen python tools/typelint.py` with the p08 path filter — exit 0, no p08 diagnostics; `/tmp/telescreen-svc-p08-verification-deploy-g7-final-typelint.log`.
-- `uv run --frozen pytest -p no:cacheprovider tests/split tests/inventory_service tests/notification_service tests/leak tests/examples tests/e2e` — exit 0, 175 passed, 4 skipped; `/tmp/telescreen-svc-p08-verification-deploy-g7-final-pytest.log`.
-- `mise run ci` — exit 0, 1397 passed, 35 skipped, 1 warning; full log `/tmp/telescreen-svc-p08-verification-deploy-g7-final-ci.log`.
-- `mise run ddl-check` — exit 0, canonical exports and 10 schema tests passed; `/tmp/telescreen-svc-p08-verification-deploy-g7-ddl.log`.
-- `mise run web-ci` — exit 0, 49 test files and 262 tests passed; `/tmp/telescreen-svc-p08-verification-deploy-g7-web.log`.
-- `uv build --out-dir /tmp/telescreen-svc-p08-verification-deploy-g7-dist` — exit 0; source distribution and wheel created; `/tmp/telescreen-svc-p08-verification-deploy-g7-build.log`.
-- `uv run --frozen pytest -p no:cacheprovider -q tests/inventory_service/test_process.py tests/leak/test_leak_matrix_split.py` — exit 0, 2 passed; `/tmp/telescreen-svc-p08-attempt1-process-leak-final.log`.
-- `uv run --frozen pytest -p no:cacheprovider -q tests/inventory_service/test_process.py tests/leak/test_leak_matrix_split.py` — review-repair source, exit 0, 2 passed; `/tmp/telescreen-svc-p08-g7-r3-process-leak.log`.
-- `! grep -n 'pytest.mark.skip\|pytest.skip(' tests/inventory_service/test_process.py && test ! -e examples/compose/docker-compose.inventory.yml && test -f examples/compose/docker-compose.services.yml` — exit 0.
-
-Earlier repair attempts in this session: the process harness first used an invalid fingerprint secret reference, then probed protected health routes without service headers; both were corrected and the final process tests pass. The raw locator sample was correctly rejected with 422 and the test now asserts the safe rejection. An early broad pytest shell used zsh's read-only `status` variable and produced an incomplete log; the final scoped pytest and `mise run ci` above were rerun with complete logs.
-
-### Session 8 review repair (2026-10-16)
-
-- Fixed P08-R1R8-MATRIX's dead Notification destination: Inventory now targets the allocated live Notification TCP port.
-- Strengthened the process leak probe with a successful source-content ingest using a runtime sample; it asserts 200 and checks the returned body, three database files, process logs and API bodies for raw samples.
-- Focused process/leak verification: 2 passed, exit 0; `/tmp/telescreen-svc-p08-g7-r3-process-leak.log`.
-- Scoped final-source suite: 175 passed, 4 environment-gated integration skips, exit 0; `/tmp/telescreen-svc-p08-verification-deploy-g7-r3-pytest.log`.
-- `ruff format --check`, `ruff check`, `ty check`, and `python tools/typelint.py`: exit 0; logs `/tmp/telescreen-svc-p08-verification-deploy-g7-r3-{format,ruff,ty,typelint}.log`.
-- `mise run ci`: exit 0, 1397 passed, 35 skipped, 1 warning; `/tmp/telescreen-svc-p08-verification-deploy-g7-r3-ci.log`.
-- `mise run ddl-check`: exit 0, 10 schema tests passed; `/tmp/telescreen-svc-p08-verification-deploy-g7-r3-ddl.log`.
-- `mise run web-ci`: exit 0, 262 tests passed and production build completed; `/tmp/telescreen-svc-p08-verification-deploy-g7-r3-web.log`.
-- `uv build --out-dir /tmp/telescreen-svc-p08-verification-deploy-g7-r3-dist`: exit 0; `/tmp/telescreen-svc-p08-verification-deploy-g7-r3-build.log`.
-- Full P08-R1R8-MATRIX and P08-LEAK-MATRIX remain incomplete: no cross-process producer delivery/replay, stopped-Telescreen overdue, full cutover delivery/dedup, or all-table/wire/audit-export scan is present. No production source or DDL was changed.
-- Required remaining gate: implement assigned TCP flows and complete leak sinks, then rerun the full verification commands on final source. Status stays In Progress.
-
-### Owner resolution: 2026-10-16 (after session 24)
-
-Not an external blocker: the remaining work is inside this plan's own scope and paths.
-Everything else on the checkpoint is green (`mise run ci` 1397 passed / 35 skipped,
-ddl-check, web-ci, uv build; process/leak tests pass; the skipped legacy tests are
-rewritten). Finish exactly these, using the existing TCP process harness in
-`tests/inventory_service/test_process.py` and `tests/split`:
-1. P08-R1R8-MATRIX: (a) cross-process producer delivery and replay (Telescreen
-   outbox -> Inventory and -> Notification; stop the receiver, write, restart, assert
-   exactly-once application via receipts); (b) Inventory publishes an overdue
-   notification and serves `/api/data/*` while the Telescreen process is stopped;
-   (c) cutover delivery/dedup: copied pending obligations deliver once after cutover.
-2. P08-LEAK-MATRIX: scan every table of all three stores, captured wire bodies
-   (outbox/inbox payloads), process logs and audit exports for the raw samples.
-Keep each test file under 1000 lines (split by topic). Then rerun the full
-verification list on final source, record hashes, mark Completed. Conventions 7a:
-only final passing commands, `priorVerification` empty, no fixed findings as risks.
+The run 7 entries (sessions 7 and 8 and the owner resolution) are archived in
+[`../logs/svc-p08-verification-deploy-2026-10-16.md`](../logs/svc-p08-verification-deploy-2026-10-16.md).
+Append run 8 sessions below, following conventions section 8.

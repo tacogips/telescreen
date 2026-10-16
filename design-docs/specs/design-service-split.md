@@ -1,6 +1,6 @@
 # Service split: Telescreen, Inventory and Notification
 
-Status: Implementation in progress; cross-process R1-R8 verification pending, 2026-10-16
+Status: Implementation in progress (run 8: only svc-p08 cross-process R1-R8 and leak matrices remain), 2026-10-16
 Requirements: [design-service-split-requirements.md](design-service-split-requirements.md)
 (R1-R8, owner decisions D1-D5). Builds on [inventory microservice](design-inventory-microservice.md),
 [inventory/alert boundaries](design-inventory-alert-boundaries.md) and the
@@ -567,19 +567,59 @@ PostgreSQL variants marked `integration`. They cover:
 
 The single-process suite must stay green. Commands: `mise run ci`, `mise run ddl-check`,
 `mise run web-ci`, `uv build`, `uv run pytest -q tests/inventory_service
-tests/notification_service`.
+tests/notification_service tests/split tests/leak`.
+
+**Run 8 acceptance flows (svc-p08 owner resolution).** These are offline tests that run in
+the default `uv run pytest`. They reuse the `_port`/`_start`/`_ready` harness of
+`tests/inventory_service/test_process.py`: ephemeral ports, bounded readiness and
+receipt polling with finite timeouts, and every process terminated in `finally`. They
+live in `tests/split/` and `tests/leak/`, one module per topic, each under 1000 lines.
+Stopping a process means terminating it and starting a new process on the same SQLite
+file and port settings. Exactly-once is asserted from stored state, not from logs.
+
+- (a) **Producer outage/replay.** Telescreen -> Inventory: stop Inventory, commit an
+  issue change that produces an `IssueLinkState`, restart, run the engine, and assert
+  that one `inventory_issue_links` row is at the published sequence and the outbox row
+  is delivered. Telescreen -> Notification: stop Notification, commit a producer
+  notification (for example an issue comment), restart, and assert one
+  `notification_inbox` row per `event_id` and one notification row per deterministic
+  id. A redelivery of the same command returns `DUPLICATE` and adds no rows.
+- (b) **Telescreen stopped (R1, R5).** After resync, terminate the Telescreen API and
+  worker. Inventory still answers `/api/data/*` with a replica-authenticated API token
+  (called directly with the service-auth headers its routes need). An overdue asset
+  makes Inventory publish an `inventory_notification_outbox` command, which Notification
+  applies (inbox receipt plus `data_overdue` notification row) and delivers to the fake
+  transport, with no Telescreen process running.
+- (c) **Cutover delivery and dedup.** The entry points are `telescreen notification-store
+  copy/verify --writers-stopped` (section 13 step 4) and the Notification inbox check
+  against `retention_notification_receipts`. A copied `pending` notification row is
+  delivered exactly once by the Notification worker after cutover. An Inventory retention
+  command whose `event_id` equals a copied receipt id returns `DUPLICATE` and creates no
+  second notification row.
+
+**Leak matrix (section 16).** The runtime-assembled raw samples travel through issue
+titles, comments, workflow inline text, asset locators and context fields. The scan then
+covers: every table of each store, enumerated from `db/ownership.py`
+(`tables_for(Store.MAIN|INVENTORY|NOTIFICATION)`) rather than a hardcoded list; every
+outbox and inbox payload column; every HTTP request and response body captured by the
+tests; all process logs; and `telescreen-inventory audit export` and
+`telescreen-notification audit export` output. Telescreen has no audit export command, so
+its chain is covered by the main-store table scan and `/api/audit/search`. No raw sample
+may appear anywhere.
 
 Plan shape (`svc-pNN`, disjoint writePaths). The plan files in `impl-plans/active/` and
-the current dispatch manifest (`telescreen-svc-20261016-g7-dispatch.json`, superseding
-g6 with the same plans, writePaths and DAG) are authoritative for writePaths. p01, p02,
-p03 and p07 are integration-accepted and are recorded as accepted dependencies at
-checkpoint `a5392d9`; they are not redispatched. The remaining plans run in waves:
+the current dispatch manifest (`telescreen-svc-20261016-g8-dispatch.json`, superseding
+g7 with the same plans, writePaths and DAG) are authoritative for writePaths. p01-p07
+are integration-accepted and are recorded as accepted dependencies at checkpoint
+`aaa2c4c`; they are not redispatched. The remaining work runs in waves:
 
-1. p04, p05 and p06. p05 and p06 are implemented, and only the independent re-review is
-   left. p04 still owes its R5 retention-dispatch behavior cases.
-2. p08.
-3. Serial finalization. It also applies the Nodetto layout fix (section 12), because the
-   Nodetto document and `tests/db/**` are paths of the accepted p02.
+1. p08 (the run 8 acceptance flows and leak matrix above, then the final gates).
+2. Serial finalization. It archives the svc plans and the g1-g8 manifests to
+   `impl-plans/completed/`, and updates `impl-plans/README.md`, `README.md` and the
+   status lines of this design and its related specs. It also applies the Nodetto
+   layout fix (section 12), which is not yet applied at `aaa2c4c` (the Nodetto JSONL
+   was last changed in run 1), because the Nodetto document and `tests/db/**` are paths
+   of the accepted p02.
 
 The critical path is p01 -> p02 -> p07 -> p04/p05 -> p08. Each plan owns the shared
 exact-count/inventory tests that its change breaks.
