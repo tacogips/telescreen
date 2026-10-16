@@ -191,7 +191,7 @@ mise tasks added: `web-install`, `web-typecheck`, `web-test`, `web-build`, `web-
 
 ---
 
-## Service split (designed)
+## Service split (implemented)
 
 Full split requires both `TELESCREEN_INVENTORY_SERVICE_URL` and
 `TELESCREEN_NOTIFICATION_SERVICE_URL`. Setting only one is a configuration error.
@@ -211,7 +211,7 @@ New settings:
 - `TELESCREEN_NOTIFICATION_DATABASE_URL`
 - `TELESCREEN_NOTIFICATION_REPLICA_GRACE_SECONDS` (default 600)
 
-`TELESCREEN_BUREAU_SERVICE_URL` is removed. See the [service split](design-service-split.md)
+`TELESCREEN_BUREAU_SERVICE_URL` is no longer read. See the [service split](design-service-split.md)
 sections 13-14 for the cutover order and per-process settings.
 
 ## Independent inventory service
@@ -222,3 +222,10 @@ Use `telescreen migrate --store main` for the bureau database and
 then configure the bureau API and engine to use its service URL and shared service
 secret reference. See [deployment, cutover and HTTP contracts](design-inventory-microservice.md)
 for all settings and the separate-database Compose overlay.
+
+
+Full split deployment uses [`docker-compose.services.yml`](../../examples/compose/docker-compose.services.yml)
+with separate main, inventory and notification PostgreSQL stores. The ordered cutover is
+`migrate`, `notification-store copy`, `notification-store verify`, `inventory-store copy`,
+`inventory-store verify`, then `projections resync`; see section 13 of
+[design-service-split.md](design-service-split.md).

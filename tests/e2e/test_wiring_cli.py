@@ -1,5 +1,6 @@
 """Offline worker and collector command behavior using file-backed SQLite."""
 
+import argparse
 import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,9 +17,13 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+import telescreen.cli as cli
+import telescreen.cli_inventory_store as cli_inventory_store
 from telescreen.cli import main
 from telescreen.collectors.codec import selector_to_json
+from telescreen.core.config import TelescreenSettings
 from telescreen.core.json import dump_json
+from telescreen.core.secrets import EnvSource
 from telescreen.core.vocabulary import CollectorKind, TriggerMode
 from telescreen.db.base import Base
 from telescreen.db.models import (
@@ -30,6 +35,7 @@ from telescreen.db.models import (
 from telescreen.db.ownership import NOTIFICATION_TABLES, main_database_tables
 from telescreen.db.session import create_sessionmaker
 from telescreen.ports.collectors import GitHubSelector
+from telescreen.wiring import Container
 
 
 def _configure_environment(monkeypatch: pytest.MonkeyPatch, database_url: str) -> None:
@@ -197,3 +203,47 @@ def test_split_default_migration_creates_main_tables_only(
         }
     finally:
         engine.dispose()
+
+
+def test_notification_store_verify_dispatches_without_building_container(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Route notification transfer to its handler without opening runtime services."""
+    database_url: str = f"sqlite+aiosqlite:///{tmp_path / 'notification-store.db'}"
+    _configure_environment(monkeypatch, database_url)
+    notification_calls: list[str] = []
+    inventory_calls: list[str] = []
+
+    def run_notification(settings: TelescreenSettings, arguments: argparse.Namespace) -> int:
+        notification_calls.append(arguments.notification_store_command)
+        return 0
+
+    def run_inventory(settings: TelescreenSettings, arguments: argparse.Namespace) -> int:
+        inventory_calls.append(arguments.inventory_store_command)
+        return 0
+
+    def unexpected_container(settings: TelescreenSettings, env: EnvSource) -> Container:
+        raise AssertionError("store commands must not build a container")
+
+    monkeypatch.setattr(cli_inventory_store, "run_notification", run_notification)
+    monkeypatch.setattr(cli_inventory_store, "run", run_inventory)
+    monkeypatch.setattr(cli, "_build_cli_container", unexpected_container)
+
+    assert main(["notification-store", "verify", "--writers-stopped"]) == 0
+    assert notification_calls == ["verify"]
+    assert main(["inventory-store", "verify", "--writers-stopped"]) == 0
+    assert inventory_calls == ["verify"]
+
+
+def test_notification_store_copy_requires_notification_database_url(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Report the configured URL error from the real notification transfer handler."""
+    database_url: str = f"sqlite+aiosqlite:///{tmp_path / 'notification-copy.db'}"
+    _configure_environment(monkeypatch, database_url)
+
+    assert main(["notification-store", "copy"]) == 3
+    assert (
+        "notification transfer requires main and notification database URLs"
+        in capsys.readouterr().err
+    )

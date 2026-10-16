@@ -384,3 +384,44 @@ def test_workflow_examples_validate_through_the_cli() -> None:
     }
     for path in paths:
         assert main(["workflow", "validate", str(path)]) == 0
+
+
+def test_three_service_compose_has_disjoint_stores_and_private_services() -> None:
+    """Validate the full split deployment overlay without starting external services."""
+    services_path: Path = _COMPOSE / "docker-compose.services.yml"
+    compose: JsonValue = parse_yaml(services_path.read_text(encoding="utf-8"))
+    services: JsonValue | None = compose.get("services")
+    assert services is not None
+    assert services.kind is JsonKind.OBJECT
+    names: set[str] = set(services.member_names())
+    assert {
+        "telescreen-postgres",
+        "inventory-postgres",
+        "notification-postgres",
+    } <= names
+    assert {
+        "migrate-main",
+        "migrate-inventory",
+        "migrate-notification",
+        "bureau",
+        "engine",
+        "inventory",
+        "notification",
+    } <= names
+    published: set[str] = set()
+    for name in names:
+        service: JsonValue | None = services.get(name)
+        assert service is not None
+        ports: JsonValue | None = service.get("ports")
+        if ports is not None:
+            published.add(name)
+        environment: JsonValue | None = service.get("environment")
+        if environment is not None and environment.kind is JsonKind.OBJECT:
+            channel_settings: set[str] = {
+                key for key in environment.member_names() if "SMTP" in key or "SLACK" in key
+            }
+            assert not channel_settings or name == "notification"
+    assert published == {"bureau"}
+    text: str = services_path.read_text(encoding="utf-8")
+    assert not find_leaks(text)
+    assert not (_COMPOSE / "docker-compose.inventory.yml").exists()

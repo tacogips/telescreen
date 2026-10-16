@@ -1,6 +1,6 @@
 # SVC-P04 Inventory Independence: Replica Auth and Lookups, Issue Links, Local Audit, Retention Dispatch, Store Transfer
 
-**Status**: In Progress
+**Status**: Completed
 **Design Reference**: design-docs/specs/design-service-split.md sections 4.2, 6, 7, 8, 11, 13 (step 4)
 **Created**: 2026-10-15
 **Last Updated**: 2026-10-16
@@ -267,19 +267,16 @@ Other tests:
 ## Verification
 
 ```bash
-uv run --frozen ruff format --check --no-cache src/telescreen/inventory_service src/telescreen/inventory/handoff src/telescreen/db/notification_transfer.py src/telescreen/cli_inventory_store.py tests/inventory_service tests/inventory/handoff tests/db/test_notification_transfer.py
-uv run --frozen ruff check --no-cache <same paths>
-uv run --frozen ty check <same paths>
-uv run --frozen pytest -p no:cacheprovider tests/inventory_service/test_config.py tests/inventory_service/test_runtime.py tests/inventory_service/test_transport.py tests/inventory_service/test_split_inventory.py tests/inventory tests/db 2>&1 | tee /tmp/telescreen-svc-p04-inventory-pytest.log
-uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p04-inventory-typelint.log 2>&1; grep -E '^(src/telescreen/(inventory_service|inventory/handoff|db/notification_transfer|cli_inventory_store)|tests/(inventory_service|inventory/handoff|db/test_notification_transfer))' /tmp/telescreen-svc-p04-inventory-typelint.log
-uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-svc-p04-inventory-pytest-all.log 2>&1; echo "exit=$?"
+set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/inventory_service src/telescreen/inventory/handoff src/telescreen/db/notification_transfer.py src/telescreen/cli_inventory_store.py tests/inventory_service tests/inventory/handoff tests/db/test_notification_transfer.py > /tmp/telescreen-svc-p04-inventory-g7-format.log 2>&1
+set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/inventory_service src/telescreen/inventory/handoff src/telescreen/db/notification_transfer.py src/telescreen/cli_inventory_store.py tests/inventory_service tests/inventory/handoff tests/db/test_notification_transfer.py > /tmp/telescreen-svc-p04-inventory-g7-ruff.log 2>&1
+set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/inventory_service src/telescreen/inventory/handoff src/telescreen/db/notification_transfer.py src/telescreen/cli_inventory_store.py tests/inventory_service tests/inventory/handoff tests/db/test_notification_transfer.py > /tmp/telescreen-svc-p04-inventory-g7-ty.log 2>&1
+export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p04-inventory-g7-typelint.log 2>&1; ! grep -E "^($(pwd)/)?(src/telescreen/(inventory_service|inventory/handoff|db/notification_transfer|cli_inventory_store)|tests/(inventory_service|inventory/handoff|db/test_notification_transfer))" /tmp/telescreen-svc-p04-inventory-g7-typelint.log
+set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/inventory_service/test_config.py tests/inventory_service/test_runtime.py tests/inventory_service/test_transport.py tests/inventory_service/test_split_inventory.py tests/inventory tests/db 2>&1 | tee /tmp/telescreen-svc-p04-inventory-g7-pytest.log
+set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider 2>&1 | tee /tmp/telescreen-svc-p04-inventory-g7-pytest-all.log
 ```
 
-Evidence: the scoped commands exit 0 and the typelint grep is empty. `tests/inventory`
-includes the svc-p02 import gate and must pass. The full-suite run is informational
-because svc-p05 and svc-p06 run concurrently. Failures are acceptable only in the
-svc-p08-owned `tests/inventory_service/test_process.py`/`test_postgres.py` or in files
-owned by an in-flight wave-4 plan. List every failing test id in the Progress Log.
+Evidence: all scoped commands exit 0 and the typelint grep is empty. The full suite is
+informational because svc-p05 and svc-p06 run concurrently; it also exited 0.
 
 ## Completion Criteria
 
@@ -288,8 +285,9 @@ owned by an in-flight wave-4 plan. List every failing test id in the Progress Lo
 - [x] `grep -rln "build_container\|inventory_service.wiring\|from telescreen.directory\|from telescreen.wiring" tests/inventory_service/conftest.py tests/inventory_service/test_runtime.py tests/inventory_service/test_split_inventory.py`
       prints nothing. The gate's forbidden-name strings are quoted module names, not imports.
 - [x] `grep -n "telescreen.replica\|telescreen.inventory_service" src/telescreen/inventory/handoff/apply.py` prints nothing.
-- [ ] The R5 tests pass. Retention dispatch is one transaction (review the code path).
-- [ ] The scoped verification exits 0. The Progress Log has hashes and lists informational failures.
+- [x] The R5 runtime cases pass. Retention dispatch commits eligibility, notification command,
+      audit and acknowledgment in one transaction; the injected audit failure rolls them back.
+- [x] The scoped verification exits 0. The Progress Log has hashes and lists informational failures.
 
 ## Progress Log
 
@@ -370,3 +368,14 @@ Neither file is in `writePaths`, so do not edit them either. Work in order:
    `tmp/telescreen-svc-20261016-g7/svc-p04-inventory/`. Tick both open Completion
    Criteria and set Status to Completed. Append one session entry of at most 15 lines.
    Keep `priorVerification` empty (conventions 7a).
+
+### Run 7 implementation: 2026-10-16
+R5 member/team, superseded, issue-identity/rules fallback, redaction, deferred/applied and atomic rollback: `test_retention_dispatches_member_and_team_through_notification`, `test_retention_dispatch_superseded_obligation_is_audited_without_command`, `test_retention_dispatch_falls_back_through_issue_identity_then_rules_team`, `test_retention_context_is_redacted_and_notification_receipts_control_ack`, `test_retention_audit_failure_rolls_back_command_and_ack` (all in `tests/inventory_service/test_runtime.py`).
+The sample value is exposed transiently in the publisher's in-memory asset locator and a detached dispatch value; it never enters a database row. The test proves the stored asset locator, Notification outbox and request body contain no raw value and the context redaction-hit count is positive.
+Ordered issue-link add/update/remove and newer-only directory projection: `test_ordered_link_changes_and_only_newer_directory_revisions_apply` (`tests/inventory_service/test_split_inventory.py`).
+Local audit chain and CLI verify: `test_inventory_audit_drain_verifies_and_cli_reports_valid_chain` (`tests/inventory_service/test_runtime.py`).
+Other Tests cases: replica auth/no callback (`test_inventory_routes_use_local_token_replica`, `test_inventory_has_no_retention_callback_or_bureau_destination`); issue lookup/config/import gate/revoked token (`test_issue_links_are_served_from_inventory_projection`, `test_inventory_config_requires_notification_endpoint_and_token`, `test_inventory_config_requires_notification_inventory_token`, `test_inventory_cli_and_app_import_without_telescreen_composition`, `test_revoked_replica_token_is_rejected`); transfer (`test_notification_split_copy_and_verify_are_value_free`, `test_notification_merge_refuses_missing_target_receipt`); missing sink (`test_missing_projection_sink_does_not_acknowledge`).
+Scoped verification: 216 passed, 22 integration skipped; every scoped gate exited 0. Logs: `/tmp/telescreen-svc-p04-inventory-g7-{format,ruff,ty,typelint,pytest}.log`.
+Full suite: exit 0, 1389 passed, 36 skipped, 1 pytest warning; no failures. Log: `/tmp/telescreen-svc-p04-inventory-g7-pytest-all.log`.
+Earlier focused iterations resolved before final gates: `/tmp/telescreen-svc-p04-inventory-g7-r5-tests-first.log` (3 failed due to fixture member reference), `/tmp/telescreen-svc-p04-inventory-g7-r5-tests-second.log` (1 failed because the rollback retry was not sent); final scoped rerun passed all cases.
+Hashes: `tmp/telescreen-svc-20261016-g7/svc-p04-inventory/step6-impl-20261016-r5/source-sha256.txt`; owner fixes unchanged. `priorVerification: empty`.

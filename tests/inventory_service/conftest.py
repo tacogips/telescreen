@@ -35,6 +35,8 @@ class ServiceNetwork(httpx.AsyncBaseTransport):
 
     inventory_app: FastAPI | None = None
     requests: list[str] | None = None
+    notification_receipt: NotificationCommandReceipt = NotificationCommandReceipt.APPLIED
+    notification_bodies: list[str] | None = None
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         """Keep every call local and record the requested origin/path."""
@@ -42,7 +44,10 @@ class ServiceNetwork(httpx.AsyncBaseTransport):
             self.requests = []
         self.requests.append(str(request.url))
         if request.url.host == "notification":
-            return httpx.Response(200, json=NotificationCommandReceipt.APPLIED.value)
+            if self.notification_bodies is None:
+                self.notification_bodies = []
+            self.notification_bodies.append(request.content.decode("utf-8"))
+            return httpx.Response(200, json=self.notification_receipt.value)
         if request.url.host != "inventory" or self.inventory_app is None:
             raise AssertionError("unexpected service destination")
         return await httpx.ASGITransport(app=self.inventory_app).handle_async_request(request)

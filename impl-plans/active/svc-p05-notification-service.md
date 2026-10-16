@@ -1,6 +1,6 @@
 # SVC-P05 Notification Service: Process, Inbox, Replica, DLP Prior-Hit Fold, Delivery Pump, Routes, Audit
 
-**Status**: Implementation Complete (pending review)
+**Status**: Completed (run 7 implementation verification; independent reviews pending)
 **Design Reference**: design-docs/specs/design-service-split.md sections 4.3, 4.4, 6, 7, 9, 10, 11, 14
 **Created**: 2026-10-15
 **Last Updated**: 2026-10-16
@@ -243,20 +243,19 @@ uv run --frozen ruff format --check --no-cache src/telescreen/notification_servi
 uv run --frozen ruff check --no-cache src/telescreen/notification_service src/telescreen/notifications src/telescreen/api/routers/notification_settings.py tests/notification_service tests/notifications
 uv run --frozen ty check src/telescreen/notification_service src/telescreen/notifications src/telescreen/api/routers/notification_settings.py tests/notification_service tests/notifications
 uv run --frozen pytest -p no:cacheprovider tests/notification_service tests/notifications tests/inventory/retention tests/api/v12_routers tests/e2e/test_flow_v12_notifications.py tests/core/split/test_lazy_notifications.py
-uv run --frozen python tools/typelint.py; ! grep -E '^(src/telescreen/(notification_service|notifications|api/routers/notification_settings)|tests/(notification_service|notifications))' tmp/telescreen-svc-20261016-g6/svc-p05-notification-service/final-v3-typelint.log
+uv run --frozen python tools/typelint.py; ! grep -E '^(src/telescreen/(notification_service|notifications|api/routers/notification_settings)|tests/(notification_service|notifications))' /tmp/telescreen-svc-p05-notification-service-g7-typelint.log
 uv run --frozen python -m telescreen.notification_service --help
 ! grep -n MemberRow src/telescreen/api/routers/notification_settings.py
 ```
 
-Final-source evidence (source hash manifest:
-`tmp/telescreen-svc-20261016-g6/svc-p05-notification-service/source-hashes.sha256`,
-manifest SHA-256 `da8f4346d3b30aac755c0d36ac072f7bf23a42fb84de3fdf2ff0b7c4081b2a6a`):
-format, ruff, ty, scoped pytest, assigned-path typelint scan, CLI help and MemberRow
-gate all exited 0. Scoped pytest collected 192 tests: 191 passed, 0 failed, and 1
-offline-gated PostgreSQL integration test skipped. Complete current-source logs are in
-`tmp/telescreen-svc-20261016-g6/svc-p05-notification-service/` (`final-v3-format.log`,
-`final-v3-ruff.log`, `final-v3-ty.log`, `final-v3-pytest.log`, `final-v3-typelint.log`,
-`final-v3-help.log`, `final-v3-memberrow.log`, `final-v3-hashes.log`). The full suite is
+Run 7 final-source evidence (source hash manifest:
+`tmp/telescreen-svc-20261016-g7/svc-p05-notification-service/source-hashes.sha256`,
+34 entries, manifest SHA-256 `aed01dfd8e0398bad2fc1d6ddfabb6b857c9d3ec53497c0c2bb80a5f1d670025`):
+format, ruff, ty, scoped pytest, assigned-path typelint scan, CLI help, MemberRow gate and
+plan line-count gate all exited 0. Scoped pytest collected 192 tests: 191 passed, 0 failed,
+and 1 offline-gated PostgreSQL integration test skipped. Complete logs are in
+`tmp/telescreen-svc-20261016-g7/svc-p05-notification-service/attempt-1/` and at the
+`/tmp/telescreen-svc-p05-notification-service-g7-*.log` paths. The full suite is
 informational in wave 4 and is owned by the integration flow.
 
 ## Completion Criteria
@@ -269,6 +268,8 @@ informational in wave 4 and is owned by the integration flow.
 - [x] The scoped verification exits 0. The Progress Log has hashes.
 - [x] Delivery pump continues after an exception from one tick, logs only its type, and
       remains cancellable; the regression test and existing pump behavior tests pass.
+- [x] Run 7 planning-commit gates all exit 0; scoped pytest reports 191 passed, 1 skipped,
+      and 0 failed, with the g7 source hash manifest recorded below.
 
 ## Progress Log
 
@@ -326,3 +327,15 @@ not re-implement them.
 3. Refresh the source hash manifest under the g7 evidence root. Set Status to Completed.
    Append one session entry of at most 12 lines. Keep `priorVerification` empty
    (conventions 7a).
+
+### 2026-10-16 — Run 7 re-verification
+
+- Re-verified the already implemented deliverables on planning commit
+  `45078bd2ac959ebc9584fad785c59dea757593f0`; no source or test re-implementation was needed.
+- All assigned gates exited 0: format, Ruff, ty, scoped pytest, assigned-path typelint,
+  service CLI help, no-`MemberRow`, and plan line-count checks. Pytest: 191 passed,
+  1 offline-gated integration skip, 0 failed.
+- Refreshed the 34-file source manifest at
+  `tmp/telescreen-svc-20261016-g7/svc-p05-notification-service/source-hashes.sha256`
+  (SHA-256 `aed01dfd8e0398bad2fc1d6ddfabb6b857c9d3ec53497c0c2bb80a5f1d670025`).
+- Independent test-integrity, adversarial and integration reviews remain downstream.

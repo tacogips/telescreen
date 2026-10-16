@@ -1,6 +1,6 @@
 # SVC-P06 Telescreen Split Composition: Wiring, Proxies, Integrations, CLI, Weekly Move
 
-**Status**: In Progress (run 7: notification-store dispatch, then independent re-review)
+**Status**: Completed (implementation; independent re-review pending)
 **Design Reference**: design-docs/specs/design-service-split.md sections 3, 4.4, 5, 9 (public routes), 10, 14, 15, C5, C8
 **Created**: 2026-10-15
 **Last Updated**: 2026-10-16
@@ -277,7 +277,7 @@ edit it): importing `telescreen.wiring` must load no `telescreen.inventory` or
 - [x] `grep -rn "inventory_service.clients" src tests` prints nothing, and `clients.py` is
       deleted, or a Reconciliation request records why it is kept.
 - [x] The scoped verification exits 0. The Progress Log has hashes.
-- [ ] (run 7) `grep -n 'run_notification' src/telescreen/cli.py` shows the `notification-store`
+- [x] (run 7) `grep -n 'run_notification' src/telescreen/cli.py` shows the `notification-store`
       dispatch; the two run 7 CLI tests in `tests/e2e/test_wiring_cli.py` pass.
 - [ ] (run 7) Independent test-integrity, adversarial and integration review accepted.
 
@@ -306,3 +306,12 @@ The deliverables from run 6 are in the tree. Do not re-implement them. Work in o
    `tmp/telescreen-svc-20261016-g7/svc-p06-composition/`. Tick the run 7 criteria and set
    Status to Completed. Append one session entry of at most 15 lines. Keep
    `priorVerification` empty (conventions 7a).
+
+### Run 7 Session 1 (2026-10-16)
+
+- Routed `notification-store` to lazy `cli_inventory_store.run_notification`; added dispatch, missing-URL, and inventory-route regression coverage.
+- Initial ruff check found I001 import ordering in the new test; fixed it, preserved the diagnostic at `tmp/telescreen-svc-20261016-g7/svc-p06-composition/ruff-initial-failure.log`, and reran ruff successfully.
+- Scoped checks: format, ruff, ty and targeted typelint passed; scoped pytest: 224 collected, 222 passed, 2 skipped, 0 failed.
+- Informational full pytest: 1,382 passed, 36 skipped, 0 failed; skipped external-service and deferred inventory-only cases.
+- Evidence logs: `/tmp/telescreen-svc-p06-composition-g7-{format,ruff,ty,typelint,pytest,pytest-all}.log`; hashes: `tmp/telescreen-svc-20261016-g7/svc-p06-composition/source-hashes.txt`.
+- Implementation complete. Test-integrity, adversarial and integration reviews remain downstream and pending.

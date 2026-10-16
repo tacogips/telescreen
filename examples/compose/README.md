@@ -135,3 +135,30 @@ uv run pytest -m live tests/live
 
 Without these variables the live tests skip. The test suite does not read the local Slack
 credential file itself.
+
+
+## Run the three-service deployment
+
+The full split uses `docker-compose.services.yml` as a standalone Compose file. It runs
+three PostgreSQL stores, the Telescreen API and worker, Inventory, and Notification.
+Only the Telescreen API publishes a host port. Inventory and Notification have no shared
+`.env` file; channel credentials are mounted only into Notification.
+
+Create the additional secret files and use distinct local database passwords:
+
+```sh
+printf '%s' 'replace-with-an-inventory-service-token' > secrets/inventory_service_token
+printf '%s' 'replace-with-a-notification-service-token' > secrets/notification_service_token
+printf '%s' 'replace-with-a-notification-inventory-token' > secrets/notification_inventory_token
+printf '%s' 'replace-with-a-Slack-bot-token' > secrets/slack_bot_token
+# Set INVENTORY_POSTGRES_PASSWORD and NOTIFICATION_POSTGRES_PASSWORD in .env.
+docker compose -f docker-compose.services.yml up --build
+```
+
+The notification process alone receives SMTP and Slack settings. Configure an SMTP host
+reachable from the Compose network before enabling email delivery. For an existing shared
+database, stop writers and follow section 13 of
+[`design-service-split.md`](../../design-docs/specs/design-service-split.md), including
+notification-store copy/verify before inventory-store copy/verify. The owner runs live
+Mailpit, Keycloak and PostgreSQL checks with `dev-services.yml`; they are not part of the
+offline test suite.

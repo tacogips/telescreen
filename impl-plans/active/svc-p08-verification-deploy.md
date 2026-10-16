@@ -1,6 +1,6 @@
 # SVC-P08 Verification and Deployment: Multi-Process Tests, Restricted Logins, Leak Matrix, Compose, Docs
 
-**Status**: Not Started
+**Status**: In Progress (review repair; full R1-R8 process matrix pending)
 **Design Reference**: design-docs/specs/design-service-split.md sections 13-17; design-docs/specs/design-service-split-requirements.md section 7
 **Created**: 2026-10-15
 **Last Updated**: 2026-10-16
@@ -212,14 +212,89 @@ command as the build evidence. Evidence: every command exits 0, and the full sui
 
 ## Completion Criteria
 
-- [ ] All R1-R8 acceptance flows in `tests/split` pass. The leak matrix passes. The import
-      gates pass.
-- [ ] `mise run ci`, `ddl-check`, `web-ci` and `uv build --out-dir` exit 0. Logs are recorded.
-- [ ] Compose overlay test passes. `docker-compose.inventory.yml` is removed.
-- [ ] `grep -n "pytest.mark.skip\|pytest.skip(" tests/inventory_service/test_process.py` prints
-      nothing. The `test_postgres.py` module-level `pytest.skip(` placeholder is gone.
-- [ ] The verification doc and design corrections are written. The Progress Log has hashes.
+- [ ] Full R1-R8 multi-process acceptance flows pass, including token/OIDC parity, producer outage/replay in both directions, DLP delivery parity, overdue with Telescreen stopped, complete three-store cutover/deduplication, and the full leak sink matrix.
+- [x] `mise run ci`, `mise run ddl-check`, `mise run web-ci` and `uv build --out-dir` exit 0 on the final implementation source. Logs are recorded below.
+- [x] Three-store Compose topology validation passes; `docker-compose.inventory.yml` is removed.
+- [x] `tests/inventory_service/test_process.py` has no skip placeholder and passes offline; `test_postgres.py` is integration-marked with the configured database fixture gate.
+- [x] Verification document, accepted design corrections and deployment documentation are written; source hashes are recorded.
 
 ## Progress Log
 
 (append sessions per conventions section 8)
+
+
+### Session 7 implementation (2026-10-16)
+
+Status remains In Progress because full R1-R8 acceptance flows are not yet implemented.
+No production code or DDL changed.
+
+Implemented in this plan:
+
+- Rewrote `tests/inventory_service/test_process.py` to migrate and start Telescreen API,
+  Telescreen worker, Inventory and Notification against three SQLite files. It runs
+  `projections resync`, creates an API token through the CLI, registers/reads an Inventory
+  asset through the TCP proxy, checks a runtime sample is rejected without echo, scans all
+  three database files, service logs and API responses, and terminates every process in
+  `finally`.
+- Added `tests/split/test_import_gates.py`, `tests/split/test_cutover.py`,
+  `tests/leak/flows_split.py` and `tests/leak/test_leak_matrix_split.py`.
+- Rewrote `tests/inventory_service/test_postgres.py` as an integration-marked three-role
+  ownership/grant test. It was skipped offline because `TELESCREEN_TEST_DATABASE_URL` is
+  not set; no live grant result is claimed.
+- Added `examples/compose/docker-compose.services.yml` with three owner databases and
+  three service processes, deleted `docker-compose.inventory.yml`, and updated the example
+  validator, `.env.example` and README.
+- Added `design-docs/specs/design-service-split-verification.md`; updated the service-split
+  design status, token projection label and allowed DLP/guard imports; corrected the
+  command and inventory deployment documents.
+
+Source hash manifest: `tmp/telescreen-svc-20261016-g7/svc-p08-verification-deploy/attempt-1/source-hashes.final.sha256`.
+
+Verification commands (final source unless otherwise noted):
+
+- `uv run --frozen ruff format --check --no-cache tests/split tests/inventory_service tests/e2e tests/leak tests/examples` — exit 0, 68 files; `/tmp/telescreen-svc-p08-verification-deploy-g7-final-format.log`.
+- `uv run --frozen ruff check --no-cache tests/split tests/inventory_service tests/e2e tests/leak tests/examples` — exit 0; `/tmp/telescreen-svc-p08-verification-deploy-g7-final-ruff.log`.
+- `uv run --frozen ty check tests/split tests/inventory_service tests/e2e tests/leak tests/examples` — exit 0; `/tmp/telescreen-svc-p08-verification-deploy-g7-final-ty.log`.
+- `uv run --frozen python tools/typelint.py` with the p08 path filter — exit 0, no p08 diagnostics; `/tmp/telescreen-svc-p08-verification-deploy-g7-final-typelint.log`.
+- `uv run --frozen pytest -p no:cacheprovider tests/split tests/inventory_service tests/notification_service tests/leak tests/examples tests/e2e` — exit 0, 175 passed, 4 skipped; `/tmp/telescreen-svc-p08-verification-deploy-g7-final-pytest.log`.
+- `mise run ci` — exit 0, 1397 passed, 35 skipped, 1 warning; full log `/tmp/telescreen-svc-p08-verification-deploy-g7-final-ci.log`.
+- `mise run ddl-check` — exit 0, canonical exports and 10 schema tests passed; `/tmp/telescreen-svc-p08-verification-deploy-g7-ddl.log`.
+- `mise run web-ci` — exit 0, 49 test files and 262 tests passed; `/tmp/telescreen-svc-p08-verification-deploy-g7-web.log`.
+- `uv build --out-dir /tmp/telescreen-svc-p08-verification-deploy-g7-dist` — exit 0; source distribution and wheel created; `/tmp/telescreen-svc-p08-verification-deploy-g7-build.log`.
+- `uv run --frozen pytest -p no:cacheprovider -q tests/inventory_service/test_process.py tests/leak/test_leak_matrix_split.py` — exit 0, 2 passed; `/tmp/telescreen-svc-p08-attempt1-process-leak-final.log`.
+- `uv run --frozen pytest -p no:cacheprovider -q tests/inventory_service/test_process.py tests/leak/test_leak_matrix_split.py` — review-repair source, exit 0, 2 passed; `/tmp/telescreen-svc-p08-g7-r3-process-leak.log`.
+- `! grep -n 'pytest.mark.skip\|pytest.skip(' tests/inventory_service/test_process.py && test ! -e examples/compose/docker-compose.inventory.yml && test -f examples/compose/docker-compose.services.yml` — exit 0.
+
+Earlier repair attempts in this session: the process harness first used an invalid fingerprint secret reference, then probed protected health routes without service headers; both were corrected and the final process tests pass. The raw locator sample was correctly rejected with 422 and the test now asserts the safe rejection. An early broad pytest shell used zsh's read-only `status` variable and produced an incomplete log; the final scoped pytest and `mise run ci` above were rerun with complete logs.
+
+### Session 8 review repair (2026-10-16)
+
+- Fixed P08-R1R8-MATRIX's dead Notification destination: Inventory now targets the allocated live Notification TCP port.
+- Strengthened the process leak probe with a successful source-content ingest using a runtime sample; it asserts 200 and checks the returned body, three database files, process logs and API bodies for raw samples.
+- Focused process/leak verification: 2 passed, exit 0; `/tmp/telescreen-svc-p08-g7-r3-process-leak.log`.
+- Scoped final-source suite: 175 passed, 4 environment-gated integration skips, exit 0; `/tmp/telescreen-svc-p08-verification-deploy-g7-r3-pytest.log`.
+- `ruff format --check`, `ruff check`, `ty check`, and `python tools/typelint.py`: exit 0; logs `/tmp/telescreen-svc-p08-verification-deploy-g7-r3-{format,ruff,ty,typelint}.log`.
+- `mise run ci`: exit 0, 1397 passed, 35 skipped, 1 warning; `/tmp/telescreen-svc-p08-verification-deploy-g7-r3-ci.log`.
+- `mise run ddl-check`: exit 0, 10 schema tests passed; `/tmp/telescreen-svc-p08-verification-deploy-g7-r3-ddl.log`.
+- `mise run web-ci`: exit 0, 262 tests passed and production build completed; `/tmp/telescreen-svc-p08-verification-deploy-g7-r3-web.log`.
+- `uv build --out-dir /tmp/telescreen-svc-p08-verification-deploy-g7-r3-dist`: exit 0; `/tmp/telescreen-svc-p08-verification-deploy-g7-r3-build.log`.
+- Full P08-R1R8-MATRIX and P08-LEAK-MATRIX remain incomplete: no cross-process producer delivery/replay, stopped-Telescreen overdue, full cutover delivery/dedup, or all-table/wire/audit-export scan is present. No production source or DDL was changed.
+- Required remaining gate: implement assigned TCP flows and complete leak sinks, then rerun the full verification commands on final source. Status stays In Progress.
+
+### Owner resolution: 2026-10-16 (after session 24)
+
+Not an external blocker: the remaining work is inside this plan's own scope and paths.
+Everything else on the checkpoint is green (`mise run ci` 1397 passed / 35 skipped,
+ddl-check, web-ci, uv build; process/leak tests pass; the skipped legacy tests are
+rewritten). Finish exactly these, using the existing TCP process harness in
+`tests/inventory_service/test_process.py` and `tests/split`:
+1. P08-R1R8-MATRIX: (a) cross-process producer delivery and replay (Telescreen
+   outbox -> Inventory and -> Notification; stop the receiver, write, restart, assert
+   exactly-once application via receipts); (b) Inventory publishes an overdue
+   notification and serves `/api/data/*` while the Telescreen process is stopped;
+   (c) cutover delivery/dedup: copied pending obligations deliver once after cutover.
+2. P08-LEAK-MATRIX: scan every table of all three stores, captured wire bodies
+   (outbox/inbox payloads), process logs and audit exports for the raw samples.
+Keep each test file under 1000 lines (split by topic). Then rerun the full
+verification list on final source, record hashes, mark Completed. Conventions 7a:
+only final passing commands, `priorVerification` empty, no fixed findings as risks.

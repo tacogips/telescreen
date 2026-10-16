@@ -338,6 +338,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             from telescreen.cli_inventory_store import run
 
             return run(settings, arguments)
+        if arguments.command == "notification-store":
+            from telescreen.cli_inventory_store import run_notification
+
+            return run_notification(settings, arguments)
         container: Container
         container = _build_cli_container(settings, env)
         return asyncio.run(_run_and_close(container, arguments))

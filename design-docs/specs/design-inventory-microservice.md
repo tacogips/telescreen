@@ -42,10 +42,10 @@ Internal endpoints and proxied inventory requests require a shared secret resolv
 `TELESCREEN_INVENTORY_SERVICE_TOKEN`. Configure the same secret in both processes and
 use private networking plus TLS when traffic leaves a trusted host. HTTP calls have a
 finite timeout, reject redirects and validate typed responses. Remote failures return
-safe errors; pending outbox records survive outages. The inventory service needs a
-bureau callback URL (`TELESCREEN_BUREAU_SERVICE_URL`) and its own database URL, with no
-main URL. Independent owner migrations and the existing stopped-writer transfer runbook
-remain authoritative; no new tables are needed.
+safe errors; pending outbox records survive outages. The implemented service needs its own database URL, the Notification service URL, service
+tokens and the shared identity/fingerprint key reference. `TELESCREEN_BUREAU_SERVICE_URL`
+is no longer read. Independent owner migrations and the stopped-writer transfer runbook
+remain authoritative.
 
 The versioned contract is `/internal/inventory/v1/*`; public API JSON and CSV remain
 unchanged. Inventory adapters can be replaced behind the existing ports, or the service
@@ -64,7 +64,8 @@ package build. Document deployment and adaptation procedures.
 | Process | Required settings | Command |
 | --- | --- | --- |
 | Bureau API and engine | Existing main settings, `TELESCREEN_INVENTORY_SERVICE_URL`, `TELESCREEN_INVENTORY_SERVICE_TOKEN` | `telescreen serve`, `telescreen worker` |
-| Inventory | `TELESCREEN_INVENTORY_DATABASE_URL`, `TELESCREEN_BUREAU_SERVICE_URL`, `TELESCREEN_INVENTORY_SERVICE_TOKEN`, existing fingerprint key settings | `telescreen-inventory serve --port 8001` |
+| Inventory | `TELESCREEN_INVENTORY_DATABASE_URL`, `TELESCREEN_NOTIFICATION_SERVICE_URL`, service tokens, fingerprint key | `telescreen-inventory serve --port 8001` |
+| Notification | `TELESCREEN_NOTIFICATION_DATABASE_URL`, service tokens, fingerprint key, channel credentials | `telescreen-notification serve --port 8002` |
 | Main migration | Main database URL only | `telescreen migrate --store main` |
 | Inventory migration | Inventory database URL only | `telescreen-inventory migrate` |
 
@@ -74,18 +75,12 @@ Inventory reads `TELESCREEN_DATA_OVERDUE_CRON` and `TELESCREEN_PUBLIC_BASE_URL`;
 ignores its local overdue scheduler in remote mode. Do not inject inventory sessions into
 a remote bureau. A configured inventory URL is never connected by a remote bureau.
 
-For a fresh local Compose deployment, copy the existing `.env.example`, populate the
-existing secrets, set `INVENTORY_POSTGRES_PASSWORD`, and create
-`examples/compose/secrets/inventory_service_token`. From `examples/compose` run:
-
-```sh
-docker compose -f docker-compose.yml -f docker-compose.inventory.yml up --build
-```
-
-The overlay creates a separate PostgreSQL instance, owner migration container and
-inventory API/worker process. Inventory has no shared `.env` file, main database URL,
-Slack token or SMTP credentials. Only the bureau publishes a host port. Each owner can
-restart independently; the other owner retains durable pending work during outages.
+For a fresh local full-split deployment, copy `.env.example`, populate the three database
+passwords and service-token secret files, then run `docker compose -f
+docker-compose.services.yml up --build` from `examples/compose`. The standalone file creates
+three PostgreSQL stores and the three service processes. Only the Telescreen API publishes
+a host port; SMTP and Slack credentials are mounted only into Notification. Each owner can
+restart independently while the other services retain durable pending work during outages.
 Use separately provisioned DDL and runtime credentials as described in the existing
 [cutover runbook](design-inventory-store-cutover.md) for production.
 

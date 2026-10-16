@@ -16,6 +16,17 @@ from telescreen.db.models.inventory_links import InventoryIssueLinkRow
 from telescreen.inventory_service.app import build_inventory_runtime
 from telescreen.inventory_service.lookups import ReplicaIssueLookup
 from telescreen.ports.asset_context import ResourceIssueRef
+from telescreen.ports.directory_projection import (
+    DirectoryEntity,
+    DirectoryEntityKind,
+    MemberEntity,
+)
+from telescreen.ports.inventory_commands import (
+    DirectoryUpdate,
+    InventoryCommand,
+    IssueLinkState,
+    encode_inventory_command,
+)
 from tests.e2e.harness import PairEnv
 from tests.inventory_service.conftest import InventoryWorld
 
@@ -38,6 +49,67 @@ async def test_issue_links_are_served_from_inventory_projection(
     lookup: ReplicaIssueLookup = ReplicaIssueLookup(world.harness.sessions)
     result: tuple[ResourceIssueRef, ...] = await lookup.open_issues_for_resources(("resource-1",))
     assert result == (ResourceIssueRef("resource-1", "issue-1", "ISSUE-1"),)
+
+
+async def test_ordered_link_changes_and_only_newer_directory_revisions_apply(
+    inventory_world: InventoryWorld,
+) -> None:
+    """Inbox order applies link updates/removal while stale directory revisions are ignored."""
+    world: InventoryWorld = inventory_world
+    operations: tuple[IssueLinkState | DirectoryUpdate, ...] = (
+        IssueLinkState("issue-ordered", "resource-ordered", "ISSUE-1", "unresolved", None, True),
+        IssueLinkState("issue-ordered", "resource-ordered", "ISSUE-1", "resolved", None, True),
+        IssueLinkState("issue-ordered", "resource-ordered", "ISSUE-1", "resolved", None, False),
+        DirectoryUpdate(
+            DirectoryEntity(
+                DirectoryEntityKind.MEMBER,
+                "projected-member",
+                2,
+                True,
+                MemberEntity("projected-member", "projection", "New Name", True, None, None, None),
+            )
+        ),
+        DirectoryUpdate(
+            DirectoryEntity(
+                DirectoryEntityKind.MEMBER,
+                "projected-member",
+                1,
+                True,
+                MemberEntity("projected-member", "projection", "Old Name", True, None, None, None),
+            )
+        ),
+    )
+    for sequence, operation in enumerate(operations, start=1):
+        command: InventoryCommand = InventoryCommand(
+            f"ordered-projection-{sequence}",
+            "ordered-projection",
+            sequence,
+            world.clock.now(),
+            operation,
+        )
+        response: httpx.Response = await world.client.post(
+            "/internal/inventory/v1/commands",
+            headers=world.headers,
+            content=encode_inventory_command(command),
+        )
+        assert response.status_code == 200, response.text
+        assert response.json() == "applied"
+        if sequence == 2:
+            async with world.harness.sessions() as session:
+                link: InventoryIssueLinkRow | None = await session.get(
+                    InventoryIssueLinkRow, "issue-ordered"
+                )
+            assert link is not None and link.status == "resolved"
+    async with world.harness.sessions() as session:
+        removed: InventoryIssueLinkRow | None = await session.get(
+            InventoryIssueLinkRow, "issue-ordered"
+        )
+        member: DirectoryEntity | None = await world.runtime.replica.get(
+            session, DirectoryEntityKind.MEMBER, "projected-member"
+        )
+    assert removed is None
+    assert member is not None and isinstance(member.payload, MemberEntity)
+    assert member.payload.display_name == "New Name"
 
 
 def test_inventory_config_requires_notification_endpoint_and_token() -> None:

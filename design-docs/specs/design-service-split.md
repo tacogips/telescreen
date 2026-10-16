@@ -1,6 +1,6 @@
 # Service split: Telescreen, Inventory and Notification
 
-Status: DESIGNED, 2026-10-15
+Status: Implementation in progress; cross-process R1-R8 verification pending, 2026-10-16
 Requirements: [design-service-split-requirements.md](design-service-split-requirements.md)
 (R1-R8, owner decisions D1-D5). Builds on [inventory microservice](design-inventory-microservice.md),
 [inventory/alert boundaries](design-inventory-alert-boundaries.md) and the
@@ -79,7 +79,7 @@ delivery is order-insensitive and idempotent.
 | `member` | id, handle, display_name, active, role, email, slack_user_id | without email/slack | full |
 | `team` | id, slug, name, lead_member_id, member_ids, email, slack_channel | without email/slack | full |
 | `identity` | id, member_id, kind, identity_key (existing keyed HMAC hex) | yes | yes |
-| `api_token` | id, token_hash (existing SHA-256), scopes, member_id, revoked | yes | yes |
+| `api_token` | id, label, token_hash (existing SHA-256), scopes, member_id, revoked | yes | yes |
 | `ownership_rules` | single id `rules`: ordered (id, position, source, pattern, team_id, enabled) | yes | no |
 | `collector` | id, name | yes | no |
 
@@ -534,8 +534,10 @@ These are isolated-process import tests:
 - Inventory imports no `telescreen.notifications` implementation.
 - Notification imports no `telescreen.inventory*`.
 - A split-mode Telescreen container imports no `telescreen.inventory` business modules
-  and no `telescreen.notifications` implementation (sender, delivery, dlp, email, slack,
-  tester, retention, preferences, repository, templates service).
+  and no `telescreen.notifications` delivery implementation (sender, delivery, email, slack,
+  tester, retention, preferences, repository, templates service). The shared outbound guard
+  modules `telescreen.notifications.dlp` and `telescreen.notifications.guard` remain allowed
+  because GitHub outbound requests use them in split mode.
 - The Police SDK still imports no `telescreen.*`.
 
 ## 16. Data safety
