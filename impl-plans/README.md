@@ -40,41 +40,6 @@ Large features are split into multiple related plans with cross-references.
 All plans share `impl-plans/conventions.md` (ownership, typing, verification and
 progress-log rules).
 
-### Service split (svc, created 2026-10-15)
-
-These plans come from `design-docs/specs/design-service-split.md` (R1-R8, D1-D5) on
-`feat/service-split`. Plans in the same wave have disjoint write paths.
-
-| Wave | Plans |
-| --- | --- |
-| 1 | [svc-p01-foundation](active/svc-p01-foundation.md) (integration-accepted at `19074e9`) |
-| 2 | [svc-p02-db](active/svc-p02-db.md) (integration-accepted, checkpoint `077b71a`) |
-| 3 | [svc-p03-publishers](active/svc-p03-publishers.md), [svc-p07-service-runtime](active/svc-p07-service-runtime.md) (integration-accepted, checkpoint `a5392d9`) |
-| 4 | [svc-p04-inventory](active/svc-p04-inventory.md), [svc-p05-notification-service](active/svc-p05-notification-service.md), [svc-p06-composition](active/svc-p06-composition.md) (integration-accepted, checkpoint `aaa2c4c`) |
-| 5 (g11 wave F) | [svc-p08-verification-deploy](active/svc-p08-verification-deploy.md) ('Run 11 Scope') |
-
-The current dispatch manifest is
-[`telescreen-svc-20261016-g11`](active/telescreen-svc-20261016-g11-dispatch.json) (run 11,
-final re-verify, base `66531bd`). It supersedes g10 (run 10, base `3190903`), g9 (run 9, base `f2c6707`), g8 (run 8, base
-`aaa2c4c`), g7 (run 7, base `a5392d9`), g6 (run 6, base `077b71a`), g5 (run 5, base
-`8b09786`), g4 (run 4, base `c3ed4bc`), g3 (run 3, base `6017743`), g2 (run 2, base
-`19074e9`) and g1. g11 records svc-p01 to svc-p07 as accepted dependencies at `66531bd`
-and dispatches only svc-p08. Its 'Run 11 Scope' re-runs the final gates without code
-changes, with the skip-marker check phrased as a grep without the test-runner word
-(owner resolution 4), and refreshes the verification evidence doc.
-Earlier session logs are in
-[`logs/svc-p02-db-2026-10-15.md`](logs/svc-p02-db-2026-10-15.md),
-[`logs/svc-p02-db-2026-10-15-run3.md`](logs/svc-p02-db-2026-10-15-run3.md),
-[`logs/svc-p04-inventory-2026-10-16.md`](logs/svc-p04-inventory-2026-10-16.md),
-[`logs/svc-p06-composition-2026-10-16.md`](logs/svc-p06-composition-2026-10-16.md),
-[`logs/svc-p08-verification-deploy-2026-10-16.md`](logs/svc-p08-verification-deploy-2026-10-16.md),
-[`logs/svc-p08-verification-deploy-2026-10-16-run9.md`](logs/svc-p08-verification-deploy-2026-10-16-run9.md) and
-[`logs/svc-p08-verification-deploy-2026-10-16-run10.md`](logs/svc-p08-verification-deploy-2026-10-16-run10.md).
-Serial finalization after the fanout applies the Nodetto layout fix
-(design-service-split.md section 12), archives the eight svc plans to `completed/` and
-the eleven manifests to `completed/dispatch/`, and updates this index.
-`inventory-alert-boundaries.md` stays in `active/`.
-
 The [inventory and alert boundary plan](active/inventory-alert-boundaries.md) is complete:
 independent persistence, durable handoffs, inventory master authority, owner migrations
 and verified cutover/rollback. Its [completion audit](../design-docs/specs/design-inventory-boundary-verification.md)
@@ -97,6 +62,43 @@ manifests `telescreen-v14-20261013-f1`, `telescreen-v14-20261014-f2` and `-f3`, 
 archived under `completed/dispatch/`.
 
 ## Completed Plans
+
+### Service split (svc: R1-R8, D1-D5 of `design-docs/specs/design-service-split-requirements.md`)
+
+Created 2026-10-15 on `feat/service-split` from `design-docs/specs/design-service-split.md`.
+Plans in the same wave had disjoint write paths. All 8 plans were archived to
+`completed/` (and the g1-g11 manifests to `completed/dispatch/`) by the serial
+finalization on 2026-10-16, after svc-p08 passed test integrity and adversarial review in
+run 11 (re-verify of `66531bd` with no code change: process suite 3x 7 passed, scoped
+suite 180 passed, `mise run ci` 1402 passed / 35 skipped, ddl-check, web-ci, uv build;
+see the [verification evidence](../design-docs/specs/design-service-split-verification.md)).
+The final manifest is
+[`telescreen-svc-20261016-g11`](completed/dispatch/telescreen-svc-20261016-g11-dispatch.json)
+(run 11, base `66531bd`). It superseded g10 (run 10, base `3190903`), g9 (run 9, base
+`f2c6707`), g8 (run 8, base `aaa2c4c`), g7 (run 7, base `a5392d9`), g6 (run 6, base
+`077b71a`), g5 (run 5, base `8b09786`), g4 (run 4, base `c3ed4bc`), g3 (run 3, base
+`6017743`), g2 (run 2, base `19074e9`) and g1. PostgreSQL restricted-login and live
+Mailpit/Keycloak checks are owner-run.
+
+Session logs:
+[`logs/svc-p02-db-2026-10-15.md`](logs/svc-p02-db-2026-10-15.md),
+[`logs/svc-p02-db-2026-10-15-run3.md`](logs/svc-p02-db-2026-10-15-run3.md),
+[`logs/svc-p04-inventory-2026-10-16.md`](logs/svc-p04-inventory-2026-10-16.md),
+[`logs/svc-p06-composition-2026-10-16.md`](logs/svc-p06-composition-2026-10-16.md),
+[`logs/svc-p08-verification-deploy-2026-10-16.md`](logs/svc-p08-verification-deploy-2026-10-16.md),
+[`logs/svc-p08-verification-deploy-2026-10-16-run9.md`](logs/svc-p08-verification-deploy-2026-10-16-run9.md) and
+[`logs/svc-p08-verification-deploy-2026-10-16-run10.md`](logs/svc-p08-verification-deploy-2026-10-16-run10.md).
+
+| Plan | Wave | Accepted at |
+| --- | --- | --- |
+| [`completed/svc-p01-foundation.md`](completed/svc-p01-foundation.md) | 1 | `19074e9` |
+| [`completed/svc-p02-db.md`](completed/svc-p02-db.md) | 2 | `077b71a` |
+| [`completed/svc-p03-publishers.md`](completed/svc-p03-publishers.md) | 3 | `a5392d9` |
+| [`completed/svc-p07-service-runtime.md`](completed/svc-p07-service-runtime.md) | 3 | `a5392d9` |
+| [`completed/svc-p04-inventory.md`](completed/svc-p04-inventory.md) | 4 | `aaa2c4c` |
+| [`completed/svc-p05-notification-service.md`](completed/svc-p05-notification-service.md) | 4 | `aaa2c4c` |
+| [`completed/svc-p06-composition.md`](completed/svc-p06-composition.md) | 4 | `aaa2c4c` |
+| [`completed/svc-p08-verification-deploy.md`](completed/svc-p08-verification-deploy.md) | 5 (runs 8-11) | `66531bd` (run 11 re-verify) |
 
 The [inventory microservice extraction](completed/inventory-microservice.md) is complete:
 independent API/worker deployment, owner database and authenticated HTTP adapters,
@@ -337,6 +339,11 @@ Only plans from eligible phases should be read to minimize context loading.
 | 25 (v1.4 wave 3) | COMPLETED | Phase 24 |
 | 26 (v1.4 run 2 wave A) | COMPLETED | Phase 25 |
 | 27 (v1.4 wave 4) | COMPLETED | Phase 26 |
+| 28 (svc wave 1) | COMPLETED | Phase 27 |
+| 29 (svc wave 2) | COMPLETED | Phase 28 |
+| 30 (svc wave 3) | COMPLETED | Phase 29 |
+| 31 (svc wave 4) | COMPLETED | Phase 30 |
+| 32 (svc wave 5) | COMPLETED | Phase 31 |
 
 Run B added `p30-ui-design-system.md` and `p31-ui-mock-api.md` (wave B1, before the
 reworked p12, p13 and p14), split the end-to-end and leak tests into p28b and p28c after
@@ -385,7 +392,12 @@ PHASE_TO_PLANS = {
   24: ["v14-p04-inventory-core.md", "v14-p05-scan-hooks.md", "v14-p06-ui-pages.md"],
   25: ["v14-p07-fields-retention.md"],
   26: ["v14-p09-live-fixes.md"],
-  27: ["v14-p08-wiring-verification.md"]
+  27: ["v14-p08-wiring-verification.md"],
+  28: ["svc-p01-foundation.md"],
+  29: ["svc-p02-db.md"],
+  30: ["svc-p03-publishers.md", "svc-p07-service-runtime.md"],
+  31: ["svc-p04-inventory.md", "svc-p05-notification-service.md", "svc-p06-composition.md"],
+  32: ["svc-p08-verification-deploy.md"]
 }
 ```
 

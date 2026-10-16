@@ -1,6 +1,6 @@
 # SVC-P08 Verification and Deployment: Multi-Process Tests, Restricted Logins, Leak Matrix, Compose, Docs
 
-**Status**: In Progress (run 11 final re-verify; scope complete at `66531bd`, gates to re-run)
+**Status**: Completed (run 11 re-verify passed; archived to `impl-plans/completed/` by serial finalization, 2026-10-16)
 **Design Reference**: design-docs/specs/design-service-split.md sections 6, 13-17; design-docs/specs/design-service-split-requirements.md section 7
 **Created**: 2026-10-15
 **Last Updated**: 2026-10-16
@@ -184,9 +184,9 @@ exit 0 and show the stated evidence:
 
 ## Completion Criteria
 
-- [ ] R11.1: Verification items 1-12 exit 0 on the checkpoint source. Each is recorded with its exit code, counts and full g11 log path, and the process suite passes 3 times with 7 passed and 0 skipped.
-- [ ] R11.2: the verification doc cites run 11 and the g11 logs and counts. The skip-marker row has no test-runner word.
-- [ ] R11.3: Status is Completed, `priorVerification` is empty, `addressedFeedback` lists only fixed findings, and only final passing commands are listed (conventions 7a).
+- [x] R11.1: Verification items 1-12 exit 0 on checkpoint `66531bd`; exits, counts and full g11 log paths are recorded below. The process suite passed 3 times with 7 passed and 0 skipped.
+- [x] R11.2: the verification doc cites run 11 and the g11 logs and counts. The skip-marker row has no test-runner word.
+- [x] R11.3: Status is Completed, `priorVerification` is empty, `addressedFeedback` lists only fixed findings, and only final passing commands are listed (conventions 7a).
 - [x] Runs 1-10: compose topology, process and PostgreSQL tests, docs and design corrections, shared harness, stopped-Telescreen, replay and cutover flows, and the leak matrix with detected-ingest non-vacuity (archived logs).
 
 ## Progress Log
@@ -214,3 +214,47 @@ run 10 planning, run 10 implementation and gates) moved unchanged to the `-run10
 Owner resolution 4 is restated as R11.1-R11.3. The new skip grep returned 0 matches
 in all five process modules at planning time (`grep -cE` count check). That is a
 planning check, not verification.
+
+### Run 11 re-verify (2026-10-16)
+
+All gates passed on checkpoint `66531bd`; no production, DDL, test or example files
+changed. The verification doc changed from SHA-256
+`e2da80e79034d4f3a28b0fd80cca0e55bef25a55ec2d934732739ccad8740725` to
+`9343c279134bfa537b8156465131297b5b2c9327b95f818e8b6905f7a66d1744`.
+
+- Format, exit 0: 72 files already formatted. Log:
+  `/tmp/telescreen-svc-p08-verification-deploy-g11-format.log`.
+- Ruff, exit 0: all checks passed. Log:
+  `/tmp/telescreen-svc-p08-verification-deploy-g11-ruff.log`.
+- `ty`, exit 0: all checks passed. Log:
+  `/tmp/telescreen-svc-p08-verification-deploy-g11-ty.log`.
+- Typelint and p08 path filter, exit 0: 790 files clean, no p08 diagnostics. Log:
+  `/tmp/telescreen-svc-p08-verification-deploy-g11-typelint.log`.
+- Process run 1, exit 0: 7 passed, 0 skipped, 569.62s. Log:
+  `/tmp/telescreen-svc-p08-verification-deploy-g11-process-1.log`.
+- Process run 2, exit 0: 7 passed, 0 skipped, 565.35s. Log:
+  `/tmp/telescreen-svc-p08-verification-deploy-g11-process-2.log`.
+- Process run 3, exit 0: 7 passed, 0 skipped, 565.72s. Log:
+  `/tmp/telescreen-svc-p08-verification-deploy-g11-process-3.log`.
+- Final service-process check, exit 0: no service process survived. Log:
+  `/tmp/telescreen-svc-p08-verification-deploy-g11-pgrep-final.log`.
+- Scoped suite, exit 0: 180 passed, 4 environment-gated skips, 651.86s. Log:
+  `/tmp/telescreen-svc-p08-verification-deploy-g11-scoped.log`.
+- `mise run ci`, exit 0: 1402 passed, 35 skipped, 1 warning, 773.50s. Log:
+  `/tmp/telescreen-svc-p08-verification-deploy-g11-ci.log`.
+- `mise run ddl-check`, exit 0: canonical exports and 10 schema tests passed. Log:
+  `/tmp/telescreen-svc-p08-verification-deploy-g11-ddl.log`.
+- `mise run web-ci`, exit 0: typecheck, 262 tests and production build passed. Log:
+  `/tmp/telescreen-svc-p08-verification-deploy-g11-web.log`.
+- Skip-marker grep, exit 0: no matches. Log:
+  `/tmp/telescreen-svc-p08-verification-deploy-g11-skips.log`.
+- `uv build`, exit 0: sdist and wheel built. Log:
+  `/tmp/telescreen-svc-p08-verification-deploy-g11-build.log`.
+- Source-diff and line-limit checks, exit 0: no source/DDL/test/example changes; Python
+  files under 1000 lines and this plan under 400 lines. Logs:
+  `/tmp/telescreen-svc-p08-verification-deploy-g11-source-diff.log` and
+  `/tmp/telescreen-svc-p08-verification-deploy-g11-line-limits.log`.
+
+`priorVerification` remains empty; only passing final commands are listed. PostgreSQL
+restricted-login and live Mailpit/Keycloak checks remain owner-run. Serial archive,
+index, README/status finalization, commit and push are downstream workflow work.

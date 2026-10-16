@@ -414,4 +414,10 @@ Use the example overlay from `examples/compose`:
 | `TELESCREEN_NOTIFICATION_REPLICA_GRACE_SECONDS` | Recipient replica grace period (default 600) |
 
 See the [service split design and cutover procedure](design-docs/specs/design-service-split.md)
-for topology, contracts, settings and deployment details.
+for topology, contracts, settings and deployment details. The multi-process tests in
+`tests/split` and `tests/leak/test_leak_matrix_split.py` start the three services over TCP
+and cover producer outage and replay, Inventory delivery while Telescreen is stopped,
+cutover deduplication and the split leak matrix; restricted-login PostgreSQL checks in
+`tests/inventory_service/test_postgres.py` run only when `TELESCREEN_TEST_DATABASE_URL` is
+set. Results are recorded in the
+[service split verification evidence](design-docs/specs/design-service-split-verification.md).

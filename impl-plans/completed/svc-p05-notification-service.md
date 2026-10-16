@@ -1,6 +1,6 @@
 # SVC-P05 Notification Service: Process, Inbox, Replica, DLP Prior-Hit Fold, Delivery Pump, Routes, Audit
 
-**Status**: Completed (run 7 implementation verification; independent reviews pending)
+**Status**: Completed (integration-accepted at checkpoint `aaa2c4c`; archived 2026-10-16)
 **Design Reference**: design-docs/specs/design-service-split.md sections 4.3, 4.4, 6, 7, 9, 10, 11, 14
 **Created**: 2026-10-15
 **Last Updated**: 2026-10-16

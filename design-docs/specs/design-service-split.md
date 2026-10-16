@@ -1,6 +1,6 @@
 # Service split: Telescreen, Inventory and Notification
 
-Status: Implementation in progress (run 11, final re-verify: svc-p08 scope is complete at `66531bd`; only the final gates and serial finalization remain), 2026-10-16
+Status: IMPLEMENTED (run 11 final re-verify passed on `66531bd`; all eight svc plans and the g1-g11 manifests are archived under `impl-plans/completed/`; the section 12 Nodetto layout-only fix remains a serial-finalization step before commit), 2026-10-16
 Requirements: [design-service-split-requirements.md](design-service-split-requirements.md)
 (R1-R8, owner decisions D1-D5). Builds on [inventory microservice](design-inventory-microservice.md),
 [inventory/alert boundaries](design-inventory-alert-boundaries.md) and the
@@ -638,8 +638,9 @@ carries the runtime sample returns 200. A finding or issue exists that holds onl
 masked representation. Where a path keeps counts (the collection run `findings_count`
 or the notification `dlp_hit_count`), the count is positive.
 
-Plan shape (`svc-pNN`, disjoint writePaths). The plan files in `impl-plans/active/` and
-the current dispatch manifest (`telescreen-svc-20261016-g11-dispatch.json`, superseding
+Plan shape (`svc-pNN`, disjoint writePaths). The plan files (archived in
+`impl-plans/completed/`) and the final dispatch manifest
+(`impl-plans/completed/dispatch/telescreen-svc-20261016-g11-dispatch.json`, superseding
 g10 with the same svc-p08 writePaths) are authoritative for writePaths. p01-p07
 are integration-accepted and are recorded as accepted dependencies at checkpoint
 `66531bd`; they are not redispatched. The remaining work runs in waves:

@@ -1,6 +1,6 @@
 # SVC-P06 Telescreen Split Composition: Wiring, Proxies, Integrations, CLI, Weekly Move
 
-**Status**: Completed (implementation; independent re-review pending)
+**Status**: Completed (integration-accepted at checkpoint `aaa2c4c`; archived 2026-10-16)
 **Design Reference**: design-docs/specs/design-service-split.md sections 3, 4.4, 5, 9 (public routes), 10, 14, 15, C5, C8
 **Created**: 2026-10-15
 **Last Updated**: 2026-10-16
