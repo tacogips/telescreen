@@ -1,6 +1,6 @@
 # Service split: Telescreen, Inventory and Notification
 
-Status: Implementation in progress (run 10, final: only the svc-p08 cutover flow, the leak matrix non-vacuity fix and the final gates remain), 2026-10-16
+Status: Implementation in progress (run 11, final re-verify: svc-p08 scope is complete at `66531bd`; only the final gates and serial finalization remain), 2026-10-16
 Requirements: [design-service-split-requirements.md](design-service-split-requirements.md)
 (R1-R8, owner decisions D1-D5). Builds on [inventory microservice](design-inventory-microservice.md),
 [inventory/alert boundaries](design-inventory-alert-boundaries.md) and the
@@ -586,10 +586,13 @@ worker drives delivery). Concurrent directory-stream deliveries can arrive out o
 the inbox answers GAP (recorded as `conflict`) and the task retries about 5 s later. This
 is expected behavior, not a defect (svc-p08 owner resolution 2). Flow (b) passes at
 `f2c6707` (`tests/split/test_stopped_telescreen_process.py`) and flow (a) at `3190903`
-(`tests/split/test_replay_process.py`). Run 10 finishes (c)
+(`tests/split/test_replay_process.py`). Flow (c)
 (`tests/split/test_cutover_process.py`) and the leak matrix
-(`tests/leak/test_leak_matrix_split.py`); svc-p08 owner resolution 3 found only
-test-design errors there, so no production change is expected.
+(`tests/leak/test_leak_matrix_split.py`) pass at `66531bd` with no production change.
+Run 11 changes no code: it re-runs the final gates (svc-p08 owner resolution 4). The
+no-skip-marker check is phrased without the test-runner name, for example
+`! grep -nE 'mark\.skip|\.skip\(|skipif' <files>`, so the progress gate does not
+classify it as a zero-count test run; every real test command keeps its passed count.
 
 - (a) **Producer outage/replay.** Telescreen -> Inventory: stop Inventory, commit an
   issue change that produces an `IssueLinkState`, restart, run the engine, and assert
@@ -636,17 +639,17 @@ masked representation. Where a path keeps counts (the collection run `findings_c
 or the notification `dlp_hit_count`), the count is positive.
 
 Plan shape (`svc-pNN`, disjoint writePaths). The plan files in `impl-plans/active/` and
-the current dispatch manifest (`telescreen-svc-20261016-g10-dispatch.json`, superseding
-g9 with the same svc-p08 writePaths) are authoritative for writePaths. p01-p07
+the current dispatch manifest (`telescreen-svc-20261016-g11-dispatch.json`, superseding
+g10 with the same svc-p08 writePaths) are authoritative for writePaths. p01-p07
 are integration-accepted and are recorded as accepted dependencies at checkpoint
-`3190903`; they are not redispatched. The remaining work runs in waves:
+`66531bd`; they are not redispatched. The remaining work runs in waves:
 
-1. p08 (the remaining acceptance flow (c) and the leak matrix above, as specified by
-   svc-p08 owner resolution 3, then the 3x process suite and the final gates).
-2. Serial finalization. It archives the svc plans and the g1-g10 manifests to
+1. p08 (re-verify only, as specified by svc-p08 owner resolution 4: the 3x process
+   suite and the final gates on the unchanged checkpoint source).
+2. Serial finalization. It archives the svc plans and the g1-g11 manifests to
    `impl-plans/completed/`, and updates `impl-plans/README.md`, `README.md` and the
    status lines of this design and its related specs. It also applies the Nodetto
-   layout fix (section 12), which is not yet applied at `3190903` (the Nodetto JSONL
+   layout fix (section 12), which is not yet applied at `66531bd` (the Nodetto JSONL
    was last changed in run 1), because the Nodetto document and `tests/db/**` are paths
    of the accepted p02. `impl-plans/active/inventory-alert-boundaries.md` is not a svc
    plan and stays where it is.

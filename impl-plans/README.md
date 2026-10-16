@@ -51,26 +51,28 @@ These plans come from `design-docs/specs/design-service-split.md` (R1-R8, D1-D5)
 | 2 | [svc-p02-db](active/svc-p02-db.md) (integration-accepted, checkpoint `077b71a`) |
 | 3 | [svc-p03-publishers](active/svc-p03-publishers.md), [svc-p07-service-runtime](active/svc-p07-service-runtime.md) (integration-accepted, checkpoint `a5392d9`) |
 | 4 | [svc-p04-inventory](active/svc-p04-inventory.md), [svc-p05-notification-service](active/svc-p05-notification-service.md), [svc-p06-composition](active/svc-p06-composition.md) (integration-accepted, checkpoint `aaa2c4c`) |
-| 5 (g10 wave E) | [svc-p08-verification-deploy](active/svc-p08-verification-deploy.md) ('Run 10 Scope') |
+| 5 (g11 wave F) | [svc-p08-verification-deploy](active/svc-p08-verification-deploy.md) ('Run 11 Scope') |
 
 The current dispatch manifest is
-[`telescreen-svc-20261016-g10`](active/telescreen-svc-20261016-g10-dispatch.json) (run 10,
-final, base `3190903`). It supersedes g9 (run 9, base `f2c6707`), g8 (run 8, base
+[`telescreen-svc-20261016-g11`](active/telescreen-svc-20261016-g11-dispatch.json) (run 11,
+final re-verify, base `66531bd`). It supersedes g10 (run 10, base `3190903`), g9 (run 9, base `f2c6707`), g8 (run 8, base
 `aaa2c4c`), g7 (run 7, base `a5392d9`), g6 (run 6, base `077b71a`), g5 (run 5, base
 `8b09786`), g4 (run 4, base `c3ed4bc`), g3 (run 3, base `6017743`), g2 (run 2, base
-`19074e9`) and g1. g10 records svc-p01 to svc-p07 as accepted dependencies at `3190903`
-and dispatches only svc-p08. Its 'Run 10 Scope' fixes the cutover seed and the leak
-matrix non-vacuity check (owner resolution 3), then runs the 3x process gate and the
-final gates; the stopped-Telescreen and replay flows already pass.
+`19074e9`) and g1. g11 records svc-p01 to svc-p07 as accepted dependencies at `66531bd`
+and dispatches only svc-p08. Its 'Run 11 Scope' re-runs the final gates without code
+changes, with the skip-marker check phrased as a grep without the test-runner word
+(owner resolution 4), and refreshes the verification evidence doc.
 Earlier session logs are in
 [`logs/svc-p02-db-2026-10-15.md`](logs/svc-p02-db-2026-10-15.md),
 [`logs/svc-p02-db-2026-10-15-run3.md`](logs/svc-p02-db-2026-10-15-run3.md),
 [`logs/svc-p04-inventory-2026-10-16.md`](logs/svc-p04-inventory-2026-10-16.md),
-[`logs/svc-p06-composition-2026-10-16.md`](logs/svc-p06-composition-2026-10-16.md) and
-[`logs/svc-p08-verification-deploy-2026-10-16.md`](logs/svc-p08-verification-deploy-2026-10-16.md).
+[`logs/svc-p06-composition-2026-10-16.md`](logs/svc-p06-composition-2026-10-16.md),
+[`logs/svc-p08-verification-deploy-2026-10-16.md`](logs/svc-p08-verification-deploy-2026-10-16.md),
+[`logs/svc-p08-verification-deploy-2026-10-16-run9.md`](logs/svc-p08-verification-deploy-2026-10-16-run9.md) and
+[`logs/svc-p08-verification-deploy-2026-10-16-run10.md`](logs/svc-p08-verification-deploy-2026-10-16-run10.md).
 Serial finalization after the fanout applies the Nodetto layout fix
 (design-service-split.md section 12), archives the eight svc plans to `completed/` and
-the ten manifests to `completed/dispatch/`, and updates this index.
+the eleven manifests to `completed/dispatch/`, and updates this index.
 `inventory-alert-boundaries.md` stays in `active/`.
 
 The [inventory and alert boundary plan](active/inventory-alert-boundaries.md) is complete:

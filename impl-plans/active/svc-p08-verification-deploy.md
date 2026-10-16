@@ -1,6 +1,6 @@
 # SVC-P08 Verification and Deployment: Multi-Process Tests, Restricted Logins, Leak Matrix, Compose, Docs
 
-**Status**: Completed (run 10 R10.1-R10.4 verified; serial archive/index/commit/push remain downstream)
+**Status**: In Progress (run 11 final re-verify; scope complete at `66531bd`, gates to re-run)
 **Design Reference**: design-docs/specs/design-service-split.md sections 6, 13-17; design-docs/specs/design-service-split-requirements.md section 7
 **Created**: 2026-10-15
 **Last Updated**: 2026-10-16
@@ -9,8 +9,8 @@
 
 - planId: `svc-p08-verification-deploy`
 - planPath: `impl-plans/active/svc-p08-verification-deploy.md`
-- wave: E (manifest `telescreen-svc-20261016-g10`, the only dispatched wave)
-- dependsOn: none open; svc-p01 to svc-p07 are accepted dependencies at `3190903`
+- wave: F (manifest `telescreen-svc-20261016-g11`, the only dispatched wave)
+- dependsOn: none open; svc-p01 to svc-p07 are accepted dependencies at `66531bd`
 - writePaths:
   - `impl-plans/active/svc-p08-verification-deploy.md`
   - `tests/split`
@@ -34,321 +34,183 @@
 
 This plan proves R1-R8 end to end and ships the deployment artifacts: three uvicorn
 processes over TCP on three SQLite files, restricted-login grants, the leak matrix, the
-compose overlay and the runbook docs. Runs 1-9 delivered everything except two test-design
-errors found by owner resolution 3 (Progress Log below):
+compose overlay and the runbook docs. Runs 1-10 delivered all of it. At `66531bd` every
+gate was green in run 10: the process suite passed 7 tests 3 times, the scoped suite
+passed 180, `mise run ci` passed 1402 with 35 skipped, and ddl-check, web-ci and
+`uv build` passed.
 
-1. `tests/split/test_cutover_process.py` seeds a `pending` notification (there is no such
-   `NotificationStatus`) with `member:<id>` (senders store the handle-based `member:alice`).
-2. `tests/leak/test_leak_matrix_split.py` requires a positive `ProducerRedactionHits`
-   count. Zero is correct, because content is redacted before a producer builds its
-   command.
+The workflow progress gate still blocked run 10 (owner resolution 4, Progress Log below).
+Its verification list contained the no-skip-marker grep with the literal test-runner
+word in it. The gate classifies any command containing that word as a test run, and a
+grep has no passed count, so it was counted as a zero-count test run. This was a false
+positive, not a product or test defect.
 
-Run 10 fixes both tests, updates the verification doc and runs the full gate list. The
-replay flow (`tests/split/test_replay_process.py`, flow a) and the stopped-Telescreen
-flow (`tests/split/test_stopped_telescreen_process.py`, flow b) already pass and must stay
-unchanged and green.
-
-Imitate:
-
-- `tests/split/support.py` (`ServiceStack`, `SmtpRecorder`, `run_cli`, `wait_ready`,
-  `wait_for`, `scalar_int`, `seed_member`, `seed_issue`);
-- `tests/split/test_stopped_telescreen_process.py` (wait for both replicas, restart a
-  service, then `wait_ready`);
-- `tests/split/test_cutover.py` (in-process cutover row shapes, `queued` status).
+Run 11 re-runs the final gates on the unchanged checkpoint source. The skip-marker grep
+is phrased without the test-runner word. The verification doc is refreshed with the g11
+evidence. No code changes.
 
 ## Non-goals
 
-- No production code, DDL, Alembic or owner-baseline change. Do not edit `src/**` or
-  `db/**`. A product defect is a "Reconciliation request" in the Progress Log with a
-  failing test id, the log path and the observed row state.
-- No live-service tests in verification (owner-run `examples/compose/dev-services.yml`).
-- No new process cases (OIDC parity, DLP parity, settings proxy, collection).
-- Do not change `tests/split/test_replay_process.py`,
-  `tests/split/test_stopped_telescreen_process.py`, `tests/split/test_cutover.py` or
-  `tests/leak/flows_split.py`, unless a reproduced defect in them blocks a gate.
-- Do not archive plans, write manifests or edit `impl-plans/README.md`, `README.md`,
-  `impl-plans/logs/**` or the design status line. Serial finalization does that.
+- No change to `src/**`, `db/**`, any test module, compose file, `command.md`,
+  `design-inventory-microservice.md` or `design-service-split.md`. The design status
+  line and section 17 were already updated by the run 11 design step, and serial
+  finalization sets the final status. The only file edits in run 11 are
+  `design-docs/specs/design-service-split-verification.md` (R11.2) and this plan's
+  Status line, Completion Criteria and Progress Log (R11.3).
+- No new tests, no longer timeouts, no retries, and no weakening of any assertion or
+  gate.
+- No live-service tests in verification. The owner runs PostgreSQL restricted-login
+  and Mailpit/Keycloak checks with `examples/compose/dev-services.yml`. Offline-skipped
+  integration tests are neither verification nor risks (conventions 7a).
+- No plan archiving, no manifest writes, and no edits to `impl-plans/README.md`,
+  `README.md`, `impl-plans/logs/**` or the Nodetto document. Serial finalization does
+  that.
+- No git checkout, restore, stash, reset, clean, add, commit or push.
 
 ## Deliverables
 
-Deliverables of runs 1-9 are archived in
+Deliverables of runs 1-10 are archived in
 [`../logs/svc-p08-verification-deploy-2026-10-16.md`](../logs/svc-p08-verification-deploy-2026-10-16.md)
-(runs 1-7) and
+(runs 1-7),
 [`../logs/svc-p08-verification-deploy-2026-10-16-run9.md`](../logs/svc-p08-verification-deploy-2026-10-16-run9.md)
-(Run 9 Scope and the run 8-9 Progress Log). Run 10 delivers only R10.1-R10.4.
+(Run 9 Scope and the run 8-9 Progress Log) and
+[`../logs/svc-p08-verification-deploy-2026-10-16-run10.md`](../logs/svc-p08-verification-deploy-2026-10-16-run10.md)
+(Run 10 Scope R10.1-R10.4 and the run 10 Progress Log, including the final run 10
+gates). Run 11 delivers only R11.1-R11.3.
 
 ## Key Pitfalls
 
-- Never leave orphan processes: `try/finally` with `stack.stop_all()` and `smtp.close()`.
-- After every `stack.start`/`stack.restart`, `await wait_ready(...)` on that service's
-  health URL before any HTTP call to it. Before stopping a producer, wait until its
-  outboxes are drained.
-- Directory-stream deliveries can arrive out of order. The inbox answers GAP (engine task
-  `last_error_code='conflict'`) and the task retries about 5 s later. This is expected:
-  never assert on `conflict` and never treat it as a defect.
-- Never write to a SQLite store while its owning process runs. Seed only while every
-  writer is stopped; read through the read-only probes in `support.py`.
-- Notification's `DeliveryPump` (`notification_service/worker.py`) starts with the serve
-  process and polls every second. `NotificationDeliveryHandler.handle`
-  (`notifications/delivery.py:55-67`) marks a row `failed` with `recipient_unknown`,
-  terminally, when `ReplicaRecipientResolver` (`replica/directory.py:52-61`) cannot find
-  the member in Notification's directory replica. A copied `queued` row for
-  `member:alice` therefore fails if the pump sees it before resync has applied alice.
-  See R10.1 step 4.
-- Sample secrets come only from `tests.support.samples` (gitleaks blocks literals).
-- Typelint: no `Any`, `object`, dict types, `**kwargs` or type-ignore.
+- Do not list any non-test command whose text contains the test-runner word. Use the
+  skip-marker grep exactly as in Verification item 10, and never the run 10 form. Every
+  real test command must report its passed count.
+- `priorVerification` stays empty. A failed attempt is not verification. If a gate fails
+  and is then fixed, the fixed failure goes into the Progress Log, and only the final
+  passing run is listed (conventions 7a).
+- Run commands one at a time in the foreground. Never run the process suite
+  concurrently with `mise run ci`: both start uvicorn processes and share the 32 GB host.
+- The process suite takes about 560 s per iteration (about 28 min for 3). Use a tool
+  timeout that covers it, or run the three iterations as three separate foreground
+  commands with one log each. Do not background them.
+- Directory-stream GAP/`conflict` retries in process logs are expected behavior (owner
+  resolution 2). They are neither a failure nor a risk.
+- After the process loop, check that no service process survived (Verification item 6)
+  before starting `mise run ci`.
 
-## Run 10 Scope (manifest g10, base 3190903) - authoritative
+## Run 11 Scope (manifest g11, base 66531bd) - authoritative
 
-### R10.1 Cutover seed in `tests/split/test_cutover_process.py` (flow c)
+### R11.1 Final gates (no code change)
 
-Keep the existing structure (migrate main and inventory, seed with stopped writers,
-`notification-store copy/verify --writers-stopped`, start, resync, assert, restart
-Inventory with `TELESCREEN_DATA_OVERDUE_CRON="* * * * *"`, assert dedup). Change:
+Run Verification items 1-12 below on the checkpoint source, in order. Write each log to
+`/tmp/telescreen-svc-p08-verification-deploy-g11-<name>.log`, where `<name>` is the item
+label. Record the exit code, the passed/skipped counts for test commands and the full
+log path for every item.
 
-1. In the `NotificationRow` seed, use `status=NotificationStatus.QUEUED.value` (import from
-   `telescreen.core.vocabulary`) and `recipient_ref="member:alice"`. Rename the id and
-   subject from "pending" to "queued", keeping the id at 36 characters or fewer. Update the
-   docstring and failure messages to match.
-2. Keep `event_id = retention_event_id(asset_id, due_field_id, due_revision_id)`, where
-   `due_revision_id` is the `revision_id` of the `deletion_due` `DataFieldValueRow`. This is
-   what `inventory/retention.py:173` computes, so the receipt id matches the obligation.
-   Do not change this alignment.
-3. After `notification-store copy`, assert through `scalar_int` on the notification store
-   that `retention_notification_receipts` holds id `event_id` (count 1) and that the
-   notifications row holds `status='queued'` (count 1). Both are carriers that make the
-   later assertions non-vacuous.
-4. Delivery ordering. First run the runbook order as written (design section 13, step 5:
-   start Notification, then resync). If the copied row ends `failed` with `error_code
-   'recipient_unknown'` (print status, error_code and the
-   `notification_directory_entries` count in the failure message), the pump raced the
-   replica. This is the reproduced defect. Record it in the Progress Log (test id, log
-   path, row state), then apply the replica-first cutover order. The order needs no
-   production change, because `notification-store copy` replaces only `notifications`,
-   `notification_templates`, `notification_settings` and
-   `retention_notification_receipts` (`db/notification_transfer.py:22-27`) and keeps
-   `notification_directory_entries`:
-   1. Seed main and inventory with every writer stopped.
-   2. Run `telescreen.notification_service migrate`, start Notification, Inventory and the
-      Telescreen worker (and the API if `seed`/resync needs it), `wait_ready` each, run
-      `telescreen projections resync`, and `wait_for` alice in both
-      `inventory_directory_entries` and `notification_directory_entries`. The Notification
-      store has no queued rows yet, so nothing races.
-   3. Wait until `projection_changes` is empty, then `stack.stop_all()`. All writers are
-      now stopped.
-   4. `notification-store copy --writers-stopped` and `verify --writers-stopped`. Start
-      the stack again and `wait_ready` every process.
-   Then update design-service-split.md section 13 (steps 4-6: seed the Notification
-   replica by resync before the stopped-writer copy, and say why) and the section 17
-   flow (c) text, plus the cutover runbook in `design-docs/specs/command.md` if it
-   lists the steps. Do not edit any other design section.
-5. Exactly once: the row reaches `status='sent'`, and `smtp.messages` holds exactly one
-   message containing the subject. After `asyncio.sleep(5)` there is still exactly one,
-   and the row is still `sent`.
-6. Dedup (unchanged): after the Inventory restart, `inventory_notification_outbox` row
-   `event_id` is delivered, `notification_inbox` has no row `event_id`, the
-   `data_overdue` notification count equals its value before the restart, and the SMTP
-   count is unchanged. Notification answered `DUPLICATE` at
-   `notification_service/inbox.py:62-74`.
+If any item fails:
 
-Tests (input -> expected):
+1. Keep the failing log. Reproduce the failure with the single failing test id or
+   command, and record test id, log path and observed state in the Progress Log.
+2. Owner diagnosis rule: find the root cause. If the cause is inside this plan's
+   writePaths (for example a test timing assumption in `tests/split/**`), fix it there
+   at the root, without a blind timeout increase or retry, and record pre/post SHA-256
+   hashes. If the cause is in `src/**`, `db/**` or another plan's files, write a
+   "Reconciliation request" (test id, log path, observed row state, suspected owner
+   path) and stop. Do not edit those files.
+3. After any fix, re-run the whole Verification list from item 1, including all three
+   process iterations from scratch. Only that final passing run is verification.
 
-- copied `queued` member row plus split start -> exactly one SMTP message and row `sent`;
-- copied receipt `X` plus overdue cron -> outbox row `X` delivered, no inbox row `X`, no
-  new `data_overdue` row.
+### R11.2 Verification doc
 
-### R10.2 Leak matrix non-vacuity in `tests/leak/test_leak_matrix_split.py`
+In `design-docs/specs/design-service-split-verification.md`, change only these parts:
 
-1. Delete the `any(isinstance(operation, MemberSendOperation) ... > 0 ...)` assertion, the
-   `_notification_outboxes` helper and the imports only it used
-   (`MemberSendOperation`, `decode_notification_command`). Keep every sink scan unchanged:
-   `assert_store_tables_clean` over `tables_for` of all three stores,
-   `assert_split_sinks_clean` (stores, four logs, API bodies), and `assert_texts_clean`
-   (SMTP DATA plus both audit exports). Keep
-   `test_split_leak_matrix_fails_when_owned_table_is_missing` unchanged.
-2. Add non-vacuity assertions after the scans:
-   - the ingest carrying `samples[0]` returned 200 (already asserted in
-     `support.py:seed_issue`; do not weaken that assertion);
-   - `findings` has at least one row for `issue_id` with a non-empty `masked_snippet`
-     (`SELECT count(*) FROM findings WHERE issue_id=? AND masked_snippet <> ''` >= 1). The
-     table scan already proves the raw and JSON-escaped sample appear nowhere, so this
-     row holds only the masked form;
-   - the scan job that produced it kept a positive count:
-     `SELECT max(s.findings_count) FROM scan_jobs s JOIN findings f ON f.scan_job_id =
-     s.id WHERE f.issue_id=?` > 0 (`issues/service.py:288` sets `scan_job_id`);
-   - keep the mention notification row for alice (`ISSUE_MENTIONED`), and keep
-     `audit_records` > 0 in main.
-3. Do not require positive `ProducerRedactionHits` or `dlp_hit_count`. The comment and
-   workflow carriers are redacted upstream, so zero is correct for them.
-4. If `findings_count` is 0 while findings exist, that is a production counting defect:
-   write a Reconciliation request. Do not delete the assertion.
+- the introduction: "continuation run 10" -> "continuation run 11", and the sentence
+  that says which source the results come from (the run 11 re-verify of `66531bd`);
+- in the requirement table, the R1, R3 and R5 rows' g10 process log paths -> the g11
+  paths. Keep the test ids, wording and claims unchanged unless a run 11 result differs;
+- in the "Commands and results" table, every `-g10-` log path -> `-g11-`, and every count
+  and duration -> the run 11 values (format file count, process 7 passed per run and
+  durations, scoped suite passed/skipped, `mise run ci` passed/skipped/warnings, ddl test
+  count, web test count);
+- the skip-marker row: name the command as the no-skip-marker grep
+  `! grep -nE 'mark\.skip|\.skip\(|skipif' <process modules>`, without the test-runner
+  word.
 
-Tests (input -> expected):
+The doc must not claim results for the skipped PostgreSQL/live checks. Leave the R6 and
+R8 rows unchanged.
 
-- runtime samples through ingest, comment, workflow notify, rejected locator and context
-  field -> no raw or escaped sample in any sink; findings row with masked snippet;
-  `findings_count` > 0;
-- empty SQLite store -> `AssertionError` "store is missing declared table" (unchanged).
+### R11.3 Plan bookkeeping
 
-### R10.3 Verification doc
-
-In `design-docs/specs/design-service-split-verification.md`: change "continuation run 9"
-to run 10. In rows R3, R5 and R7, replace the failure and Reconciliation wording with the
-final passing test ids and the g10 log paths. If R10.1 step 4 applied the replica-first
-order, say so in row R5. Add the 3x process gate result.
-
-### R10.4 Final verification
-
-Run the Verification list below on the final source, in order, in the foreground. Record
-exit codes, passed/skipped counts and full log paths in the Progress Log.
+After every item exits 0, set Status to `Completed (run 11 re-verify passed; serial
+archive/index/commit/push remain downstream)`, tick the run 11 Completion Criteria, and
+append a "Run 11 re-verify" Progress Log entry. The entry lists each final command with
+its exit code, counts and log path, plus the R11.2 SHA-256 pre/post hashes. Keep the plan
+under 400 lines.
 
 ## Invariants
 
-- `git diff --quiet HEAD -- src db` exits 0 at the end.
-- Every file under `tests/split` and `tests/leak` stays under 1000 lines; this plan stays
-  under 400.
-- No `pytest.skip`, `skipif` or `pytest.mark.skip` in the process modules.
+- `git diff --quiet HEAD -- src db tests examples` exits 0 at the end. Run 11 changes
+  no code, test or example, unless R11.1 step 2 fixed a root cause in this plan's test
+  paths; in that case, record it and this item lists only those paths.
+- The only changed files are
+  `design-docs/specs/design-service-split-verification.md` and this plan, plus any R11.1
+  root-cause fix. This is checked with `git status --porcelain`, ignoring files changed
+  by the run 11 planning commit.
+- Every file under `tests/split` and `tests/leak` stays under 1000 lines. This plan
+  stays under 400.
+- The process modules contain no skip markers.
 - Raw samples never enter any table, log, outbox, replica, wire body, notification or
   export (the leak matrix proves it).
 - Per-edit discipline: read each file fresh before editing. Record pre/post SHA-256 and
-  an intent snapshot under `tmp/telescreen-svc-20261016-g10/svc-p08-verification-deploy/attempt-<n>/`.
-  On unexpected drift, write a Reconciliation request and do not overwrite.
+  an intent snapshot under
+  `tmp/telescreen-svc-20261016-g11/svc-p08-verification-deploy/attempt-<n>/`. On
+  unexpected drift, write a Reconciliation request and do not overwrite.
 
-## Verification (run 10; logs `/tmp/telescreen-svc-p08-verification-deploy-g10-*.log`)
+## Verification (run 11; logs `/tmp/telescreen-svc-p08-verification-deploy-g11-<name>.log`)
 
-Use `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1` for every command. Each must exit 0:
+Prefix every command with `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1;`. Each must
+exit 0 and show the stated evidence:
 
-1. `uv run --frozen ruff format --check --no-cache tests/split tests/inventory_service tests/e2e tests/leak tests/examples`
-2. `uv run --frozen ruff check --no-cache tests/split tests/inventory_service tests/e2e tests/leak tests/examples`
-3. `uv run --frozen ty check tests/split tests/inventory_service tests/e2e tests/leak tests/examples`
-4. `uv run --frozen python tools/typelint.py > <log> 2>&1`, with no line matching `tests/(split|leak|inventory_service)`.
-5. `for i in 1 2 3; do uv run --frozen pytest -p no:cacheprovider -q tests/split/test_replay_process.py tests/split/test_stopped_telescreen_process.py tests/split/test_cutover_process.py tests/leak/test_leak_matrix_split.py tests/inventory_service/test_process.py > <log-$i> 2>&1 || exit 1; done`. Each of the three runs passes with 0 skipped (flakiness gate).
-6. `! pgrep -f 'telescreen.(inventory_service|notification_service) serve'` (no orphans).
-7. `uv run --frozen pytest -p no:cacheprovider tests/split tests/inventory_service tests/notification_service tests/leak tests/examples tests/e2e`
-8. `mise run ci`. Passed must be at least 1397 (baseline at `3190903`).
-9. `mise run ddl-check`; `mise run web-ci`; `uv build --out-dir /tmp/telescreen-svc-p08-verification-deploy-g10-dist`.
-10. `git diff --quiet HEAD -- src db`; `test "$(wc -l < impl-plans/active/svc-p08-verification-deploy.md)" -lt 400`; every `tests/split/*.py` and `tests/leak/*.py` is under 1000 lines.
+1. format: `uv run --frozen ruff format --check --no-cache tests/split tests/inventory_service tests/e2e tests/leak tests/examples` -> "files already formatted".
+2. ruff: `uv run --frozen ruff check --no-cache tests/split tests/inventory_service tests/e2e tests/leak tests/examples` -> "All checks passed".
+3. ty: `uv run --frozen ty check tests/split tests/inventory_service tests/e2e tests/leak tests/examples` -> "All checks passed".
+4. typelint: `uv run --frozen python tools/typelint.py > <log> 2>&1; ! grep -E "^($(pwd)/)?tests/(split|leak|inventory_service)" <log>` -> exit 0, no p08 diagnostics.
+5. process-1, process-2, process-3: `uv run --frozen pytest -p no:cacheprovider -q tests/split/test_replay_process.py tests/split/test_stopped_telescreen_process.py tests/split/test_cutover_process.py tests/leak/test_leak_matrix_split.py tests/inventory_service/test_process.py > <log-i> 2>&1`, run three times in sequence -> each "7 passed", 0 skipped.
+6. pgrep-final: `! pgrep -f 'telescreen.(inventory_service|notification_service) serve'` -> no surviving service process.
+7. scoped: `uv run --frozen pytest -p no:cacheprovider tests/split tests/inventory_service tests/notification_service tests/leak tests/examples tests/e2e` -> at least 180 passed; skips are only the environment-gated integration tests.
+8. ci: `mise run ci` -> at least 1402 passed (the run 10 count at `66531bd`), with format, ruff, typelint, ty and build passing.
+9. ddl: `mise run ddl-check` -> exports canonical and the schema tests pass. web: `mise run web-ci` -> typecheck, vitest and build pass.
+10. skips: `! grep -nE 'mark\.skip|\.skip\(|skipif' tests/split/test_replay_process.py tests/split/test_stopped_telescreen_process.py tests/split/test_cutover_process.py tests/leak/test_leak_matrix_split.py tests/inventory_service/test_process.py` -> no match.
+11. build: `uv build --out-dir /tmp/telescreen-svc-p08-verification-deploy-g11-dist` -> sdist and wheel built.
+12. source-diff and line-limits: `git diff --quiet HEAD -- src db tests examples`; `for f in tests/split/*.py tests/leak/*.py; do test "$(wc -l < "$f")" -lt 1000 || exit 1; done`; `test "$(wc -l < impl-plans/active/svc-p08-verification-deploy.md)" -lt 400`.
 
 ## Completion Criteria
 
-- [x] R10.1: the copied `queued` `member:alice` row is delivered exactly once after cutover, and the copied receipt deduplicates the retention obligation.
-- [x] R10.2: the leak matrix proves non-vacuity by ingest 200, a masked-only finding and `findings_count` > 0, and no longer requires producer redaction hits.
-- [x] R10.3: the verification doc is updated; design section 13/17 and the command cutover summary document the replica-first order.
-- [x] Verification commands 1-10 exit 0 on the final source, with logs and hashes recorded. Status is Completed, `priorVerification` is empty, and only final passing commands are listed (conventions 7a).
-- [x] Compose topology, the rewritten `test_process.py`/`test_postgres.py`, docs and design corrections (run 7); shared harness and stopped-Telescreen flow (run 8); seed helpers and replay flow (run 9).
+- [ ] R11.1: Verification items 1-12 exit 0 on the checkpoint source. Each is recorded with its exit code, counts and full g11 log path, and the process suite passes 3 times with 7 passed and 0 skipped.
+- [ ] R11.2: the verification doc cites run 11 and the g11 logs and counts. The skip-marker row has no test-runner word.
+- [ ] R11.3: Status is Completed, `priorVerification` is empty, `addressedFeedback` lists only fixed findings, and only final passing commands are listed (conventions 7a).
+- [x] Runs 1-10: compose topology, process and PostgreSQL tests, docs and design corrections, shared harness, stopped-Telescreen, replay and cutover flows, and the leak matrix with detected-ingest non-vacuity (archived logs).
 
 ## Progress Log
 
-Earlier entries are archived in the two log files named under Deliverables. Append run 10
-sessions below, following conventions section 8.
-
-### Owner resolution 3: 2026-10-16 (after session 26)
-
-Neither remaining failure needs a production change; both are test-design errors.
-
-1. Cutover: `NotificationStatus` has no `pending` value (queued, sent, failed, blocked,
-   skipped). Unsent rows are `queued` in the monolith, and the Notification worker
-   (`notification_service/worker.py`) schedules copied `queued` rows. Seed the copied
-   pending notification with `status='queued'`, and use the real handle-based member
-   reference (`member:alice`), which is what senders store. Then assert it is delivered
-   once after cutover and that the copied `retention_notification_receipts` deduplicate
-   the retention obligation.
-2. Leak matrix non-vacuity: a zero `ProducerRedactionHits` count is correct, because
-   content is redacted before the producer builds its command. Do not require positive
-   producer hits. Prove non-vacuity instead by showing the raw sample entered the system
-   and was handled: the ingest/scan request with the runtime sample returns 200, a
-   finding/issue exists with only the masked representation, and (where a path keeps
-   counts) detector or DLP hit counts are positive. Then scan every table of the three
-   stores, wire bodies, process logs and audit exports for the raw and JSON-escaped
-   sample, as already implemented.
-
-Then run the 3x process suite and the full verification list on final source.
-For build-output commands, write to /tmp paths (no artifactRoots needed) or list them
-as artifactRoots in the plan. Conventions 7a.
-
-### Run 10 planning (2026-10-16)
-
-Manifest g10 supersedes g9 with the same writePaths. The Run 9 Scope and the run 8-9
-entries moved to the `-run9` log. Owner resolution 3 is restated as R10.1 and R10.2. A
-code reading found one hazard to settle by reproduction (R10.1 step 4): Notification's
-pump fails a copied member row with `recipient_unknown` if it runs before resync seeds
-the replica (`notifications/delivery.py:55-67`, `replica/directory.py:52-61`). Planning
-could not execute pytest in its sandbox, so the hazard is unverified. The fallback is a
-test and runbook ordering change, not a production change.
-
-### Run 10 implementation and final verification (2026-10-16)
-
-R10.1 corrected the process fixture to use `NotificationStatus.QUEUED`, `member:alice`,
-and `DlpVerdict.PASS`. The first corrected run with the runbook's original Notification-
-before-resync order reproduced the documented race: Notification marked the row
-`failed/recipient_unknown` while `notification_directory_entries` was empty; resync later
-populated two entries. The process test now starts the empty Notification store, resyncs
-both service replicas, waits for `projection_changes` to drain, stops all writers, copies
-and verifies notification state, then restarts processes. It asserts the copied receipt
-and queued row, one SMTP message, `sent` status after 5 seconds, and retention dedup with
-no inbox row or additional `data_overdue` notification. The test reports status,
-`error_code` and directory count on delivery timeout. The reproduced race is recorded in
-`/tmp/telescreen-svc-p08-verification-deploy-g10-cutover-attempt2.log`; the fixed focused
-cutover pass is recorded in
-`/tmp/telescreen-svc-p08-verification-deploy-g10-cutover-attempt3.log` (1 passed, 0 skipped).
-
-R10.2 removed the producer-redaction operation inspection and replaced it with a finding
-for the ingested issue having a non-empty `masked_snippet` and a joined positive
-`scan_jobs.findings_count`. All raw and JSON-escaped sink scans, mention notification,
-audit assertions and missing-table failure check remain. Focused leak run:
-`/tmp/telescreen-svc-p08-verification-deploy-g10-leak-attempt1.log` (2 passed, 0 skipped).
-The first cutover attempt at
-`/tmp/telescreen-svc-p08-verification-deploy-g10-cutover-attempt1.log` exposed an invalid
-fixture verdict (`clear`) as a worker `ValueError`; the fixture was corrected to
-`DlpVerdict.PASS` without a production change. The first targeted Ruff check also found
-one E501 line; it was corrected before final checks. These resolved attempts are recorded
-here, not in final verification or `priorVerification`.
-
-Per-file SHA-256 before/after edits: `tests/split/test_cutover_process.py`
-`7b627fdcc29580205a394122e9a16514cd0d539ac485ed6d66436864ef8e1944` ->
-`0af905c571c2b65dc2cea5b6dbf3ae45d12e0d31a79e91f8045f3010ffb4bcc0`;
-`tests/leak/test_leak_matrix_split.py`
-`17ea9649b6d3802c67bca8b471e399cbeeeaa935a07476ce617909a98d526420` ->
-`f75fe88922dbeeac35aec42eedac33887b5416a75e02bf3238c4c0a1357fdf6c`;
-`design-docs/specs/design-service-split.md`
-`6434354e2d8dac221dd255c004e3fcb81c1a603efd05e08424b24bbd52afb3ac` ->
-`8fb18e874a27170a6526ca213064b01045e5141c33bcd2bfad99808475306dc8`;
-`design-docs/specs/design-service-split-verification.md`
-`ad85a66a3ddc4132be1d7907ca4d94278e9855ea7e35750b0a22d942fff02309` ->
-`e2da80e79034d4f3a28b0fd80cca0e55bef25a55ec2d934732739ccad8740725`;
-`design-docs/specs/command.md`
-`76b54480643dd777086b64b5acb14889558bdfbfb8f2eac5d775690c49da9a12` ->
-`73107a8aa0c5887e39456001dd3091e2501a0a102d4e6d34bea70d3abb860f84`.
-The hashes and per-edit intents are also preserved under
-`tmp/telescreen-svc-20261016-g10/svc-p08-verification-deploy/attempt-1/`.
-
-Final verification (all exit 0; full logs under `/tmp`):
-
-- `uv run --frozen ruff format --check --no-cache tests/split tests/inventory_service tests/e2e tests/leak tests/examples` — 72 files; `/tmp/telescreen-svc-p08-verification-deploy-g10-format.log`.
-- `uv run --frozen ruff check --no-cache tests/split tests/inventory_service tests/e2e tests/leak tests/examples` — `/tmp/telescreen-svc-p08-verification-deploy-g10-ruff.log`.
-- `uv run --frozen ty check tests/split tests/inventory_service tests/e2e tests/leak tests/examples` — `/tmp/telescreen-svc-p08-verification-deploy-g10-ty.log`.
-- `uv run --frozen python tools/typelint.py` with the required path filter — no diagnostics; `/tmp/telescreen-svc-p08-verification-deploy-g10-typelint.log`.
-- Three sequential focused process runs: each 7 passed, 0 skipped; `/tmp/telescreen-svc-p08-verification-deploy-g10-process-1.log`, `...-process-2.log`, `...-process-3.log` (561.54s, 562.17s, 562.23s).
-- `! pgrep -f 'telescreen.(inventory_service|notification_service) serve'` — no service process survived; `/tmp/telescreen-svc-p08-verification-deploy-g10-pgrep-final.log`.
-- `uv run --frozen pytest -p no:cacheprovider tests/split tests/inventory_service tests/notification_service tests/leak tests/examples tests/e2e` — 180 passed, 4 skipped; `/tmp/telescreen-svc-p08-verification-deploy-g10-pytest.log`.
-- `mise run ci` — 1402 passed, 35 skipped, 1 warning; `/tmp/telescreen-svc-p08-verification-deploy-g10-ci.log`.
-- `mise run ddl-check` — Nodetto exports canonical, 10 tests passed; `/tmp/telescreen-svc-p08-verification-deploy-g10-ddl.log`.
-- `mise run web-ci` — typecheck, 262 tests and build passed; `/tmp/telescreen-svc-p08-verification-deploy-g10-web.log`.
-- `uv build --out-dir /tmp/telescreen-svc-p08-verification-deploy-g10-dist` — wheel and sdist built; `/tmp/telescreen-svc-p08-verification-deploy-g10-build.log`.
-- `git diff --quiet HEAD -- src db`, forbidden assertion/skip greps, line budgets and final pgrep — all exit 0; logs `/tmp/telescreen-svc-p08-verification-deploy-g10-source-diff.log`, `/tmp/telescreen-svc-p08-verification-deploy-g10-leak-proxy.log`, `/tmp/telescreen-svc-p08-verification-deploy-g10-status.log`, `/tmp/telescreen-svc-p08-verification-deploy-g10-skips.log`, `/tmp/telescreen-svc-p08-verification-deploy-g10-line-limits.log`, `/tmp/telescreen-svc-p08-verification-deploy-g10-pgrep-final.log`.
-
-The owner-run PostgreSQL restricted-login and live Mailpit/Keycloak checks remain outside
-this offline gate. Archiving plans/manifests, README/index/status finalization, formal
-review, exact-file staging, commit and push are owned by later workflow steps.
+Earlier entries are archived in the three log files named under Deliverables. Append
+run 11 sessions below, following conventions section 8.
 
 ### Owner resolution 4: 2026-10-16 (after session 27)
 
 Run 10 finished all p08 work with every gate green (process suite 3x 7 passed, scoped
-pytest 180 passed, `mise run ci` 1402 passed / 35 skipped, ddl-check, web-ci, build).
+suite 180 passed, `mise run ci` 1402 passed / 35 skipped, ddl-check, web-ci, build).
 The workflow progress gate still blocked it because the verification list contained the
-no-skip-marker check `! grep -n 'pytest.mark.skip\|...'`: any command containing the word
-`pytest` is classified as a behavioral test run, and a grep has no positive test count,
+no-skip-marker check with the test-runner word in its pattern. Any command containing
+that word is classified as a behavioral test run, and a grep has no positive test count,
 so it was counted as a zero-count test. This is a false positive. Re-run the final gates
 on the checkpoint and report the skip-marker check without the literal word, for example
-`! grep -nE 'mark\.skip|\.skip\(|skipif' <files>`; keep every real pytest command with
-its passed count. Keep `priorVerification` empty and change no code (conventions 7a).
+`! grep -nE 'mark\.skip|\.skip\(|skipif' <files>`. Keep every real test command with its
+passed count. Keep `priorVerification` empty and change no code (conventions 7a).
+
+### Run 11 planning (2026-10-16)
+
+Manifest g11 supersedes g10 with the same writePaths. svc-p01 to svc-p07 are accepted
+dependencies at `66531bd`. The Run 10 Scope and the run 10 entries (owner resolution 3,
+run 10 planning, run 10 implementation and gates) moved unchanged to the `-run10` log.
+Owner resolution 4 is restated as R11.1-R11.3. The new skip grep returned 0 matches
+in all five process modules at planning time (`grep -cE` count check). That is a
+planning check, not verification.
