@@ -243,7 +243,11 @@ identity comes from the credential, never from the payload. Inventory keeps
 4. **Retention (R5).** The existing overdue publisher and `inventory_retention_outbox`
    stay (one obligation id per asset, due field and value revision). A local dispatcher
    handles each pending obligation in **one inventory transaction**:
-   - It checks eligibility (`RetentionLookup`, now local).
+   - It checks eligibility (`RetentionLookup`, now local). The eligibility query lives in
+     `telescreen.inventory` (`inventory/retention_outbox.py:retention_status(session,
+     command, clock)`, shared with `InventoryRetentionLookup.status`), so
+     `inventory_service` runs it in the dispatch session without importing inventory
+     SQL models.
    - If the obligation is not current (cleared, deleted or superseded), it appends
      `data_asset.overdue_superseded` to the local chain.
    - If it is current, it resolves the recipient. The owner is taken first from the asset
@@ -399,7 +403,31 @@ Replica tables share one shape: `(kind, id)` PK, `revision`, `present`, indexed
 `short_id`, `status` and `owner_ref`.
 
 DDL order: Nodetto JSONL first (new frames per model module, exact index names, logical
-relations only within a store), then `ddl-arrange`, `ddl-export`, models, then new revisions:
+relations only within a store), then `ddl-arrange`, `ddl-export`, models, then new revisions.
+
+Nodetto layout (run 7). Frame membership is geometric. `ddl-arrange` reflows a frame
+together with the tables inside it, and lays out every table outside all frames in the
+frameless row. At `a5392d9` only `inventory_audit_records`, `inventory_audit_chain_head`,
+`notification_audit_records` and `inventory_notification_outbox` lie inside a frame. The
+other eight service-split tables sit in the frameless row (y 3346) or above
+`f-workflow`, and the `f-projections` and `f-inventory-links` frames are empty. The fix is
+visual only. Each of the 12 tables is moved into the frame of its model module, and the
+frame is enlarged to fit:
+
+| Model module | Frame | Tables |
+| --- | --- | --- |
+| `projections.py` | `f-projections` "Directory projections" | `projection_changes`, `inventory_directory_entries`, `notification_directory_entries` |
+| `inventory_links.py` | `f-inventory-links` "Inventory issue links" | `inventory_issue_links` |
+| `notification_handoff.py` | `f-notification-handoff` "Notification handoff" | `notification_outbox`, `inventory_notification_outbox`, `notification_inbox`, `notification_delivery_state` |
+| `service_audit.py` | `f-service-audit` "Service audit chains" | `inventory_audit_records`, `inventory_audit_chain_head`, `notification_audit_records`, `notification_audit_chain_head` |
+
+Then run `mise run ddl-arrange` and `mise run ddl-export`. No table, column, index or
+relation changes, so the SQL exports, models and migrations stay unchanged. A test in
+`tests/db/test_nodetto_schema.py` asserts that each of the 12 tables lies inside the frame
+in this table: the table origin is inside the frame, and `x + width` is within the frame
+width. The 11 pre-existing frameless inventory handoff tables are out of scope.
+
+Revisions:
 
 - Legacy shared graph `0010_service_split`: all 12 new tables, the `directory_revision`
   counter seed, two genesis heads and the PostgreSQL append-only triggers for the two new
@@ -540,14 +568,18 @@ The single-process suite must stay green. Commands: `mise run ci`, `mise run ddl
 tests/notification_service`.
 
 Plan shape (`svc-pNN`, disjoint writePaths). The plan files in `impl-plans/active/` and
-the current dispatch manifest (`telescreen-svc-20261016-g6-dispatch.json`, superseding
-g5 with the same plans, writePaths and DAG, extended only with shared exact-count or
-inventory tests) are authoritative for writePaths. p01 (accepted at `19074e9`) and p02
-(integration-accepted) are recorded as accepted dependencies at checkpoint `077b71a`.
-The remaining plans run in waves: p03 and p07 (code complete at `8b09786`, re-verified at
-`077b71a`; re-verify only: final gates, hashes, reviews and the pending integration
-review); p04, p05 and p06; p08; then serial finalization. The
-critical path is p01 -> p02 -> p07 -> p04/p05 -> p08. Each plan owns the shared
+the current dispatch manifest (`telescreen-svc-20261016-g7-dispatch.json`, superseding
+g6 with the same plans, writePaths and DAG) are authoritative for writePaths. p01, p02,
+p03 and p07 are integration-accepted and are recorded as accepted dependencies at
+checkpoint `a5392d9`; they are not redispatched. The remaining plans run in waves:
+
+1. p04, p05 and p06. p05 and p06 are implemented, and only the independent re-review is
+   left. p04 still owes its R5 retention-dispatch behavior cases.
+2. p08.
+3. Serial finalization. It also applies the Nodetto layout fix (section 12), because the
+   Nodetto document and `tests/db/**` are paths of the accepted p02.
+
+The critical path is p01 -> p02 -> p07 -> p04/p05 -> p08. Each plan owns the shared
 exact-count/inventory tests that its change breaks.
 
 | Plan | Content | Depends on |
@@ -558,5 +590,5 @@ exact-count/inventory tests that its change breaks.
 | p07 shared service runtime | shared directory replica store/apply (`telescreen/replica`), replica authenticator (section 7) with parity tests, chain-parameterized audit (`audit/` service, chain, verify, query, export) used by sections 8.3 and 11 | p01, p02 |
 | p04 inventory | replica-backed lookups and auth binding, issue links, local audit drain, retention dispatcher and notification outbox, removal of callbacks; `notification-store` copy/verify (`db/notification_transfer.py`, reusing p02's transfer helpers) | p01, p02, p07 |
 | p05 notification service | package, inbox, replica binding, delivery pump, routes, audit CLI, identity-through-ports changes in `notifications/`, `DlpGate` `prior_hits` fold in `notifications/dlp.py` and `sender.py`. Test: DLP parity: the same raw sample secret in a context field, an inline body and a template-rendered field gives the same row verdict, hit_count > 0 and audit action under MASK and BLOCK, single-process vs the split adapter + inbox path in process | p01, p02, p07 |
-| p06 telescreen split composition | `wiring*.py`, proxies, integrations, weekly move, `cli.py` registration of every new Telescreen command, no-op delivery handler | p01, p02, p03 |
+| p06 telescreen split composition | `wiring*.py`, proxies, integrations, weekly move, `cli.py` registration and dispatch of every new Telescreen command (`telescreen notification-store` is parsed by p04's `cli_inventory_store.add_commands` and must be routed to `cli_inventory_store.run_notification` (the `inventory-store` branch at `cli.py:337` calls `run`); at `a5392d9` it falls through to exit 2. The p06 CLI test asserts that `notification-store verify` reaches `run_notification`), no-op delivery handler | p01, p02, p03 |
 | p08 verification and deployment | multi-process and PostgreSQL tests (including a multi-process DLP parity case under `TELESCREEN_DLP_POLICY=block`), restricted-login grants, leak matrix, import gates, compose overlay (names fixed by sections 9 and 14), examples tests, command.md, runbook, archive plans (including `active/inventory-alert-boundaries.md`, already COMPLETED) | p04, p05, p06 |

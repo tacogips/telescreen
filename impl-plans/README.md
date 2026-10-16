@@ -49,23 +49,25 @@ These plans come from `design-docs/specs/design-service-split.md` (R1-R8, D1-D5)
 | --- | --- |
 | 1 | [svc-p01-foundation](active/svc-p01-foundation.md) (integration-accepted at `19074e9`) |
 | 2 | [svc-p02-db](active/svc-p02-db.md) (integration-accepted, checkpoint `077b71a`) |
-| 3 (g6 wave A) | [svc-p03-publishers](active/svc-p03-publishers.md), [svc-p07-service-runtime](active/svc-p07-service-runtime.md) (code complete; re-verify, integration review pending) |
-| 4 (g6 wave B) | [svc-p04-inventory](active/svc-p04-inventory.md), [svc-p05-notification-service](active/svc-p05-notification-service.md), [svc-p06-composition](active/svc-p06-composition.md) |
-| 5 (g6 wave C) | [svc-p08-verification-deploy](active/svc-p08-verification-deploy.md) |
+| 3 | [svc-p03-publishers](active/svc-p03-publishers.md), [svc-p07-service-runtime](active/svc-p07-service-runtime.md) (integration-accepted, checkpoint `a5392d9`) |
+| 4 (g7 wave B) | [svc-p04-inventory](active/svc-p04-inventory.md), [svc-p05-notification-service](active/svc-p05-notification-service.md), [svc-p06-composition](active/svc-p06-composition.md) |
+| 5 (g7 wave C) | [svc-p08-verification-deploy](active/svc-p08-verification-deploy.md) |
 
 The current dispatch manifest is
-[`telescreen-svc-20261016-g6`](active/telescreen-svc-20261016-g6-dispatch.json) (run 6,
-base `077b71a`). It supersedes g5 (run 5, base `8b09786`), g4 (run 4, base `c3ed4bc`),
-g3 (run 3, base `6017743`), g2 (run 2, base `19074e9`) and g1. g6 keeps g5's plans, write
-paths and DAG; svc-p06 additionally runs the unowned `tests/inventory_service/test_config.py`
-in its scoped gate. It records svc-p01 and svc-p02 as accepted dependencies at `077b71a`.
-svc-p03 and svc-p07 are code complete at `8b09786` and passed run 5 test-integrity and
-adversarial review; they re-run their final gates, record hashes and go through review,
-including the pending integration review. Earlier svc-p02 log entries are in
-[`logs/svc-p02-db-2026-10-15.md`](logs/svc-p02-db-2026-10-15.md) and
-[`logs/svc-p02-db-2026-10-15-run3.md`](logs/svc-p02-db-2026-10-15-run3.md). Serial
-finalization after the fanout archives these plans and the completed
-`inventory-alert-boundaries.md` to `completed/`, the six manifests to
+[`telescreen-svc-20261016-g7`](active/telescreen-svc-20261016-g7-dispatch.json) (run 7,
+base `a5392d9`). It supersedes g6 (run 6, base `077b71a`), g5 (run 5, base `8b09786`),
+g4 (run 4, base `c3ed4bc`), g3 (run 3, base `6017743`), g2 (run 2, base `19074e9`) and
+g1. g7 keeps g6's plans, write paths and DAG. It records svc-p01, svc-p02, svc-p03 and
+svc-p07 as accepted dependencies at `a5392d9`. Each wave B plan has a 'Run 7 Scope'
+section: svc-p04 adds its R5 retention-dispatch cases, svc-p05 is re-verified only, and
+svc-p06 adds the `notification-store` dispatch. Earlier session logs are in
+[`logs/svc-p02-db-2026-10-15.md`](logs/svc-p02-db-2026-10-15.md),
+[`logs/svc-p02-db-2026-10-15-run3.md`](logs/svc-p02-db-2026-10-15-run3.md),
+[`logs/svc-p04-inventory-2026-10-16.md`](logs/svc-p04-inventory-2026-10-16.md) and
+[`logs/svc-p06-composition-2026-10-16.md`](logs/svc-p06-composition-2026-10-16.md).
+Serial finalization after the fanout applies the Nodetto layout fix
+(design-service-split.md section 12), archives these plans and the completed
+`inventory-alert-boundaries.md` to `completed/`, the seven manifests to
 `completed/dispatch/`, and updates this index.
 
 The [inventory and alert boundary plan](active/inventory-alert-boundaries.md) is complete:

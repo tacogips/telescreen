@@ -3,7 +3,7 @@
 **Status**: Not Started
 **Design Reference**: design-docs/specs/design-service-split.md sections 13-17; design-docs/specs/design-service-split-requirements.md section 7
 **Created**: 2026-10-15
-**Last Updated**: 2026-10-15
+**Last Updated**: 2026-10-16
 
 ## Plan Metadata
 
@@ -102,6 +102,14 @@ Imitate:
      delivery happens. The single-process equivalent is also `blocked`.
 2. **Rewrite `tests/inventory_service/test_process.py` and `test_postgres.py`** for full
    split mode (Notification required); they must be green.
+   - At `a5392d9` both files are owner placeholders. `test_process.py` has a module-level
+     `pytest.mark.skip`, and `test_postgres.py` calls `pytest.skip(...)` at import time.
+     Remove both skips. `test_process.py` must then run and pass offline, so record its
+     passed count. `test_postgres.py` keeps only the `integration` marker plus the
+     `TELESCREEN_TEST_DATABASE_URL` skip.
+   - The cutover below needs `telescreen notification-store`, which svc-p06 routes to
+     `cli_inventory_store.run_notification` in run 7. If it still exits 2, write a
+     Reconciliation request.
    - `tests/e2e/test_inventory_split_runtime.py` is a single-process separate-store test.
      It is not owned here and must stay green; run it in verification.
    - The single-process inventory cutover e2e (`tests/e2e/test_inventory_store_cutover.py`)
@@ -166,9 +174,10 @@ Imitate:
      - 4.1 the `api_token` payload includes `label` (needed by the token actor display);
      - 15 Telescreen split mode allows `notifications.dlp`/`notifications.guard` (GitHub
        outbound guard);
-     - 12 (O1, including its observable single-process table layout) and 17 are already
-       corrected (sessions 20-23, manifest g6). Change them only if the implemented
-       ownership or migration behavior differs;
+     - 12 (O1, including its observable single-process table layout, and the run 7
+       Nodetto layout rule) and 17 are already corrected (sessions 20-24, manifest g7).
+       Change them only if the implemented ownership or migration behavior differs. The
+       Nodetto layout fix itself belongs to serial finalization, not to this plan;
      - 13 runbook commands as implemented.
    - `command.md`: "TELESCREEN_BUREAU_SERVICE_URL is no longer read". Add the final
      command list.
@@ -207,6 +216,8 @@ command as the build evidence. Evidence: every command exits 0, and the full sui
       gates pass.
 - [ ] `mise run ci`, `ddl-check`, `web-ci` and `uv build --out-dir` exit 0. Logs are recorded.
 - [ ] Compose overlay test passes. `docker-compose.inventory.yml` is removed.
+- [ ] `grep -n "pytest.mark.skip\|pytest.skip(" tests/inventory_service/test_process.py` prints
+      nothing. The `test_postgres.py` module-level `pytest.skip(` placeholder is gone.
 - [ ] The verification doc and design corrections are written. The Progress Log has hashes.
 
 ## Progress Log

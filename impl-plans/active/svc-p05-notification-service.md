@@ -311,3 +311,18 @@ informational in wave 4 and is owned by the integration flow.
   refreshed 23-entry manifest digest is
   `da8f4346d3b30aac755c0d36ac072f7bf23a42fb84de3fdf2ff0b7c4081b2a6a`; full logs are
   listed above. Independent adversarial re-review remains pending.
+
+### Run 7 Scope (manifest g7, base a5392d9)
+
+Re-verify only. Deliverables, the TI-P05-1..3 repairs and ADV-P05-1 are in the tree. Do
+not re-implement them.
+
+1. Re-run the Verification block on the planning commit. Write the logs and the typelint
+   log under `tmp/telescreen-svc-20261016-g7/svc-p05-notification-service/`. Point the
+   typelint grep at that new log, not at the g6 path. Every command must exit 0.
+2. Go through the independent test-integrity, adversarial and integration review. Change
+   source or tests only for a real gate failure or review finding, and fix it at its root
+   cause inside `writePaths`. List only fixed findings in `addressedFeedback`.
+3. Refresh the source hash manifest under the g7 evidence root. Set Status to Completed.
+   Append one session entry of at most 12 lines. Keep `priorVerification` empty
+   (conventions 7a).
