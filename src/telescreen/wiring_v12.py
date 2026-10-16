@@ -1,5 +1,7 @@
 """Composition helpers for v1.2 templates, roles, OIDC and routers."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 import httpx
@@ -7,10 +9,6 @@ from fastapi import APIRouter
 
 from telescreen.api.common.context import ApiContext
 from telescreen.api.routers.auth import AuthRouterDeps, build_auth_router
-from telescreen.api.routers.notification_templates import (
-    NotificationTemplatesRouterDeps,
-    build_notification_templates_router,
-)
 from telescreen.api.routers.users import UsersRouterDeps, build_users_router
 from telescreen.core.config import TelescreenSettings
 from telescreen.core.oidc_settings import OidcSettings
@@ -20,13 +18,11 @@ from telescreen.directory.tokens import TokenService
 from telescreen.identity.discovery import OidcProviderClient
 from telescreen.identity.signin import SignInService
 from telescreen.identity.verifier import OidcBearerVerifier
-from telescreen.notifications.delivery import NotificationDeliveryHandler
 from telescreen.notifications.dlp import DlpGate
-from telescreen.notifications.sender import NotificationService
-from telescreen.notifications.templates.repository import TemplateRepository
-from telescreen.notifications.templates.resolver import DbTemplateResolver
-from telescreen.notifications.templates.service import TemplateService
 from telescreen.ports.identity import MemberProvisioner
+from telescreen.ports.notifications import NotificationSender
+from telescreen.ports.templates import TemplateCatalog
+from telescreen.ports.workflow import TaskHandler
 from telescreen.wiring_builders import RuntimePrimitives
 
 
@@ -34,8 +30,7 @@ from telescreen.wiring_builders import RuntimePrimitives
 class WiringV12Parts:
     """V1.2 services needed by the composition root to finish container assembly."""
 
-    templates: TemplateService
-    template_resolver: DbTemplateResolver
+    templates: TemplateCatalog
     roles: RoleService
     provisioner: DirectoryProvisioner
     verifier: OidcBearerVerifier | None
@@ -47,9 +42,9 @@ class WiringV12Parts:
 class WiringV12:
     """Public v1.2 container services used by the CLI and API host."""
 
-    templates: TemplateService
-    notifications: NotificationService
-    delivery: NotificationDeliveryHandler
+    templates: TemplateCatalog
+    notifications: NotificationSender
+    delivery: TaskHandler
     roles: RoleService
     sign_in: SignInService | None
 
@@ -60,17 +55,27 @@ def build_v12(
     gate: DlpGate,
     http: httpx.AsyncClient,
     token_service: TokenService,
+    template_catalog: TemplateCatalog | None = None,
+    split: bool = False,
 ) -> WiringV12Parts:
     """Build v1.2 template, role and optional OIDC services and API routers."""
-    template_repository: TemplateRepository = TemplateRepository()
-    template_resolver: DbTemplateResolver = DbTemplateResolver(template_repository)
-    templates: TemplateService = TemplateService(
-        template_repository,
-        primitives.redactor,
-        gate,
-        primitives.audit,
-        primitives.clock,
-    )
+    local_templates: TemplateCatalog | None = None
+    templates: TemplateCatalog
+    if template_catalog is None:
+        from telescreen.notifications.templates.repository import TemplateRepository
+        from telescreen.notifications.templates.service import TemplateService
+
+        template_repository: TemplateRepository = TemplateRepository()
+        local_templates = TemplateService(
+            template_repository,
+            primitives.redactor,
+            gate,
+            primitives.audit,
+            primitives.clock,
+        )
+        templates = local_templates
+    else:
+        templates = template_catalog
     roles: RoleService = RoleService(primitives.audit, primitives.clock)
     provisioner: DirectoryProvisioner = DirectoryProvisioner(
         primitives.fingerprinter, roles, primitives.audit, primitives.clock
@@ -99,12 +104,27 @@ def build_v12(
         identities,
     )
     routers: tuple[APIRouter, ...] = (
-        build_notification_templates_router(NotificationTemplatesRouterDeps(context, templates)),
         build_users_router(UsersRouterDeps(context, roles, token_service, oidc is not None)),
         build_auth_router(
             AuthRouterDeps(context, oidc, settings.ui_token_login, verifier, sign_in)
         ),
     )
-    return WiringV12Parts(
-        templates, template_resolver, roles, provisioner, verifier, sign_in, routers
-    )
+    if not split:
+        from telescreen.notifications.templates.service import TemplateService
+
+        if local_templates is None:
+            raise RuntimeError("local template service is unavailable")
+        if not isinstance(local_templates, TemplateService):
+            raise RuntimeError("local template service has an unsupported implementation")
+        from telescreen.api.routers.notification_templates import (
+            NotificationTemplatesRouterDeps,
+            build_notification_templates_router,
+        )
+
+        routers = (
+            build_notification_templates_router(
+                NotificationTemplatesRouterDeps(context, local_templates)
+            ),
+            *routers,
+        )
+    return WiringV12Parts(templates, roles, provisioner, verifier, sign_in, routers)

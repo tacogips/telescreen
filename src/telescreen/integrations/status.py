@@ -2,12 +2,23 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from telescreen.core.config import TelescreenSettings
+from telescreen.core.errors import TelescreenError
 from telescreen.core.vocabulary import ErrorCode, IntegrationKind
 from telescreen.integrations.repository import IntegrationCheck, IntegrationCheckRepository
+from telescreen.ports.notification_commands import ChannelStatus
+
+
+class ChannelStatusSource(Protocol):
+    """Read configured delivery channels from the notification owner."""
+
+    async def status(self) -> ChannelStatus:
+        """Return only configured channel flags."""
+        ...
 
 
 @dataclass(frozen=True)
@@ -28,14 +39,21 @@ class IntegrationStatusService:
 
     settings: TelescreenSettings
     checks: IntegrationCheckRepository
+    channels: ChannelStatusSource | None = None
 
     async def list(self, session: AsyncSession) -> tuple[IntegrationStatus, ...]:
         """Return status for each supported integration, without secret values."""
         latest: tuple[IntegrationCheck, ...] = await self.checks.get_all(session)
+        configured: ChannelStatus | None = None
+        if self.channels is not None:
+            try:
+                configured = await self.channels.status()
+            except TelescreenError:
+                configured = ChannelStatus(False, False)
         return tuple(
             IntegrationStatus(
                 kind,
-                self._configured(kind),
+                self._configured(kind, configured),
                 self._at(kind, latest),
                 self._ok(kind, latest),
                 self._error(kind, latest),
@@ -44,11 +62,15 @@ class IntegrationStatusService:
             for kind in IntegrationKind
         )
 
-    def _configured(self, kind: IntegrationKind) -> bool:
+    def _configured(self, kind: IntegrationKind, channels: ChannelStatus | None) -> bool:
         """Determine configuration only from presence of non-secret settings."""
         if kind is IntegrationKind.SLACK:
+            if channels is not None:
+                return channels.slack
             return bool(self.settings.slack_bot_token_ref)
         if kind is IntegrationKind.EMAIL:
+            if channels is not None:
+                return channels.email
             return bool(self.settings.smtp_host and self.settings.smtp_from)
         if kind is IntegrationKind.GITHUB_ISSUES:
             return bool(self.settings.github_issues_token_ref and self.settings.github_issues_repos)

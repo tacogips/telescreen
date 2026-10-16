@@ -1,5 +1,7 @@
 """Command handlers for v1.2 notification and identity utilities."""
 
+from __future__ import annotations
+
 import sys
 
 from telescreen.core.errors import TelescreenError
@@ -15,10 +17,6 @@ from telescreen.core.vocabulary import (
 )
 from telescreen.db.models.notifications import NotificationRow
 from telescreen.directory.tokens import CreatedToken
-from telescreen.notifications.repository import NotificationRepository
-from telescreen.notifications.templates.service import TemplateInfo
-from telescreen.notifications.templates.synthetic import synthetic_context
-from telescreen.ports.notifications import NotificationReceipt, NotificationRequest
 from telescreen.ports.workflow import ClaimedTask
 from telescreen.wiring import Container
 
@@ -27,6 +25,10 @@ async def notify_test(
     container: Container, channel_name: str, recipient: str, name: str | None
 ) -> int:
     """Queue and deliver one synthetic notification through production services."""
+    from telescreen.notifications.templates.service import TemplateInfo
+    from telescreen.notifications.templates.synthetic import synthetic_context
+    from telescreen.ports.notifications import NotificationReceipt, NotificationRequest
+
     try:
         channel: NotificationChannel = NotificationChannel(channel_name)
     except ValueError:
@@ -87,6 +89,8 @@ async def _notification_rows(
     container: Container, identifiers: tuple[str, ...]
 ) -> tuple[NotificationRow, ...]:
     """Load safe delivery metadata for the CLI result rows."""
+    from telescreen.notifications.repository import NotificationRepository
+
     repository: NotificationRepository = NotificationRepository()
     rows: list[NotificationRow] = []
     async with container.sessions() as session:

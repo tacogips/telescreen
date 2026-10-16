@@ -22,8 +22,9 @@ from telescreen.core.vocabulary import (
 from telescreen.db.models.notifications import NotificationRow
 from telescreen.notifications.addresses import channel_addresses
 from telescreen.notifications.dlp import CensoredMessage, DlpGate, OutboundMessage
-from telescreen.notifications.member_send import member_reference
+from telescreen.notifications.member_send import MainMemberReferences, MemberReferences
 from telescreen.notifications.preferences import PreferenceRepository, PreferenceService
+from telescreen.notifications.prior_hits import prior_hits_for
 from telescreen.notifications.repository import NotificationRepository
 from telescreen.notifications.templates.builtins import builtin_name
 from telescreen.notifications.templates.model import ResolvedTemplate
@@ -31,6 +32,8 @@ from telescreen.notifications.templates.render import render_for_channel
 from telescreen.notifications.templates.resolver import BuiltinTemplateResolver, TemplateResolver
 from telescreen.ports.audit import AuditEntry, AuditLog
 from telescreen.ports.directory import RecipientResolver, ResolvedRecipients
+from telescreen.ports.notification_commands import notification_row_id
+from telescreen.ports.notification_types import ProducerRedactionHits
 from telescreen.ports.notifications import (
     MemberNotification,
     NotificationContext,
@@ -72,6 +75,8 @@ class NotificationService:
     clock: Clock
     repository: NotificationRepository
     templates: TemplateResolver = field(default_factory=BuiltinTemplateResolver)
+    preferences_repository: PreferenceRepository = field(default_factory=PreferenceRepository)
+    members: MemberReferences = field(default_factory=MainMemberReferences)
 
     async def send(
         self, session: AsyncSession, request: NotificationRequest
@@ -85,8 +90,14 @@ class NotificationService:
         safe_message: CensoredMessage = rendered.message
         notification_ids: list[str] = []
         skipped_ids: list[str] = []
-        for recipient_ref, problem in zip(request.recipients, problems, strict=True):
-            notification_id: str = new_id()
+        for index, (recipient_ref, problem) in enumerate(
+            zip(request.recipients, problems, strict=True)
+        ):
+            notification_id: str = (
+                notification_row_id(request.id_seed, index)
+                if request.id_seed is not None
+                else new_id()
+            )
             status: NotificationStatus = NotificationStatus.QUEUED
             if problem is not None:
                 status = NotificationStatus.SKIPPED
@@ -154,8 +165,8 @@ class NotificationService:
         self, session: AsyncSession, notification: MemberNotification
     ) -> NotificationReceipt:
         """Choose a member's configured channel and send through the normal DLP path."""
-        recipient_ref: str = await member_reference(session, notification.member_id)
-        preferences: PreferenceService = PreferenceService(PreferenceRepository(), self.clock)
+        recipient_ref: str = await self.members.member_reference(session, notification.member_id)
+        preferences: PreferenceService = PreferenceService(self.preferences_repository, self.clock)
         preference: NotificationPreference = await preferences.channel_for(
             session, notification.member_id, notification.category
         )
@@ -177,6 +188,8 @@ class NotificationService:
                 context=notification.context,
                 record_unreachable=True,
                 category=notification.category,
+                id_seed=notification.id_seed,
+                prior_hits=notification.prior_hits,
             ),
         )
 
@@ -190,7 +203,7 @@ class NotificationService:
         problems: list[ErrorCode | None] = []
         for recipient_ref in request.recipients:
             needs_filter: bool = category is not None and recipient_ref.startswith("member:")
-            if not request.record_unreachable and not needs_filter:
+            if not request.record_unreachable and not needs_filter and not request.skip_unknown:
                 await self.resolver.resolve(session, recipient_ref)
                 problems.append(None)
                 continue
@@ -199,6 +212,9 @@ class NotificationService:
             except TelescreenError as error:
                 if error.code is not ErrorCode.RECIPIENT_UNKNOWN:
                     raise
+                if request.skip_unknown:
+                    problems.append(ErrorCode.RECIPIENT_UNKNOWN)
+                    continue
                 problems.append(ErrorCode.RECIPIENT_UNKNOWN)
                 continue
             member_problem: ErrorCode | None = None
@@ -231,7 +247,7 @@ class NotificationService:
             return None
         if not resolved.member_ids:
             return None
-        preferences: PreferenceService = PreferenceService(PreferenceRepository(), self.clock)
+        preferences: PreferenceService = PreferenceService(self.preferences_repository, self.clock)
         direct_category: bool = category in (
             NotificationCategory.ASSIGNED,
             NotificationCategory.MENTIONS,
@@ -254,9 +270,11 @@ class NotificationService:
         """Produce the gated message for the v1, inline-event, or template path."""
         message: OutboundMessage = OutboundMessage(request.subject, request.body)
         if request.event is None:
-            return _Rendered(await self.gate.inspect(message))
+            return _Rendered(await self.gate.inspect(message, _plain_hits(request.prior_hits)))
         if request.inline:
-            return _Rendered(await self.gate.inspect_redacted(message))
+            return _Rendered(
+                await self.gate.inspect_redacted(message, _plain_hits(request.prior_hits))
+            )
         template: ResolvedTemplate = await self.templates.resolve(
             session, request.template_name or builtin_name(request.event), request.event
         )
@@ -269,7 +287,9 @@ class NotificationService:
             request.event,
         )
         return _Rendered(
-            await self.gate.inspect_redacted(OutboundMessage(subject, body)),
+            await self.gate.inspect_redacted(
+                OutboundMessage(subject, body), prior_hits_for(request, template.texts)
+            ),
             template.name,
             template.version,
             template.fallback,
@@ -315,3 +335,8 @@ def _category(request: NotificationRequest) -> NotificationCategory | None:
     ):
         return NotificationCategory.WORKFLOW_TASKS
     return request.category
+
+
+def _plain_hits(hits: ProducerRedactionHits | None) -> int:
+    """Return prior subject/body hits for non-template request paths."""
+    return hits.subject + hits.body if hits is not None else 0

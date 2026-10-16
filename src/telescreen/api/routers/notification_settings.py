@@ -21,8 +21,7 @@ from telescreen.core.json import (
 )
 from telescreen.core.permissions import Permission
 from telescreen.core.vocabulary import ErrorCode, NotificationCategory, NotificationPreference
-from telescreen.db.models import MemberRow
-from telescreen.notifications.preferences import CategorySetting, PreferenceService
+from telescreen.notifications.preferences import CategorySetting, MemberContact, PreferenceService
 
 
 @pydantic.dataclasses.dataclass(frozen=True)
@@ -93,7 +92,7 @@ def build_notification_settings_router(deps: NotificationSettingsRouterDeps) -> 
         """Return stored and effective preferences for the authenticated member."""
         member_id: str = _member_id(principal)
         async with deps.ctx.sessions() as session:
-            member: MemberRow | None = await session.get(MemberRow, member_id)
+            member: MemberContact | None = await deps.preferences.member_contact(session, member_id)
             if member is None:
                 raise TelescreenError(ErrorCode.FORBIDDEN, "member principal is unavailable")
             settings: tuple[CategorySetting, ...] = await deps.preferences.settings(
@@ -121,7 +120,7 @@ def build_notification_settings_router(deps: NotificationSettingsRouterDeps) -> 
             (item.category, item.stored) for item in body.items
         )
         async with deps.ctx.sessions.begin() as session:
-            member: MemberRow | None = await session.get(MemberRow, member_id)
+            member: MemberContact | None = await deps.preferences.member_contact(session, member_id)
             if member is None:
                 raise TelescreenError(ErrorCode.FORBIDDEN, "member principal is unavailable")
             try:

@@ -323,3 +323,10 @@ interrupted branch evidence before the integration review.
 - Format, Ruff, ty, typelint path filter, import gate, diffstat and plan line-count gates exited 0; logs: `/tmp/telescreen-svc-p03-publishers-g5-{format,ruff,ty,typelint,import-gate,diffstat}.log`.
 - Owned-file SHA-256 values for all files changed since `c3ed4bc` are recorded in `tmp/telescreen-svc-20261016-g5/svc-p03-publishers/owned-file-sha256.txt`; plan remains under 400 lines.
 - Formal test-integrity/adversarial and integration review, commit, and push are downstream workflow steps.
+
+### Session 3 — 2026-10-16 (g6 re-verification)
+
+- Re-verified planning checkpoint `f0a34727fb479c141a8e503ffa23318ffe7a8504`; source and test files are unchanged from `077b71a`, with no review findings supplied.
+- Scoped suite: 218 passed, 10 skipped; full offline suite: 1,333 passed, 37 skipped. Complete logs are `/tmp/telescreen-svc-p03-publishers-g6-pytest.log` and `/tmp/telescreen-svc-p03-publishers-g6-pytest-all.log`.
+- Format, Ruff, ty, typelint, import gate, diffstat, and plan line-count gates exited 0. SHA-256 values for all owned files changed since `c3ed4bc` are in `tmp/telescreen-svc-20261016-g6/svc-p03-publishers/owned-file-sha256.txt`.
+- `priorVerification` remains empty. Formal integrity/adversarial and serial integration reviews, commit, and push remain downstream.

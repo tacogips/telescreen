@@ -1,4 +1,4 @@
-"""Standalone inventory composition with no main database credentials or services."""
+"""Standalone inventory composition with local replicas and no bureau callback."""
 
 import asyncio
 from collections.abc import AsyncGenerator
@@ -24,13 +24,18 @@ from telescreen.api.routers.data_asset_values import (
 )
 from telescreen.api.routers.data_assets import DataAssetsRouterDeps, build_data_assets_router
 from telescreen.api.routers.data_fields import DataFieldsRouterDeps, build_data_fields_router
+from telescreen.audit.chain import INVENTORY_AUDIT_MODELS
+from telescreen.audit.service import AuditLogService
 from telescreen.core.clock import Clock, SystemClock
 from telescreen.core.config import TelescreenSettings
 from telescreen.core.errors import ConfigError, TelescreenError
 from telescreen.core.secrets import EnvSource, SecretValue, resolve_secret
+from telescreen.db.models.projections import InventoryDirectoryEntryRow
 from telescreen.db.session import create_engine, create_sessionmaker
+from telescreen.identity.discovery import OidcProviderClient
+from telescreen.identity.verifier import OidcBearerVerifier
 from telescreen.inventory.assets import AssetService
-from telescreen.inventory.audit import InventoryAuditOutbox, InventoryAuditPublisher
+from telescreen.inventory.audit import InventoryAuditPublisher
 from telescreen.inventory.export import AssetExporter
 from telescreen.inventory.fields import FieldService
 from telescreen.inventory.handoff.apply import InventoryOperationApplier
@@ -41,9 +46,22 @@ from telescreen.inventory.reconcile import InventoryReconcilerImpl
 from telescreen.inventory.registration import RegistrationService
 from telescreen.inventory.repository import InventoryRepository
 from telescreen.inventory.retention import DataOverdueHandler
-from telescreen.inventory.retention_outbox import InventoryRetentionLookup, RetentionOutbox
+from telescreen.inventory.retention_outbox import RetentionOutbox
 from telescreen.inventory.values import ValueService, ValueValidator
-from telescreen.inventory_service.clients import AuditClient, BureauClient, RetentionClient
+from telescreen.inventory_service.audit_drain import LocalAuditDrain, build_local_audit_drain
+from telescreen.inventory_service.dispatch import RetentionDispatcher
+from telescreen.inventory_service.links import IssueLinkStore, ReplicaDirectorySink
+from telescreen.inventory_service.lookups import (
+    ReplicaActorLookup,
+    ReplicaAssetOwnerLookup,
+    ReplicaAssigneeLookup,
+    ReplicaIssueLookup,
+)
+from telescreen.inventory_service.notify_outbox import (
+    NotificationOutbox,
+    NotificationOutboxPump,
+    notification_transport,
+)
 from telescreen.inventory_service.transport import (
     PREFIX,
     InternalAuth,
@@ -51,17 +69,18 @@ from telescreen.inventory_service.transport import (
     encode_response,
     read_payload,
 )
-from telescreen.inventory_service.worker import InventoryWorker, OutboxPump
+from telescreen.inventory_service.worker import InventoryWorker
 from telescreen.masking.fingerprint import Fingerprinter
 from telescreen.masking.redact import Redactor
-from telescreen.ports.audit_commands import AuditCommand, AuditReceipt
 from telescreen.ports.inventory_commands import InventoryReceipt, decode_inventory_command
-from telescreen.ports.retention import (
-    RetentionCommand,
-    RetentionReceipt,
-    RetentionStatus,
-    decode_retention_command,
+from telescreen.replica.auth import ReplicaAuthenticator
+from telescreen.replica.directory import (
+    ReplicaActorDirectory,
+    ReplicaOwnerDirectory,
+    ReplicaRecipientResolver,
 )
+from telescreen.replica.rules import ReplicaOwnershipRules
+from telescreen.replica.store import DirectoryReplica
 
 
 @dataclass(frozen=True)
@@ -73,7 +92,6 @@ class InventoryRuntime:
     worker: InventoryWorker
     context: ApiContext
     inbox: InventoryInbox
-    retention: InventoryRetentionLookup
     queries: AssetQueries
     assets: AssetService
     fields: FieldService
@@ -83,6 +101,7 @@ class InventoryRuntime:
     audit: InventoryAuditPublisher
     redactor: Redactor
     auth: InternalAuth
+    replica: DirectoryReplica
 
 
 def build_inventory_runtime(
@@ -92,14 +111,22 @@ def build_inventory_runtime(
     sessions: async_sessionmaker[AsyncSession] | None = None,
     clock: Clock | None = None,
 ) -> InventoryRuntime:
-    """Require only inventory persistence, fingerprint keys and the bureau callback."""
-    if not settings.inventory_database_url or not settings.bureau_service_url:
-        raise ConfigError("inventory database URL and bureau service URL are required")
+    """Build inventory from its own store, directory replica and Notification client."""
+    if not settings.inventory_database_url:
+        raise ConfigError("inventory database URL is required")
     if not settings.inventory_service_token_ref:
         raise ConfigError("inventory service token is required")
-    secret: SecretValue = resolve_secret(settings.inventory_service_token_ref, env)
-    transport: ServiceHttp = ServiceHttp(http, settings.bureau_service_url, secret)
-    bureau: BureauClient = BureauClient(transport)
+    if not settings.notification_service_url:
+        raise ConfigError("notification service URL is required")
+    if not settings.notification_inventory_token_ref:
+        raise ConfigError("notification inventory token is required")
+    inventory_secret: SecretValue = resolve_secret(settings.inventory_service_token_ref, env)
+    notification_secret: SecretValue = resolve_secret(
+        settings.notification_inventory_token_ref, env
+    )
+    notification_http: ServiceHttp = notification_transport(
+        http, settings.notification_service_url, notification_secret
+    )
     keys: tuple[tuple[int, SecretValue], ...] = tuple(
         (item.version, resolve_secret(item.ref, env)) for item in settings.fingerprint_keys
     )
@@ -116,15 +143,31 @@ def build_inventory_runtime(
     if sessions is None:
         engine = create_engine(settings.inventory_database_url)
         sessions = create_sessionmaker(engine)
+    replica: DirectoryReplica = DirectoryReplica(InventoryDirectoryEntryRow)
+    verifier: OidcBearerVerifier | None = None
+    if settings.oidc is not None:
+        provider: OidcProviderClient = OidcProviderClient(http, settings.oidc, selected_clock)
+        verifier = OidcBearerVerifier(provider, settings.oidc, selected_clock)
+    recipients: ReplicaRecipientResolver = ReplicaRecipientResolver(replica)
+    owners: ReplicaOwnerDirectory = ReplicaOwnerDirectory(replica)
+    actor_directory: ReplicaActorDirectory = ReplicaActorDirectory(replica)
+    rules: ReplicaOwnershipRules = ReplicaOwnershipRules(replica)
+    issue_lookup: ReplicaIssueLookup = ReplicaIssueLookup(sessions)
+    actor_lookup: ReplicaActorLookup = ReplicaActorLookup(sessions, actor_directory)
+    assignee_lookup: ReplicaAssigneeLookup = ReplicaAssigneeLookup(sessions, recipients)
+    fallback_lookup: ReplicaAssetOwnerLookup = ReplicaAssetOwnerLookup(sessions, owners, rules)
     repository: InventoryRepository = InventoryRepository()
     audit: InventoryAuditPublisher = InventoryAuditPublisher(selected_clock, redactor)
     context: ApiContext = ApiContext(
-        sessions, selected_clock, audit, authentication=bureau.authenticate
+        sessions,
+        selected_clock,
+        audit,
+        authentication=ReplicaAuthenticator(sessions, replica, verifier, fingerprinter),
     )
-    queries: AssetQueries = AssetQueries(bureau, bureau)
+    queries: AssetQueries = AssetQueries(issue_lookup, actor_lookup)
     assets: AssetService = AssetService(repository, audit, redactor, selected_clock)
     fields: FieldService = FieldService(audit, redactor, selected_clock)
-    validator: ValueValidator = ValueValidator(bureau, redactor)
+    validator: ValueValidator = ValueValidator(assignee_lookup, redactor)
     values: ValueService = ValueService(repository, validator, audit, selected_clock)
     registration: RegistrationService = RegistrationService(
         repository, values, fingerprinter, redactor, audit, selected_clock
@@ -132,19 +175,31 @@ def build_inventory_runtime(
     inbox: InventoryInbox = InventoryInbox(
         sessions,
         InventoryOperationApplier(
-            InventoryObserverImpl(repository), InventoryReconcilerImpl(repository, selected_clock)
+            InventoryObserverImpl(repository),
+            InventoryReconcilerImpl(repository, selected_clock),
+            IssueLinkStore(),
+            ReplicaDirectorySink(replica),
         ),
         selected_clock,
     )
-    audit_pump: OutboxPump[AuditCommand, AuditReceipt] = OutboxPump(
-        sessions, InventoryAuditOutbox(), AuditClient(transport).receive, selected_clock
-    )
-    retention_pump: OutboxPump[RetentionCommand, RetentionReceipt] = OutboxPump(
-        sessions, RetentionOutbox(), RetentionClient(transport).receive, selected_clock
+    audit_drain: LocalAuditDrain = build_local_audit_drain(sessions, selected_clock, redactor)
+    retention_dispatch: RetentionDispatcher = RetentionDispatcher(
+        sessions,
+        RetentionOutbox(),
+        NotificationOutbox(),
+        recipients,
+        owners,
+        fallback_lookup,
+        redactor,
+        AuditLogService(selected_clock, redactor, INVENTORY_AUDIT_MODELS),
+        selected_clock,
     )
     worker: InventoryWorker = InventoryWorker(
-        audit_pump.tick,
-        retention_pump.tick,
+        audit_drain.tick,
+        retention_dispatch.tick,
+        NotificationOutboxPump(
+            sessions, NotificationOutbox(), notification_http, selected_clock
+        ).tick,
         DataOverdueHandler(sessions, redactor, selected_clock, settings.public_base_url),
         selected_clock,
         settings.data_overdue_cron or "",
@@ -156,7 +211,6 @@ def build_inventory_runtime(
         worker,
         context,
         inbox,
-        InventoryRetentionLookup(sessions, selected_clock),
         queries,
         assets,
         fields,
@@ -165,14 +219,15 @@ def build_inventory_runtime(
         registration,
         audit,
         redactor,
-        InternalAuth(secret),
+        InternalAuth(inventory_secret),
+        replica,
     )
 
 
 def create_inventory_app(
     runtime: InventoryRuntime, http: httpx.AsyncClient | None = None
 ) -> FastAPI:
-    """Serve public inventory routes behind service auth and run owned background work."""
+    """Serve unchanged inventory routes behind service authentication."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -241,15 +296,13 @@ def create_inventory_app(
             TypeAdapter(InventoryReceipt),
         )
 
-    @app.post(PREFIX + "/retention-status")
-    async def retention_status(request: Request) -> Response:
-        return encode_response(
-            await runtime.retention.status(decode_retention_command(await read_payload(request))),
-            TypeAdapter(RetentionStatus),
-        )
-
     @app.get(PREFIX + "/health")
     async def health() -> Response:
-        return Response('"ok"', media_type="application/json")
+        async with runtime.sessions() as session:
+            revision: int = await runtime.replica.watermark(session)
+        return Response(
+            f'{{"status":"ok","directory_revision":{revision}}}',
+            media_type="application/json",
+        )
 
     return app

@@ -51,7 +51,7 @@ def _parser() -> argparse.ArgumentParser:
     worker.add_argument("--once", action="store_true")
     migrate: argparse.ArgumentParser = commands.add_parser("migrate")
     migrate.add_argument("--revision", default="head")
-    migrate.add_argument("--store", choices=("main", "inventory"))
+    migrate.add_argument("--store", choices=("main", "inventory", "notification"))
     migrate.add_argument("--adopt", action="store_true")
     migrate.add_argument("--writers-stopped", action="store_true")
     from telescreen.cli_inventory_store import add_commands
@@ -96,6 +96,8 @@ def _parser() -> argparse.ArgumentParser:
     notify_test_parser.add_argument("--channel", choices=("email", "slack"), required=True)
     notify_test_parser.add_argument("--to", dest="recipient", required=True)
     notify_test_parser.add_argument("--template")
+    projections: argparse.ArgumentParser = commands.add_parser("projections")
+    projections.add_subparsers(dest="projections_command").add_parser("resync")
     search: argparse.ArgumentParser = commands.add_parser("search")
     search.add_subparsers(dest="search_command").add_parser("reindex")
     commands.add_parser("mcp")
@@ -211,7 +213,23 @@ async def _run_async_command(container: Container, arguments: argparse.Namespace
     if arguments.command == "mcp":
         run_stdio(AssistantTools(container.sessions, container.redactor, container.clock))
         return 0
+    if arguments.command == "projections" and arguments.projections_command == "resync":
+        from telescreen.core.topology import Topology, topology_of
+
+        if topology_of(container.settings) is not Topology.SPLIT:
+            print("projections require split mode", file=sys.stderr)
+            return 2
+        from telescreen.projections.resync import resync
+
+        created: int = await resync(container.sessions, container.clock)
+        print(created)
+        return 0
     if arguments.command == "notify" and arguments.notify_command == "test":
+        from telescreen.core.topology import Topology, topology_of
+
+        if topology_of(container.settings) is Topology.SPLIT:
+            print("use telescreen-notification send-test", file=sys.stderr)
+            return 2
         return await notify_test(
             container, arguments.channel, arguments.recipient, arguments.template
         )
@@ -274,11 +292,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if settings.inventory_service_url
                 else None
             )
-            selected_url: str | None = (
-                settings.inventory_database_url or settings.database_url
-                if selected_store is Store.INVENTORY
-                else settings.database_url
-            )
+            selected_url: str | None
+            if selected_store is Store.NOTIFICATION:
+                selected_url = settings.notification_database_url
+            elif selected_store is Store.INVENTORY:
+                selected_url = settings.inventory_database_url or settings.database_url
+            else:
+                selected_url = settings.database_url
             if selected_url is None:
                 raise ConfigError("selected store database URL is required")
             if arguments.adopt:

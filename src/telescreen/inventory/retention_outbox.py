@@ -71,34 +71,43 @@ class InventoryRetentionLookup:
     async def status(self, command: RetentionCommand) -> RetentionStatus:
         """A superseded, archived, cleared or deleted obligation cannot generate notices."""
         async with self.sessions() as session:
-            eligible: str | None = await session.scalar(
-                select(DataAssetRow.id)
-                .join(DataFieldValueRow, DataFieldValueRow.asset_id == DataAssetRow.id)
-                .join(DataFieldRow, DataFieldRow.id == DataFieldValueRow.field_id)
-                .where(
-                    DataAssetRow.id == command.asset_id,
-                    DataAssetRow.state != DataAssetState.DELETED.value,
-                    DataAssetRow.source == command.source,
-                    DataAssetRow.resource_key == command.resource_key,
-                    DataFieldRow.id == command.due_field_id,
-                    DataFieldRow.role == DataFieldRole.DELETION_DUE.value,
-                    DataFieldRow.archived_at.is_(None),
-                    DataFieldValueRow.revision_id == command.due_revision_id,
-                    DataFieldValueRow.value_date == command.context.data_deletion_due,
-                    DataFieldValueRow.value_date < self.clock.now().date().isoformat(),
-                )
-            )
-            if eligible is None:
-                return RetentionStatus(False)
-            owner_field: DataFieldRow | None = await session.scalar(
-                select(DataFieldRow).where(
-                    DataFieldRow.role == DataFieldRole.OWNER.value,
-                    DataFieldRow.archived_at.is_(None),
-                )
-            )
-            owner: DataFieldValueRow | None = (
-                await session.get(DataFieldValueRow, (command.asset_id, owner_field.id))
-                if owner_field is not None
-                else None
-            )
-            return RetentionStatus(True, parse_json(owner.value_json).as_str() if owner else None)
+            return await retention_status(session, command, self.clock)
+
+
+async def retention_status(
+    session: AsyncSession, command: RetentionCommand, clock: Clock
+) -> RetentionStatus:
+    """Revalidate an obligation and read the current owner inside the caller's session."""
+    eligible: str | None = await session.scalar(
+        select(DataAssetRow.id)
+        .join(DataFieldValueRow, DataFieldValueRow.asset_id == DataAssetRow.id)
+        .join(DataFieldRow, DataFieldRow.id == DataFieldValueRow.field_id)
+        .where(
+            DataAssetRow.id == command.asset_id,
+            DataAssetRow.state != DataAssetState.DELETED.value,
+            DataAssetRow.source == command.source,
+            DataAssetRow.resource_key == command.resource_key,
+            DataFieldRow.id == command.due_field_id,
+            DataFieldRow.role == DataFieldRole.DELETION_DUE.value,
+            DataFieldRow.archived_at.is_(None),
+            DataFieldValueRow.revision_id == command.due_revision_id,
+            DataFieldValueRow.value_date == command.context.data_deletion_due,
+            DataFieldValueRow.value_date < clock.now().date().isoformat(),
+        )
+    )
+    if eligible is None:
+        return RetentionStatus(False)
+    owner_field: DataFieldRow | None = await session.scalar(
+        select(DataFieldRow).where(
+            DataFieldRow.role == DataFieldRole.OWNER.value,
+            DataFieldRow.archived_at.is_(None),
+        )
+    )
+    owner: DataFieldValueRow | None = (
+        await session.get(DataFieldValueRow, (command.asset_id, owner_field.id))
+        if owner_field is not None
+        else None
+    )
+    if owner is None or owner.value_json is None:
+        return RetentionStatus(True)
+    return RetentionStatus(True, parse_json(owner.value_json).as_str())

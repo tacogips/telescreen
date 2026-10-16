@@ -23,7 +23,7 @@ from telescreen.core.vocabulary import (
 from telescreen.directory.tokens import CreatedToken
 from telescreen.issues.activity.notifier import SubscriptionActivityNotifier
 from telescreen.issues.archive import ArchiveMaintenanceProvider
-from telescreen.notifications.weekly import WeeklyReportHandler, WeeklyReportProvider
+from telescreen.issues.weekly_report import WeeklyReportHandler, WeeklyReportProvider
 from telescreen.ports.issues import IssueEvent, IssueEventSink
 from telescreen.ports.workflow import TaskHandler
 from telescreen.wiring import (

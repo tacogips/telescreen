@@ -16,10 +16,10 @@ from telescreen.core.vocabulary import (
     NotificationStatus,
 )
 from telescreen.db.models.notifications import NotificationRow
+from telescreen.issues.weekly_report import WeeklyReportHandler, WeeklyReportProvider
 from telescreen.notifications.preferences import PreferenceRepository, PreferenceService
 from telescreen.notifications.repository import NotificationRepository
 from telescreen.notifications.sender import NotificationService
-from telescreen.notifications.weekly import WeeklyReportHandler, WeeklyReportProvider
 from telescreen.ports.directory import ResolvedRecipients
 from telescreen.ports.issues import IssueReportSource, ReportIssue, WeeklySummary
 from telescreen.ports.workflow import ClaimedTask, TaskResult

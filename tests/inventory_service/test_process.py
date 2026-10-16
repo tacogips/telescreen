@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 
 import httpx
+import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
@@ -22,6 +23,13 @@ from telescreen.db.session import create_engine, create_sessionmaker
 from telescreen.directory.tokens import CreatedToken, TokenService
 from telescreen.masking.redact import Redactor
 from tests.e2e.harness import bearer
+
+# Owner interim note (2026-10-16): this two-process flow starts the removed
+# inventory-only remote mode (design-service-split.md section 3, default 5).
+# svc-p08-verification-deploy rewrites it for the three-service topology.
+pytestmark: list[pytest.MarkDecorator] = [
+    pytest.mark.skip(reason="inventory-only remote mode removed; svc-p08 rewrites this flow")
+]
 
 
 def _port() -> int:

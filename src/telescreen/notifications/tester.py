@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from telescreen.core.errors import TelescreenError
 from telescreen.core.json import json_null
 from telescreen.core.vocabulary import (
     EngineTaskKind,
@@ -14,8 +15,10 @@ from telescreen.core.vocabulary import (
 )
 from telescreen.db.models import NotificationRow
 from telescreen.notifications.delivery import NotificationDeliveryHandler
+from telescreen.notifications.member_send import MemberReferences
 from telescreen.notifications.repository import NotificationRepository
 from telescreen.ports.directory import OwnerDirectory
+from telescreen.ports.notification_commands import ChannelStatus
 from telescreen.ports.notifications import (
     NotificationContext,
     NotificationReceipt,
@@ -36,11 +39,33 @@ class NotificationServiceTester(NotificationTester):
     delivery: NotificationDeliveryHandler
     members: OwnerDirectory
     repository: NotificationRepository = field(default_factory=NotificationRepository)
+    member_references: MemberReferences | None = None
+    channel_status: ChannelStatus | None = None
 
-    async def send_test(self, channel: NotificationChannel, member_id: str) -> TestOutcome:
+    async def send_test(
+        self,
+        channel: NotificationChannel,
+        member_id: str,
+        template_name: str | None = None,
+    ) -> TestOutcome:
         """Test a member's selected channel without returning message contents."""
+        if self.channel_status is not None and not _channel_configured(
+            self.channel_status, channel
+        ):
+            return TestOutcome(False, ErrorCode.INTEGRATION_UNCONFIGURED, None)
         async with self.sessions.begin() as session:
-            recipient_ref: str | None = await self.members.member_ref(session, member_id)
+            recipient_ref: str | None
+            if self.member_references is None:
+                recipient_ref = await self.members.member_ref(session, member_id)
+            else:
+                try:
+                    recipient_ref = await self.member_references.member_reference(
+                        session, member_id
+                    )
+                except TelescreenError as error:
+                    if error.code is not ErrorCode.RECIPIENT_UNKNOWN:
+                        raise
+                    recipient_ref = None
             if recipient_ref is None:
                 return TestOutcome(False, ErrorCode.RECIPIENT_UNREACHABLE, None)
             request: NotificationRequest = NotificationRequest(
@@ -50,6 +75,7 @@ class NotificationServiceTester(NotificationTester):
                 "",
                 "system:notification-test",
                 event=NotificationEvent.INTEGRATION_TEST,
+                template_name=template_name,
                 context=NotificationContext(health_target="telescreen"),
                 record_unreachable=True,
             )
@@ -79,3 +105,8 @@ class NotificationServiceTester(NotificationTester):
             ErrorCode(row.error_code) if row.error_code is not None else None
         )
         return TestOutcome(ok, error_code, notification_id)
+
+
+def _channel_configured(status: ChannelStatus, channel: NotificationChannel) -> bool:
+    """Return the static configuration flag for one notification transport."""
+    return status.email if channel is NotificationChannel.EMAIL else status.slack

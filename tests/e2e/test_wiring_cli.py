@@ -5,7 +5,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import create_engine as sync_engine
+from sqlalchemy import inspect, select
+from sqlalchemy.engine import Engine
 from sqlalchemy.engine.result import ScalarResult
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -25,6 +27,7 @@ from telescreen.db.models import (
     CounterRow,
     MapJobRow,
 )
+from telescreen.db.ownership import NOTIFICATION_TABLES, main_database_tables
 from telescreen.db.session import create_sessionmaker
 from telescreen.ports.collectors import GitHubSelector
 
@@ -120,3 +123,77 @@ def test_token_create_cli_prints_one_token_line(
         assert len(output.splitlines()) == 1
     finally:
         asyncio.run(engine.dispose())
+
+
+def test_notification_migration_requires_url_and_creates_only_notification_tables(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Select the notification owner URL and create only its isolated owner schema."""
+    main_path: Path = tmp_path / "main.db"
+    notification_path: Path = tmp_path / "notification.db"
+    database_url: str = f"sqlite+aiosqlite:///{main_path}"
+    _configure_environment(monkeypatch, database_url)
+    assert main(["migrate", "--store", "notification"]) == 3
+    monkeypatch.setenv(
+        "TELESCREEN_NOTIFICATION_DATABASE_URL", f"sqlite+aiosqlite:///{notification_path}"
+    )
+    assert main(["migrate", "--store", "notification"]) == 0
+    engine: Engine = sync_engine(f"sqlite:///{notification_path}")
+    try:
+        assert set(inspect(engine).get_table_names()) == {
+            *NOTIFICATION_TABLES,
+            "alembic_version_notification",
+        }
+    finally:
+        engine.dispose()
+
+
+def test_single_process_projection_resync_is_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Require full split topology for projection recovery commands."""
+    database_url: str = f"sqlite+aiosqlite:///{tmp_path / 'projection.db'}"
+    _configure_environment(monkeypatch, database_url)
+    assert main(["projections", "resync"]) == 2
+    assert "projections require split mode" in capsys.readouterr().err
+
+
+def test_split_notify_test_requires_notification_service_cli(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Keep synchronous test sends on the Notification service in split mode."""
+    database_url: str = f"sqlite+aiosqlite:///{tmp_path / 'split-notify.db'}"
+    _configure_environment(monkeypatch, database_url)
+    monkeypatch.setenv("TELESCREEN_INVENTORY_SERVICE_URL", "http://inventory")
+    monkeypatch.setenv("TELESCREEN_INVENTORY_SERVICE_TOKEN", "env:INVENTORY_TOKEN")
+    monkeypatch.setenv("INVENTORY_TOKEN", "i" * 32)
+    monkeypatch.setenv("TELESCREEN_NOTIFICATION_SERVICE_URL", "http://notification")
+    monkeypatch.setenv("TELESCREEN_NOTIFICATION_SERVICE_TOKEN", "env:NOTIFICATION_TOKEN")
+    monkeypatch.setenv("NOTIFICATION_TOKEN", "n" * 32)
+    assert main(["notify", "test", "--channel", "email", "--to", "member:alice"]) == 2
+    assert "use telescreen-notification send-test" in capsys.readouterr().err
+
+
+def test_split_default_migration_creates_main_tables_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Default migration in split mode upgrades only the main owner history."""
+    database_path: Path = tmp_path / "split-main.db"
+    database_url: str = f"sqlite+aiosqlite:///{database_path}"
+    _configure_environment(monkeypatch, database_url)
+    monkeypatch.setenv("TELESCREEN_INVENTORY_SERVICE_URL", "http://inventory")
+    monkeypatch.setenv("TELESCREEN_INVENTORY_SERVICE_TOKEN", "env:INVENTORY_TOKEN")
+    monkeypatch.setenv("INVENTORY_TOKEN", "i" * 32)
+    monkeypatch.setenv("TELESCREEN_NOTIFICATION_SERVICE_URL", "http://notification")
+    monkeypatch.setenv("TELESCREEN_NOTIFICATION_SERVICE_TOKEN", "env:NOTIFICATION_TOKEN")
+    monkeypatch.setenv("NOTIFICATION_TOKEN", "n" * 32)
+    assert main(["migrate"]) == 0
+
+    engine: Engine = sync_engine(f"sqlite:///{database_path}")
+    try:
+        assert set(inspect(engine).get_table_names()) == {
+            *main_database_tables(),
+            "alembic_version_main",
+        }
+    finally:
+        engine.dispose()

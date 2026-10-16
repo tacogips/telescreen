@@ -67,10 +67,11 @@ class OutboxPump[T, R]:
 
 @dataclass
 class InventoryWorker:
-    """Run local publication and two independent retry loops within the inventory process."""
+    """Run publication, local audit and independent delivery loops in inventory."""
 
     audit_tick: Callable[[], Awaitable[None]]
     retention_tick: Callable[[], Awaitable[None]]
+    notification_tick: Callable[[], Awaitable[None]]
     overdue: DataOverdueHandler
     clock: Clock
     cron: str
@@ -112,3 +113,4 @@ class InventoryWorker:
             group.create_task(self._loop(self.publish_due))
             group.create_task(self._loop(self.audit_tick))
             group.create_task(self._loop(self.retention_tick))
+            group.create_task(self._loop(self.notification_tick))

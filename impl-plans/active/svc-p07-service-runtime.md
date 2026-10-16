@@ -226,3 +226,15 @@ interrupted branch evidence before the integration review.
 - Format, Ruff, `ty`, typelint (752 files), replica import guard, audit test unchanged, diffstat and plan length: exit 0; g5 logs at `/tmp/telescreen-svc-p07-service-runtime-g5-{format,ruff,ty,typelint,import-grep,diffstat}.log` (audit/plan checks emitted exit status).
 - Scoped pytest: exit 0, 152 passed / 10 skipped; `/tmp/telescreen-svc-p07-service-runtime-g5-pytest.log`.
 - Full pytest: exit 0, 1333 passed / 37 skipped; `/tmp/telescreen-svc-p07-service-runtime-g5-pytest-all.log`.
+
+### Session: 2026-10-16 10:07 JST (g6 re-verify)
+**Tasks Completed**: Re-verified the unchanged implementation on `f0a3472`; all assigned gates passed. **Tasks In Progress**: None.
+**Blockers**: None. **Reconciliation requests**: None. **priorVerification**: empty.
+**Hashes**: `tmp/telescreen-svc-20261016-g6/svc-p07-service-runtime/owned-file-sha256.txt` (final SHA-256 for every owned file changed since `c3ed4bc`).
+**Verification**:
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/replica src/telescreen/audit tests/replica tests/audit` -> exit 0; `uv run --frozen ruff check --no-cache src/telescreen/replica src/telescreen/audit tests/replica tests/audit` -> exit 0; `uv run --frozen ty check src/telescreen/replica src/telescreen/audit tests/replica tests/audit` -> exit 0 (logs: `/tmp/telescreen-svc-p07-service-runtime-g6-{format,ruff,ty}.log`).
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/replica tests/audit tests/directory tests/api tests/inventory 2>&1 | tee /tmp/telescreen-svc-p07-service-runtime-g6-pytest.log` -> exit 0, 152 passed / 10 skipped.
+- `export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p07-service-runtime-g6-typelint.log 2>&1; ! grep -E '^(src/telescreen/(replica|audit)|tests/(replica|audit))' /tmp/telescreen-svc-p07-service-runtime-g6-typelint.log` -> exit 0.
+- `set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-svc-p07-service-runtime-g6-pytest-all.log 2>&1` -> exit 0, 1333 passed / 37 skipped.
+- `! grep -rn 'telescreen.directory\|telescreen.issues' src/telescreen/replica` -> exit 0; `git diff --quiet 077b71a -- tests/audit/test_audit.py` -> exit 0; `git diff --stat 077b71a -- src/telescreen/replica src/telescreen/audit/service.py src/telescreen/audit/chain.py src/telescreen/audit/verify.py src/telescreen/audit/query.py src/telescreen/audit/export.py tests/replica tests/audit` -> exit 0 (log: `/tmp/telescreen-svc-p07-service-runtime-g6-diffstat.log`); `test "$(wc -l < impl-plans/active/svc-p07-service-runtime.md)" -lt 400` -> exit 0.
+**Notes**: All assigned gates passed. No source or test edits were needed.

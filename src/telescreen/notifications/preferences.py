@@ -1,6 +1,7 @@
 """Per-member notification preference reads and updates."""
 
 from dataclasses import dataclass
+from typing import Protocol
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,12 +26,34 @@ class CategorySetting:
 
 
 @dataclass(frozen=True)
+class MemberContact:
+    """Contact channels required to resolve notification preferences."""
+
+    id: str
+    email: bool
+    slack_user_id: bool
+
+
+class PreferenceMembers(Protocol):
+    """Look up contact-channel availability for one member."""
+
+    async def member(self, session: AsyncSession, member_id: str) -> MemberContact | None:
+        """Return the member contact DTO, if present."""
+        ...
+
+
+@dataclass(frozen=True)
 class PreferenceRepository:
     """Load and persist notification settings inside the caller transaction."""
 
-    async def member(self, session: AsyncSession, member_id: str) -> MemberRow | None:
+    async def member(self, session: AsyncSession, member_id: str) -> MemberContact | None:
         """Load contact channels for a member."""
-        return await session.get(MemberRow, member_id)
+        member: MemberRow | None = await session.get(MemberRow, member_id)
+        return (
+            MemberContact(member.id, bool(member.email), bool(member.slack_user_id))
+            if member is not None
+            else None
+        )
 
     async def settings(
         self, session: AsyncSession, member_id: str
@@ -60,10 +83,16 @@ class PreferenceService:
 
     repository: PreferenceRepository
     clock: Clock
+    members: PreferenceMembers | None = None
+
+    async def member_contact(self, session: AsyncSession, member_id: str) -> MemberContact | None:
+        """Return member contacts through the configured member directory."""
+        source: PreferenceMembers = self.members or self.repository
+        return await source.member(session, member_id)
 
     async def settings(self, session: AsyncSession, member_id: str) -> tuple[CategorySetting, ...]:
         """Return every category with its stored and effective channel."""
-        member: MemberRow | None = await self.repository.member(session, member_id)
+        member: MemberContact | None = await self.member_contact(session, member_id)
         if member is None:
             raise TelescreenError(ErrorCode.FORBIDDEN, "member is not available")
         rows: tuple[NotificationSettingRow, ...] = await self.repository.settings(
@@ -85,7 +114,7 @@ class PreferenceService:
         self, session: AsyncSession, member_id: str, category: NotificationCategory
     ) -> NotificationPreference:
         """Return the explicit preference or contact-based default."""
-        member: MemberRow | None = await self.repository.member(session, member_id)
+        member: MemberContact | None = await self.member_contact(session, member_id)
         if member is None:
             return NotificationPreference.OFF
         row: NotificationSettingRow | None = await self.repository.get(session, member_id, category)
@@ -105,7 +134,7 @@ class PreferenceService:
         items: tuple[tuple[NotificationCategory, NotificationPreference | None], ...],
     ) -> tuple[CategorySetting, ...]:
         """Upsert supplied settings; null values delete stored overrides."""
-        member: MemberRow | None = await self.repository.member(session, member_id)
+        member: MemberContact | None = await self.member_contact(session, member_id)
         if member is None:
             raise TelescreenError(ErrorCode.FORBIDDEN, "member is not available")
         if len({category for category, _ in items}) != len(items):
@@ -140,7 +169,7 @@ class PreferenceService:
         return await self.settings(session, member_id)
 
 
-def _default(member: MemberRow) -> NotificationPreference:
+def _default(member: MemberContact) -> NotificationPreference:
     """Choose the default personal channel from available member contacts."""
     if member.email:
         return NotificationPreference.EMAIL

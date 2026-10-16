@@ -1,5 +1,7 @@
 """Composition helpers for v1.3 issue, notification, and organization services."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 import httpx
@@ -29,10 +31,6 @@ from telescreen.api.routers.issue_triage import IssueTriageRouterDeps, build_iss
 from telescreen.api.routers.issue_views import IssueViewsRouterDeps, build_issue_views_router
 from telescreen.api.routers.issues import build_issues_router
 from telescreen.api.routers.issues_common import IssuesRouterDeps
-from telescreen.api.routers.notification_settings import (
-    NotificationSettingsRouterDeps,
-    build_notification_settings_router,
-)
 from telescreen.api.routers.ownership import OwnershipRouterDeps, build_ownership_router
 from telescreen.core.config import TelescreenSettings
 from telescreen.core.secrets import EnvSource
@@ -40,7 +38,7 @@ from telescreen.directory.actors import DirectoryActorDirectory
 from telescreen.directory.members import MemberAdminService
 from telescreen.directory.repository import DirectoryRepository
 from telescreen.integrations.repository import IntegrationCheckRepository
-from telescreen.integrations.status import IntegrationStatusService
+from telescreen.integrations.status import ChannelStatusSource, IntegrationStatusService
 from telescreen.integrations.tests import IntegrationTester
 from telescreen.issues.activity.notifier import SubscriptionActivityNotifier
 from telescreen.issues.archive import ArchiveMaintenanceProvider, ArchivePolicy
@@ -52,19 +50,15 @@ from telescreen.issues.merge import MergeService
 from telescreen.issues.ownership import OwnershipAssigneeSuggester, OwnershipRuleService
 from telescreen.issues.service import IssueService
 from telescreen.issues.views import SavedViewService
-from telescreen.notifications.delivery import NotificationDeliveryHandler
 from telescreen.notifications.dlp import DlpGate
 from telescreen.notifications.guard import DlpOutboundGuard
-from telescreen.notifications.preferences import PreferenceRepository, PreferenceService
-from telescreen.notifications.sender import NotificationService
-from telescreen.notifications.tester import NotificationServiceTester
-from telescreen.notifications.weekly import WeeklyReportHandler, WeeklyReportProvider
 from telescreen.ports.directory import (
     ActorDirectory,
     OwnerDirectory,
     RecipientResolver,
 )
 from telescreen.ports.issues import AssigneeSuggester, IssueEvent, IssueEventSink
+from telescreen.ports.notifications import MemberNotifier, NotificationSender, NotificationTester
 from telescreen.ports.workflow import ScheduleProvider, TaskHandler
 from telescreen.wiring_builders import RuntimePrimitives
 from telescreen.wiring_v11 import IssueOps
@@ -99,11 +93,13 @@ class WiringV13Parts:
     primitives: RuntimePrimitives
     resolver: RecipientResolver
     owners: OwnerDirectory
+    notification_members: MemberNotifier
     issue_service: IssueService
     issue_ops: IssueOps
-    notification_service: NotificationService
-    notification_delivery: NotificationDeliveryHandler
+    notification_service: NotificationSender
     notification_gate: DlpGate
+    notification_tester: NotificationTester
+    channel_status: ChannelStatusSource | None
     queue: SqlTaskQueue
     workflow_triggers: WorkflowTriggerService
     workflow_repository: WorkflowRepository
@@ -133,7 +129,7 @@ def build_v13(parts: WiringV13Parts) -> WiringV13:
     settings: TelescreenSettings = parts.settings
     actors: DirectoryActorDirectory = DirectoryActorDirectory()
     activity: SubscriptionActivityNotifier = SubscriptionActivityNotifier(
-        parts.notification_service, actors, primitives.clock
+        parts.notification_members, actors, primitives.clock
     )
     archive_policy: ArchivePolicy = ArchivePolicy(
         settings.escalating_min_findings, settings.escalating_factor
@@ -170,23 +166,18 @@ def build_v13(parts: WiringV13Parts) -> WiringV13:
         starter,
         alert_repository,
     )
-    preferences: PreferenceService = PreferenceService(PreferenceRepository(), primitives.clock)
+    from telescreen.issues.weekly_report import WeeklyReportHandler, WeeklyReportProvider
+
     report_source: IssueReportSourceImpl = IssueReportSourceImpl()
     weekly_provider: WeeklyReportProvider = WeeklyReportProvider(
         settings.weekly_report_cron, parts.queue
     )
     weekly_handler: WeeklyReportHandler = WeeklyReportHandler(
-        primitives.sessions, report_source, parts.notification_service, primitives.clock
+        primitives.sessions, report_source, parts.notification_members, primitives.clock
     )
     checks: IntegrationCheckRepository = IntegrationCheckRepository()
-    notification_tester: NotificationServiceTester = NotificationServiceTester(
-        primitives.sessions,
-        parts.notification_service,
-        parts.notification_delivery,
-        parts.owners,
-    )
     integration_tester: IntegrationTester = IntegrationTester(
-        notification_tester,
+        parts.notification_tester,
         parts.v12.verifier,
         parts.http._transport,
         settings,
@@ -194,6 +185,7 @@ def build_v13(parts: WiringV13Parts) -> WiringV13:
         checks,
         primitives.audit,
         primitives.clock,
+        channels=parts.channel_status,
     )
     github: GithubIssueCreator | None = None
     if settings.github_issues_token_ref is not None:
@@ -231,7 +223,7 @@ def build_v13(parts: WiringV13Parts) -> WiringV13:
         parts.resolver,
         actors,
         suggester,
-        parts.notification_service,
+        parts.notification_members,
     )
     archive_provider: ArchiveMaintenanceProvider = ArchiveMaintenanceProvider(
         primitives.audit, activity
@@ -270,14 +262,11 @@ def build_v13(parts: WiringV13Parts) -> WiringV13:
             )
         ),
         build_alerts_router(AlertsRouterDeps(parts.context, alert_service)),
-        build_notification_settings_router(
-            NotificationSettingsRouterDeps(parts.context, preferences)
-        ),
         build_dashboard_router(DashboardRouterDeps(parts.context, DashboardService())),
         build_integrations_router(
             IntegrationsRouterDeps(
                 parts.context,
-                IntegrationStatusService(settings, checks),
+                IntegrationStatusService(settings, checks, parts.channel_status),
                 integration_tester,
                 checks,
             )

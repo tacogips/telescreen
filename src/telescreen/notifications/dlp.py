@@ -50,7 +50,7 @@ class DlpGate:
     redactor: Redactor
     policy: DlpPolicy
 
-    async def inspect(self, message: OutboundMessage) -> CensoredMessage:
+    async def inspect(self, message: OutboundMessage, prior_hits: int = 0) -> CensoredMessage:
         """Return a sealed message that contains no detected raw value."""
         items: tuple[ScanItem, ScanItem] = (
             ScanItem("subject", "notification", "subject", message.subject),
@@ -68,10 +68,11 @@ class DlpGate:
             raise TelescreenError(
                 ErrorCode.DETECTOR_UNAVAILABLE, "detector returned an invalid batch"
             )
-        hit_count: int = len(subject_result.findings) + len(body_result.findings)
+        detected_hits: int = len(subject_result.findings) + len(body_result.findings)
+        hit_count: int = detected_hits + prior_hits
         if hit_count == 0:
             return CensoredMessage(message.subject, message.body, DlpVerdict.PASS, 0, _SEAL)
-        if self.policy is DlpPolicy.BLOCK:
+        if self.policy is DlpPolicy.BLOCK and (detected_hits > 0 or prior_hits > 0):
             return CensoredMessage(
                 "[BLOCKED BY DLP]", "[BLOCKED BY DLP]", DlpVerdict.BLOCKED, hit_count, _SEAL
             )
@@ -84,7 +85,9 @@ class DlpGate:
             )
         return CensoredMessage(subject, body, DlpVerdict.MASKED, hit_count, _SEAL)
 
-    async def inspect_redacted(self, message: OutboundMessage) -> CensoredMessage:
+    async def inspect_redacted(
+        self, message: OutboundMessage, prior_hits: int = 0
+    ) -> CensoredMessage:
         """Apply the rule redactor, then inspect; redactor hits count as DLP hits.
 
         A redactor hit blocks under the block policy and otherwise turns a passing
@@ -92,7 +95,7 @@ class DlpGate:
         """
         subject: RedactionResult = self.redactor.redact(message.subject)
         body: RedactionResult = self.redactor.redact(message.body)
-        redacted_hits: int = subject.hit_count + body.hit_count
+        redacted_hits: int = subject.hit_count + body.hit_count + prior_hits
         if redacted_hits and self.policy is DlpPolicy.BLOCK:
             return CensoredMessage(
                 "[BLOCKED BY DLP]", "[BLOCKED BY DLP]", DlpVerdict.BLOCKED, redacted_hits, _SEAL

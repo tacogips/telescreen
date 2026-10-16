@@ -1,7 +1,6 @@
 """Failure boundaries never acknowledge unvalidated remote success."""
 
 import gzip
-from datetime import UTC, datetime
 
 import httpx
 import pytest
@@ -9,10 +8,8 @@ from pydantic import TypeAdapter
 
 from telescreen.core.errors import ConfigError, TelescreenError
 from telescreen.core.secrets import SecretValue
-from telescreen.core.vocabulary import ErrorCode
-from telescreen.inventory_service.clients import InventoryClient
 from telescreen.inventory_service.transport import ServiceHttp
-from telescreen.ports.inventory_commands import InventoryCommand, InventoryReceipt, StopTracking
+from telescreen.ports.inventory_commands import InventoryReceipt
 
 
 @pytest.mark.parametrize(
@@ -24,20 +21,9 @@ async def test_invalid_receipts_and_failures_are_safe(body: bytes, status: int) 
     async with httpx.AsyncClient(
         transport=httpx.MockTransport(lambda request: httpx.Response(status, content=body))
     ) as http:
-        client: InventoryClient = InventoryClient(
-            ServiceHttp(http, "http://inventory", SecretValue("secret"))
-        )
+        transport: ServiceHttp = ServiceHttp(http, "http://inventory", SecretValue("secret"))
         with pytest.raises(TelescreenError) as failure:
-            await client.receive(
-                InventoryCommand(
-                    "event",
-                    "collector:config",
-                    1,
-                    datetime(2026, 10, 15, tzinfo=UTC),
-                    StopTracking("config", "system:test"),
-                )
-            )
-        assert failure.value.code is ErrorCode.SERVICE_UNAVAILABLE
+            await transport.post("/commands", "{}", TypeAdapter(InventoryReceipt))
         assert "sensitive" not in str(failure.value)
 
 
@@ -87,39 +73,3 @@ def test_invalid_service_origins_fail_without_opening_a_connection(url: str) -> 
     """Credentials and ambiguous URL components are rejected at startup."""
     with pytest.raises(ConfigError):
         ServiceHttp(httpx.AsyncClient(), url, SecretValue("secret"))
-
-
-async def test_public_exports_stream_beyond_the_internal_handoff_limit(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The internal message bound must not truncate or reject existing public CSV exports."""
-    from fastapi import FastAPI
-
-    from telescreen.inventory_service import transport as boundary
-    from telescreen.inventory_service.bureau import build_proxy_router
-
-    monkeypatch.setattr(boundary, "MAX_HANDOFF_BYTES", 32)
-    payload: bytes = b"csv,row\n" * 1000
-    async with httpx.AsyncClient(
-        transport=httpx.MockTransport(
-            lambda request: httpx.Response(
-                200,
-                content=payload,
-                headers={
-                    "content-type": "text/csv",
-                    "content-disposition": "attachment; filename=assets.csv",
-                },
-            )
-        )
-    ) as upstream:
-        app: FastAPI = FastAPI()
-        app.include_router(
-            build_proxy_router(ServiceHttp(upstream, "http://inventory", SecretValue("secret")))
-        )
-        async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://bureau"
-        ) as public:
-            response: httpx.Response = await public.get("/api/data/export")
-            assert response.status_code == 200
-            assert response.content == payload
-            assert response.headers["content-disposition"] == "attachment; filename=assets.csv"

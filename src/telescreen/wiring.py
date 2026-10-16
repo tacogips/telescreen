@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -44,7 +44,9 @@ from telescreen.collectors.sweep import CollectorSweeperImpl
 from telescreen.collectors.tasks import CollectorScanHandler, WatchRenewHandler
 from telescreen.core.clock import Clock
 from telescreen.core.config import TelescreenSettings
+from telescreen.core.errors import ConfigError
 from telescreen.core.secrets import EnvSource, SecretValue, resolve_secret
+from telescreen.core.topology import Topology, topology_of
 from telescreen.db.replay import ReplayNonceStore
 from telescreen.detection.factory import (
     build_detector,
@@ -62,6 +64,7 @@ from telescreen.evidence.image import LlmImageEvidenceScanner
 from telescreen.evidence.query import EvidenceQueryImpl
 from telescreen.evidence.service import EvidenceService
 from telescreen.evidence.store import LocalFileEvidenceStore
+from telescreen.integrations.status import ChannelStatusSource
 from telescreen.inventory_service.transport import ServiceHttp
 from telescreen.inventory_service.wiring import (
     RemoteInventoryWiring,
@@ -76,12 +79,7 @@ from telescreen.masking.fingerprint import Fingerprinter
 from telescreen.masking.index_guard import IndexGuard
 from telescreen.masking.redact import Redactor
 from telescreen.masking.seal import Masker
-from telescreen.notifications.delivery import NotificationDeliveryHandler
 from telescreen.notifications.dlp import DlpGate
-from telescreen.notifications.email import EmailNotifier, SmtplibTransport
-from telescreen.notifications.repository import NotificationRepository
-from telescreen.notifications.sender import NotificationService
-from telescreen.notifications.slack import SlackNotifier
 from telescreen.police.claims import ClaimService
 from telescreen.police.delivery import PolicePushDeliveryHandler
 from telescreen.police.gateway import PullQueueTransport, RoutingPoliceGateway, WebhookTransport
@@ -91,6 +89,8 @@ from telescreen.police.repository import PoliceRepository
 from telescreen.police.results import ResultService
 from telescreen.ports.audit import AuditLog
 from telescreen.ports.issues import IssueEvent, IssueEventSink
+from telescreen.ports.notifications import MemberNotifier, NotificationSender, NotificationTester
+from telescreen.ports.templates import TemplateCatalog
 from telescreen.ports.workflow import TaskHandler
 from telescreen.search.audit_tick import AuditIndexSchedule
 from telescreen.search.backend import SearchBackend
@@ -101,7 +101,7 @@ from telescreen.wiring_collectors import (
     build_webhook_secrets,
     drive_channel_key,
 )
-from telescreen.wiring_inventory_parts import WiringV14Parts
+from telescreen.wiring_inventory_parts import NotificationParts, WiringV14Parts
 from telescreen.wiring_v11 import (
     DirectoryV11,
     Health,
@@ -116,6 +116,8 @@ from telescreen.wiring_v12 import WiringV12, WiringV12Parts, build_v12
 from telescreen.wiring_v13 import IssueEventFanout, WiringV13, WiringV13Parts, build_v13
 
 if TYPE_CHECKING:
+    from telescreen.wiring_notify_local import LocalNotificationComposition
+    from telescreen.wiring_split import SplitNotificationComposition, SplitNotificationProducers
     from telescreen.wiring_v14 import WiringV14
 from telescreen.workflow.engine.child import ChildRunFinishedHandler
 from telescreen.workflow.engine.definitions import WorkflowService
@@ -234,6 +236,7 @@ def build_container(
     inventory_sessions: async_sessionmaker[AsyncSession] | None = None,
 ) -> Container:
     """Build feature services, worker handlers, and API routers."""
+    topology: Topology = topology_of(settings)
     primitives: RuntimePrimitives = build_primitives(
         settings, env, http, sessions, clock, inventory_sessions
     )
@@ -259,8 +262,34 @@ def build_container(
     dlp_detector: Detector = build_detector(settings, env, http, settings.dlp_detectors)
     notification_gate: DlpGate = DlpGate(dlp_detector, primitives.redactor, settings.dlp_policy)
     token_service: TokenService = TokenService(primitives.audit, primitives.clock)
+    template_catalog: TemplateCatalog | None = None
+    split_producers: SplitNotificationProducers | None = None
+    if topology is Topology.SPLIT:
+        from telescreen.integrations.notification_client import TemplateCatalogClient
+        from telescreen.inventory_service.transport import NOTIFICATION_PREFIX
+        from telescreen.wiring_split import build_split_notification_producers
+
+        notification_token: SecretValue = resolve_secret(
+            settings.notification_service_token_ref or "", env
+        )
+        notification_transport: ServiceHttp = ServiceHttp(
+            http,
+            settings.notification_service_url or "",
+            notification_token,
+            NOTIFICATION_PREFIX,
+        )
+        template_catalog = TemplateCatalogClient(notification_transport)
+        split_producers = build_split_notification_producers(
+            resolver, directory_v11.owners, primitives.redactor, queue, primitives.clock
+        )
     v12_parts: WiringV12Parts = build_v12(
-        settings, primitives, notification_gate, http, token_service
+        settings,
+        primitives,
+        notification_gate,
+        http,
+        token_service,
+        template_catalog,
+        topology is Topology.SPLIT,
     )
     ctx: ApiContext = ApiContext(
         primitives.sessions,
@@ -269,15 +298,42 @@ def build_container(
         v12_parts.verifier,
         v12_parts.provisioner if settings.oidc is not None else None,
     )
-    notification_service: NotificationService = NotificationService(
-        notification_gate,
-        resolver,
-        queue,
-        primitives.audit,
-        primitives.clock,
-        NotificationRepository(),
-        v12_parts.template_resolver,
-    )
+    local_notification_composition: LocalNotificationComposition | None = None
+    notification_parts: NotificationParts
+    notification_handler: TaskHandler
+    notification_service: NotificationSender
+    notification_tester: NotificationTester | None
+    channel_status: ChannelStatusSource | None = None
+    notification_members: MemberNotifier
+    if topology is Topology.SINGLE_PROCESS:
+        from telescreen.wiring_notify_local import build_local_notifications
+
+        local_notification_composition = build_local_notifications(
+            settings,
+            env,
+            http,
+            primitives,
+            ctx,
+            resolver,
+            queue,
+            notification_gate,
+            v12_parts.templates,
+        )
+        notification_parts = local_notification_composition.parts
+        notification_service = local_notification_composition.service
+        notification_handler = cast(TaskHandler, local_notification_composition.delivery)
+        notification_tester = notification_parts.tester
+        channel_status = notification_parts.channel_status
+        notification_members = notification_parts.members
+    else:
+        from telescreen.integrations.notification_delivery import NotificationDeliveryNoop
+
+        if split_producers is None:
+            raise ConfigError("split notification producers are unavailable")
+        notification_service = split_producers.sender
+        notification_members = split_producers.members
+        notification_handler = NotificationDeliveryNoop()
+        notification_tester = None
     health: Health = build_health(
         settings,
         collector_repository,
@@ -303,8 +359,11 @@ def build_container(
     )
     scan_jobs: ScanJobStoreImpl = ScanJobStoreImpl(collector_repository)
     channel_key: bytes = drive_channel_key(primitives.fingerprint_key)
+    collector_settings: TelescreenSettings = (
+        replace(settings, slack_bot_token_ref=None) if topology is Topology.SPLIT else settings
+    )
     collector_registry: CollectorRegistry = build_collector_registry(
-        settings, env, http, primitives.clock, channel_key
+        collector_settings, env, http, primitives.clock, channel_key
     )
     scanner: ResourceScannerImpl = ResourceScannerImpl(
         primitives.sessions,
@@ -339,19 +398,22 @@ def build_container(
         DirectoryActorDirectory(),
         resolver,
         directory_v11.owners,
-        notification_service,
+        notification_members,
         notification_service,
         queue,
         ctx,
         inventory_sessions=primitives.inventory_sessions,
     )
     v14: WiringV14 | RemoteInventoryWiring
-    if settings.inventory_service_url:
+    if topology is Topology.SPLIT:
+        inventory_url: str | None = settings.inventory_service_url
+        if inventory_url is None:
+            raise ConfigError("inventory service URL is required in split mode")
         v14 = build_remote_inventory(
             v14_parts,
             ServiceHttp(
                 http,
-                settings.inventory_service_url,
+                inventory_url,
                 service_secret(settings.inventory_service_token_ref, env),
             ),
         )
@@ -359,6 +421,26 @@ def build_container(
         from telescreen.wiring_v14 import build_v14
 
         v14 = build_v14(v14_parts)
+    if topology is Topology.SPLIT:
+        from telescreen.wiring_split import build_split_notifications
+
+        if not isinstance(v14, RemoteInventoryWiring) or split_producers is None:
+            raise ConfigError("split inventory composition is unavailable")
+        split_notification_composition: SplitNotificationComposition = build_split_notifications(
+            settings,
+            env,
+            http,
+            primitives.sessions,
+            primitives.clock,
+            queue,
+            primitives.redactor,
+            split_producers,
+            v14.publisher,
+        )
+        notification_parts = split_notification_composition.parts
+        notification_handler = split_notification_composition.delivery
+        notification_tester = notification_parts.tester
+        channel_status = notification_parts.channel_status
     issue_service.inventory = v14.publisher
     collector: CollectorService = CollectorService(
         collector_registry,
@@ -410,36 +492,6 @@ def build_container(
         rescanner,
         notification_service,
         primitives.indexer,
-    )
-    slack_token: SecretValue | None = (
-        resolve_secret(settings.slack_bot_token_ref, env)
-        if settings.slack_bot_token_ref is not None
-        else None
-    )
-    smtp_password: SecretValue | None = (
-        resolve_secret(settings.smtp_password_ref, env)
-        if settings.smtp_password_ref is not None
-        else None
-    )
-    slack_notifier: SlackNotifier = SlackNotifier(http, slack_token)
-    email_notifier: EmailNotifier = EmailNotifier(
-        SmtplibTransport(
-            settings.smtp_host or "localhost",
-            settings.smtp_port,
-            settings.smtp_username,
-            smtp_password,
-            settings.smtp_starttls,
-        ),
-        settings.smtp_from or "telescreen@localhost",
-    )
-    notification_handler: NotificationDeliveryHandler = NotificationDeliveryHandler(
-        primitives.sessions,
-        resolver,
-        slack_notifier,
-        email_notifier,
-        primitives.audit,
-        primitives.clock,
-        NotificationRepository(),
     )
     signing_key: SecretValue | None = (
         resolve_secret(settings.police_signing_key_ref, env)
@@ -540,6 +592,8 @@ def build_container(
     workflow_triggers: WorkflowTriggerService = WorkflowTriggerService(
         run_engine, workflow_repository
     )
+    if notification_tester is None:
+        raise ConfigError("notification tester is unavailable")
     v13: WiringV13 = build_v13(
         WiringV13Parts(
             settings,
@@ -549,11 +603,13 @@ def build_container(
             primitives,
             resolver,
             directory_v11.owners,
+            notification_members,
             issue_service,
             issue_ops,
             notification_service,
-            notification_handler,
             notification_gate,
+            notification_tester,
+            channel_status,
             queue,
             workflow_triggers,
             workflow_repository,
@@ -589,6 +645,7 @@ def build_container(
             issue_ops.exception_maintenance,
             health.collector_provider,
             health.police_provider,
+            *notification_parts.providers,
             *v13.providers,
             *v14.providers,
         ),
@@ -602,7 +659,8 @@ def build_container(
             primitives.sessions, workflow_repository, run_engine, primitives.clock
         )
     )
-    handlers.register(cast(TaskHandler, notification_handler))
+    for notification_task_handler in notification_parts.handlers:
+        handlers.register(notification_task_handler)
     for handler in v13.handlers:
         handlers.register(handler)
     for handler in v14.handlers:
@@ -742,6 +800,7 @@ def build_container(
     collector_secrets: WebhookSecrets = build_webhook_secrets(settings, env, channel_key)
     routers: tuple[APIRouter, ...] = (
         *v13.routers,
+        *notification_parts.routers,
         *v14.routers,
         build_health_router(),
         build_directory_router(

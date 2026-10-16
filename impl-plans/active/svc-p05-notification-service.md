@@ -1,9 +1,9 @@
 # SVC-P05 Notification Service: Process, Inbox, Replica, DLP Prior-Hit Fold, Delivery Pump, Routes, Audit
 
-**Status**: Not Started
+**Status**: Implementation Complete (pending review)
 **Design Reference**: design-docs/specs/design-service-split.md sections 4.3, 4.4, 6, 7, 9, 10, 11, 14
 **Created**: 2026-10-15
-**Last Updated**: 2026-10-15
+**Last Updated**: 2026-10-16
 
 ## Plan Metadata
 
@@ -242,23 +242,72 @@ pass unedited, so `notifications/dlp.py` and `prior_hits.py` never import
 uv run --frozen ruff format --check --no-cache src/telescreen/notification_service src/telescreen/notifications src/telescreen/api/routers/notification_settings.py tests/notification_service tests/notifications
 uv run --frozen ruff check --no-cache src/telescreen/notification_service src/telescreen/notifications src/telescreen/api/routers/notification_settings.py tests/notification_service tests/notifications
 uv run --frozen ty check src/telescreen/notification_service src/telescreen/notifications src/telescreen/api/routers/notification_settings.py tests/notification_service tests/notifications
-uv run --frozen pytest -p no:cacheprovider tests/notification_service tests/notifications tests/inventory/retention tests/api/v12_routers tests/e2e/test_flow_v12_notifications.py tests/core/split/test_lazy_notifications.py 2>&1 | tee /tmp/telescreen-svc-p05-notification-service-pytest.log
-uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p05-notification-service-typelint.log 2>&1; grep -E '^(src/telescreen/(notification_service|notifications|api/routers/notification_settings)|tests/(notification_service|notifications))' /tmp/telescreen-svc-p05-notification-service-typelint.log
-uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-svc-p05-notification-service-pytest-all.log 2>&1; echo "exit=$?"
+uv run --frozen pytest -p no:cacheprovider tests/notification_service tests/notifications tests/inventory/retention tests/api/v12_routers tests/e2e/test_flow_v12_notifications.py tests/core/split/test_lazy_notifications.py
+uv run --frozen python tools/typelint.py; ! grep -E '^(src/telescreen/(notification_service|notifications|api/routers/notification_settings)|tests/(notification_service|notifications))' tmp/telescreen-svc-20261016-g6/svc-p05-notification-service/final-v3-typelint.log
+uv run --frozen python -m telescreen.notification_service --help
+! grep -n MemberRow src/telescreen/api/routers/notification_settings.py
 ```
 
-Evidence: the scoped commands exit 0 and the typelint grep is empty. The full suite is
-informational in wave 4 (other plans in progress). Record failing ids, if any.
+Final-source evidence (source hash manifest:
+`tmp/telescreen-svc-20261016-g6/svc-p05-notification-service/source-hashes.sha256`,
+manifest SHA-256 `da8f4346d3b30aac755c0d36ac072f7bf23a42fb84de3fdf2ff0b7c4081b2a6a`):
+format, ruff, ty, scoped pytest, assigned-path typelint scan, CLI help and MemberRow
+gate all exited 0. Scoped pytest collected 192 tests: 191 passed, 0 failed, and 1
+offline-gated PostgreSQL integration test skipped. Complete current-source logs are in
+`tmp/telescreen-svc-20261016-g6/svc-p05-notification-service/` (`final-v3-format.log`,
+`final-v3-ruff.log`, `final-v3-ty.log`, `final-v3-pytest.log`, `final-v3-typelint.log`,
+`final-v3-help.log`, `final-v3-memberrow.log`, `final-v3-hashes.log`). The full suite is
+informational in wave 4 and is owned by the integration flow.
 
 ## Completion Criteria
 
-- [ ] `uv run --frozen python -m telescreen.notification_service --help` exits 0.
-- [ ] `grep -n MemberRow src/telescreen/api/routers/notification_settings.py` prints
+- [x] `uv run --frozen python -m telescreen.notification_service --help` exits 0.
+- [x] `grep -n MemberRow src/telescreen/api/routers/notification_settings.py` prints
       nothing. `tests/notifications/v13/test_router.py` stays green.
-- [ ] The DLP parity tests pass under both policies. `prior_hits=0` paths are unchanged
+- [x] The DLP parity tests pass under both policies. `prior_hits=0` paths are unchanged
       (the existing notification tests are green).
-- [ ] The scoped verification exits 0. The Progress Log has hashes.
+- [x] The scoped verification exits 0. The Progress Log has hashes.
+- [x] Delivery pump continues after an exception from one tick, logs only its type, and
+      remains cancellable; the regression test and existing pump behavior tests pass.
 
 ## Progress Log
 
-(append sessions per conventions section 8)
+### 2026-10-16 — Implementation
+
+- Implemented the notification service process, runtime, inbox, delivery pump, API routes,
+  replica-backed preferences/member references, settings router decoupling, and DLP
+  prior-hit folding with compatibility defaults.
+- Initial implementation checkpoint identity: branch `feat/service-split`, HEAD
+  `f0a34727fb479c141a8e503ffa23318ffe7a8504`; SHA-256 file manifest at
+  `tmp/telescreen-svc-20261016-g6/svc-p05-notification-service/source-hashes.sha256`
+  (manifest digest `dbc626849843113be7cb1cd7253b2bfabed2e06b91ae6e7f5d69cfe8e046cee5`).
+- Initial checkpoint scoped gates passed: Ruff format/check, ty, assigned-path typelint scan, CLI help,
+  no-`MemberRow` check; pytest reported 190 passed and 0 failed. Full logs are
+  recorded above under the plan-local evidence directory.
+- Formal test-integrity/adversarial/integration reviews and review-dependent finalization
+  remain downstream workflow steps.
+
+### 2026-10-16 — Test-integrity repairs
+
+- TI-P05-1: added service middleware 401/403 checks and producer authorization no-write
+  cases, including Telescreen directory apply.
+- TI-P05-2: added retention receipt duplicate coverage with no-write assertions and
+  narrowed the changed-digest assertion to `ErrorCode.CONFLICT`.
+- TI-P05-3: added runtime-backed settings, `/channels`, `/test`, replica member-reference,
+  and delivery queue coverage through the Notification app/runtime.
+- Added the plan's DLP audit-action parity assertion, multi-reference deterministic-ID test,
+  and explicit `telescreen.inventory_service` import gate.
+- Refreshed the 23-file source hash manifest and reran all scoped gates; pytest reported
+  190 passed, 0 failed. Independent review of the repairs remains pending.
+
+### 2026-10-16 — Adversarial repair ADV-P05-1
+
+- `DeliveryPump.run` now catches `Exception` per tick, logs only `type(error).__name__`,
+  and proceeds to the next poll. `CancelledError` remains uncaught and terminates the task.
+- Added `test_delivery_pump_continues_after_tick_error_and_cancels`, which proves a
+  raising first tick is followed by another tick, the log excludes exception details,
+  and cancellation ends the pump. Existing sent/retry/dead/seeding tests remain intact.
+- The scoped gate reported 191 passed, 1 offline integration skip, and 0 failures. The
+  refreshed 23-entry manifest digest is
+  `da8f4346d3b30aac755c0d36ac072f7bf23a42fb84de3fdf2ff0b7c4081b2a6a`; full logs are
+  listed above. Independent adversarial re-review remains pending.

@@ -13,8 +13,10 @@ from telescreen.core.json import json_bool, json_object, json_str
 from telescreen.core.secrets import EnvSource, resolve_secret
 from telescreen.core.vocabulary import ActorKind, ErrorCode, IntegrationKind, NotificationChannel
 from telescreen.integrations.repository import IntegrationCheckRepository
+from telescreen.integrations.status import ChannelStatusSource
 from telescreen.ports.audit import AuditEntry, AuditLog
 from telescreen.ports.identity import BearerVerifier
+from telescreen.ports.notification_commands import ChannelStatus
 from telescreen.ports.notifications import NotificationTester, TestOutcome
 
 
@@ -40,12 +42,13 @@ class IntegrationTester:
     checks: IntegrationCheckRepository
     audit: AuditLog
     clock: Clock
+    channels: ChannelStatusSource | None = None
 
     async def run(
         self, kind: IntegrationKind, member_id: str, session: AsyncSession
     ) -> IntegrationCheckResult:
         """Execute one check and persist only its timestamp, result and enum code."""
-        if not self._configured(kind):
+        if not await self._configured(kind):
             raise TelescreenError(
                 ErrorCode.INTEGRATION_UNCONFIGURED, "integration is not configured"
             )
@@ -89,8 +92,14 @@ class IntegrationTester:
         )
         return IntegrationCheckResult(kind, now, ok, error_code)
 
-    def _configured(self, kind: IntegrationKind) -> bool:
+    async def _configured(self, kind: IntegrationKind) -> bool:
         """Check required settings by presence without resolving secret refs."""
+        if kind in (IntegrationKind.SLACK, IntegrationKind.EMAIL) and self.channels is not None:
+            try:
+                channels: ChannelStatus = await self.channels.status()
+            except TelescreenError:
+                return False
+            return channels.slack if kind is IntegrationKind.SLACK else channels.email
         if kind is IntegrationKind.SLACK:
             return bool(self.settings.slack_bot_token_ref)
         if kind is IntegrationKind.EMAIL:
