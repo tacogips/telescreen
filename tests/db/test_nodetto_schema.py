@@ -25,6 +25,7 @@ from tests.db.nodetto_schema import (
     REPOSITORY_ROOT,
     SQLITE_DDL,
     NodettoDocument,
+    NodettoFrameElement,
     NodettoTableElement,
     SchemaSpec,
     load_nodetto_document,
@@ -139,6 +140,54 @@ def test_schema_document_has_one_erd_page() -> None:
     document: NodettoDocument = load_nodetto_document()
     assert document.page_ids == ["schema"]
     assert {table.page for table in document.tables} == {"schema"}
+
+
+SERVICE_SPLIT_FRAMES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "f-projections",
+        ("projection_changes", "inventory_directory_entries", "notification_directory_entries"),
+    ),
+    ("f-inventory-links", ("inventory_issue_links",)),
+    (
+        "f-notification-handoff",
+        (
+            "notification_outbox",
+            "inventory_notification_outbox",
+            "notification_inbox",
+            "notification_delivery_state",
+        ),
+    ),
+    (
+        "f-service-audit",
+        (
+            "inventory_audit_records",
+            "inventory_audit_chain_head",
+            "notification_audit_records",
+            "notification_audit_chain_head",
+        ),
+    ),
+)
+
+
+@pytest.mark.parametrize(("frame_id", "table_names"), SERVICE_SPLIT_FRAMES)
+def test_service_split_tables_are_drawn_in_their_module_frame(
+    frame_id: str, table_names: tuple[str, ...]
+) -> None:
+    """Tidy layout keeps a table in a frame only when it lies inside and above it."""
+    document: NodettoDocument = load_nodetto_document()
+    frame: NodettoFrameElement = next(f for f in document.frames if f.id == frame_id)
+    left: float = frame.visual.x
+    top: float = frame.visual.y
+    right: float = left + frame.visual.width
+    bottom: float = top + (frame.visual.height or 0)
+    for name in table_names:
+        table: NodettoTableElement = next(
+            t for t in document.tables if t.semantic.table_name == name
+        )
+        assert table.visual is not None, name
+        assert left <= table.visual.x and table.visual.x + table.visual.width <= right, name
+        assert top <= table.visual.y <= bottom, name
+        assert table.index > frame.index, f"{name} is drawn below {frame_id}"
 
 
 def test_schema_differences_reports_a_changed_column() -> None:

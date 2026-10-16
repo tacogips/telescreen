@@ -1,6 +1,6 @@
 # Service split: Telescreen, Inventory and Notification
 
-Status: IMPLEMENTED (run 11 final re-verify passed on `66531bd`; all eight svc plans and the g1-g11 manifests are archived under `impl-plans/completed/`; the section 12 Nodetto layout-only fix remains a serial-finalization step before commit), 2026-10-16
+Status: IMPLEMENTED (run 11 final re-verify passed on `66531bd`; all eight svc plans and the g1-g11 manifests are archived under `impl-plans/completed/`; the section 12 Nodetto layout-only fix was applied by the owner after run 11: the 12 tables were raised above their frames in z-order, because Tidy layout counts a table as a frame member only when it lies inside the frame and above it), 2026-10-16
 Requirements: [design-service-split-requirements.md](design-service-split-requirements.md)
 (R1-R8, owner decisions D1-D5). Builds on [inventory microservice](design-inventory-microservice.md),
 [inventory/alert boundaries](design-inventory-alert-boundaries.md) and the

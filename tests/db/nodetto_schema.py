@@ -98,12 +98,42 @@ class NodettoTable:
 
 
 @pydantic.dataclasses.dataclass
+class NodettoVisual:
+    """Element geometry; Nodetto computes a table's height, so it may be absent."""
+
+    x: float
+    y: float
+    width: float
+    height: float | None = None
+
+
+@pydantic.dataclasses.dataclass
 class NodettoTableElement:
     """An ``erd.table`` element record."""
 
     id: str
     page: str
     semantic: NodettoTable
+    index: str = ""
+    visual: NodettoVisual | None = None
+
+
+@pydantic.dataclasses.dataclass
+class NodettoFrameName:
+    """The semantic payload of a ``frame`` element."""
+
+    name: str
+
+
+@pydantic.dataclasses.dataclass
+class NodettoFrameElement:
+    """A ``frame`` element record; a table is a member when it lies inside and above it."""
+
+    id: str
+    page: str
+    index: str
+    semantic: NodettoFrameName
+    visual: NodettoVisual
 
 
 @pydantic.dataclasses.dataclass
@@ -151,6 +181,7 @@ class NodettoRelationElement:
 HEADER_ADAPTER: TypeAdapter[NodettoRecordHeader] = TypeAdapter(NodettoRecordHeader)
 TABLE_ADAPTER: TypeAdapter[NodettoTableElement] = TypeAdapter(NodettoTableElement)
 RELATION_ADAPTER: TypeAdapter[NodettoRelationElement] = TypeAdapter(NodettoRelationElement)
+FRAME_ADAPTER: TypeAdapter[NodettoFrameElement] = TypeAdapter(NodettoFrameElement)
 
 
 @dataclass(frozen=True)
@@ -228,6 +259,7 @@ class NodettoDocument:
 
     tables: list[NodettoTableElement] = field(default_factory=list)
     relations: list[NodettoRelationElement] = field(default_factory=list)
+    frames: list[NodettoFrameElement] = field(default_factory=list)
     page_ids: list[str] = field(default_factory=list)
 
 
@@ -246,6 +278,8 @@ def load_nodetto_document(path: Path = NODETTO_DOCUMENT) -> NodettoDocument:
             document.tables.append(TABLE_ADAPTER.validate_json(line))
         elif header.type == "erd.relation":
             document.relations.append(RELATION_ADAPTER.validate_json(line))
+        elif header.type == "frame":
+            document.frames.append(FRAME_ADAPTER.validate_json(line))
     return document
 
 
