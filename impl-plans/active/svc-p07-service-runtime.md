@@ -186,16 +186,18 @@ the assigned suite passes (152 passed, 10 offline integration skips); the full s
 - [x] `grep -rn "telescreen.directory\|telescreen.issues" src/telescreen/replica` prints nothing.
 - [x] Verification exits 0. The Progress Log has hashes.
 
-## Run 5 Re-verify Scope (manifest `telescreen-svc-20261016-g5`, wave A)
+## Run 6 Re-verify Scope (manifest `telescreen-svc-20261016-g6`, wave A)
 
-The code is complete at `8b09786`. The wave-3 review was interrupted, and no finding exists.
-- Do not re-implement. Run the g5 manifest verification commands (logs
-  `/tmp/telescreen-svc-p07-service-runtime-g5-*.log`) on the planning-commit tree unchanged.
+The code is complete at `8b09786` and unchanged at `077b71a`. Run 5 re-verified it and it
+passed test-integrity and adversarial review with no finding; an agent exit then
+interrupted branch evidence before the integration review.
+- Do not re-implement. Run the g6 manifest verification commands (logs
+  `/tmp/telescreen-svc-p07-service-runtime-g6-*.log`) on the planning-commit tree unchanged.
 - Edit source or tests only to fix a failing gate or a review finding, at its root cause
   inside this plan's writePaths. `tests/audit/test_audit.py` stays unchanged. Main-chain
   defaults stay, because unowned single-process e2e tests rely on them.
 - Record the final SHA-256 of every owned file changed since `c3ed4bc` in
-  `tmp/telescreen-svc-20261016-g5/svc-p07-service-runtime/owned-file-sha256.txt`.
+  `tmp/telescreen-svc-20261016-g6/svc-p07-service-runtime/owned-file-sha256.txt`.
 - Append one Progress Log entry (at most 12 lines). Keep Status Completed and
   priorVerification empty (conventions 7a).
 

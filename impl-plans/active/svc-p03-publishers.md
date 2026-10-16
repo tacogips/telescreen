@@ -262,15 +262,17 @@ Evidence: all commands above exit 0. Scoped tests pass 218 tests; the full suite
 - [x] Verification exits 0. The Progress Log has hashes.
 - [x] Run 5 re-verification passed every g5 gate on checkpoint `47e933b4e8a1ad516203f92ae5b3a53c2e548167`; final hashes are in `tmp/telescreen-svc-20261016-g5/svc-p03-publishers/owned-file-sha256.txt`.
 
-## Run 5 Re-verify Scope (manifest `telescreen-svc-20261016-g5`, wave A)
+## Run 6 Re-verify Scope (manifest `telescreen-svc-20261016-g6`, wave A)
 
-The code is complete at `8b09786`. The wave-3 review was interrupted, and no finding exists.
-- Do not re-implement. Run the g5 manifest verification commands (logs
-  `/tmp/telescreen-svc-p03-publishers-g5-*.log`) on the planning-commit tree unchanged.
+The code is complete at `8b09786` and unchanged at `077b71a`. Run 5 re-verified it and it
+passed test-integrity and adversarial review with no finding; an agent exit then
+interrupted branch evidence before the integration review.
+- Do not re-implement. Run the g6 manifest verification commands (logs
+  `/tmp/telescreen-svc-p03-publishers-g6-*.log`) on the planning-commit tree unchanged.
 - Edit source or tests only to fix a failing gate or a review finding, at its root cause
   inside this plan's writePaths. Never weaken a relay or redaction assertion.
 - Record the final SHA-256 of every owned file changed since `c3ed4bc` in
-  `tmp/telescreen-svc-20261016-g5/svc-p03-publishers/owned-file-sha256.txt`.
+  `tmp/telescreen-svc-20261016-g6/svc-p03-publishers/owned-file-sha256.txt`.
 - Append one Progress Log entry (at most 12 lines). Keep Status Completed and
   priorVerification empty (conventions 7a).
 

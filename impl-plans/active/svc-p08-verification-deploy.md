@@ -167,7 +167,7 @@ Imitate:
      - 15 Telescreen split mode allows `notifications.dlp`/`notifications.guard` (GitHub
        outbound guard);
      - 12 (O1, including its observable single-process table layout) and 17 are already
-       corrected (sessions 20-22, manifest g5). Change them only if the implemented
+       corrected (sessions 20-23, manifest g6). Change them only if the implemented
        ownership or migration behavior differs;
      - 13 runbook commands as implemented.
    - `command.md`: "TELESCREEN_BUREAU_SERVICE_URL is no longer read". Add the final

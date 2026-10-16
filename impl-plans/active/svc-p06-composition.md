@@ -241,7 +241,7 @@ Imitate:
 uv run --frozen ruff format --check --no-cache src/telescreen/wiring.py src/telescreen/wiring_builders.py src/telescreen/wiring_v12.py src/telescreen/wiring_v13.py src/telescreen/wiring_inventory_parts.py src/telescreen/wiring_notify_local.py src/telescreen/wiring_split.py src/telescreen/inventory_service/wiring.py src/telescreen/inventory_service/bureau.py src/telescreen/integrations/inventory_client.py src/telescreen/integrations/status.py src/telescreen/integrations/tests.py src/telescreen/issues/weekly_report.py src/telescreen/cli.py src/telescreen/cli_v12.py tests/e2e tests/integrations tests/issues/test_weekly_report.py
 uv run --frozen ruff check --no-cache <same paths>
 uv run --frozen ty check <same paths> tests/leak/flows_v12.py
-uv run --frozen pytest -p no:cacheprovider tests/e2e/test_wiring_split.py tests/e2e/test_wiring_v12.py tests/e2e/test_wiring_v13.py tests/e2e/test_wiring_v14.py tests/e2e/test_wiring_cli.py tests/e2e/test_cli_v12.py tests/e2e/test_cli_event_loop.py tests/e2e/test_route_permissions.py tests/e2e/test_route_permissions_v13.py tests/e2e/test_route_permissions_v14.py tests/e2e/test_api_routes.py tests/e2e/test_inventory_client.py tests/e2e/test_inventory_split_runtime.py tests/e2e/test_inventory_store_cutover.py tests/integrations tests/issues tests/test_package.py 2>&1 | tee /tmp/telescreen-svc-p06-composition-pytest.log
+uv run --frozen pytest -p no:cacheprovider tests/e2e/test_wiring_split.py tests/e2e/test_wiring_v12.py tests/e2e/test_wiring_v13.py tests/e2e/test_wiring_v14.py tests/e2e/test_wiring_cli.py tests/e2e/test_cli_v12.py tests/e2e/test_cli_event_loop.py tests/e2e/test_route_permissions.py tests/e2e/test_route_permissions_v13.py tests/e2e/test_route_permissions_v14.py tests/e2e/test_api_routes.py tests/e2e/test_inventory_client.py tests/e2e/test_inventory_split_runtime.py tests/e2e/test_inventory_store_cutover.py tests/inventory_service/test_config.py tests/integrations tests/issues tests/test_package.py 2>&1 | tee /tmp/telescreen-svc-p06-composition-pytest.log
 uv run --frozen python tools/typelint.py > /tmp/telescreen-svc-p06-composition-typelint.log 2>&1; grep -E '^(src/telescreen/(wiring|integrations|issues/weekly_report|cli|inventory_service/(wiring|bureau))|tests/(e2e/test_wiring_split|integrations|issues/test_weekly_report))' /tmp/telescreen-svc-p06-composition-typelint.log
 uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-svc-p06-composition-pytest-all.log 2>&1; echo "exit=$?"
 ```
@@ -252,6 +252,10 @@ by svc-p04 and svc-p08) or in files owned by an in-flight wave-4 plan (svc-p04/s
 List every failing id in the Progress Log. A failure in any other file is this plan's to
 fix, or a Reconciliation request if the file is outside `writePaths`.
 `tests/e2e/test_inventory_store_cutover.py` (svc-p02) must be green in the scoped run.
+So must the unowned `tests/inventory_service/test_config.py` (svc-p02, g6 sweep; do not
+edit it): importing `telescreen.wiring` must load no `telescreen.inventory` or
+`telescreen.wiring_v14` module (keep split and inventory imports lazy), and the real
+`cli.main(["migrate", "--store", "inventory"])` still creates only inventory tables.
 
 ## Completion Criteria
 
