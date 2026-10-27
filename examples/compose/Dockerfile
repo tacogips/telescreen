@@ -5,7 +5,8 @@ RUN bun install --frozen-lockfile
 COPY src/web/ ./
 RUN bun run build
 
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS python-build
+FROM python:3.12-slim-bookworm AS python-build
+COPY --from=ghcr.io/astral-sh/uv:0.13.6 /uv /uvx /usr/local/bin/
 WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY src/ ./src/

@@ -23,7 +23,7 @@ gitleaks = "latest"
 node = "22.23.4"
 pre-commit = "latest"
 python = "3.12"
-uv = "0.12.3"
+uv = "0.13.6"
 
 [tasks.default]
 description = "Show available tasks"
