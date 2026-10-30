@@ -114,7 +114,7 @@ Imitate:
 3. `tests/go_police/test_gdrive_police_e2e.py`, one async test (plus a second one only if
    it is needed for clarity):
    1. Build: `shutil.which("go")`. If go is missing -> `pytest.fail` with "run via mise",
-      never a skip. Then `subprocess.run(["go", "build", "-o", <tmp>/telescreen-gdrive-police,
+      never a skip. Then `subprocess.run(["go", "build", "-trimpath", "-o", <repo>/go/bin/telescreen-gdrive-police-e2e,
       "./cmd/telescreen-gdrive-police"], cwd=<repo>/go, env={...GOTOOLCHAIN=local,
       GOFLAGS=-mod=vendor}, timeout=300, check=True)`.
    2. World: `make_world(tmp_path, (enrollment env pair,), OutboundRecorder(),
@@ -203,7 +203,7 @@ uv run --frozen ty check tests/go_police
 uv run --frozen python tools/typelint.py > "$EV/typelint.log" 2>&1; ! grep -E '^tests/go_police' "$EV/typelint.log"
 wc -l tests/go_police/e2e_fakes.py tests/go_police/test_gdrive_police_e2e.py go/cmd/telescreen-gdrive-police/*.go
 test -z "$(git diff --name-only fb93c5e -- mise.toml)"
-mise run ci > "$EV/ci.log" 2>&1; echo "exit=$?"
+{ mise run fmt-check && mise run lint && mise run typelint && mise run typecheck && mise run go-lint && mise run go-test && mise run go-build && mise run test && uv build --out-dir /tmp/telescreen-gdp-p10-dist; } > "$EV/ci.log" 2>&1; echo "exit=$?"
 ```
 
 Run 3 (h3): log paths are under `EV`. The `/tmp/telescreen-gdp-p10-*.log` paths from h2
@@ -219,7 +219,8 @@ Required results:
 - Every command exits 0, and the typelint grep prints nothing.
 - The `tests/go_police` pytest log shows the parity freshness, envelope contract and E2E
   tests PASSED, with zero skipped (`-rA` lists them).
-- The `mise run ci` log ends with every gate green. If `ci` fails only in files owned by
+- The CI-equivalent log (every `mise run ci` gate, with `uv build` redirected to
+  `/tmp/telescreen-gdp-p10-dist`) ends with every gate green. If `ci` fails only in files owned by
   another plan, record a Reconciliation request with the log path; do not edit those
   files.
 
@@ -227,7 +228,7 @@ Required results:
 
 - [ ] The binary builds via `mise run go-build`, and the `run` exit codes are tested.
 - [ ] The E2E passes offline and meets every assertion in step 6 and the leak check.
-- [ ] `go-lint`, `go-test`, the `tests/go_police` suite and `mise run ci` exit 0, with log
+- [ ] `go-lint`, `go-test`, the `tests/go_police` suite and the CI-equivalent sequence exit 0, with log
       paths recorded.
 - [ ] Progress Log complete, including the uvicorn-or-fallback decision.
 
@@ -258,3 +259,25 @@ estate and the E2E, decide uvicorn-or-fallback and record the decision in this P
 Log (prefer the real `uvicorn.Server` on port 0, which is a declared dependency), then run
 every final gate, `mise run ci` included. Re-run all gates yourself and leave
 `priorVerification` empty.
+
+### Owner resolution (2026-10-31, run 3 -> run 4): artifact boundary for the E2E and CI
+
+Run 3 blocked because the E2E built its binary under pytest `tmp_path` and `mise run ci`
+runs `uv build` into `dist/`. Owner amendments (already applied above):
+
+- The E2E builds `go/bin/telescreen-gdrive-police-e2e` with `-trimpath`, inside the
+  declared artifact root `go/bin` (gitignored). Record its sha256 next to the
+  `go/bin/telescreen-gdrive-police` audit record.
+- The plan's CI gate is the exact `mise run ci` sequence with the final `mise run build`
+  replaced by `uv build --out-dir /tmp/telescreen-gdp-p10-dist` (the 2026-10-08 ruling in
+  `impl-plans/conventions.md` section 7). Do not run the literal `mise run ci` and do not
+  edit `mise.toml`; the owner runs the literal `mise run ci` after the workflow.
+- Gitignored tool caches that pytest, ruff, uv and Python create (`.pytest_cache`,
+  `.ruff_cache`, `__pycache__`, `.venv`) and everything under `/tmp` or the user's home
+  caches are not artifacts, need no `artifactRoots` entry and are never a blocker. The
+  service-split runs used them the same way.
+- pytest `tmp_path` stays the place for the generated service-account JSON and other test
+  data; it is outside the repository and is not an artifact.
+
+Re-run every gate yourself and leave `priorVerification` empty.
+

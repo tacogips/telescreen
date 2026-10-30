@@ -596,7 +596,8 @@ Python (`uv run pytest tests/go_police`):
   `payload`s against `partition-result.schema.json`. It asserts that the expected file
   set is present, so it cannot pass vacuously, and that `contract_version` is `1.2`.
 - `test_gdrive_police_e2e.py`:
-  - Builds the binary with `go build` into `tmp_path`, with `go` from the mise-provided
+  - Builds the binary with `go build -trimpath` into `go/bin/telescreen-gdrive-police-e2e`
+    (inside the `go/bin` artifact root), with `go` from the mise-provided
     PATH, `cwd=go/`, `GOTOOLCHAIN=local` and `GOFLAGS=-mod=vendor`. A missing toolchain is
     a test failure, never a skip.
   - Serves the Bureau's real FastAPI app from the existing hermetic harness
