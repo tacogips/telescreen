@@ -1,6 +1,6 @@
 # GDP-P09 Go Envelope Goldens and Python Schema Contract Test
 
-**Status**: Ready
+**Status**: Completed
 **Run 2**: Re-dispatched 2026-10-30 under `impl-plans/active/telescreen-gdp-20261030-h2-dispatch.json` (supersedes h1; same tasks, wave and writePaths). Evidence goes under `tmp/telescreen-gdp-20261030-h2/gdp-p09-envelopes-contract/attempt-<n>/`. Go caches follow the 2026-10-30 Go ruling in `impl-plans/conventions.md` section 7: never an artifact root, never a blocker.
 **Design Reference**: design-docs/specs/design-go-gdrive-police.md sections 8.1, 9.5, 10
 **Created**: 2026-10-30
@@ -129,12 +129,27 @@ shows all tests passed with zero skipped.
 
 ## Completion Criteria
 
-- [ ] The 9 golden files exist and the Go golden test passes without `-update`.
-- [ ] The Python contract test passes and covers 1.0, 1.1 and 1.2 members, partition,
+- [x] The 9 golden files exist and the Go golden test passes without `-update`.
+- [x] The Python contract test passes and covers 1.0, 1.1 and 1.2 members, partition,
       `scan_shard` and failed shapes.
-- [ ] ruff, ty and typelint are clean; `vet` and `gofmt` are clean. Progress Log
+- [x] ruff, ty and typelint are clean; `vet` and `gofmt` are clean. Progress Log
       complete.
 
 ## Progress Log
 
 (append sessions per `impl-plans/conventions.md` section 8)
+
+### Session: 2026-10-31
+**Tasks Completed**: Generated nine production-encoded goldens and added Go byte comparison and Python schema, redaction, accounting and locator checks.
+**Tasks In Progress**: Formal reviews and integration are downstream.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: New files had before=absent; after hashes are recorded in `tmp/telescreen-gdp-20261030-h2/gdp-p09-envelopes-contract/attempt-1/final-hashes.log`. Plan before=cb46b384750d83d65dcd77ef202d0209e6372207517bb9cd29f472429b77a2b9; after is in the same log.
+**Verification**: All commands exited 0; complete logs are under `tmp/telescreen-gdp-20261030-h2/gdp-p09-envelopes-contract/attempt-1/`.
+- `cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go test -count=1 -v ./internal/envelopes/...` (go-test.log): nine cases passed without update.
+- `cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go vet ./internal/envelopes/...` (vet.log); `cd go && test -z "$(mise exec -- gofmt -l internal/envelopes)"` (gofmt.log).
+- `PYTHONDONTWRITEBYTECODE=1 uv run --frozen pytest -p no:cacheprovider tests/go_police/test_go_envelopes_contract.py` (final-python-test.log): 11 passed, zero skipped.
+- `uv run --frozen ruff format --check --no-cache tests/go_police/test_go_envelopes_contract.py` (final-format.log); `uv run --frozen ruff check --no-cache tests/go_police/test_go_envelopes_contract.py` (final-ruff.log); `uv run --frozen ty check tests/go_police/test_go_envelopes_contract.py` (final-ty.log); `uv run --frozen python tools/typelint.py` (final-typelint.log).
+- `mise exec -- gitleaks dir --config .gitleaks.toml --redact --no-banner go/testdata/envelopes` (final-gitleaks.log): no leaks.
+- Mutation: removed status from a copy in `/tmp/telescreen-gdp-p09-mutated.json`; validator returned errors (mutation.log).
+**Notes**: Plan aligns with design sections 8.1, 9.5 and 10; dependency acceptance follows dispatch.

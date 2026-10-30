@@ -168,6 +168,13 @@ of these needs an `artifactRoots` entry, none is tracked by fanout change tracki
 none is ever a reason to report a blocker. `go/vendor` is committed source, not an
 artifact. Repository-internal generated output (for example `go/bin`) still needs its
 declared artifact root.
+Owner ruling (2026-10-30, synthetic secrets): gitleaks decodes base64, hex and percent
+encoding, so committed test data must never hold a secret-shaped sample in those forms. Use
+the parity fixture `xor-v1` encoding (`design-go-gdrive-police.md` section 9.5) or build
+samples from fragments at run time. Never add path-wide gitleaks allowlists for test data;
+only field-exact `condition = "AND"` entries for provably non-secret values (hashes, obfuscated
+synthetic keys) are allowed. Run `gitleaks dir` from the repository root with
+`--config .gitleaks.toml`.
 
 Record in the Progress Log for every command: the command, exit status and log path. An
 incomplete log is not a pass.

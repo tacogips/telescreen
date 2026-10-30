@@ -301,19 +301,19 @@ Record in the Progress Log:
 
 ## Completion Criteria
 
-- [ ] `mise.toml` pins go 1.27.3 and has `go-test`, `go-lint`, `go-build`, plus the new
+- [x] `mise.toml` pins go 1.27.3 and has `go-test`, `go-lint`, `go-build`, plus the new
       `ci` chain verbatim.
-- [ ] `.gitignore` ignores `/go/bin/`.
-- [ ] `go.mod` has exactly one requirement, x/text, at a pinned version.
-- [ ] `go/vendor` is populated as committed source with fewer than 512 files and no file
+- [x] `.gitignore` ignores `/go/bin/`.
+- [x] `go.mod` has exactly one requirement, x/text, at a pinned version.
+- [x] `go/vendor` is populated as committed source with fewer than 512 files and no file
       over 7812k. `go mod verify` exits 0.
-- [ ] The vendoring audit (x/text version, `go get`/`go mod tidy`/`go mod vendor`
+- [x] The vendoring audit (x/text version, `go get`/`go mod tidy`/`go mod vendor`
       commands and exit codes, and the sha256 of `go.mod`, `go.sum` and `modules.txt`) is
       in the Progress Log.
-- [ ] All contract files exist with the exact names and shapes above. Tests pass, `go
+- [x] All contract files exist with the exact names and shapes above. Tests pass, `go
       vet` is clean, and `gofmt` reports nothing.
-- [ ] `unorm.Version()` equals the Python `unidata_version`, and both are recorded.
-- [ ] Progress Log has hashes, commands, exit codes and log paths.
+- [x] `unorm.Version()` equals the Python `unidata_version`, and both are recorded.
+- [x] Progress Log has hashes, commands, exit codes and log paths.
 
 ## Progress Log
 
@@ -329,3 +329,29 @@ like the uv cache, and need no `artifactRoots` entry (see the 2026-10-30 Go ruli
 default caches or set `GOCACHE=/tmp/telescreen-gdp-p01-foundation-gocache` and
 `GOMODCACHE=/tmp/telescreen-gdp-gomodcache`. Do not report this as a blocker again, and do
 not list the earlier blocked attempt in `priorVerification`.
+
+
+### Session: 2026-10-30 — foundation implementation
+
+Implemented the Go module, task gates, contract DTOs, interfaces, Unicode wrapper and
+Python-compatible table loader. The plan matches design sections 1, 3, 8.1, 9.2 and 11.
+Formal review and commit are downstream workflow steps; go-build and CI await p10.
+
+- Python `unicodedata.unidata_version`: 15.0.0; x/text v0.33.0 `norm.Version`:
+  15.0.0. Newer published releases select Unicode 17.0.0 for Go 1.27.
+- `mise install go`: exit 0, already installed; `mise exec -- go version`: exit 0,
+  go1.27.3. Installed binary SHA-256:
+  `aa355b078a81158d418079a3f8c776719eb99cc6f527e39ffa3250c66566aafb`.
+- From `go/`, `GOTOOLCHAIN=local GOFLAGS=-mod=mod mise exec -- go get
+  golang.org/x/text@v0.33.0`, `GOTOOLCHAIN=local GOFLAGS=-mod=mod mise exec -- go mod
+  tidy`, and `GOTOOLCHAIN=local GOFLAGS=-mod=mod mise exec -- go mod vendor`: exit 0.
+- Vendor contains 18 files; `find go/vendor -type f -size +7812k` output is empty.
+  SHA-256: `go/go.mod` `0fc9de1620318a1a506aaf0a6b13e21a97d7d347ca1c9c872bc3513e294bb21f`,
+  `go/go.sum` `40772d1784fa5decc919cae8d60497466e7cc2f7cb3c05a9da3c222c231c9f19`,
+  `go/vendor/modules.txt` `59782bec3a89f25f01d45fe4207950b79dd630abcf4f8b88b93cf0adb5e5317d`.
+- Go test (six tests), vet, gofmt check, mod verify, task list, vendor count and
+  size checks all exit 0. Evidence and per-edit intentions are in
+  `tmp/telescreen-gdp-20261030-h2/gdp-p01-foundation/attempt-1/`.
+- `mise.toml` before `b5db0fbf71cef9bca4093fa996c29cfd2746a0daf56a4483b4be9d49cfb27d05`; `.gitignore` before `1b03881a90cb58f0b420d952558ecaa699489c5554bcbbf3516f1b6f20ce5d31`.
+  All other authored source paths were absent. After hashes are in `source-hashes.txt`;
+  vendor is generated source and its inventory is in the shared fanout evidence.

@@ -20,6 +20,7 @@ fi
 "aqua:slackapi/slack-cli" = "4.9.0"
 bun = "1.4.4"
 gitleaks = "latest"
+go = "1.27.3"
 node = "22.23.4"
 pre-commit = "latest"
 python = "3.12"
@@ -89,9 +90,31 @@ run = "uv build"
 description = "Remove generated artifacts"
 run = "rm -rf build dist htmlcov .coverage .pytest_cache .ruff_cache src/*.egg-info"
 
+[tasks.go-test]
+description = "Run Go tests"
+dir = "go"
+env = { GOTOOLCHAIN = "local", GOFLAGS = "-mod=vendor" }
+run = "go test ./..."
+
+[tasks.go-lint]
+description = "Check Go formatting and vet"
+dir = "go"
+env = { GOTOOLCHAIN = "local", GOFLAGS = "-mod=vendor" }
+run = '''
+files=$(find . -name '*.go' -not -path './vendor/*' -not -path './bin/*' -exec gofmt -l {} +)
+if [ -n "$files" ]; then printf '%s\n' "$files"; exit 1; fi
+go vet ./...
+'''
+
+[tasks.go-build]
+description = "Build the Go worker"
+dir = "go"
+env = { GOTOOLCHAIN = "local", GOFLAGS = "-mod=vendor" }
+run = "go build -trimpath -o bin/telescreen-gdrive-police ./cmd/telescreen-gdrive-police"
+
 [tasks.ci]
 description = "Run the standard CI checks"
-run = "mise run fmt-check && mise run lint && mise run typelint && mise run typecheck && mise run test && mise run build"
+run = "mise run fmt-check && mise run lint && mise run typelint && mise run typecheck && mise run go-lint && mise run go-test && mise run go-build && mise run test && mise run build"
 
 [tasks.ddl-edit]
 description = "Open the database schema (db/schema/telescreen.nodetto.jsonl) in the Nodetto app"

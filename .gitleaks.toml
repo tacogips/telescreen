@@ -12,3 +12,10 @@ description = "12-hex data item fingerprint prefixes (key_prefix) in web test an
 paths = ['''^src/web/src/.*\.(test\.tsx|test\.ts|ts|json)$''']
 regexTarget = "line"
 regexes = ['''key_prefix"?\s*:\s*"[0-9a-f]{12}"''']
+
+[[allowlists]]
+description = "Go parity fixtures: SHA-256 shard digests and xor-v1 obfuscated synthetic fixture keys (design-go-gdrive-police.md section 9.5)"
+condition = "AND"
+paths = ['''^go/testdata/parity/(locators|fingerprints)\.json$''']
+regexTarget = "match"
+regexes = ['''shard_key"\s*:\s*"[0-9a-f]{64}"''', '''(?:item_key_b64|key_b64)"\s*:\s*"[A-Za-z0-9+/]+={0,2}"''']

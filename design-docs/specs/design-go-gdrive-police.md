@@ -531,7 +531,12 @@ Fixtures go to `go/testdata/parity/*.json`:
 | `sealing.json` | Segment text and locator → `masked_snippet`, `location`, `external_fingerprint` per finding | `Masker`, `Redactor`, `mask_value` |
 | `redactor.json` | Strings → `has_hits`, `redact` | `Redactor.default()` |
 
-Text inputs are stored base64-encoded and the fixture key is a fixed, labelled test key.
+Text inputs are stored in `*_b64` fields as base64 of the UTF-8 bytes XOR-ed with the
+repeating key `telescreen-go-parity-fixture` (`"obfuscation": "xor-v1:..."`, owner decision
+2026-10-30), because gitleaks decodes plain base64. The fixture key is a fixed, labelled test
+key. No path-wide gitleaks allowlist covers fixture paths; one field-exact `.gitleaks.toml`
+entry (`condition = "AND"`) allows the SHA-256 `shard_key` digests and the obfuscated
+`key_b64`/`item_key_b64` values in `locators.json` and `fingerprints.json`.
 No committed file contains a contiguous secret-shaped string, and the gitleaks pre-commit
 hook must pass. Go test sources likewise build samples from fragments or from decoded
 fixtures.

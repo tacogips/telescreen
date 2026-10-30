@@ -149,11 +149,15 @@ The Go commands exit 0. Both READMEs exist, contain the env names, the gaps and 
 
 ## Completion Criteria
 
-- [ ] `config.Load` implements every rule above, and the tests pass with `-race`.
-- [ ] Both READMEs are written with the sections listed and are consistent with the
+- [x] `config.Load` implements every rule above, and the tests pass with `-race`.
+- [x] Both READMEs are written with the sections listed and are consistent with the
       design (including the V1 owner decision).
-- [ ] `vet` and `gofmt` are clean. Progress Log complete.
+- [x] `vet` and `gofmt` are clean. Progress Log complete.
 
 ## Progress Log
 
 (append sessions per `impl-plans/conventions.md` section 8)
+
+### Session: 2026-10-30
+
+Implemented injected environment configuration and hermetic boundary tests, and both operator READMEs. The accepted design and plan are aligned; V1 and G1-G5 are documented. Race test passed (16 subtests), vet, gofmt and documentation presence checks exited 0. Complete logs: `tmp/telescreen-gdp-20261030-h2/gdp-p07-config-docs/attempt-1/{gotest,gotest-verbose,govet,gofmt,docs}.log`. Verification ran on the shared working tree; formal reviews and integration are downstream.

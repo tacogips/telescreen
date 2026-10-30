@@ -1,6 +1,6 @@
 # GDP-P08 Masking, Snippet Sealing, Redactor, Fingerprints and the detect.Engine
 
-**Status**: Ready
+**Status**: Implementation complete; review pending
 **Run 2**: Re-dispatched 2026-10-30 under `impl-plans/active/telescreen-gdp-20261030-h2-dispatch.json` (supersedes h1; same tasks, wave and writePaths). Evidence goes under `tmp/telescreen-gdp-20261030-h2/gdp-p08-detect-seal/attempt-<n>/`. Go caches follow the 2026-10-30 Go ruling in `impl-plans/conventions.md` section 7: never an artifact root, never a blocker.
 **Design Reference**: design-docs/specs/design-go-gdrive-police.md sections 8.3, 9.3, 9.4, 9.5
 **Created**: 2026-10-30
@@ -139,12 +139,56 @@ still pass.
 
 ## Completion Criteria
 
-- [ ] `MaskValue`, `Redactor`, both fingerprint functions, the clean derivation and
+- [x] `MaskValue`, `Redactor`, both fingerprint functions, the clean derivation and
       `SealEngine` exist. `var _ Engine = (*SealEngine)(nil)` compiles.
-- [ ] The sealing, redactor and fingerprint parity tests pass with zero mismatches.
-- [ ] `vet` and `gofmt` are clean, and no gdp-p05 file changed (hashes recorded).
-- [ ] Progress Log complete.
+- [x] The sealing, redactor and fingerprint parity tests pass with zero mismatches.
+- [x] `vet` and `gofmt` are clean, and no gdp-p05 file changed (hashes recorded).
+- [x] Progress Log complete.
 
 ## Progress Log
 
 (append sessions per `impl-plans/conventions.md` section 8)
+
+### Owner note (2026-10-30, run 2): fixture `*_b64` encoding
+
+The repository gitleaks scan decodes base64 (and hex and percent-encoding) before matching,
+so base64 alone does not keep synthetic secret samples out of its view: run 2 found 292
+matches in `go/testdata/parity`. Owner decision: keep every `*_b64` field name, but each
+`*_b64` value is now standard padded base64 of the UTF-8 bytes XOR-ed byte by byte with the
+repeating ASCII key `telescreen-go-parity-fixture` (obfuscation, not encryption). This
+applies uniformly to every `*_b64` field in every parity fixture, `key_b64` included. Each
+fixture file carries a top-level `"obfuscation": "xor-v1:telescreen-go-parity-fixture"`
+member, and loaders must reject any other value. Do NOT add a gitleaks allowlist for fixture
+paths and do not weaken any gitleaks rule; the gitleaks scan of `go/testdata/parity` must
+exit 0. Go and Python tests decode with a small local helper (base64 decode, then XOR with
+the same key).
+
+Wherever this plan says `decode(..._b64)`, decode means base64 decode followed by the XOR
+with that key. Keep any sample secret literal out of Go source and test files as well: build
+samples from fixture data or from fragments.
+
+
+### Session: 2026-10-31 — implementation
+
+Implemented masking, redaction, HMAC fingerprints with clean re-derivation, and
+`SealEngine`; sealing lives in `engine.go`, so no separate `seal.go` is needed.
+Parity tests cover 17 sealing, 20 redactor, 4 external, 4 item and 19 finding
+cases, including two derived fingerprints. Detector parity covers 2,040 cases.
+The verbose combined test ran 9 tests, all passed; the manifest test, vet, and
+gofmt checks exited 0. Logs and per-edit intent are in
+`tmp/telescreen-gdp-20261030-h2/gdp-p08-detect-seal/attempt-1/` and sibling
+`mask-redact/` and `fingerprint-agent-1/` evidence directories. The p05 before
+and after hashes match (`attempt-1/p05-diff.log` is empty). Formal reviews and
+downstream integration are pending.
+
+Source hashes (before: absent for each new file):
+
+- `mask.go`: b5c1df15318cf0da10a0fdc497362cbb8c5d868eda7ce2a23372d8d23c72fd0b
+- `redact.go`: c462b54f1dcd8ea73b48c29b215a26662c38796a7d5b53719b29725ce6b14b7b
+- `fingerprint.go`: 271e9bd552a94a2f139f138132dfd3a43c8ad3ef3a1b93222337d2b116c3386f
+- `engine.go`: 66ea13dd572a07af96ff136190e3a7641b08509297f56b0313b06e55ec637d53
+- `seal_parity_test.go`: b5f3e1c47096395e8b545e8bb47a7ef3bc77d382d6e7b9929ee8ecc6731343b7
+- `engine_test.go`: d72a4816776a99b9d7b06063cedca1626c8c3df69347f121309922171c88d138
+
+Plan before and after hashes are recorded in `attempt-1/plan-before-hash.log`
+and `attempt-1/plan-after-hash.log`.

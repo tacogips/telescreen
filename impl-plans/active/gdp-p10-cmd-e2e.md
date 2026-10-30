@@ -226,3 +226,27 @@ Required results:
 ## Progress Log
 
 (append sessions per `impl-plans/conventions.md` section 8)
+
+### Session: 2026-10-31
+**Tasks Completed**: Added command wiring and focused exit-code test. `mise run go-build` produced the binary.
+**Tasks In Progress**: Offline fake estate and three-sweep E2E, remaining verification, and the uvicorn-or-fallback decision.
+**Blockers**: `mise run go-lint` exits 1 before running lint: mise rejects the `{{.Dir}}` task template in `mise.toml`.
+**Reconciliation requests**: gdp-p01 owner: repair `mise.toml` task `go-lint` so mise accepts its Go template while preserving gofmt and go vet checks; rerun the required gates. This path is outside gdp-p10 writePaths.
+**Hashes**: `go/cmd/telescreen-gdrive-police/main.go` before=absent after=dd3680b195a5e0fb1fed1eaf3ed932b461be915ca9511502d68e1958ef2eeff4; `run.go` before=absent after=b6f3a1f783f75ba1fecd50f1a53d6f11fd9ca2a7da4d59bc1a5922d7317a2a72; `run_test.go` before=absent after=a5f79f7434dfc7973273537c74de391dff4ecb4b0a250015e91cf7996eb7e8f1; plan before=abe74b1f3d2f1aa6a83af65df3889dab555879ae76aaaa69400d5989fc7b442f.
+**Verification**: `cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go test -v ./cmd/telescreen-gdrive-police` exit 0 (log: `tmp/telescreen-gdp-20261030-h2/gdp-p10-cmd-e2e/attempt-1/cmd-test.log`); `mise run go-test` exit 0 (log: `tmp/telescreen-gdp-20261030-h2/gdp-p10-cmd-e2e/attempt-1/gotest.log`); `mise run go-lint` exit 1 (log: `tmp/telescreen-gdp-20261030-h2/gdp-p10-cmd-e2e/attempt-1/golint.log`); `mise run go-build` exit 0 (log: `tmp/telescreen-gdp-20261030-h2/gdp-p10-cmd-e2e/attempt-1/gobuild.log`).
+**Notes**: Build audit: `mise exec -- go version` exit 0: `go version go1.27.3 darwin/arm64`; `shasum -a 256 go/bin/telescreen-gdrive-police` exit 0: `ccc82af02850b3de2db8f55d824e13786e5375fbe2c94abf258c17a49be1e499`. No tool installation was performed. Formal reviews and finalization remain downstream.
+
+### Owner resolution (2026-10-31, run 2 -> run 3): go-lint task repaired
+
+Run 2 blocked this plan because mise renders task scripts with Tera, and the Go template
+`{{.Dir}}` in the `go-lint` task (owned by accepted gdp-p01) failed validation before lint
+started. The owner replaced the file listing with
+`find . -name '*.go' -not -path './vendor/*' -not -path './bin/*' -exec gofmt -l {} +`;
+gofmt and `go vet ./...` are both preserved. Verified by the owner: `mise run go-lint` exit 0,
+and a deliberately misformatted file made it exit 1 (file removed). Do not edit `mise.toml`.
+gdp-p01..gdp-p09 are accepted dependencies at the run-3 checkpoint. Continue from the
+partial run-2 session (the cmd package and its unit test exist): implement the offline fake
+estate and the E2E, decide uvicorn-or-fallback and record the decision in this Progress
+Log (prefer the real `uvicorn.Server` on port 0, which is a declared dependency), then run
+every final gate, `mise run ci` included. Re-run all gates yourself and leave
+`priorVerification` empty.

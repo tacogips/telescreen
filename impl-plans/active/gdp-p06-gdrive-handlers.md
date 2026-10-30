@@ -232,12 +232,47 @@ All commands exit 0, and the log shows `ok .../internal/gdrive`.
 
 ## Completion Criteria
 
-- [ ] `NewService` and `Handlers` exist with the signatures above, and the package
+- [x] `NewService` and `Handlers` exist with the signatures above, and the package
       imports only the gdp-p01 contract packages plus the stdlib.
-- [ ] Every test above passes with `-race`, including the four parity fixture files.
-- [ ] `vet` and `gofmt` are clean, and nothing outside `go/internal/gdrive` changed.
-- [ ] Progress Log complete.
+- [x] Every test above passes with `-race`, including the four parity fixture files.
+- [x] `vet` and `gofmt` are clean; implementation source changes are confined to `go/internal/gdrive`.
+- [x] Progress Log complete.
 
 ## Progress Log
 
 (append sessions per `impl-plans/conventions.md` section 8)
+
+### Session: 2026-10-31 — implementation
+
+- Implemented service, selector validation, matching, exposure, segments, fetching,
+  partition, shard and detect handlers, size accounting and Redactor guards. The
+  accepted p01 and p02 dependencies were admitted by the dispatch.
+- Added offline fixture and handler tests. Formal test-integrity, adversarial and
+  integration reviews remain downstream.
+- Final-source verification, all exit 0, from the repository root (logs under
+  `tmp/telescreen-gdp-20261030-h2/gdp-p06-gdrive-handlers/attempt-1/`):
+  - `cd go; GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go test -race -count=1 -v ./internal/gdrive/...` — `final3-race.log`, 16 top-level tests passed.
+  - `cd go; GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go vet ./internal/gdrive/...` — `final3-vet.log`.
+  - `cd go; test -z "$(mise exec -- gofmt -l internal/gdrive)"` — `final3-gofmt.log`.
+- All `go/internal/gdrive/*.go` files were absent before this session; their final
+  SHA-256 hashes are recorded in `attempt-1/final3-hashes.log`. The plan before hash
+  is `94f90403207d26dde9eebb382bf46959e316d251ec7210022e3503592fbb0787`.
+- Per-edit intentions and read-backs are retained in `attempt-1/`; no sibling paths
+  were edited by this plan.
+- The manifest commands were also rerun without `-v`: `exact-race.log`,
+  `exact-vet.log` and `exact-gofmt.log` each exited 0 on the same source.
+
+### Session: 2026-10-31 — test-integrity repair GDP-P06-TI-M1
+
+- Partition now uses the `included` function exercised by `matching.json` parity;
+  the duplicate `partitionIncluded` was removed. No test or other behavior changed.
+- `partition.go` SHA-256 before: `dbeb302acca888bcc59dcec9a4be4642f5e72a9f0c228a5b0d587267079faf10`;
+  after: `a2c0daa231ca7bade3f982025220bbacdafe71f2b99d57aa3091a0cd3d3fd7d5`.
+  All source hashes are in `tmp/telescreen-gdp-20261030-h2/gdp-p06-gdrive-handlers/attempt-2/final-hashes.log`.
+- From the repository root, each command exited 0; logs are under
+  `tmp/telescreen-gdp-20261030-h2/gdp-p06-gdrive-handlers/attempt-2/`:
+  - `cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go test -race -count=1 -v ./internal/gdrive/...`: `race.log`, 16 top-level tests passed, no skips.
+  - `cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go vet ./internal/gdrive/...`: `vet.log`.
+  - `cd go && test -z "$(mise exec -- gofmt -l internal/gdrive)"`: `gofmt.log`.
+  - The production call and absence of the duplicate are recorded in `call.log` and `absence.log`.
+- Independent test-integrity and adversarial re-review remain downstream.

@@ -194,7 +194,7 @@ uv run --frozen ruff check --no-cache tools/gen_go_police_fixtures.py tools/go_p
 uv run --frozen ty check tools/gen_go_police_fixtures.py tools/go_police_fixture_cases.py tests/go_police/test_parity_fixtures_current.py
 uv run --frozen pytest -p no:cacheprovider tests/go_police/test_parity_fixtures_current.py 2>&1 | tee /tmp/telescreen-gdp-p02-pytest.log; echo "exit=$?"
 uv run --frozen python tools/typelint.py > /tmp/telescreen-gdp-p02-typelint.log 2>&1; grep -E '^(tools/gen_go_police_fixtures|tools/go_police_fixture_cases|tests/go_police)' /tmp/telescreen-gdp-p02-typelint.log
-mise exec -- gitleaks dir --redact --no-banner tools/gen_go_police_fixtures.py tools/go_police_fixture_cases.py go/testdata/parity go/internal/pytext/data tests/go_police 2>&1 | tee /tmp/telescreen-gdp-p02-gitleaks.log; echo "exit=$?"
+mise exec -- gitleaks dir --config .gitleaks.toml --redact --no-banner tools/gen_go_police_fixtures.py tools/go_police_fixture_cases.py go/testdata/parity go/internal/pytext/data tests/go_police 2>&1 | tee /tmp/telescreen-gdp-p02-gitleaks.log; echo "exit=$?"
 ```
 
 All commands exit 0; the typelint grep prints nothing; the pytest log shows the
@@ -203,13 +203,13 @@ with this version, run it once per path and record each run.
 
 ## Completion Criteria
 
-- [ ] All 8 table files and 8 fixture files exist with headers or `meta`, and `--check`
+- [x] All 8 table files and 8 fixture files exist with headers or `meta`, and `--check`
       exits 0.
-- [ ] Detector corpus has at least 2000 generated cases plus handpicked cases for all 15
+- [x] Detector corpus has at least 2000 generated cases plus handpicked cases for all 15
       catalog rules; at least two derived fingerprint cases exist.
-- [ ] Freshness test passes; ruff, ty and typelint are clean for owned paths; gitleaks is
+- [x] Freshness test passes; ruff, ty and typelint are clean for owned paths; gitleaks is
       clean.
-- [ ] Progress Log has hashes, commands, exit codes and log paths.
+- [x] Progress Log has hashes, commands, exit codes and log paths.
 
 ## Progress Log
 
@@ -240,3 +240,166 @@ committed in the continuation checkpoint are kept. Continue with the outstanding
 (generator CLI, all parity fixtures, case builders, freshness test, mutation check and the
 plan's final verification). Re-run every final gate yourself and leave `priorVerification`
 empty; the partial checks of run 1 are superseded.
+
+### Session: 2026-10-30 (run 2, partial)
+**Tasks Completed**: Added a seeded 2,000-input detector case builder using synthetic
+samples and Unicode, keyword, separator and whitespace fragments.
+**Tasks In Progress**: The generator CLI, eight parity fixture families, handpicked rule
+coverage, derived fingerprint search, freshness test, mutation check and full final
+verification remain outstanding. The case builder is not yet connected to a fixture.
+**Blockers**: None identified.
+**Reconciliation requests**: None.
+**Hashes**: `tools/go_police_fixture_cases.py` before=absent
+ after=a5cdc9f086f2c5b3d9a9a504f40f79865c2f465fc0a492d0e2078bd6f5305bfb;
+ `impl-plans/active/gdp-p02-parity-fixtures.md` before=66d67a5d326fd236e6e52256250d8f130d944c567684ec5c25b52fe8ddb08b0d (after hash recorded in session output).
+**Verification**: All logs below are in `tmp/telescreen-gdp-20261030-h2/gdp-p02-parity-fixtures/attempt-1/`.
+`uv run --frozen ruff format --check --no-cache tools/go_police_fixture_cases.py` exit 0 (`format-final.log`);
+`uv run --frozen ruff check --no-cache tools/go_police_fixture_cases.py` exit 0 (`ruff-final.log`);
+`uv run --frozen ty check tools/go_police_fixture_cases.py` exit 0 (`ty-final.log`);
+`uv run --frozen python -c 'from tools.go_police_fixture_cases import generated_detector_cases; a = generated_detector_cases(); assert len(a) == 2000 and a == generated_detector_cases(); print("2 assertions passed")'` exit 0 (`cases-final.log`);
+`uv run --frozen python tools/typelint.py > /tmp/telescreen-gdp-p02-owned-typelint-full.log 2>&1; ! grep -E '^tools/go_police_fixture_cases' /tmp/telescreen-gdp-p02-owned-typelint-full.log` exit 0 (`typelint-final.log`);
+`mise exec -- gitleaks dir --redact --no-banner tools/go_police_fixture_cases.py` exit 0 (`gitleaks-final.log`).
+**Notes**: These scoped checks do not satisfy the plan's final gates. The initial format
+check failed and the file was formatted before the final checks (`format.log`). Formal
+reviews and integration remain downstream.
+
+### Session: 2026-10-30 (run 2, continuation 1)
+**Tasks Completed**: Added Python-reference builders for exposure, MIME matching, line
+segments, detector findings, redaction, masking and fingerprints, including deterministic
+search for two redactor-triggered base fingerprints. Added four focused builder tests and
+corrected existing generator unpack declarations for typelint.
+**Tasks In Progress**: The CLI, full fixture outputs, locator and sheet fixtures, complete
+handpicked detector/sealing coverage, freshness and mutation checks, and final output gates
+remain unfinished. The current tests cover builders, not on-disk freshness.
+**Blockers**: None identified.
+**Reconciliation requests**: None.
+**Hashes**: `tools/gen_go_police_fixtures.py` before=14d55692aa40614c5014776c0000634208e1bd1a2565ba2d726e1b51f8e5e04d after=53f5f0526389311b501c68c35f8d8e40b62dd91de57cbd85eb03c06a3e4cf01d;
+`tools/go_police_fixture_cases.py` before=a5cdc9f086f2c5b3d9a9a504f40f79865c2f465fc0a492d0e2078bd6f5305bfb after=8de9d17a4f7ca8709aae317f49cb6898ee577dd5d4a6b6ff40e0e3c6804f61f5;
+`tests/go_police/test_parity_fixtures_current.py` before=absent after=6cd0368a1a957162640db71d998285fe23ec9c3962c08aca3cb5f3c2bc49d77a;
+`impl-plans/active/gdp-p02-parity-fixtures.md` before=a61e0972dcaac6b4e2ffee0ea6f9397f2cbf6160fc9a373e7963196224f035e7 (after hash recorded in session output).
+**Verification**: Logs are under `tmp/telescreen-gdp-20261030-h2/gdp-p02-parity-fixtures/attempt-2/`.
+`uv run --frozen pytest -p no:cacheprovider tests/go_police/test_parity_fixtures_current.py` exit 0, four passed, zero skipped (`test-final.log`);
+`uv run --frozen ruff format --check --no-cache tools/gen_go_police_fixtures.py tools/go_police_fixture_cases.py tests/go_police` exit 0 (`format-final.log`);
+`uv run --frozen ruff check --no-cache tools/gen_go_police_fixtures.py tools/go_police_fixture_cases.py tests/go_police` exit 0 (`ruff-final.log`);
+`uv run --frozen ty check tools/gen_go_police_fixtures.py tools/go_police_fixture_cases.py tests/go_police/test_parity_fixtures_current.py` exit 0 (`ty-final.log`);
+`uv run --frozen python tools/typelint.py > /tmp/gdp-p02-attempt2-final-typelint.log 2>&1; ! grep -E '/(tools/gen_go_police_fixtures.py|tools/go_police_fixture_cases.py|tests/go_police/)' /tmp/gdp-p02-attempt2-final-typelint.log` exit 0 (`types-final.log`);
+`mise exec -- gitleaks dir --redact --no-banner tools/go_police_fixture_cases.py` exit 0 (`leaks-helper-final.log`);
+`mise exec -- gitleaks dir --redact --no-banner tests/go_police` exit 0 (`leaks-test-final.log`).
+**Notes**: An initial scoped ruff check failed on import order (`ruff.log`); corrected and
+rerun. This is partial implementation and the above tests are not freshness evidence.
+Formal reviews and integration remain downstream.
+
+### Session: 2026-10-30 (run 2, continuation 2)
+**Tasks Completed**: Added generator CLI and eight parity outputs, offline locator and
+Sheets capture, all-rule handpicked cases and an on-disk freshness test. Regeneration
+and check pass; the deliberate one-byte mutation was detected and restored.
+**Tasks In Progress**: The parity gitleaks scan fails; the requested sealing fallback and
+several detailed boundary cases remain to be confirmed. Do not treat this plan as complete.
+**Blockers**: The scan reports 292 matches in generated parity fixtures; inspect synthetic
+fixture representation and resolve without weakening secret detection.
+**Reconciliation requests**: None.
+**Hashes**: `tools/gen_go_police_fixtures.py` before=53f5f0526389311b501c68c35f8d8e40b62dd91de57cbd85eb03c06a3e4cf01d after=e5946b0c1b8ba58e35b53b210d2cbde4a1183aaddb1030bbda39b403455c0529;
+`tools/go_police_fixture_cases.py` before=8de9d17a4f7ca8709aae317f49cb6898ee577dd5d4a6b6ff40e0e3c6804f61f5 after=eea300103de1c8f43e3f366a23f5a81de85636b7deee0011a14d8136ae67b15f;
+`tests/go_police/test_parity_fixtures_current.py` before=6cd0368a1a957162640db71d998285fe23ec9c3962c08aca3cb5f3c2bc49d77a after=b157aa442961b1de8b683620c59987d6557540bae95704d8c9442c8c679c9d4e;
+`impl-plans/active/gdp-p02-parity-fixtures.md` before=e0f1492af05d8f6c94ce5e5f138185d6ec4eb5ee5fbcfd3088b8f7a35fd3e254 (after hash recorded in session output).
+Generated file hashes are recorded in `attempt-3/output-final-hashes.log`; previous table
+hashes and absent fixture state are in `attempt-3/output-before-hashes.log`.
+**Verification**: Logs below are under `tmp/telescreen-gdp-20261030-h2/gdp-p02-parity-fixtures/attempt-3/`.
+`PYTHONDONTWRITEBYTECODE=1 uv run --frozen python tools/gen_go_police_fixtures.py --write` exit 0 (`write-final.log`);
+`PYTHONDONTWRITEBYTECODE=1 uv run --frozen python tools/gen_go_police_fixtures.py --check` exit 0 (`check-final.log`);
+`PYTHONDONTWRITEBYTECODE=1 uv run --frozen pytest -p no:cacheprovider tests/go_police/test_parity_fixtures_current.py` exit 0, five passed, zero skipped (`pytest-final.log`);
+`uv run --frozen ruff format --check --no-cache tools/gen_go_police_fixtures.py tools/go_police_fixture_cases.py tests/go_police` exit 0 (`format-final.log`);
+`uv run --frozen ruff check --no-cache tools/gen_go_police_fixtures.py tools/go_police_fixture_cases.py tests/go_police` exit 0 (`ruff-final.log`);
+`uv run --frozen ty check tools/gen_go_police_fixtures.py tools/go_police_fixture_cases.py tests/go_police/test_parity_fixtures_current.py` exit 0 (`ty-final.log`);
+`PYTHONDONTWRITEBYTECODE=1 uv run --frozen python tools/typelint.py > /tmp/gdp-p02-3-typelint-final2.log 2>&1; ! grep -E '/(tools/gen_go_police_fixtures.py|tools/go_police_fixture_cases.py|tests/go_police/)' /tmp/gdp-p02-3-typelint-final2.log` exit 0 (`typelint-final.log`);
+`mise exec -- gitleaks dir --redact --no-banner go/testdata/parity` exit 1, 292 matches (`gitleaks-parity.log`, redacted detail `gitleaks-report.json`);
+separate scans of generator, case helper, table directory and test directory exit 0 (`gitleaks-generator.log`, `gitleaks-cases.log`, `gitleaks-tables.log`, `gitleaks-tests.log`).
+Mutation control exit 1 as expected and identified only the mutated path (`mutation.log`);
+original bytes restored. Initial generation failures and initial lint failure are retained in
+`write.log`, `write-retry.log`, and `ruff-initial.log`.
+**Notes**: No `src/` files were edited. Formal reviews and integration remain downstream.
+
+### Owner resolution (2026-10-30, run 2): parity fixtures must pass gitleaks
+
+The repository gitleaks scan decodes base64 (and hex and percent-encoding) before matching,
+so base64 alone does not keep synthetic secret samples out of its view: run 2 found 292
+matches in `go/testdata/parity`. Owner decision: keep every `*_b64` field name, but each
+`*_b64` value is now standard padded base64 of the UTF-8 bytes XOR-ed byte by byte with the
+repeating ASCII key `telescreen-go-parity-fixture` (obfuscation, not encryption). This
+applies uniformly to every `*_b64` field in every parity fixture, `key_b64` included. Each
+fixture file carries a top-level `"obfuscation": "xor-v1:telescreen-go-parity-fixture"`
+member, and loaders must reject any other value. Do NOT add a gitleaks allowlist for fixture
+paths and do not weaken any gitleaks rule; the gitleaks scan of `go/testdata/parity` must
+exit 0. Go and Python tests decode with a small local helper (base64 decode, then XOR with
+the same key).
+
+Regenerate every fixture with this encoding, update the freshness test and the case
+helpers, re-run the plan's full final verification including the gitleaks scan of
+`go/testdata/parity`, and leave `priorVerification` empty. Then finish the remaining
+boundary cases and the sealing fallback named in the run-2 session.
+
+### Session: 2026-10-30 (run 2, owner encoding repair)
+**Tasks Completed**: Applied XOR-v1 to every encoded field, added the fixture marker and
+strict Python decode test, added sealing fallback and detector boundary examples, and
+regenerated the fixtures. The freshness test reports six passed and zero skipped.
+**Tasks In Progress**: The required parity secret scan still fails with four
+generic-api-key findings on required `shard_key`, `item_key_b64` and `key_b64` fields.
+The fixed key and computed shard keys are required by this plan; a resolution preserving
+the schema and scanner rules needs owner direction. Other detailed boundary coverage has
+not been independently established as complete.
+**Blockers**: The parity scan exits 1; no allowlist or scanner rule was changed.
+**Reconciliation requests**: Clarify an acceptable fixture representation for the four
+remaining scanner findings while retaining the specified field names and exact values.
+**Hashes**: Before hashes and final generated/source hashes are in
+`tmp/telescreen-gdp-20261030-h2/gdp-p02-parity-fixtures/attempt-4/before-hashes.log`
+and `attempt-4/hashes.log` respectively.
+**Verification**: Logs in `tmp/telescreen-gdp-20261030-h2/gdp-p02-parity-fixtures/attempt-4/`:
+generator `--write` and `--check` exit 0 (`write.log`, `check.log`); scoped ruff format,
+ruff check, ty and typelint exit 0 (`format.log`, `ruff.log`, `ty.log`, `typelint.log`);
+freshness test exits 0 with six passed and zero skipped (`test.log`). Separate gitleaks
+scans of generator, helper, tables and tests exit 0 (`leaks-generator.log`,
+`leaks-cases.log`, `leaks-tables.log`, `leaks-tests.log`); parity scan exits 1 with four
+findings (`leaks-parity.log`, redacted `leaks-report.json`). No `src/` file was changed.
+Formal reviews and integration remain downstream.
+
+### Owner resolution (2026-10-30, run 2, wave 2): remaining gitleaks false positives
+
+The four remaining `generic-api-key` matches (two `shard_key` SHA-256 digests in
+`locators.json`, `item_key_b64` and `key_b64` in `fingerprints.json`) are not secrets. The
+owner added a narrow `[[allowlists]]` entry to `.gitleaks.toml` (`condition = "AND"`: those
+two files AND those exact field patterns only). This refines the earlier "no allowlist"
+wording: path-wide allowlists stay forbidden; field-exact allowlists for provably
+non-secret values follow the existing repository practice. `gitleaks dir <subdir>` does not
+load the repository config, so every gitleaks gate in this plan runs from the repository
+root with `--config .gitleaks.toml` (the pre-commit hook loads it the same way). With that,
+`mise exec -- gitleaks dir --config .gitleaks.toml --redact --no-banner go/testdata/parity`
+exits 0 on the current fixtures. Keep the fixture field names and values unchanged. Re-run
+all final gates and leave `priorVerification` empty.
+
+### Session: 2026-10-31 (run 2, owner scan resolution)
+**Tasks Completed**: Re-generated and checked all fixtures without changing their hashes;
+ran the full scoped gates using the owner-authorized field-specific scanner configuration.
+The prior scanner blocker is resolved. Formal reviews and integration remain downstream.
+**Blockers**: None.
+**Reconciliation requests**: None.
+**Hashes**: Source and generated before and after hashes match in
+`tmp/telescreen-gdp-20261030-h2/gdp-p02-parity-fixtures/attempt-5/before-hashes.log`
+and `attempt-5/after-generation-hashes.log`; the plan before hash is
+`1278cb8b4194cb3db76a4a90a2d9d2bd1c85a54f0d476864f6b0c9b27e2ed8ce`.
+The plan after hash is recorded in `attempt-5/final-hashes.log`.
+**Verification**: All logs below are in `tmp/telescreen-gdp-20261030-h2/gdp-p02-parity-fixtures/attempt-5/`.
+`PYTHONDONTWRITEBYTECODE=1 uv run --frozen python tools/gen_go_police_fixtures.py --write`
+and `--check` exit 0 (`write.log`, `check.log`).
+`uv run --frozen ruff format --check --no-cache tools/gen_go_police_fixtures.py tools/go_police_fixture_cases.py tests/go_police`
+and `uv run --frozen ruff check --no-cache tools/gen_go_police_fixtures.py tools/go_police_fixture_cases.py tests/go_police`
+exit 0 (`format.log`, `ruff.log`).
+`uv run --frozen ty check tools/gen_go_police_fixtures.py tools/go_police_fixture_cases.py tests/go_police/test_parity_fixtures_current.py`
+exits 0 (`ty.log`). `PYTHONDONTWRITEBYTECODE=1 uv run --frozen pytest -p no:cacheprovider tests/go_police/test_parity_fixtures_current.py`
+exits 0 with six passed and zero skipped (`test.log`).
+`uv run --frozen python tools/typelint.py` exits 0; the owned-path filter is empty
+(`typelint-full.log`, `typelint.log`).
+`mise exec -- gitleaks dir --config .gitleaks.toml --redact --no-banner <path>` exits 0
+separately for the generator, case helper, parity directory, tables and tests
+(`leaks-tools_gen_go_police_fixtures.py.log`, `leaks-tools_go_police_fixture_cases.py.log`,
+`leaks-go_testdata_parity.log`, `leaks-go_internal_pytext_data.log`, `leaks-tests_go_police.log`).
+No `src/` file was changed by this plan.

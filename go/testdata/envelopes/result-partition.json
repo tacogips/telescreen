@@ -1,0 +1,1 @@
+{"contract_version":"1.2","task_id":"partition","status":"completed","payload":{"shards":[{"shard_key":"shard-a","descriptor":{"corpus":"drive:example","file_ids":["fileid0001"]},"weight":1},{"shard_key":"shard-b","descriptor":{"corpus":"drive:example","file_ids":["fileid0002"]},"weight":1}],"next_cursor":"page:next","sub_corpora":[]}}

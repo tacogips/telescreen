@@ -1,9 +1,14 @@
 """Generate Python semantics tables and parity fixtures for the Go worker."""
 
+import argparse
+import asyncio
 import re
 import sys
 import unicodedata
 from dataclasses import dataclass
+from pathlib import Path
+
+from telescreen.core.json import JsonValue, dump_json, json_int, json_object, json_str
 
 
 @dataclass(frozen=True)
@@ -72,6 +77,8 @@ def render_tables() -> tuple[GeneratedFile, ...]:
             folds[index].append(code)
     decimal_lines: list[str] = []
     if decimal:
+        start: int
+        value: int
         start, value = decimal[0]
         end: int = start
         last_value: int = value
@@ -110,3 +117,86 @@ def render_tables() -> tuple[GeneratedFile, ...]:
         GeneratedFile(f"go/internal/pytext/data/{name}.txt", header + "\n".join(lines) + "\n")
         for name, lines in zip(names, data, strict=True)
     )
+
+
+def _fixture(
+    name: str, members: tuple[tuple[str, JsonValue], ...], generated: bool = False
+) -> GeneratedFile:
+    version: str = ".".join(str(part) for part in sys.version_info[:3])
+    meta: list[tuple[str, JsonValue]] = [
+        ("python", json_str(version)),
+        ("unidata", json_str(unicodedata.unidata_version)),
+        ("generator", json_str("tools/gen_go_police_fixtures.py")),
+    ]
+    if generated:
+        meta.append(("generated", json_int(2000)))
+    body: str = dump_json(json_object(members))
+    content: str = (
+        '{"meta":'
+        + dump_json(json_object(meta))
+        + ',"obfuscation":"xor-v1:telescreen-go-parity-fixture",'
+        + body[1:]
+        + "\n"
+    )
+    return GeneratedFile(f"go/testdata/parity/{name}.json", content)
+
+
+def render_outputs() -> tuple[GeneratedFile, ...]:
+    """Render the complete Unicode tables and Python-reference parity fixtures."""
+    root: str = str(Path(__file__).resolve().parent.parent)
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    from go_police_fixture_cases import (
+        detector_cases,
+        exposure_cases,
+        fingerprint_cases,
+        line_segment_cases,
+        locator_cases,
+        matching_cases,
+        redactor_cases,
+        sealing_cases,
+        sheet_segment_cases,
+    )
+
+    key: bytes = b"go-parity-fixture-key-0000000000000000"
+    locator: JsonValue = asyncio.run(locator_cases())
+    fingerprints: JsonValue = fingerprint_cases(key)
+    fixtures: tuple[GeneratedFile, ...] = (
+        _fixture("exposure", (("cases", exposure_cases()),)),
+        _fixture("locators", tuple((member.name, member.value) for member in locator.members)),
+        _fixture("matching", (("cases", matching_cases()),)),
+        _fixture(
+            "segments",
+            (("lines", line_segment_cases()), ("sheets", asyncio.run(sheet_segment_cases()))),
+        ),
+        _fixture(
+            "fingerprints", tuple((member.name, member.value) for member in fingerprints.members)
+        ),
+        _fixture("detector", (("cases", detector_cases()),), True),
+        _fixture("sealing", (("cases", sealing_cases(key)),)),
+        _fixture("redactor", (("cases", redactor_cases()),)),
+    )
+    return render_tables() + fixtures
+
+
+def main() -> int:
+    """Write or compare generated files, reporting differing paths only."""
+    parser: argparse.ArgumentParser = argparse.ArgumentParser()
+    modes: argparse._MutuallyExclusiveGroup = parser.add_mutually_exclusive_group(required=True)
+    modes.add_argument("--write", action="store_true")
+    modes.add_argument("--check", action="store_true")
+    args: argparse.Namespace = parser.parse_args()
+    failed: bool = False
+    for output in render_outputs():
+        path: Path = Path(output.path)
+        if args.write:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(output.content, encoding="utf-8")
+        elif not path.exists() or path.read_bytes() != output.content.encode("utf-8"):
+            print(output.path)
+            failed = True
+    return int(failed)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,6 +1,6 @@
 # GDP-P04 Google Service-Account Auth and Drive/Sheets/Admin Clients (Go)
 
-**Status**: Ready
+**Status**: Implementation complete; review pending
 **Run 2**: Re-dispatched 2026-10-30 under `impl-plans/active/telescreen-gdp-20261030-h2-dispatch.json` (supersedes h1; same tasks, wave and writePaths). Evidence goes under `tmp/telescreen-gdp-20261030-h2/gdp-p04-google-clients/attempt-<n>/`. Go caches follow the 2026-10-30 Go ruling in `impl-plans/conventions.md` section 7: never an artifact root, never a blocker. V1 stands: only 404 is gone, 410 is a fetch failure, even though the workflow input text still says otherwise.
 **Design Reference**: design-docs/specs/design-go-gdrive-police.md sections 4, 5 (and 13 V1 withdrawn: 410 is a fetch failure)
 **Created**: 2026-10-30
@@ -159,11 +159,37 @@ All commands exit 0, and the test log shows `ok` for both packages.
 
 ## Completion Criteria
 
-- [ ] Auth, Drive, Sheets and Admin are implemented with the constructors above;
+- [x] Auth, Drive, Sheets and Admin are implemented with the constructors above;
       `types.go` is unchanged.
-- [ ] Every test above passes with `-race`; `vet` and `gofmt` are clean.
-- [ ] Progress Log complete.
+- [x] Every test above passes with `-race`; `vet` and `gofmt` are clean.
+- [x] Progress Log complete.
 
 ## Progress Log
 
 (append sessions per `impl-plans/conventions.md` section 8)
+
+### Session: 2026-10-30 — implementation
+
+Implemented the planned service account token source and Drive, Sheets and Admin clients.
+Only 404 maps to gone; 410 maps to fetch failed. Offline fakes cover the listed behaviors.
+The accepted foundation dependency was admitted by dispatch. Formal reviews are pending.
+
+Owned source files were absent before this session. SHA-256 after implementation:
+
+- `go/internal/googleauth/auth.go`: `383bb6b8cb4689ee7835e59bfacfac45691930f1d430f8b37405ff5dc83e3725`
+- `go/internal/googleauth/auth_test.go`: `5dd122295abce153f968b851cc5c038aaa08d94736443d83d2ac07892a6a220b`
+- `go/internal/gapi/http.go`: `5ff0461dc75fbe042808e2b9179fba2611fcb55bd8dad4b334e2a088aa44c0cc`
+- `go/internal/gapi/drive.go`: `3f066cea881e4074b02c1fcc02538bf9fbee3eec49361f697b3ef34d4de3c0aa`
+- `go/internal/gapi/sheets.go`: `c9cf5138b1788ef3cb4f404fd0d5d9005255d9a2d1853d1173cf4d7290a92c6c`
+- `go/internal/gapi/admin.go`: `42caa7356ab792bcaaf8706a938ff1e5e48c70d18e04dc213aff6aa5a77e48b9`
+- `go/internal/gapi/gapi_test.go`: `a82fd141ac3547669e1878c13c26a9cf6d0805a09da42d09845600c7b6a82a32`
+
+`go/internal/gapi/types.go` was not edited; SHA-256 `195f30cf84bb51132e2a947c39cffaa215532f8c54b4c356c21943e24343f478`. Plan before/after hashes and per-edit intent records are in `tmp/telescreen-gdp-20261030-h2/gdp-p04-google-clients/attempt-1/` and `auth-attempt-1/`.
+
+Final-source verification (shared working tree; logs under `tmp/telescreen-gdp-20261030-h2/gdp-p04-google-clients/attempt-1/`):
+
+- `cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go test -race -count=1 -v ./internal/googleauth/... ./internal/gapi/...`: exit 0, five tests passed, `test-final.log`.
+- `cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go vet ./internal/googleauth/... ./internal/gapi/...`: exit 0, `vet-final.log`.
+- `cd go && test -z "$(mise exec -- gofmt -l internal/googleauth internal/gapi)"`: exit 0, `format-final.log`.
+
+No blockers. Integration and formal reviews are downstream.

@@ -40,3 +40,6 @@ mise.local.toml
 **/node_modules/
 src/web/dist/
 src/web/coverage/
+
+## go
+/go/bin/

@@ -154,12 +154,39 @@ All commands exit 0 and the test log shows `ok .../internal/police`.
 
 ## Completion Criteria
 
-- [ ] Client, worker and backoff are implemented with the exported API above.
-- [ ] Every test case above exists and passes with `-race`; `go vet` and `gofmt` are
+- [x] Client, worker and backoff are implemented with the exported API above.
+- [x] Every test case above exists and passes with `-race`; `go vet` and `gofmt` are
       clean.
-- [ ] `contract.go` is unchanged (hash recorded before and after).
-- [ ] Progress Log complete.
+- [x] `contract.go` is unchanged (hash recorded before and after).
+- [x] Progress Log complete.
 
 ## Progress Log
 
 (append sessions per `impl-plans/conventions.md` section 8)
+
+### Run 2 implementation, 2026-10-30
+
+Implemented the contract client, pull worker, task cancellation, graceful drain and
+transient backoff. The accepted gdp-p01 dependency is admitted by dispatch. The plan
+and design section 3 agree; downstream handler wiring and formal reviews remain with
+their assigned steps. All paths below were absent before this session:
+
+- `go/internal/police/client.go`: after `ebb12c5cef07e231d38e401ddf3f463dff696b41105a867be29920654ce9ecc4`
+- `go/internal/police/client_test.go`: after `5762971b82f95dd4203664bbef59314099e70df39aec91162fc45bf3fca73bc4`
+- `go/internal/police/worker.go`: after `5a5065fecf4caa86486c6629b37f8e282c1007dea27c8ba3c7653bfc1e6f2a93`
+- `go/internal/police/worker_test.go`: after `902f369dee8d9b9d5e04f4b2cb66f4713b81994990076a0d67777bb480ee8060`
+- `go/internal/police/backoff.go`: after `8d228904040153e172c88637fdf44148beb26a942154d47ca1c836047823504b`
+- This plan before: `6fbaa9f73af4683a0ef6524444b82471bbbffc2f313ecaba933efaa464df2617`; its after hash is recorded in `attempt-2/final-hashes.log`.
+- `go/internal/police/contract.go` before and after: `cd1389e775ffd3c1e84d06ecff3ffd460c444f7ae195e34712d954e6b29ad59d`.
+
+Final checks, from `go/`, all exit 0; logs are under
+`tmp/telescreen-gdp-20261030-h2/gdp-p03-police-worker/attempt-2/`:
+
+- `GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go test -race -count=1 -v ./internal/police/...`: 10 top-level tests pass, `test.log`.
+- `GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go vet ./internal/police/...`: `vet.log`.
+- `test -z "$(mise exec -- gofmt -l internal/police)"`: `format.log`.
+
+Earlier interrupted test run and its fake-server correction are retained in
+`attempt-1/test-initial.log` and `attempt-worker-tests/`. Per-edit intentions are in
+`attempt-1/`, `client-agent/` and `attempt-worker-tests/`. Shared tree contains sibling
+changes; none was altered as part of this plan.
