@@ -1,6 +1,6 @@
 # GDP-P03 Police Contract Client and Pull Worker (Go)
 
-**Status**: Ready
+**Status**: Completed (accepted in run 2 at `fb93c5e`, carried as an accepted dependency through h5 at `cae1af3`; archived to `impl-plans/completed/` by the run-5 serial finalization, 2026-10-31)
 **Run 2**: Re-dispatched 2026-10-30 under `impl-plans/active/telescreen-gdp-20261030-h2-dispatch.json` (supersedes h1; same tasks, wave and writePaths). Evidence goes under `tmp/telescreen-gdp-20261030-h2/gdp-p03-police-worker/attempt-<n>/`. Go caches follow the 2026-10-30 Go ruling in `impl-plans/conventions.md` section 7: never an artifact root, never a blocker.
 **Design Reference**: design-docs/specs/design-go-gdrive-police.md section 3 (and 13 V5)
 **Created**: 2026-10-30

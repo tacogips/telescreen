@@ -300,6 +300,17 @@ mode with signed task delivery and callbacks. The standalone Python SDK lives in
 `examples/police/`. Police integrations use the published contract and do not import
 Bureau internals.
 
+An optional Go pull-mode worker, `telescreen-gdrive-police`, covers the same Google Drive
+estate as the built-in `gdrive`, `gdocs` and `gsheets` collectors through contract 1.2. It
+returns masked findings, complete locators, resource exposures and resource inventories,
+and it runs `partition` and `scan_shard` tasks so a `police`-kind collector or a map step
+with `via: police` can sweep a whole domain. It ports only the rule detector (no ML or LLM
+detectors). The Python collector is unchanged and stays the default. Build it with
+`mise run go-build` (output `go/bin/telescreen-gdrive-police`); see
+[`go/README.md`](go/README.md) for configuration, parity and contract gaps G1-G5, and
+[`examples/police/gdrive-go/README.md`](examples/police/gdrive-go/README.md) for enrollment,
+a collector config and a sweep.
+
 The Bureau side is implemented in `telescreen.police` with routes under
 `/api/police/v1` (`workers/register`, `workers/{id}/claim`, `workers/{id}/heartbeat`,
 `tasks/{id}/result`, and `callbacks/{id}`). Bureau components use a `PoliceGateway`
@@ -353,11 +364,16 @@ suite reject models that drift from the design. Install Nodetto and `nodetto-cli
 
 ## Testing and checks
 
-Run the Python format, lint, typing, test, and build gates with:
+Run the Python format, lint, typing, test, and build gates, plus the Go gates
+(`go-lint`, `go-test`, `go-build`) for the Go Drive Police worker, with:
 
 ```bash
 mise run ci
 ```
+
+The Go worker's cross-language checks live in `tests/go_police`: parity fixtures, schema
+validation of Go-produced envelopes, and an offline end-to-end sweep that runs the built
+binary against a real Bureau with fake Google token, Drive, Sheets and Admin servers.
 
 The end-to-end flows live in `tests/e2e`; the raw-value leak matrix over every sink lives
 in `tests/leak`. The v1.1 flows (`tests/e2e/test_flow_v11_*.py`) cover placement policies,

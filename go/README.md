@@ -58,4 +58,8 @@ Python-generated fixtures support parity for the rule detector, masking, exposur
 - G4: the Bureau Redactor can flag hex fingerprints; deterministic re-derivation mitigates rejection.
 - G5: the 1000 complete-locator limit bounds detect; use a sweep for wider coverage.
 
+## Verification
+
+`mise run go-test` runs the Go unit and parity tests offline with `httptest` fakes. From the repository root, `uv run pytest tests/go_police` checks the Python-generated parity fixtures, validates Go-produced envelopes against the contract schemas, and runs an offline end-to-end sweep: it builds `go/bin/telescreen-gdrive-police-e2e` and runs it against the real Bureau app served by uvicorn, with fake Google token, Drive, Sheets and Admin servers. A missing Go toolchain fails the E2E instead of skipping it. Live Google Workspace behavior is not covered.
+
 See the [design](../design-docs/specs/design-go-gdrive-police.md) and [open owner questions](../design-docs/user-qa/pending-go-gdrive-police-contract-gaps.md).

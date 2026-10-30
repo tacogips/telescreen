@@ -4,8 +4,13 @@ An optional Go deployment of the Google Drive collector (`gdrive`, `gdocs`, `gsh
 It runs as a pull-mode Police worker that speaks only Police contract v1.2. The Python
 collector in `src/telescreen/collectors/google/` is unchanged and stays the default.
 
-Status: Draft, 2026-10-30. Issue reference: none. The source is the workflow input
-(execution mode `issue-resolution`).
+Status: Implemented, 2026-10-31 (drafted 2026-10-30). gdp-p01..gdp-p10 are accepted and
+archived under `impl-plans/completed/`. The final manifest is
+`impl-plans/active/telescreen-gdp-20261031-h5-dispatch.json` (kept active as provenance
+with h1-h4; moving them to `impl-plans/completed/dispatch/` is an owner step), and the run-5
+serial finalization records the final local commit on `main` after checkpoint `ce310f5`.
+The literal `mise run ci` is an owner step after the workflow. Issue reference: none. The
+source is the workflow input (execution mode `issue-resolution`).
 
 Run 2 (2026-10-30): continuation under dispatch manifest `telescreen-gdp-20261030-h2`,
 which supersedes `telescreen-gdp-20261030-h1`. The design accepted in run 1 (step3

@@ -40,37 +40,11 @@ Large features are split into multiple related plans with cross-references.
 All plans share `impl-plans/conventions.md` (ownership, typing, verification and
 progress-log rules).
 
-### Go Google Drive Police (gdp: `design-docs/specs/design-go-gdrive-police.md`)
-
-Created 2026-10-30. This is an optional Go pull-mode Police worker
-(`telescreen-gdrive-police`). The Python collector stays the default. Plans in the same
-wave have disjoint write paths. Run 2 dispatches all ten plans under
-[telescreen-gdp-20261030-h2](active/telescreen-gdp-20261030-h2-dispatch.json), which
-supersedes h1 (run 1 blocked in wave 1 on Go caches; see `conventions.md` section 7).
-Run 2 accepted gdp-p01..gdp-p09 at `fb93c5e`. Run 3 dispatches only gdp-p10 under
-[telescreen-gdp-20261031-h3](active/telescreen-gdp-20261031-h3-dispatch.json), which
-supersedes h2. The owner repaired the `go-lint` mise task that blocked gdp-p10 in run 2.
-Run 4 dispatches only gdp-p10 under
-[telescreen-gdp-20261031-h4](active/telescreen-gdp-20261031-h4-dispatch.json), which
-supersedes h3. Run 3 blocked gdp-p10 on the artifact boundary, and the owner resolution is in
-the gdp-p10 Progress Log. gdp-p01..gdp-p09 are accepted at `fd86812`.
-Run 5 dispatches only gdp-p10, as verify-and-complete, under
-[telescreen-gdp-20261031-h5](active/telescreen-gdp-20261031-h5-dispatch.json), which
-supersedes h4. The owner wrote the gdp-p10 E2E after run 4. gdp-p01..gdp-p09 are accepted
-at `cae1af3`.
-
-| Wave | Plan | Depends on |
-|------|------|------------|
-| 1 | [gdp-p01-foundation](active/gdp-p01-foundation.md): Go module, mise gates, vendored x/text, cross-package contracts | - |
-| 1 | [gdp-p02-parity-fixtures](active/gdp-p02-parity-fixtures.md): Python generator, pytext tables, parity fixtures | - |
-| 2 | [gdp-p03-police-worker](active/gdp-p03-police-worker.md): contract client and pull loop | p01 |
-| 2 | [gdp-p04-google-clients](active/gdp-p04-google-clients.md): service-account auth, Drive/Sheets/Admin | p01 |
-| 2 | [gdp-p05-detect-core](active/gdp-p05-detect-core.md): rule detector port | p01, p02 |
-| 2 | [gdp-p06-gdrive-handlers](active/gdp-p06-gdrive-handlers.md): partition, scan_shard, detect, guards | p01, p02 |
-| 2 | [gdp-p07-config-docs](active/gdp-p07-config-docs.md): env config, go/README, examples note | p01 |
-| 3 | [gdp-p08-detect-seal](active/gdp-p08-detect-seal.md): masking, sealing, Redactor, fingerprints, Engine | p02, p05 |
-| 3 | [gdp-p09-envelopes-contract](active/gdp-p09-envelopes-contract.md): envelope goldens and Python schema test | p01, p03 |
-| 4 | [gdp-p10-cmd-e2e](active/gdp-p10-cmd-e2e.md): binary wiring and offline E2E sweep | p02-p09 |
+The gdp dispatch manifests `telescreen-gdp-20261030-h1`, `-h2`,
+`telescreen-gdp-20261031-h3`, `-h4` and `-h5` (`active/telescreen-gdp-*-dispatch.json`)
+stay here as provenance only. Their plans gdp-p01..gdp-p10 are complete and archived (see
+Completed Plans). The workflow archive step moves only `.md` plans, so moving these
+manifests to `completed/dispatch/` is an owner step.
 
 The [inventory and alert boundary plan](active/inventory-alert-boundaries.md) is complete:
 independent persistence, durable handoffs, inventory master authority, owner migrations
@@ -94,6 +68,50 @@ manifests `telescreen-v14-20261013-f1`, `telescreen-v14-20261014-f2` and `-f3`, 
 archived under `completed/dispatch/`.
 
 ## Completed Plans
+
+### Go Google Drive Police (gdp: `design-docs/specs/design-go-gdrive-police.md`)
+
+Created 2026-10-30. This is an optional Go pull-mode Police worker
+(`telescreen-gdrive-police`). The Python collector stays the default. Plans in the same
+wave had disjoint write paths. All 10 plans were archived to `completed/` by the run-5
+serial finalization on 2026-10-31. The h1-h5 dispatch manifests stay in `active/` as
+provenance, because the workflow archive step only moves `.md` plans; moving them to
+`completed/dispatch/` (the svc/v1x precedent) is an owner step. Archiving happened after
+gdp-p10 passed test integrity (comm-000151), adversarial review (comm-000152) and
+integration review (comm-000157) as a verify-and-complete dispatch on checkpoint
+`ce310f5`: verbose Go run 88 PASS / 0 FAIL, `tests/go_police` 18 passed / 0 skipped
+including the offline E2E, and the CI-equivalent sequence with the Go gates and
+`uv build --out-dir /tmp/telescreen-gdp-p10-dist` exit 0. The literal `mise run ci` is an
+owner step after the workflow.
+
+The final manifest is
+[`telescreen-gdp-20261031-h5`](active/telescreen-gdp-20261031-h5-dispatch.json)
+(run 5, base `cae1af3`). It superseded
+[h4](active/telescreen-gdp-20261031-h4-dispatch.json) (run 4, base `fd86812`;
+blocked on a zero-count Go test record, after which the owner wrote the E2E),
+[h3](active/telescreen-gdp-20261031-h3-dispatch.json) (run 3, base `fb93c5e`;
+blocked on the artifact boundary),
+[h2](active/telescreen-gdp-20261030-h2-dispatch.json) (run 2; accepted
+gdp-p01..gdp-p09 at `fb93c5e`; gdp-p10 blocked on the `go-lint` task, which the owner
+repaired) and [h1](active/telescreen-gdp-20261030-h1-dispatch.json) (run 1;
+blocked in wave 1 on Go caches, see `conventions.md` section 7). Owner decision V1
+applies: only 404 is gone, and 410 is a fetch failure. Contract gaps G1-G5 remain open
+owner questions in `design-docs/user-qa/pending-go-gdrive-police-contract-gaps.md`. The
+pre-existing Bureau defects found by the E2E (police 204 null body, SQLite issue-number
+race) are owner follow-ups in design section 15.
+
+| Wave | Plan | Depends on | Accepted at |
+|------|------|------------|-------------|
+| 1 | [gdp-p01-foundation](completed/gdp-p01-foundation.md): Go module, mise gates, vendored x/text, cross-package contracts | - | `fb93c5e` |
+| 1 | [gdp-p02-parity-fixtures](completed/gdp-p02-parity-fixtures.md): Python generator, pytext tables, parity fixtures | - | `fb93c5e` |
+| 2 | [gdp-p03-police-worker](completed/gdp-p03-police-worker.md): contract client and pull loop | p01 | `fb93c5e` |
+| 2 | [gdp-p04-google-clients](completed/gdp-p04-google-clients.md): service-account auth, Drive/Sheets/Admin | p01 | `fb93c5e` |
+| 2 | [gdp-p05-detect-core](completed/gdp-p05-detect-core.md): rule detector port | p01, p02 | `fb93c5e` |
+| 2 | [gdp-p06-gdrive-handlers](completed/gdp-p06-gdrive-handlers.md): partition, scan_shard, detect, guards | p01, p02 | `fb93c5e` |
+| 2 | [gdp-p07-config-docs](completed/gdp-p07-config-docs.md): env config, go/README, examples note | p01 | `fb93c5e` |
+| 3 | [gdp-p08-detect-seal](completed/gdp-p08-detect-seal.md): masking, sealing, Redactor, fingerprints, Engine | p02, p05 | `fb93c5e` |
+| 3 | [gdp-p09-envelopes-contract](completed/gdp-p09-envelopes-contract.md): envelope goldens and Python schema test | p01, p03 | `fb93c5e` |
+| 4 | [gdp-p10-cmd-e2e](completed/gdp-p10-cmd-e2e.md): binary wiring and offline E2E sweep | p02-p09 | run 5 (checkpoint `ce310f5`) |
 
 ### Service split (svc: R1-R8, D1-D5 of `design-docs/specs/design-service-split-requirements.md`)
 
@@ -376,6 +394,10 @@ Only plans from eligible phases should be read to minimize context loading.
 | 30 (svc wave 3) | COMPLETED | Phase 29 |
 | 31 (svc wave 4) | COMPLETED | Phase 30 |
 | 32 (svc wave 5) | COMPLETED | Phase 31 |
+| 33 (gdp wave 1) | COMPLETED | Phase 32 |
+| 34 (gdp wave 2) | COMPLETED | Phase 33 (per-plan dependencies) |
+| 35 (gdp wave 3) | COMPLETED | Phase 34 (per-plan dependencies) |
+| 36 (gdp wave 4) | COMPLETED | Phase 35 |
 
 Run B added `p30-ui-design-system.md` and `p31-ui-mock-api.md` (wave B1, before the
 reworked p12, p13 and p14), split the end-to-end and leak tests into p28b and p28c after
@@ -429,7 +451,12 @@ PHASE_TO_PLANS = {
   29: ["svc-p02-db.md"],
   30: ["svc-p03-publishers.md", "svc-p07-service-runtime.md"],
   31: ["svc-p04-inventory.md", "svc-p05-notification-service.md", "svc-p06-composition.md"],
-  32: ["svc-p08-verification-deploy.md"]
+  32: ["svc-p08-verification-deploy.md"],
+  33: ["gdp-p01-foundation.md", "gdp-p02-parity-fixtures.md"],
+  34: ["gdp-p03-police-worker.md", "gdp-p04-google-clients.md", "gdp-p05-detect-core.md",
+       "gdp-p06-gdrive-handlers.md", "gdp-p07-config-docs.md"],
+  35: ["gdp-p08-detect-seal.md", "gdp-p09-envelopes-contract.md"],
+  36: ["gdp-p10-cmd-e2e.md"]
 }
 ```
 

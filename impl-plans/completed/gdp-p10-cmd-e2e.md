@@ -1,6 +1,6 @@
 # GDP-P10 Binary Wiring (cmd/telescreen-gdrive-police) and Offline End-to-End Sweep Test
 
-**Status**: Ready
+**Status**: Completed (run-5 verify-and-complete under h5 on checkpoint `ce310f5`: Go 88 PASS / 0 FAIL, tests/go_police 18 passed / 0 skipped, CI-equivalent sequence exit 0; adversarial review comm-000152, test integrity comm-000151, integration review comm-000157 accepted; archived to `impl-plans/completed/` by the run-5 serial finalization, 2026-10-31)
 **Run 2**: Re-dispatched 2026-10-30 under `impl-plans/active/telescreen-gdp-20261030-h2-dispatch.json` (supersedes h1; same tasks, wave and writePaths). Evidence goes under `tmp/telescreen-gdp-20261030-h2/gdp-p10-cmd-e2e/attempt-<n>/`. Go caches follow the 2026-10-30 Go ruling in `impl-plans/conventions.md` section 7: never an artifact root, never a blocker; `go/bin` is this plan's only artifact root.
 **Run 3**: Re-dispatched 2026-10-31, alone, under `impl-plans/active/telescreen-gdp-20261031-h3-dispatch.json` (supersedes h2; same tasks and writePaths). gdp-p01..gdp-p09 are accepted dependencies at `fb93c5e`. Evidence goes under `tmp/telescreen-gdp-20261031-h3/gdp-p10-cmd-e2e/attempt-<n>/`, and the h3 manifest's verification log paths replace the `/tmp/telescreen-gdp-p10-*.log` paths below. See the Owner resolution at the end of the Progress Log.
 **Run 4**: Re-dispatched 2026-10-31, alone in wave 1, under `impl-plans/active/telescreen-gdp-20261031-h4-dispatch.json` (supersedes h3; same tasks, writePaths, sharedPaths and artifactRoots). gdp-p01..gdp-p09 are accepted dependencies at `fd86812`. Evidence goes under `tmp/telescreen-gdp-20261031-h4/gdp-p10-cmd-e2e/attempt-<n>/`. Both Owner resolutions at the end of the Progress Log apply. The E2E binary is `go/bin/telescreen-gdrive-police-e2e`, and the CI gate is the `mise run ci` sequence with `uv build --out-dir /tmp/telescreen-gdp-p10-dist`; the literal `mise run ci` is never run.
@@ -259,21 +259,21 @@ Required results:
 
 ## Completion Criteria
 
-- [ ] The binary builds via `mise run go-build`, and the `run` exit codes are tested.
-- [ ] The E2E passes offline and meets every assertion in step 6 and the leak check.
-- [ ] `go-lint`, `go-test`, the `tests/go_police` suite and the CI-equivalent sequence exit 0, with log
+- [x] The binary builds via `mise run go-build`, and the `run` exit codes are tested.
+- [x] The E2E passes offline and meets every assertion in step 6 and the leak check.
+- [x] `go-lint`, `go-test`, the `tests/go_police` suite and the CI-equivalent sequence exit 0, with log
       paths recorded.
-- [ ] Progress Log complete, including the uvicorn-or-fallback decision.
-- [ ] Run 5: verbose Go run exit 0. `testsRun` (`--- PASS:` count) is > 0 and
+- [x] Progress Log complete, including the uvicorn-or-fallback decision.
+- [x] Run 5: verbose Go run exit 0. `testsRun` (`--- PASS:` count) is > 0 and
       `failureCount` (`--- FAIL:` count) is 0, both from `$EV/gotest-v.log`.
-- [ ] Run 5: `tests/go_police -rA` exit 0, 18 passed, 0 skipped.
-- [ ] Run 5: `go/bin` audit recorded: `go1.27.3` and the sha256 of both binaries, rebuilt
+- [x] Run 5: `tests/go_police -rA` exit 0, 18 passed, 0 skipped.
+- [x] Run 5: `go/bin` audit recorded: `go1.27.3` and the sha256 of both binaries, rebuilt
       in this attempt.
-- [ ] Run 5: CI-equivalent sequence exit 0. `mise.toml` is unchanged against `cae1af3`.
+- [x] Run 5: CI-equivalent sequence exit 0. `mise.toml` is unchanged against `cae1af3`.
       There is no `dist/` entry.
-- [ ] Run 5: `gitleaks dir --config .gitleaks.toml` exit 0 for
+- [x] Run 5: `gitleaks dir --config .gitleaks.toml` exit 0 for
       `go/cmd/telescreen-gdrive-police` and `tests/go_police`.
-- [ ] Run 5: a Progress Log session records every command with its exit status and log
+- [x] Run 5: a Progress Log session records every command with its exit status and log
       path, and the pre/post plan hashes. `priorVerification` is empty. Any minimal fix
       lists its failing log and the pre/post file hashes.
 
@@ -375,3 +375,33 @@ the minimal fix. Re-run every final gate from the Verification section yourself 
 counts (Go via the verbose run, pytest with `-rA`), record the `go/bin` audit for both
 binaries, the CI-equivalent sequence and gitleaks, complete the Completion Criteria and
 this Progress Log, and leave `priorVerification` empty.
+
+### Session: 2026-10-31, run 5 verify-and-complete
+
+**Tasks Completed**: Verified committed cmd and owner-written E2E. No source changes or tool installs. The E2E uses `create_app(world.container)` with real `uvicorn.Server` on port 0. Formal review and serial finalization remain downstream.
+
+**Verification**: `EV=tmp/telescreen-gdp-20261031-h5/gdp-p10-cmd-e2e/attempt-1`. All commands below exited 0; logs are under `EV` (status ledger `status.log`).
+
+- `mise run go-lint`: exit 0, `golint.log`.
+- `cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go test -count=1 -v ./...`: exit 0, `gotest-v.log`.
+- `mise run go-build`: exit 0, `gobuild.log`.
+- `mise exec -- go version`: exit 0, `go-version.log`.
+- `uv run --frozen pytest -p no:cacheprovider tests/go_police -rA`: exit 0, `pytest-go-police.log`.
+- `shasum -a 256 go/bin/telescreen-gdrive-police go/bin/telescreen-gdrive-police-e2e`: exit 0, `gobin-sha256.log`.
+- `uv run --frozen ruff format --check --no-cache tests/go_police`: exit 0, `ruff-format.log`.
+- `uv run --frozen ruff check --no-cache tests/go_police`: exit 0, `ruff-check.log`.
+- `uv run --frozen ty check tests/go_police`: exit 0, `ty.log`.
+- `uv run --frozen python tools/typelint.py`: exit 0, `typelint.log`.
+- `! grep -F 'tests/go_police/' $EV/typelint.log`: exit 0, `typelint-scope.log`.
+- `wc -l tests/go_police/e2e_fakes.py tests/go_police/test_gdrive_police_e2e.py go/cmd/telescreen-gdrive-police/*.go`: exit 0, `wc.log`.
+- `test -z "$(git diff --name-only cae1af3 -- mise.toml)"`: exit 0, `mise-diff.log`.
+- `{ mise run fmt-check && mise run lint && mise run typelint && mise run typecheck && mise run go-lint && mise run go-test && mise run go-build && mise run test && uv build --out-dir /tmp/telescreen-gdp-p10-dist; }`: exit 0, `ci.log`.
+- `mise exec -- gitleaks dir --config .gitleaks.toml --redact go/cmd/telescreen-gdrive-police`: exit 0, `gitleaks-cmd.log`.
+- `mise exec -- gitleaks dir --config .gitleaks.toml --redact tests/go_police`: exit 0, `gitleaks-go-police.log`.
+- `git status --porcelain`: exit 0, `git-status.log`.
+
+**Results**: Verbose Go: testsRun 88, failureCount 0 (`gotest-v.log`); the `go-test` in `ci.log` cites those counts. Focused suite: 18 passed, 0 skipped including `test_gdrive_police_e2e` (`pytest-go-police.log`). CI: 1424 passed, 35 skipped, exit 0 (`ci.log`); build output is under `/tmp/telescreen-gdp-p10-dist`. All listed source files are under 1000 lines (`wc.log`); `mise.toml` unchanged and status has no `dist/` entry (`mise-diff.log`, `git-status.log`).
+
+**Binary audit**: `go version go1.27.3 darwin/arm64`; both binaries rebuilt with `-trimpath`, SHA-256 `07c7969d607ad510a5e37ac2bca46b5bd9c5533eb8976ebd8f348ca587d52404` each (`go-version.log`, `gobin-sha256.log`). E2E build is invoked by the focused suite.
+
+**Hashes**: plan before `90540ef705f688ef1901a5081e55b9c8fa199281883b967dd6a0ee5e90edf967`; post-edit hash is recorded in `EV/plan-post.log` (a self-contained file cannot contain its own hash). `priorVerification`: empty.
