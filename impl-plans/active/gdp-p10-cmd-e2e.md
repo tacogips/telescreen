@@ -4,6 +4,7 @@
 **Run 2**: Re-dispatched 2026-10-30 under `impl-plans/active/telescreen-gdp-20261030-h2-dispatch.json` (supersedes h1; same tasks, wave and writePaths). Evidence goes under `tmp/telescreen-gdp-20261030-h2/gdp-p10-cmd-e2e/attempt-<n>/`. Go caches follow the 2026-10-30 Go ruling in `impl-plans/conventions.md` section 7: never an artifact root, never a blocker; `go/bin` is this plan's only artifact root.
 **Run 3**: Re-dispatched 2026-10-31, alone, under `impl-plans/active/telescreen-gdp-20261031-h3-dispatch.json` (supersedes h2; same tasks and writePaths). gdp-p01..gdp-p09 are accepted dependencies at `fb93c5e`. Evidence goes under `tmp/telescreen-gdp-20261031-h3/gdp-p10-cmd-e2e/attempt-<n>/`, and the h3 manifest's verification log paths replace the `/tmp/telescreen-gdp-p10-*.log` paths below. See the Owner resolution at the end of the Progress Log.
 **Run 4**: Re-dispatched 2026-10-31, alone in wave 1, under `impl-plans/active/telescreen-gdp-20261031-h4-dispatch.json` (supersedes h3; same tasks, writePaths, sharedPaths and artifactRoots). gdp-p01..gdp-p09 are accepted dependencies at `fd86812`. Evidence goes under `tmp/telescreen-gdp-20261031-h4/gdp-p10-cmd-e2e/attempt-<n>/`. Both Owner resolutions at the end of the Progress Log apply. The E2E binary is `go/bin/telescreen-gdrive-police-e2e`, and the CI gate is the `mise run ci` sequence with `uv build --out-dir /tmp/telescreen-gdp-p10-dist`; the literal `mise run ci` is never run.
+**Run 5**: Re-dispatched 2026-10-31 as VERIFY-AND-COMPLETE. It runs alone in wave 1 under `impl-plans/active/telescreen-gdp-20261031-h5-dispatch.json`, which supersedes h4; tasks, writePaths, sharedPaths and artifactRoots are unchanged. gdp-p01..gdp-p09 are accepted dependencies at `cae1af3`. All three deliverables are committed at `cae1af3`. Deliverables 2 and 3 were written by the owner; see the run 4 -> run 5 Owner resolution. Do not rewrite working code. Re-run every gate in the Verification section with real counts, record the `go/bin` audit, and complete the Completion Criteria and the Progress Log with `priorVerification` empty. Evidence goes under `tmp/telescreen-gdp-20261031-h5/gdp-p10-cmd-e2e/attempt-<n>/`.
 **Design Reference**: design-docs/specs/design-go-gdrive-police.md sections 2, 3, 8.1, 10, 11, 15, 16
 **Created**: 2026-10-30
 **Last Updated**: 2026-10-31
@@ -12,7 +13,7 @@
 
 - planId: `gdp-p10-cmd-e2e`
 - planPath: `impl-plans/active/gdp-p10-cmd-e2e.md`
-- wave: 1 (h4; it was wave 4 in h1/h2)
+- wave: 1 (h5; also wave 1 in h3/h4; it was wave 4 in h1/h2)
 - dependsOn: `gdp-p02-parity-fixtures`, `gdp-p03-police-worker`, `gdp-p04-google-clients`, `gdp-p05-detect-core`, `gdp-p06-gdrive-handlers`, `gdp-p07-config-docs`, `gdp-p08-detect-seal`, `gdp-p09-envelopes-contract`
   - p02 and p09 are needed because this plan's gates run their tests:
     `tests/go_police/test_parity_fixtures_current.py`,
@@ -57,6 +58,13 @@ Imitate:
 - No change to `mise.toml` (gdp-p01 owns it).
 
 ## Deliverables
+
+Run 5: deliverables 1-3 already exist at `cae1af3`. They are the reference for review, not
+work to redo. Where deliverable 3 below differs from the owner-written test, the owner
+deviations in the run 4 -> run 5 Owner resolution win. If a gate fails, first save the
+failing log under `EV`. Then make the smallest fix inside this plan's writePaths and
+record it with pre/post hashes. Never edit `src/`, the harness or `mise.toml`, and never
+delete or skip an assertion to make a gate pass.
 
 1. `go/cmd/telescreen-gdrive-police/main.go`, plus `run.go` and `run_test.go`:
    - `func run(ctx context.Context, lookup func(string) (string, bool), readFile func(string) ([]byte, error), stderr io.Writer) int`.
@@ -194,35 +202,50 @@ Imitate:
 ```bash
 set -o pipefail
 export PYTHONDONTWRITEBYTECODE=1
-EV=tmp/telescreen-gdp-20261031-h4/gdp-p10-cmd-e2e/attempt-<n>; mkdir -p "$EV"
+EV=tmp/telescreen-gdp-20261031-h5/gdp-p10-cmd-e2e/attempt-<n>; mkdir -p "$EV"
 mise run go-lint > "$EV/golint.log" 2>&1; echo "exit=$?"
-mise run go-test > "$EV/gotest.log" 2>&1; echo "exit=$?"
-mise run go-build > "$EV/gobuild.log" 2>&1; echo "exit=$?"; ls -l go/bin/telescreen-gdrive-police
-mise exec -- go version
-mise exec -- uv run --frozen pytest -p no:cacheprovider tests/go_police -rA 2>&1 | tee "$EV/pytest-go-police.log"; echo "exit=$?"
-shasum -a 256 go/bin/telescreen-gdrive-police go/bin/telescreen-gdrive-police-e2e
-uv run --frozen ruff format --check --no-cache tests/go_police
-uv run --frozen ruff check --no-cache tests/go_police
-uv run --frozen ty check tests/go_police
+(cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go test -count=1 -v ./...) > "$EV/gotest-v.log" 2>&1; echo "exit=$?"
+grep -c -- '--- PASS:' "$EV/gotest-v.log"; grep -c -- '--- FAIL:' "$EV/gotest-v.log"
+mise run go-build > "$EV/gobuild.log" 2>&1; echo "exit=$?"
+mise exec -- go version > "$EV/go-version.log" 2>&1; echo "exit=$?"
+uv run --frozen pytest -p no:cacheprovider tests/go_police -rA > "$EV/pytest-go-police.log" 2>&1; echo "exit=$?"
+shasum -a 256 go/bin/telescreen-gdrive-police go/bin/telescreen-gdrive-police-e2e > "$EV/gobin-sha256.log" 2>&1; echo "exit=$?"
+uv run --frozen ruff format --check --no-cache tests/go_police > "$EV/ruff-format.log" 2>&1; echo "exit=$?"
+uv run --frozen ruff check --no-cache tests/go_police > "$EV/ruff-check.log" 2>&1; echo "exit=$?"
+uv run --frozen ty check tests/go_police > "$EV/ty.log" 2>&1; echo "exit=$?"
 uv run --frozen python tools/typelint.py > "$EV/typelint.log" 2>&1; echo "exit=$?"; ! grep -F 'tests/go_police/' "$EV/typelint.log"
-wc -l tests/go_police/e2e_fakes.py tests/go_police/test_gdrive_police_e2e.py go/cmd/telescreen-gdrive-police/*.go
-test -z "$(git diff --name-only fb93c5e -- mise.toml)"
+wc -l tests/go_police/e2e_fakes.py tests/go_police/test_gdrive_police_e2e.py go/cmd/telescreen-gdrive-police/*.go > "$EV/wc.log"
+test -z "$(git diff --name-only cae1af3 -- mise.toml)"; echo "exit=$?"
 { mise run fmt-check && mise run lint && mise run typelint && mise run typecheck && mise run go-lint && mise run go-test && mise run go-build && mise run test && uv build --out-dir /tmp/telescreen-gdp-p10-dist; } > "$EV/ci.log" 2>&1; echo "exit=$?"
+mise exec -- gitleaks dir --config .gitleaks.toml --redact go/cmd/telescreen-gdrive-police > "$EV/gitleaks-cmd.log" 2>&1; echo "exit=$?"
+mise exec -- gitleaks dir --config .gitleaks.toml --redact tests/go_police > "$EV/gitleaks-go-police.log" 2>&1; echo "exit=$?"
 git status --porcelain > "$EV/git-status.log"; ! grep -E ' dist/' "$EV/git-status.log"
 ```
 
-Run 4 (h4): log paths are under `EV`. The h2 `/tmp/telescreen-gdp-p10-*.log` paths and the
-h3 evidence root are no longer used. Every file in the `wc -l` output must be under 1000
-lines. The `mise.toml` check must print nothing and exit 0. The typelint grep matches
+Run 5 (h5): all log paths are under `EV`. The h1..h4 evidence roots are never cited.
+
+- Go counts follow the 2026-10-31 ruling in `impl-plans/conventions.md` section 7. Record
+  `testsRun` as the `--- PASS:` count, which must be > 0 (owner baseline 88). Record
+  `failureCount` as the `--- FAIL:` count, which must be 0. Never record any Go command
+  with `testsRun: 0`. The `go-test` step inside `ci.log` is cited only with the counts
+  from `gotest-v.log`.
+- The pytest log must show `18 passed` with no `skipped`. `-rA` lists
+  `test_gdrive_police_e2e` as PASSED.
+- `gitleaks dir` runs from the repository root, on this plan's source paths only. Never run
+  it on `.` or `go`, because that would scan the gitignored `go/bin` and `tmp/`.
+  Serial finalization scans the full path list of design section 16.
+- Every file in the `wc -l` output must be under 1000 lines. The `mise.toml` check must print nothing and exit 0. The typelint grep matches
 absolute or relative paths, so a typelint violation in `tests/go_police` fails it. The last
 line is the CI gate: do not run the literal `mise run ci` and do not run `uv build` without
 `--out-dir /tmp/telescreen-gdp-p10-dist`. After the gates, `git status --porcelain` must list
 only this plan's writePaths (the gitignored `go/bin`, `tmp/` and tool caches do not appear),
 and in particular no `dist/` entry.
 
-The `go/bin` artifact audit record goes in the Progress Log: the `go version` output, the
-build command (`mise run go-build`) with its exit code, and the sha256 of
-`go/bin/telescreen-gdrive-police` and `go/bin/telescreen-gdrive-police-e2e`.
+The `go/bin` artifact audit record goes in the Progress Log. It has the `go version` output
+(`go1.27.3`) and the two build commands with their exit codes: `mise run go-build`, and the
+E2E's `go build -trimpath` run by the pytest step. It also has the sha256 of
+`go/bin/telescreen-gdrive-police` and `go/bin/telescreen-gdrive-police-e2e`. Both binaries
+are rebuilt in this attempt; values from earlier runs are not reused.
 
 Required results:
 
@@ -241,6 +264,18 @@ Required results:
 - [ ] `go-lint`, `go-test`, the `tests/go_police` suite and the CI-equivalent sequence exit 0, with log
       paths recorded.
 - [ ] Progress Log complete, including the uvicorn-or-fallback decision.
+- [ ] Run 5: verbose Go run exit 0. `testsRun` (`--- PASS:` count) is > 0 and
+      `failureCount` (`--- FAIL:` count) is 0, both from `$EV/gotest-v.log`.
+- [ ] Run 5: `tests/go_police -rA` exit 0, 18 passed, 0 skipped.
+- [ ] Run 5: `go/bin` audit recorded: `go1.27.3` and the sha256 of both binaries, rebuilt
+      in this attempt.
+- [ ] Run 5: CI-equivalent sequence exit 0. `mise.toml` is unchanged against `cae1af3`.
+      There is no `dist/` entry.
+- [ ] Run 5: `gitleaks dir --config .gitleaks.toml` exit 0 for
+      `go/cmd/telescreen-gdrive-police` and `tests/go_police`.
+- [ ] Run 5: a Progress Log session records every command with its exit status and log
+      path, and the pre/post plan hashes. `priorVerification` is empty. Any minimal fix
+      lists its failing log and the pre/post file hashes.
 
 ## Progress Log
 

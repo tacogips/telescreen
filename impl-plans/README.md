@@ -54,6 +54,10 @@ Run 4 dispatches only gdp-p10 under
 [telescreen-gdp-20261031-h4](active/telescreen-gdp-20261031-h4-dispatch.json), which
 supersedes h3. Run 3 blocked gdp-p10 on the artifact boundary, and the owner resolution is in
 the gdp-p10 Progress Log. gdp-p01..gdp-p09 are accepted at `fd86812`.
+Run 5 dispatches only gdp-p10, as verify-and-complete, under
+[telescreen-gdp-20261031-h5](active/telescreen-gdp-20261031-h5-dispatch.json), which
+supersedes h4. The owner wrote the gdp-p10 E2E after run 4. gdp-p01..gdp-p09 are accepted
+at `cae1af3`.
 
 | Wave | Plan | Depends on |
 |------|------|------------|

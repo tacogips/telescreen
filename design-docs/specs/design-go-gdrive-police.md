@@ -29,6 +29,16 @@ The owner resolution in the gdp-p10 Progress Log settles both: the E2E binary is
 final `mise run build` with `uv build --out-dir /tmp/telescreen-gdp-p10-dist` (section 16).
 The design is otherwise unchanged.
 
+Run 5 (2026-10-31): continuation under dispatch manifest `telescreen-gdp-20261031-h5`,
+which supersedes h4. gdp-p01..gdp-p09 are accepted dependencies at checkpoint `cae1af3`.
+Run 5 dispatches only gdp-p10, as a verify-and-complete task. Run 4 blocked again: gdp-p10
+stopped after a partial session, and `mise run go-test` was recorded with zero tests. The
+owner then wrote the E2E (`tests/go_police/e2e_fakes.py`,
+`tests/go_police/test_gdrive_police_e2e.py`; section 10). The owner also issued the
+2026-10-31 Go test-count ruling (`impl-plans/conventions.md` section 7), which section 16
+now applies. Section 16 also defines the `gitleaks dir` scope. The architecture is
+unchanged.
+
 ## Overview
 
 The Bureau never imports out-of-process code, so this worker reaches it only through the
@@ -631,6 +641,13 @@ Python (`uv run pytest tests/go_police`):
     stdout or stderr.
   - Every wait is bounded, with an overall limit of 180 s. The subprocess is terminated
     in `finally`.
+  - The owner wrote this test and its fakes in run 4 -> run 5. The gdp-p10 Progress Log
+    records the deviations, each stricter than the list above or needed for determinism.
+    The loop also waits for an empty `inventory_outbox`. Configs use
+    `trigger_mode: "event"`. Exposures are checked on the issues of finding-bearing
+    resources. The 404 and trashed files have no issue. The worker exits 0 on SIGTERM.
+    No unexpected fake request is allowed. Those Progress Log entries are the
+    authoritative test contract.
 - Sample secrets come from `tests/support/samples.py` fragments.
 
 New Python files follow `python-coding-standards` and the strict typing rules in
@@ -730,10 +747,12 @@ the default described above and is recorded for the owner in
   the default `GOCACHE`/`GOMODCACHE`, or `/tmp/telescreen-<planId>-gocache` and
   `/tmp/telescreen-gdp-gomodcache`, are user-level caches: they need no `artifactRoots`
   entry and are never a blocker. Only `go/bin` (gdp-p10) is a repository artifact root.
-- `uvicorn` serving the harness app in the test loop is new. If the harness cannot be
-  served this way, the fallback is a dedicated SQLite app built from the same `wiring`.
-  gdp-p10 records the decision in its Progress Log; the real `uvicorn.Server` on port 0 is
-  preferred (owner resolution, run 2 -> run 3).
+- `uvicorn` serving the harness app in the test loop is new. Decided (owner, run 4 -> run
+  5): the real `uvicorn.Server` on port 0 serves `create_app(world.container)` with
+  `lifespan="off"` and `timeout_graceful_shutdown=5`. The fallback app is not used.
+  Remaining risk: E2E flakiness from the asynchronous `inventory_outbox` drain or the
+  SQLite issue-number race below. The owner recorded 13 consecutive passes. A gate failure
+  is fixed minimally in the two E2E files only, never in `src/`.
 - Pre-existing Bureau defects found by the gdp-p10 E2E. They are outside this design's
   scope and remain open owner follow-ups:
   - `src/telescreen/api/routers/police.py` `submit_result` and `callback` return
@@ -752,9 +771,17 @@ The acceptance signals are those of the intake. Evidence is recorded with the fi
 status and the full log path of each command, and only commands that execute tests count:
 
 - `mise run go-lint`
-- `mise run go-test`
+- Go tests, per the 2026-10-31 Go test-count ruling (`impl-plans/conventions.md`
+  section 7). Run `cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go test
+  -count=1 -v ./... > <log> 2>&1`, which must exit 0. Then take
+  `testsRun = grep -c -- '--- PASS:' <log>`, which must be > 0 (owner baseline: 88), and
+  `failureCount = grep -c -- '--- FAIL:' <log>`, which must be 0. `mise run go-test`
+  (also in the CI sequence) may be listed only with the counts from that same verbose
+  log, never with `testsRun: 0`.
 - `mise run go-build`
-- `uv run --frozen pytest -p no:cacheprovider tests/go_police`
+- `uv run --frozen pytest -p no:cacheprovider tests/go_police -rA`: exit 0, 18 passed,
+  0 skipped. This covers the parity fixtures, the envelope contract and the E2E. Counts
+  are taken from the `-rA` summary.
 - `uv run ruff check .`
 - `uv run ruff format --check .`
 - `uv run python tools/typelint.py`
@@ -767,12 +794,23 @@ status and the full log path of each command, and only commands that execute tes
   `dist/`. The workflow does not run the literal `mise run ci` and does not edit
   `mise.toml`; the owner runs the literal `mise run ci` after the workflow.
 - Artifact boundary: the only repository build outputs are `go/bin/telescreen-gdrive-police`
-  and `go/bin/telescreen-gdrive-police-e2e`, each recorded with its sha256. pytest
+  (from `go-build`) and `go/bin/telescreen-gdrive-police-e2e` (from the E2E). Both are built
+  with `-trimpath`. Both are rebuilt in the run, not reused from earlier runs. Each is
+  recorded with its sha256, together with `mise exec -- go version` (`go1.27.3`). pytest
   `tmp_path`, everything under `/tmp`, Go caches and gitignored tool caches
   (`.pytest_cache`, `.ruff_cache`, `__pycache__`, `.venv`) are not artifacts and never block.
 - gitleaks, always from the repository root with `--config .gitleaks.toml` (owner ruling
-  2026-10-30, `impl-plans/conventions.md` section 7). It scans tracked content only, so
-  `tmp/`, `.venv` and the gitignored `go/bin` are never in scope:
+  2026-10-30, `impl-plans/conventions.md` section 7). The allowlist `paths` are
+  root-relative, so they match only from the root. Only tracked gdp content is in scope.
+  `tmp/`, `.venv` and the gitignored `go/bin` are never scanned, so `gitleaks dir` is never
+  run on `.` or `go`:
+  - `mise exec -- gitleaks dir --config .gitleaks.toml --redact <path>`, once for each
+    path that gdp tracks. The paths are `go/cmd`, `go/internal`, `go/testdata`,
+    `go/vendor`, `go/README.md`, `go/go.mod`, `go/go.sum`, `tests/go_police`,
+    `tools/gen_go_police_fixtures.py`, `tools/go_police_fixture_cases.py`,
+    `examples/police/gdrive-go`, `design-docs/specs/design-go-gdrive-police.md` and
+    `design-docs/user-qa/pending-go-gdrive-police-contract-gaps.md`. Run them after the
+    docs edits and before staging. Each must exit 0;
   - `mise exec -- gitleaks git --config .gitleaks.toml --pre-commit --staged --redact`, on
     the staged changes before the commit;
   - `mise exec -- gitleaks git --config .gitleaks.toml --redact --log-opts=ae4ba45..HEAD`
