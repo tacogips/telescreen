@@ -168,6 +168,13 @@ of these needs an `artifactRoots` entry, none is tracked by fanout change tracki
 none is ever a reason to report a blocker. `go/vendor` is committed source, not an
 artifact. Repository-internal generated output (for example `go/bin`) still needs its
 declared artifact root.
+Owner ruling (2026-10-31, Go test counts): plain `go test` and `mise run go-test` print no
+test count, so the progress gate treats such a record as a zero-count test run and blocks
+the plan. Record Go behavioral verification with a verbose run and real counts:
+`cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go test -count=1 -v ./... > <log> 2>&1`,
+then `testsRun` = `grep -c -- '--- PASS:' <log>` and `failureCount` = `grep -c -- '--- FAIL:' <log>`
+(subtests included). `mise run go-test` may still be run, but list it only with those counts
+taken from the same verbose log, never with `testsRun: 0`.
 Owner ruling (2026-10-30, synthetic secrets): gitleaks decodes base64, hex and percent
 encoding, so committed test data must never hold a secret-shaped sample in those forms. Use
 the parity fixture `xor-v1` encoding (`design-go-gdrive-police.md` section 9.5) or build

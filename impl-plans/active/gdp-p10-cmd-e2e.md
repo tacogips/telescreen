@@ -291,3 +291,52 @@ runs `uv build` into `dist/`. Owner amendments (already applied above):
 
 Re-run every gate yourself and leave `priorVerification` empty.
 
+
+### Session: 2026-10-31 (run 4, partial)
+**Tasks Completed**: Rechecked the existing command package. The focused exit-code test, Go lint, Go test and Go build passed.
+**Tasks In Progress**: The fake estate and offline three-sweep E2E are not yet implemented. The uvicorn decision, E2E binary audit and remaining required gates are outstanding.
+**Blockers**: None identified; implementation remains incomplete.
+**Verification**: `mise run go-lint`, `mise run go-test`, `mise run go-build`, and `mise exec -- go version` exited 0; logs: `tmp/telescreen-gdp-20261031-h4/gdp-p10-cmd-e2e/attempt-1/{golint,gotest,gobuild,go-version}.log`. From `go/`, `GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go test -v ./cmd/telescreen-gdrive-police` exited 0 (one test; `attempt-1/cmd-test.log`). Go version: `go1.27.3 darwin/arm64`; built binary SHA-256: `8a1b8da700b8f42568fcbfcc7bfa5f9af7bf5956f1b87a71f0fae2f0340b0e55`.
+**Hashes**: Plan before `8e066df37c091b0fa36c7b63d8087e37acd0c7a616ec3a5742297deeb773c64a`; post-edit hash recorded in `attempt-1/plan-after.sha256`.
+**Notes**: Formal reviews, documentation finalization, archive and commit belong to downstream workflow steps.
+
+### Owner resolution (2026-10-31, run 4 -> run 5): E2E authored by the owner; verify and finalize
+
+Run 4 ended blocked-only again: the plan stopped after a partial session (cmd package
+re-checked, fake estate and E2E not written), and the gate rejected `mise run go-test`
+recorded with `testsRun: 0` (see the 2026-10-31 Go test-count ruling in
+`impl-plans/conventions.md` section 7). Because a lone incomplete plan cannot be
+redispatched within a run, the owner wrote deliverables 2 and 3:
+
+- `tests/go_police/e2e_fakes.py` (fake token, Drive, Sheets and Admin server on one
+  `ThreadingHTTPServer`, frozen `FakeEstate`, runtime RSA key, JWT verification of
+  signature, audience, issuer, scope and subject, unexpected-request log).
+- `tests/go_police/test_gdrive_police_e2e.py` (one async test, steps 1-8).
+
+Decision: the real `uvicorn.Server` on port 0 serves `create_app(world.container)`, so the
+fallback app is not used. `lifespan="off"` (the harness never runs the lifespan, and it
+would close the container twice), `timeout_graceful_shutdown=5`.
+
+Deviations from step 6, all stricter or required for determinism: the loop also waits for
+an empty `inventory_outbox` (inventory delivery is asynchronous); the configs use
+`trigger_mode: "event"` so no cron `detect` runs; exposures are checked on the issues of
+resources that have findings (text file `anyone_with_link`, Doc `external_shared`, Sheet
+`domain`); the 404 and trashed files have no issue at all; additional checks: one
+succeeded shard per job with `resources_failed = 0`, no `failed_shards`, no audit
+`dropped` counts, no `result rejected` in worker output, worker exit 0 on SIGTERM, no
+unexpected fake requests.
+
+Owner verification (2026-10-31): `uv run --frozen pytest -p no:cacheprovider tests/go_police -rA`
+exit 0, 18 passed, 0 skipped, twice (E2E about 8-10 s; 13 consecutive E2E passes during
+authoring); ruff format/check, ty and the typelint grep clean; gitleaks with
+`--config .gitleaks.toml` on `tests/go_police` exit 0; verbose Go tests 88 passed, 0 failed.
+
+Pre-existing Bureau defects found by the E2E are recorded in design section 15 as owner
+follow-ups (police 204 responses with a `null` body; SQLite-only issue-number race). They
+are outside this plan's writePaths: do not edit `src/`.
+
+Run 5 instructions: do NOT rewrite the two E2E files unless a gate fails, and then only
+the minimal fix. Re-run every final gate from the Verification section yourself with real
+counts (Go via the verbose run, pytest with `-rA`), record the `go/bin` audit for both
+binaries, the CI-equivalent sequence and gitleaks, complete the Completion Criteria and
+this Progress Log, and leave `priorVerification` empty.

@@ -734,6 +734,17 @@ the default described above and is recorded for the owner in
   served this way, the fallback is a dedicated SQLite app built from the same `wiring`.
   gdp-p10 records the decision in its Progress Log; the real `uvicorn.Server` on port 0 is
   preferred (owner resolution, run 2 -> run 3).
+- Pre-existing Bureau defects found by the gdp-p10 E2E. They are outside this design's
+  scope and remain open owner follow-ups:
+  - `src/telescreen/api/routers/police.py` `submit_result` and `callback` return
+    `JSONResponse(status_code=204, content=None)`, whose body is `null`. A real HTTP server
+    (uvicorn/h11) then logs `Too much data for declared Content-Length` and drops the
+    connection. The result is committed first, so workers are unaffected; the fix is
+    `Response(status_code=204)`.
+  - `IssueRepository.next_issue_number` relies on `SELECT ... FOR UPDATE`, which SQLite
+    ignores. Concurrent results on the SQLite harness can hit `UNIQUE constraint failed:
+    issues.number` (HTTP 500); the Go worker retries and succeeds. PostgreSQL is not
+    affected.
 
 ### 16. Acceptance and verification
 
