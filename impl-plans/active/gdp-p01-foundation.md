@@ -317,3 +317,14 @@ Record in the Progress Log:
 ## Progress Log
 
 (append sessions per `impl-plans/conventions.md` section 8)
+
+### Owner resolution (2026-10-30): Go caches are not artifacts
+
+The first dispatch of this plan blocked because the default `GOCACHE`
+(`~/Library/Caches/go-build`) and `GOMODCACHE` (`~/go/pkg/mod`) lie outside the declared
+artifact roots. Owner decision: these are user-level tool caches outside the repository,
+like the uv cache, and need no `artifactRoots` entry (see the 2026-10-30 Go ruling in
+`impl-plans/conventions.md` section 7). Proceed with the plan as written. You may keep the
+default caches or set `GOCACHE=/tmp/telescreen-gdp-p01-foundation-gocache` and
+`GOMODCACHE=/tmp/telescreen-gdp-gomodcache`. Do not report this as a blocker again, and do
+not list the earlier blocked attempt in `priorVerification`.

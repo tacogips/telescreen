@@ -213,3 +213,29 @@ with this version, run it once per path and record each run.
 ## Progress Log
 
 (append sessions per `impl-plans/conventions.md` section 8)
+
+### Session: 2026-10-30
+**Tasks Completed**: Implemented Unicode table rendering and generated eight table files.
+**Tasks In Progress**: Generator CLI and all eight parity fixtures, case builders, freshness
+ test, mutation check, and required final verification remain outstanding.
+**Blockers**: None identified.
+**Reconciliation requests**: None.
+**Hashes**: `tools/gen_go_police_fixtures.py` before=absent after=14d55692aa40614c5014776c0000634208e1bd1a2565ba2d726e1b51f8e5e04d.
+Table files before=absent; after SHA-256: casefold=0d4787463413685cae064def829ef16b34e6c2de1aed7e77a940de0b3305366c, decimal=9ede9ee34855cffc330a4ccb45107e8b992d5b86ea9b0604bdedcac1e7150a81, digit=ea61b4f89b20f3976ba413b87d5fa77f02bee209c1a5c42265ed390a19bf50b7, ignorecase=e516e40a802fc5a876ad2acfc183231a7834428c252c9765b838f533acbfa6b2, linebreak=54e5ecc81e97beb6fda560e843a986b79ed0ecff4893d8f248bb13ae47532bd1, lower=245aec7f7796ffc98922c6d9562586d280402d9b4121910d56a6c34afbc9ff08, space=f6f650ca9a50a889feaf6f47539644c84fc0fb7850e5a4fb051b63e4b3b2cea9, word=c2185d10e53198fa3070b80cc461ff71bea77d8d3fda984e9a221fad2e8ded3f.
+**Verification**: Scoped ruff and ty checks exit 0; owned-path typelint filter exit 0;
+regeneration comparison exit 0 for eight tables. Logs under
+`tmp/telescreen-gdp-20261030-h1/gdp-p02-parity-fixtures/` named `ruff.log`, `ty.log`,
+`typelint.log`, and `table-freshness.log` respectively. These are partial checks, not the
+plan's final gates. Initial ruff failed on line length, corrected by scoped formatting
+(`ruff-initial.log`).
+**Notes**: Python 3.12.13, Unicode 15.0.0. Formal reviews and integration are downstream.
+
+### Owner resolution (2026-10-30): continue from the partial session
+
+Run 1 ended before this plan finished; the wave was blocked by gdp-p01 (Go cache policy,
+now resolved by the 2026-10-30 Go ruling in `impl-plans/conventions.md` section 7). The
+generator's Unicode table rendering and the eight `go/internal/pytext/data/*.txt` tables
+committed in the continuation checkpoint are kept. Continue with the outstanding work
+(generator CLI, all parity fixtures, case builders, freshness test, mutation check and the
+plan's final verification). Re-run every final gate yourself and leave `priorVerification`
+empty; the partial checks of run 1 are superseded.

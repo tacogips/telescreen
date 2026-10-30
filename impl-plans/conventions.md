@@ -160,6 +160,14 @@ Owner ruling (2026-10-08): `/tmp/telescreen-<planId>-*` paths are outside the re
 outside fanout change tracking. Writing build outputs and logs there is always permitted,
 needs no `artifactRoots` entry, and is never a reason to report a blocker. Never run `bun run build` into
 `src/web/dist`: use `bun run build --outDir /tmp/telescreen-<planId>-web --emptyOutDir`.
+Owner ruling (2026-10-30, Go): the Go toolchain installed by mise, the default `GOCACHE`
+(`~/Library/Caches/go-build`) and `GOMODCACHE` (`~/go/pkg/mod`) are user-level tool
+caches outside the repository, exactly like the uv cache. Go plans may use them as is, or
+point them at `/tmp/telescreen-<planId>-gocache` and `/tmp/telescreen-gdp-gomodcache`. None
+of these needs an `artifactRoots` entry, none is tracked by fanout change tracking, and
+none is ever a reason to report a blocker. `go/vendor` is committed source, not an
+artifact. Repository-internal generated output (for example `go/bin`) still needs its
+declared artifact root.
 
 Record in the Progress Log for every command: the command, exit status and log path. An
 incomplete log is not a pass.
