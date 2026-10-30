@@ -2,6 +2,7 @@
 
 **Status**: Ready
 **Run 2**: Re-dispatched 2026-10-30 under `impl-plans/active/telescreen-gdp-20261030-h2-dispatch.json` (supersedes h1; same tasks, wave and writePaths). Evidence goes under `tmp/telescreen-gdp-20261030-h2/gdp-p10-cmd-e2e/attempt-<n>/`. Go caches follow the 2026-10-30 Go ruling in `impl-plans/conventions.md` section 7: never an artifact root, never a blocker; `go/bin` is this plan's only artifact root.
+**Run 3**: Re-dispatched 2026-10-31, alone, under `impl-plans/active/telescreen-gdp-20261031-h3-dispatch.json` (supersedes h2; same tasks and writePaths). gdp-p01..gdp-p09 are accepted dependencies at `fb93c5e`. Evidence goes under `tmp/telescreen-gdp-20261031-h3/gdp-p10-cmd-e2e/attempt-<n>/`, and the h3 manifest's verification log paths replace the `/tmp/telescreen-gdp-p10-*.log` paths below. See the Owner resolution at the end of the Progress Log.
 **Design Reference**: design-docs/specs/design-go-gdrive-police.md sections 2, 3, 8.1, 10, 11, 15, 16
 **Created**: 2026-10-30
 **Last Updated**: 2026-10-30
@@ -189,18 +190,25 @@ Imitate:
 ```bash
 set -o pipefail
 export PYTHONDONTWRITEBYTECODE=1
-mise run go-lint > /tmp/telescreen-gdp-p10-golint.log 2>&1; echo "exit=$?"
-mise run go-test > /tmp/telescreen-gdp-p10-gotest.log 2>&1; echo "exit=$?"
-mise run go-build > /tmp/telescreen-gdp-p10-gobuild.log 2>&1; echo "exit=$?"; ls -l go/bin/telescreen-gdrive-police
+EV=tmp/telescreen-gdp-20261031-h3/gdp-p10-cmd-e2e/attempt-<n>; mkdir -p "$EV"
+mise run go-lint > "$EV/golint.log" 2>&1; echo "exit=$?"
+mise run go-test > "$EV/gotest.log" 2>&1; echo "exit=$?"
+mise run go-build > "$EV/gobuild.log" 2>&1; echo "exit=$?"; ls -l go/bin/telescreen-gdrive-police
 mise exec -- go version
 shasum -a 256 go/bin/telescreen-gdrive-police
-mise exec -- uv run --frozen pytest -p no:cacheprovider tests/go_police -rA 2>&1 | tee /tmp/telescreen-gdp-p10-pytest.log; echo "exit=$?"
+mise exec -- uv run --frozen pytest -p no:cacheprovider tests/go_police -rA 2>&1 | tee "$EV/pytest-go-police.log"; echo "exit=$?"
 uv run --frozen ruff format --check --no-cache tests/go_police
 uv run --frozen ruff check --no-cache tests/go_police
 uv run --frozen ty check tests/go_police
-uv run --frozen python tools/typelint.py > /tmp/telescreen-gdp-p10-typelint.log 2>&1; grep -E '^tests/go_police' /tmp/telescreen-gdp-p10-typelint.log
-mise run ci > /tmp/telescreen-gdp-p10-ci.log 2>&1; echo "exit=$?"
+uv run --frozen python tools/typelint.py > "$EV/typelint.log" 2>&1; ! grep -E '^tests/go_police' "$EV/typelint.log"
+wc -l tests/go_police/e2e_fakes.py tests/go_police/test_gdrive_police_e2e.py go/cmd/telescreen-gdrive-police/*.go
+test -z "$(git diff --name-only fb93c5e -- mise.toml)"
+mise run ci > "$EV/ci.log" 2>&1; echo "exit=$?"
 ```
+
+Run 3 (h3): log paths are under `EV`. The `/tmp/telescreen-gdp-p10-*.log` paths from h2
+are no longer used. Every file in the `wc -l` output must be under 1000 lines. The
+`mise.toml` check must print nothing and exit 0.
 
 The `go/bin` artifact audit record goes in the Progress Log: the `go version` output, the
 build command (`mise run go-build`) with its exit code, and the sha256 of

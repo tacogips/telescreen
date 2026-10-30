@@ -47,6 +47,9 @@ Created 2026-10-30. This is an optional Go pull-mode Police worker
 wave have disjoint write paths. Run 2 dispatches all ten plans under
 [telescreen-gdp-20261030-h2](active/telescreen-gdp-20261030-h2-dispatch.json), which
 supersedes h1 (run 1 blocked in wave 1 on Go caches; see `conventions.md` section 7).
+Run 2 accepted gdp-p01..gdp-p09 at `fb93c5e`. Run 3 dispatches only gdp-p10 under
+[telescreen-gdp-20261031-h3](active/telescreen-gdp-20261031-h3-dispatch.json), which
+supersedes h2. The owner repaired the `go-lint` mise task that blocked gdp-p10 in run 2.
 
 | Wave | Plan | Depends on |
 |------|------|------------|

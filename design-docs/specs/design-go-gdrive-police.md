@@ -13,6 +13,13 @@ comm-000006) is reused unchanged. Run 1 blocked in wave 1 on Go toolchain caches
 owner ruling of 2026-10-30 in `impl-plans/conventions.md` section 7 settles (see section 15,
 Toolchain).
 
+Run 3 (2026-10-31): continuation under dispatch manifest `telescreen-gdp-20261031-h3`,
+which supersedes h2. Run 2 accepted gdp-p01..gdp-p09 at checkpoint `fb93c5e`, and they are
+accepted dependencies. Run 3 dispatches only gdp-p10. Run 2 blocked gdp-p10 because mise
+rejected the Go template in the `go-lint` task. The owner has repaired the task (section 11),
+and `mise.toml` is not edited in run 3. The design is otherwise unchanged; section 16 now
+names the gitleaks commands that the 2026-10-30 owner ruling requires.
+
 ## Overview
 
 The Bureau never imports out-of-process code, so this worker reaches it only through the
@@ -625,8 +632,10 @@ New Python files follow `python-coding-standards` and the strict typing rules in
   - `[tools] go = "1.27.3"`.
   - Tasks run in `dir = "go"` with `GOTOOLCHAIN=local` and `GOFLAGS=-mod=vendor`:
     - `go-test`: `go test ./...`.
-    - `go-lint`: fails if `gofmt -l` lists any file in `go list -f '{{.Dir}}' ./...`
-      (vendor excluded), then runs `go vet ./...`.
+    - `go-lint`: fails if `gofmt -l` lists any `*.go` file found by `find .` outside
+      `./vendor` and `./bin`, then runs `go vet ./...`. (Owner repair, 2026-10-31: mise
+      renders task scripts with Tera, so a Go template such as `{{.Dir}}` must not appear
+      in a task script.)
     - `go-build`: `go build -trimpath -o bin/telescreen-gdrive-police
       ./cmd/telescreen-gdrive-police`.
   - `[tasks.ci]` becomes `fmt-check && lint && typelint && typecheck && go-lint &&
@@ -729,7 +738,17 @@ status and the full log path of each command, and only commands that execute tes
 - `uv run python tools/typelint.py`
 - `uv run ty check`
 - `mise run ci`
-- `mise exec -- pre-commit run gitleaks`, on the staged changes before commit
+- gitleaks, always from the repository root with `--config .gitleaks.toml` (owner ruling
+  2026-10-30, `impl-plans/conventions.md` section 7). It scans tracked content only, so
+  `tmp/`, `.venv` and the gitignored `go/bin` are never in scope:
+  - `mise exec -- gitleaks git --config .gitleaks.toml --pre-commit --staged --redact`, on
+    the staged changes before the commit;
+  - `mise exec -- gitleaks git --config .gitleaks.toml --redact --log-opts=ae4ba45..HEAD`
+    after the commit. This covers every gdp commit (`70f77b8` onward) and the new one, and
+    must exit 0;
+  - `mise exec -- gitleaks git --config .gitleaks.toml --redact`, the whole repository
+    history. A finding only in a commit at or before `ae4ba45` predates gdp: record its
+    rule id and commit as pre-existing; it does not block run 3.
 
 ## References
 
