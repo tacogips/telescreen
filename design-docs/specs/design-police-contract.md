@@ -251,6 +251,9 @@ responses against the same schema files and the shared examples.
   `verify_remediation` by querying a local SQLite database (path from env) for the table and
   column named in `display_locator` (`sqlite://<table>/<column>`), checks values locally with
   its own regexes, and reports masked findings. README explains enrollment and running.
+- `go/` (`telescreen-gdrive-police`) and `examples/police/gdrive-go/README.md`: optional
+  Go pull-mode Police worker for Google Drive, Docs and Sheets. It handles `detect`,
+  `partition` and `scan_shard` and sends 1.2 envelopes. See `design-go-gdrive-police.md`.
 - `examples/police/n8n/telescreen-push-police.json`: importable workflow: Webhook trigger
   (POST, raw body) -> Crypto (HMAC-SHA256 of `timestamp.nonce.body`) -> IF signature valid
   -> Respond to Webhook 202 -> Code/HTTP nodes performing the check -> Crypto (sign callback)

@@ -481,6 +481,7 @@ gitleaks pre-commit hook does not flag committed sources.
 | `design-docs/specs/design-workflow-engine.md` | Workflow DSL v1, node types, engine durability, escalation |
 | `design-docs/specs/design-police-contract.md` | Police contract v1, pull/push, signing, SDK, n8n |
 | `design-docs/specs/design-map-reduce-sweeps.md` | Concurrent map-reduce sweeps: partition/map/reduce, `map` step, Police sweep tasks, quotas |
+| `design-docs/specs/design-go-gdrive-police.md` | Optional Go Google Drive collector as a pull-mode Police contract 1.2 worker: handlers, rule-detector port, parity fixtures, guards, divergences, contract gaps |
 | `design-docs/specs/design-synthetic-test-dataset.md` | Approved synthetic test dataset sources, fictitious-value rules, labeled corpus generator (follow-up) |
 | `design-docs/specs/design-ui-sentry.md` | Sentry-based UI: tokens, components, shell, issue list/detail and page patterns, licensing constraints |
 | `design-docs/specs/design-v1-1-dspm-adoption.md` | v1.1 gap analysis against comparable DSPM/DLP systems and adopted features F1-F10 (exposure, placement policies, verified resolution, coverage, owner routing, health, linked occurrences, risk score, exceptions) |

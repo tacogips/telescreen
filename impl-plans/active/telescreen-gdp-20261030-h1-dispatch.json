@@ -1,0 +1,451 @@
+{
+  "taskId": "telescreen-gdp-20261030-h1",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "ae4ba454998b884dc54fd8359a135bb2120469d9",
+  "originalHeadNotes": "Intake on main at ae4ba45 (workflowExecutionId opus-terra-design-and-implement-review-loop-session-1). The design was accepted by step3 (comm-000006) and all ten plans by step5-impl-plan-review (comm-000010), with no open high or mid findings. The planning commit on top of ae4ba45 contains this manifest, the gdp design, the user-qa gap file, the gdp index pointers in architecture.md, design-police-contract.md and design-docs/user-qa/README.md, the impl-plans/README.md gdp index and the ten gdp plans. gitPush is false: do not push.",
+  "evidenceRoot": "tmp/telescreen-gdp-20261030-h1",
+  "evidenceRootNotes": "Untracked (gitignored by **/tmp); never staged or committed. Use tmp/telescreen-gdp-20261030-h1/<planId>/attempt-<n>/. Command logs go to /tmp/telescreen-gdp-pNN-*.log as named in each plan's Verification section (conventions section 7).",
+  "designDocPaths": [
+    "design-docs/specs/design-go-gdrive-police.md",
+    "design-docs/user-qa/pending-go-gdrive-police-contract-gaps.md",
+    "design-docs/specs/design-police-contract.md",
+    "design-docs/specs/architecture.md",
+    "design-docs/user-qa/README.md"
+  ],
+  "planIndexPath": "impl-plans/README.md",
+  "conventionsPath": "impl-plans/conventions.md",
+  "waves": [
+    {"id": "1", "plans": ["gdp-p01-foundation", "gdp-p02-parity-fixtures"], "notes": "p01 creates the Go module, mise gates, vendored x/text and the cross-package contract types. p02 writes the Python generator, pytext tables and parity fixtures. No Go code in p02."},
+    {"id": "2", "plans": ["gdp-p03-police-worker", "gdp-p04-google-clients", "gdp-p05-detect-core", "gdp-p06-gdrive-handlers", "gdp-p07-config-docs"], "notes": "Disjoint files; each plan codes only against the gdp-p01 interfaces. Package-scoped Go gates only. Transient cross-package compile coupling is a known low residual (GDP-R5-L1)."},
+    {"id": "3", "plans": ["gdp-p08-detect-seal", "gdp-p09-envelopes-contract"], "notes": "p08 re-runs the gdp-p05 detector parity tests."},
+    {"id": "4", "plans": ["gdp-p10-cmd-e2e"], "notes": "Sole plan in the wave. Runs the module-wide gates (go-lint, go-test, go-build, the tests/go_police suite, mise run ci)."},
+    {"id": "finalize", "serial": true, "dependsOn": ["4"]}
+  ],
+  "sharedFileOwnership": {
+    "rule": "Every plan's writePaths are disjoint from every other plan's, and sharedPaths is empty for all plans. Only gdp-p01 may run go get, go mod tidy or go mod vendor, or edit go/go.mod, go/go.sum, go/vendor, mise.toml and .gitignore. Other plans that need a module or tooling change write a Reconciliation request. Workers never edit this manifest, impl-plans/README.md, design-docs/**, src/**, db/**, tests/e2e/harness.py, the contract schemas, pyproject.toml or uv.lock, and never run git checkout, restore, stash, reset, clean, commit, add or push. Per-edit discipline: read the file fresh before each edit, record pre/post SHA-256 under the evidence root, and file a Reconciliation request instead of overwriting a file whose hash changed outside the worker's own edits.",
+    "dependencies": "The only Go dependency is golang.org/x/text, pinned and vendored by gdp-p01. No Python dependency or lockfile change.",
+    "reconciliation": "A defect in another plan's file is a Reconciliation request in the reporting plan's Progress Log, reproduced by a failing test id. Serial finalization reproduces it and fixes the root cause in the owning plan's paths."
+  },
+  "serialFinalization": {
+    "when": "After gdp-p10-cmd-e2e is integration-accepted.",
+    "steps": [
+      "Resolve any Reconciliation requests recorded in the gdp plan Progress Logs (reproduce first; fix at the root cause).",
+      "Set the design status line to implemented, update the impl-plans/README.md gdp section, and archive the gdp plans and this manifest to impl-plans/completed only if the workflow finalization calls for it.",
+      "Rerun on the final tree: mise run go-lint, mise run go-test, mise run go-build, the tests/go_police suite and mise run ci. Record exit codes, counts and full log paths. Run the gitleaks pre-commit hook on the staged changes.",
+      "Commit only gdp-scoped files (no tmp/, go/bin/ or unrelated files). Do not push (gitPush false)."
+    ]
+  },
+  "reviewContext": {
+    "issueReference": "none (no issueUrl, issueNumber or issueRepository); runtimeVariables.workflowInput of opus-terra-design-and-implement-review-loop-session-1 is the authoritative intake. Design accepted by step3 comm-000006; plans accepted by step5-impl-plan-review comm-000010.",
+    "userProblem": "Telescreen has a Python Google Drive collector (src/telescreen/collectors/google/). The owner wants an optional Go version that covers the same Drive estate (gdrive files, Google Docs exported as text, Google Sheets values) and reports the same data (masked findings, complete_locators, resource_exposures 1.1, resource_inventories 1.2). Because the Bureau never imports out-of-process code, it must integrate as a pull-mode Police worker through contract v1.2.",
+    "requiredOutcomes": [
+      "go/ is a buildable Go module; mise run go-build produces telescreen-gdrive-police; mise run go-test passes with coverage of the contract client, auth, Drive/Sheets clients, exposure, locators/fingerprints, rule detection/masking and the detect/partition/scan_shard handlers.",
+      "Golden parity fixtures generated from Python pass in Go: exposure visibility and external principal counts, locators, item and external fingerprints, and rule detection rule_id/rule_class/spans and masked snippets.",
+      "A Python contract test validates Go-produced manifest, claim, heartbeat and result envelopes (1.0, 1.1, 1.2, partition and scan_shard) against src/telescreen/contracts/police/v1 schemas.",
+      "An offline E2E runs the Go binary against an in-process Bureau with fake Drive/Sheets/Admin/token servers, completes a partition plus scan_shard sweep, and the Bureau accepts the results: findings recorded, exposures and inventories applied, no raw_value_detected.",
+      "mise.toml pins go 1.27.3 and mise run ci runs go-lint, go-test and go-build with the Python gates, and is green.",
+      "The design doc, go/README.md and examples/police/gdrive-go/README.md describe configuration, enrollment, scaling, and the parity guarantees and limits (rule detector only)."
+    ],
+    "nonGoals": [
+      "ML and LLM detectors, verify_remediation, push mode.",
+      "The Drive changes feed and watch channels (D6).",
+      "Any change to the Python collector, the Police contract schemas, the Bureau, the Python SDK or the database schema.",
+      "Live Google Workspace verification."
+    ],
+    "constraints": [
+      "Conform to contract 1.2 as published; contract gaps are recorded as open questions (design section 14, user-qa file), never as schema edits.",
+      "No raw secret or content value leaves the worker: masked_snippet only; every result string passes the Bureau Redactor; logs never print content, permission e-mails, file names or tokens.",
+      "Credentials only from env vars or files named by env vars; no committed credentials, keys or real tenant identifiers.",
+      "Every Go dependency pinned in go.mod/go.sum and vendored; stdlib preferred; no unpinned or latest versions.",
+      "Python code follows the python-coding-standards skill and typelint (no Any/object/dict/**kwargs, dataclasses/enums, no type: ignore); no touched file reaches 1000 lines.",
+      "Go code is gofmt-clean, go vet clean, explicitly typed, small packages, no package-level mutable state (the read-only embed FS in pytext/embed.go is the only package-level variable).",
+      "All verification is offline with fakes. Skip-only commands are not evidence, and non-test greps never contain the Python test-runner word.",
+      "English only, no emojis."
+    ],
+    "designDecisionsAndRationale": [
+      "Pull-mode Police worker over contract 1.2, because the Bureau never imports out-of-process code (design overview).",
+      "Rule detector ported with hand-written backtracking matchers and Python-generated pytext tables, never Go \\b/\\d/\\w/\\s/(?i), because RE2 and Go Unicode semantics differ from Python re (design 9.1-9.2).",
+      "x/text norm.Version must equal Python unidata 15.0.0; a mismatch is a Blocker, not a workaround (design 9.2).",
+      "Only 404 maps to gone; 410 is a fetch failure, by owner decision V1 on 2026-10-30.",
+      "Flagged finding fingerprints use a deterministic clean re-derivation (n = 1..16) so the Bureau Redactor never rejects a result (G4, V7).",
+      "Result body size guard moves the heaviest resources to failed to stay within 1 MiB (G3, V8); a pre-submit Redactor backstop fails the task with raw_value_guard (8.3).",
+      "Parity is proven by committed Python-generated fixtures plus a freshness test, and envelope goldens validated by a Python schema test (design 9.5, 10)."
+    ],
+    "intentionalTradeoffs": [
+      "V2: unsupported-type gdrive files are reported complete with exposure and no findings.",
+      "V3/G1: oversized content counts in resources_failed, which under unchanged Bureau rules costs the whole shard its complete_locators, exposures and inventories for that sweep (pending owner acceptance in user-qa).",
+      "V4: delegated root partition is paged with a worker cursor.",
+      "V5: Bureau network, 5xx and 429 errors back off instead of exiting.",
+      "V6: a scan_shard whose subject lookup fails counts all descriptor ids as failed.",
+      "V9-V11: location falls back to [REDACTED]; no owner/placement/modified_at; detect is bounded to 1000 files.",
+      "GDP-R5-L2: config lowercases domains with Go unicode.ToLower; gdrive applies the Python-exact CaseFold afterwards."
+    ],
+    "supportedEdgeCases": [
+      "Gone, trashed, non-matching, permission-404, permission-error, oversize, invalid UTF-8, export-gone and rate-limited resources (design 7.2 table).",
+      "Delegated and non-delegated root partitions; user corpus without admin (sweep_unsupported); unknown corpus prefix (invalid_corpus).",
+      "Unicode digits, fullwidth input, dotted/dotless i and Kelvin sign under IGNORECASE, ligature expansions in normalization.",
+      "Sheets cells of int, float, bool, empty and ragged rows; titles containing quote, bang and spaces.",
+      "Fingerprints flagged by the Redactor (derived_n > 0).",
+      "Heartbeat cancellation, handler panic, unknown task type, graceful stop, worker clock skew (task budget from deadline minus issued_at)."
+    ],
+    "outOfScopeEdgeCases": [
+      "Live Google Workspace tenants and real credentials.",
+      "Coverage or skipped reporting channels and multi-part results (future contract 1.3).",
+      "Drive changes feed incremental scanning."
+    ],
+    "residualRisks": [
+      "x/text norm.Version under go1.27.3 must equal Python 3.12 unidata 15.0.0 (gdp-p01, gdp-p05 report a Blocker otherwise).",
+      "Matcher parity for the 6 backtracking-sensitive rules depends on corpus breadth (at least 2000 seeded plus handpicked cases).",
+      "uvicorn serving the E2E harness app in the test loop, FakeClock leases and SQLite concurrency (gdp-p10 has the design-15 fallback and bounded waits).",
+      "GDP-R5-L1 (transient wave-2 compile coupling) and GDP-R5-L2 (domain lowercasing) are low residuals.",
+      "G1/V3 shard-wide degradation is pending owner acceptance; the E2E estate avoids it by construction."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-go-gdrive-police.md",
+      "design-docs/user-qa/pending-go-gdrive-police-contract-gaps.md",
+      "design-docs/specs/design-police-contract.md",
+      "design-docs/specs/design-map-reduce-sweeps.md",
+      "impl-plans/conventions.md",
+      "src/telescreen/collectors/google/adapter.py",
+      "src/telescreen/collectors/google/sweep.py",
+      "src/telescreen/collectors/google/exposure.py",
+      "src/telescreen/collectors/google/auth.py",
+      "src/telescreen/collectors/google/drive.py",
+      "src/telescreen/collectors/google/sheets.py",
+      "src/telescreen/collectors/google/admin.py",
+      "src/telescreen/detection/rule_detector.py",
+      "src/telescreen/detection/normalize.py",
+      "src/telescreen/detection/rules/catalog.py",
+      "src/telescreen/detection/rules/validators.py",
+      "src/telescreen/masking/mask.py",
+      "src/telescreen/masking/seal.py",
+      "src/telescreen/masking/redact.py",
+      "src/telescreen/masking/fingerprint.py",
+      "src/telescreen_police_sdk/client.py",
+      "src/telescreen_police_sdk/worker.py",
+      "src/telescreen_police_sdk/masking.py",
+      "src/telescreen/police/results.py",
+      "src/telescreen/contracts/police/v1",
+      "tests/e2e/harness.py",
+      "tests/e2e/test_flow_v14_inventory.py"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "gdp-p01-foundation",
+      "planPath": "impl-plans/active/gdp-p01-foundation.md",
+      "wave": "1",
+      "dependsOn": [],
+      "writePaths": [
+        "impl-plans/active/gdp-p01-foundation.md",
+        "mise.toml",
+        ".gitignore",
+        "go/go.mod",
+        "go/go.sum",
+        "go/vendor",
+        "go/internal/unorm/unorm.go",
+        "go/internal/unorm/unorm_test.go",
+        "go/internal/police/contract.go",
+        "go/internal/police/contract_test.go",
+        "go/internal/gapi/types.go",
+        "go/internal/gapi/types_test.go",
+        "go/internal/detect/api.go",
+        "go/internal/pytext/tables.go",
+        "go/internal/pytext/tables_test.go",
+        "go/internal/pytext/testdata"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "mise.toml pins go 1.27.3, defines go-test, go-lint and go-build, and the ci chain is exactly the one in the plan.",
+        ".gitignore ignores /go/bin/.",
+        "go.mod has exactly one requirement, golang.org/x/text, at a pinned version; go mod verify exits 0.",
+        "go/vendor is committed source with fewer than 512 files and no file over 7812k; the vendoring audit (x/text version, commands with exit codes, sha256 of go.mod, go.sum and modules.txt) is in the Progress Log.",
+        "All contract files exist with the exact names and shapes in the plan; go test ok for unorm, police, gapi and pytext; go vet and gofmt clean.",
+        "unorm.Version() equals the Python unicodedata.unidata_version and both are recorded."
+      ],
+      "verification": [
+        "set -o pipefail; mise install go 2>&1 | tee /tmp/telescreen-gdp-p01-mise.log",
+        "mise exec -- go version",
+        "set -o pipefail; cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go test ./internal/... 2>&1 | tee /tmp/telescreen-gdp-p01-gotest.log",
+        "set -o pipefail; cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go vet ./internal/... 2>&1 | tee /tmp/telescreen-gdp-p01-govet.log",
+        "cd go && test -z \"$(mise exec -- gofmt -l internal)\"",
+        "set -o pipefail; cd go && GOTOOLCHAIN=local mise exec -- go mod verify 2>&1 | tee /tmp/telescreen-gdp-p01-modverify.log",
+        "test \"$(mise tasks ls | grep -cE '^go-(test|lint|build) ')\" -eq 3",
+        "test \"$(find go/vendor -type f | wc -l)\" -lt 512",
+        "test -z \"$(find go/vendor -type f -size +7812k)\"",
+        "shasum -a 256 go/go.mod go/go.sum go/vendor/modules.txt"
+      ]
+    },
+    {
+      "planId": "gdp-p02-parity-fixtures",
+      "planPath": "impl-plans/active/gdp-p02-parity-fixtures.md",
+      "wave": "1",
+      "dependsOn": [],
+      "writePaths": [
+        "impl-plans/active/gdp-p02-parity-fixtures.md",
+        "tools/gen_go_police_fixtures.py",
+        "tools/go_police_fixture_cases.py",
+        "go/internal/pytext/data",
+        "go/testdata/parity",
+        "tests/go_police/test_parity_fixtures_current.py"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "All 8 pytext table files and 8 parity fixture files exist with headers or meta, and the generator --check exits 0 right after --write.",
+        "The detector corpus has at least 2000 generated cases plus handpicked cases for all 15 catalog rules; at least two derived fingerprint cases (derived_n > 0) exist.",
+        "The freshness test passes with zero skipped; ruff, ty and typelint are clean for owned paths; gitleaks is clean.",
+        "No file under src/ changed; Progress Log has hashes, commands, exit codes and log paths."
+      ],
+      "verification": [
+        "set -o pipefail; PYTHONDONTWRITEBYTECODE=1 uv run --frozen python tools/gen_go_police_fixtures.py --write 2>&1 | tee /tmp/telescreen-gdp-p02-gen.log",
+        "set -o pipefail; PYTHONDONTWRITEBYTECODE=1 uv run --frozen python tools/gen_go_police_fixtures.py --check 2>&1 | tee /tmp/telescreen-gdp-p02-check.log",
+        "uv run --frozen ruff format --check --no-cache tools/gen_go_police_fixtures.py tools/go_police_fixture_cases.py tests/go_police",
+        "uv run --frozen ruff check --no-cache tools/gen_go_police_fixtures.py tools/go_police_fixture_cases.py tests/go_police",
+        "uv run --frozen ty check tools/gen_go_police_fixtures.py tools/go_police_fixture_cases.py tests/go_police/test_parity_fixtures_current.py",
+        "set -o pipefail; PYTHONDONTWRITEBYTECODE=1 uv run --frozen pytest -p no:cacheprovider tests/go_police/test_parity_fixtures_current.py 2>&1 | tee /tmp/telescreen-gdp-p02-pytest.log",
+        "uv run --frozen python tools/typelint.py > /tmp/telescreen-gdp-p02-typelint.log 2>&1; ! grep -E '^(tools/gen_go_police_fixtures|tools/go_police_fixture_cases|tests/go_police)' /tmp/telescreen-gdp-p02-typelint.log",
+        "set -o pipefail; mise exec -- gitleaks dir --redact --no-banner tools/gen_go_police_fixtures.py tools/go_police_fixture_cases.py go/testdata/parity go/internal/pytext/data tests/go_police 2>&1 | tee /tmp/telescreen-gdp-p02-gitleaks.log"
+      ]
+    },
+    {
+      "planId": "gdp-p03-police-worker",
+      "planPath": "impl-plans/active/gdp-p03-police-worker.md",
+      "wave": "2",
+      "dependsOn": ["gdp-p01-foundation"],
+      "writePaths": [
+        "impl-plans/active/gdp-p03-police-worker.md",
+        "go/internal/police/client.go",
+        "go/internal/police/client_test.go",
+        "go/internal/police/worker.go",
+        "go/internal/police/worker_test.go",
+        "go/internal/police/backoff.go"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Client, worker and backoff are implemented with the exported API in the plan.",
+        "Every listed test case exists and passes with -race; go vet and gofmt are clean.",
+        "go/internal/police/contract.go is unchanged (hash recorded before and after).",
+        "Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go test -race -count=1 ./internal/police/... 2>&1 | tee /tmp/telescreen-gdp-p03-gotest.log",
+        "set -o pipefail; cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go vet ./internal/police/... 2>&1 | tee /tmp/telescreen-gdp-p03-govet.log",
+        "cd go && test -z \"$(mise exec -- gofmt -l internal/police)\""
+      ]
+    },
+    {
+      "planId": "gdp-p04-google-clients",
+      "planPath": "impl-plans/active/gdp-p04-google-clients.md",
+      "wave": "2",
+      "dependsOn": ["gdp-p01-foundation"],
+      "writePaths": [
+        "impl-plans/active/gdp-p04-google-clients.md",
+        "go/internal/googleauth",
+        "go/internal/gapi/http.go",
+        "go/internal/gapi/drive.go",
+        "go/internal/gapi/sheets.go",
+        "go/internal/gapi/admin.go",
+        "go/internal/gapi/gapi_test.go"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Service-account auth, Drive, Sheets and Admin clients are implemented with the constructors in the plan; go/internal/gapi/types.go is unchanged.",
+        "Only 404 maps to GoneError; 410 maps to FetchFailedError (owner decision V1); 429 and 403 rate-limit reasons map to RateLimitedError.",
+        "Every listed test passes with -race; go vet and gofmt are clean.",
+        "Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go test -race -count=1 ./internal/googleauth/... ./internal/gapi/... 2>&1 | tee /tmp/telescreen-gdp-p04-gotest.log",
+        "set -o pipefail; cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go vet ./internal/googleauth/... ./internal/gapi/... 2>&1 | tee /tmp/telescreen-gdp-p04-govet.log",
+        "cd go && test -z \"$(mise exec -- gofmt -l internal/googleauth internal/gapi)\""
+      ]
+    },
+    {
+      "planId": "gdp-p05-detect-core",
+      "planPath": "impl-plans/active/gdp-p05-detect-core.md",
+      "wave": "2",
+      "dependsOn": ["gdp-p01-foundation", "gdp-p02-parity-fixtures"],
+      "writePaths": [
+        "impl-plans/active/gdp-p05-detect-core.md",
+        "go/internal/pytext/embed.go",
+        "go/internal/pytext/embed_test.go",
+        "go/internal/detect/normalize.go",
+        "go/internal/detect/validators.go",
+        "go/internal/detect/rules.go",
+        "go/internal/detect/rules_credentials.go",
+        "go/internal/detect/rules_pii.go",
+        "go/internal/detect/detector.go",
+        "go/internal/detect/core_test.go",
+        "go/internal/detect/detector_parity_test.go"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "All 15 catalog rules are ported; the detector parity test passes over the full corpus (at least 2000 generated cases) with zero mismatches.",
+        "pytext.Default().UnidataVersion() equals unorm.Version() (design 9.2); a mismatch is recorded as a Blocker, not worked around.",
+        "No regexp literal uses \\b, \\d, \\w, \\s or (?i).",
+        "go vet and gofmt are clean; no file outside writePaths changed; Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go test -count=1 ./internal/detect/... ./internal/pytext/... 2>&1 | tee /tmp/telescreen-gdp-p05-gotest.log",
+        "set -o pipefail; cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go vet ./internal/detect/... ./internal/pytext/... 2>&1 | tee /tmp/telescreen-gdp-p05-govet.log",
+        "cd go && test -z \"$(mise exec -- gofmt -l internal/detect internal/pytext)\""
+      ]
+    },
+    {
+      "planId": "gdp-p06-gdrive-handlers",
+      "planPath": "impl-plans/active/gdp-p06-gdrive-handlers.md",
+      "wave": "2",
+      "dependsOn": ["gdp-p01-foundation", "gdp-p02-parity-fixtures"],
+      "writePaths": [
+        "impl-plans/active/gdp-p06-gdrive-handlers.md",
+        "go/internal/gdrive"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "NewService and Handlers exist with the plan signatures; the package imports only the gdp-p01 contract packages plus the stdlib.",
+        "Every listed test passes with -race, including the exposure, locators, matching and segments parity fixtures, the design 7.2 table rows, partition cursors, size guard, accounting identity and log-leak test.",
+        "go vet and gofmt are clean; nothing outside go/internal/gdrive changed; Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go test -race -count=1 ./internal/gdrive/... 2>&1 | tee /tmp/telescreen-gdp-p06-gotest.log",
+        "set -o pipefail; cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go vet ./internal/gdrive/... 2>&1 | tee /tmp/telescreen-gdp-p06-govet.log",
+        "cd go && test -z \"$(mise exec -- gofmt -l internal/gdrive)\""
+      ]
+    },
+    {
+      "planId": "gdp-p07-config-docs",
+      "planPath": "impl-plans/active/gdp-p07-config-docs.md",
+      "wave": "2",
+      "dependsOn": ["gdp-p01-foundation"],
+      "writePaths": [
+        "impl-plans/active/gdp-p07-config-docs.md",
+        "go/internal/config",
+        "go/README.md",
+        "examples/police/gdrive-go/README.md"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "config.Load implements every env rule in the plan; error messages name the variable, never the value; tests pass with -race.",
+        "go/README.md and examples/police/gdrive-go/README.md are written with the listed sections, consistent with the design including the V1 owner decision and the G1-G5 gaps, and contain no emojis or real credentials.",
+        "go vet and gofmt are clean; Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go test -race -count=1 ./internal/config/... 2>&1 | tee /tmp/telescreen-gdp-p07-gotest.log",
+        "set -o pipefail; cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go vet ./internal/config/... 2>&1 | tee /tmp/telescreen-gdp-p07-govet.log",
+        "cd go && test -z \"$(mise exec -- gofmt -l internal/config)\"",
+        "test \"$(grep -nE 'Mode|TELESCREEN_|G1|V3|police:<config>' go/README.md examples/police/gdrive-go/README.md | wc -l)\" -gt 0"
+      ]
+    },
+    {
+      "planId": "gdp-p08-detect-seal",
+      "planPath": "impl-plans/active/gdp-p08-detect-seal.md",
+      "wave": "3",
+      "dependsOn": ["gdp-p05-detect-core", "gdp-p02-parity-fixtures"],
+      "writePaths": [
+        "impl-plans/active/gdp-p08-detect-seal.md",
+        "go/internal/detect/mask.go",
+        "go/internal/detect/redact.go",
+        "go/internal/detect/seal.go",
+        "go/internal/detect/fingerprint.go",
+        "go/internal/detect/engine.go",
+        "go/internal/detect/seal_parity_test.go",
+        "go/internal/detect/engine_test.go"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "MaskValue, Redactor, ExternalFingerprint, ItemFingerprint, the clean derivation and SealEngine exist; var _ Engine = (*SealEngine)(nil) compiles.",
+        "The sealing, redactor and fingerprint parity tests pass with zero mismatches, including at least two derived_n > 0 cases; the gdp-p05 detector parity tests still pass.",
+        "go vet and gofmt are clean; no gdp-p05 file changed (hashes recorded); Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go test -count=1 ./internal/detect/... 2>&1 | tee /tmp/telescreen-gdp-p08-gotest.log",
+        "set -o pipefail; cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go vet ./internal/detect/... 2>&1 | tee /tmp/telescreen-gdp-p08-govet.log",
+        "cd go && test -z \"$(mise exec -- gofmt -l internal/detect)\""
+      ]
+    },
+    {
+      "planId": "gdp-p09-envelopes-contract",
+      "planPath": "impl-plans/active/gdp-p09-envelopes-contract.md",
+      "wave": "3",
+      "dependsOn": ["gdp-p01-foundation", "gdp-p03-police-worker"],
+      "writePaths": [
+        "impl-plans/active/gdp-p09-envelopes-contract.md",
+        "go/internal/envelopes",
+        "go/testdata/envelopes",
+        "tests/go_police/test_go_envelopes_contract.py"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "The 9 golden envelope files exist and the Go golden test passes without -update.",
+        "The Python contract test validates all 9 files and both partition payloads against the v1 schemas, covers 1.0, 1.1 and 1.2 members, partition, scan_shard and failed shapes, checks the accounting identity and locator rules, and finds no Redactor hits; zero skipped.",
+        "ruff, ty and typelint are clean; go vet and gofmt are clean; Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go test -count=1 ./internal/envelopes/... 2>&1 | tee /tmp/telescreen-gdp-p09-gotest.log",
+        "cd go && GOTOOLCHAIN=local GOFLAGS=-mod=vendor mise exec -- go vet ./internal/envelopes/...",
+        "cd go && test -z \"$(mise exec -- gofmt -l internal/envelopes)\"",
+        "set -o pipefail; PYTHONDONTWRITEBYTECODE=1 uv run --frozen pytest -p no:cacheprovider tests/go_police/test_go_envelopes_contract.py 2>&1 | tee /tmp/telescreen-gdp-p09-pytest.log",
+        "uv run --frozen ruff format --check --no-cache tests/go_police/test_go_envelopes_contract.py",
+        "uv run --frozen ruff check --no-cache tests/go_police/test_go_envelopes_contract.py",
+        "uv run --frozen ty check tests/go_police/test_go_envelopes_contract.py",
+        "uv run --frozen python tools/typelint.py > /tmp/telescreen-gdp-p09-typelint.log 2>&1; ! grep -E '^tests/go_police/test_go_envelopes_contract' /tmp/telescreen-gdp-p09-typelint.log"
+      ]
+    },
+    {
+      "planId": "gdp-p10-cmd-e2e",
+      "planPath": "impl-plans/active/gdp-p10-cmd-e2e.md",
+      "wave": "4",
+      "dependsOn": [
+        "gdp-p02-parity-fixtures",
+        "gdp-p03-police-worker",
+        "gdp-p04-google-clients",
+        "gdp-p05-detect-core",
+        "gdp-p06-gdrive-handlers",
+        "gdp-p07-config-docs",
+        "gdp-p08-detect-seal",
+        "gdp-p09-envelopes-contract"
+      ],
+      "writePaths": [
+        "impl-plans/active/gdp-p10-cmd-e2e.md",
+        "go/cmd/telescreen-gdrive-police",
+        "go/bin",
+        "tests/go_police/e2e_fakes.py",
+        "tests/go_police/test_gdrive_police_e2e.py"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["go/bin"],
+      "artifactRootNotes": "go/bin is the gitignored build output of mise run go-build (declared by the accepted gdp-p10 plan; gitignored by gdp-p01). Its audit record (go version, build command and exit code, sha256 of go/bin/telescreen-gdrive-police) goes in the gdp-p10 Progress Log. Never committed.",
+      "acceptanceCriteria": [
+        "The binary builds via mise run go-build and the run() exit codes (2 config, 3 unauthorized) are tested in go/cmd/telescreen-gdrive-police.",
+        "The offline E2E passes: three police sweeps (gdrive, gdocs, gsheets) over the delegated fake estate succeed with resources_failed 0; issues under police:<config> with credential, email, password and payment_card classes; exposures applied; Sheets inventory item_count 3 with kind table, Drive and Docs kind file; no open issue for the 404 and trashed files; no police.result_rejected; no status 422; token server saw user and admin subjects; no raw sample, e-mail, file name or token in worker output.",
+        "mise run go-lint, mise run go-test, mise run go-build, the tests/go_police suite (parity freshness, envelope contract and E2E PASSED, zero skipped) and mise run ci exit 0, with log paths recorded.",
+        "Progress Log complete, including the uvicorn-or-fallback decision and the go/bin audit record."
+      ],
+      "verification": [
+        "mise run go-lint > /tmp/telescreen-gdp-p10-golint.log 2>&1",
+        "mise run go-test > /tmp/telescreen-gdp-p10-gotest.log 2>&1",
+        "mise run go-build > /tmp/telescreen-gdp-p10-gobuild.log 2>&1 && ls -l go/bin/telescreen-gdrive-police",
+        "mise exec -- go version",
+        "shasum -a 256 go/bin/telescreen-gdrive-police",
+        "set -o pipefail; PYTHONDONTWRITEBYTECODE=1 mise exec -- uv run --frozen pytest -p no:cacheprovider tests/go_police -rA 2>&1 | tee /tmp/telescreen-gdp-p10-pytest.log",
+        "uv run --frozen ruff format --check --no-cache tests/go_police",
+        "uv run --frozen ruff check --no-cache tests/go_police",
+        "uv run --frozen ty check tests/go_police",
+        "uv run --frozen python tools/typelint.py > /tmp/telescreen-gdp-p10-typelint.log 2>&1; ! grep -E '^tests/go_police' /tmp/telescreen-gdp-p10-typelint.log",
+        "mise run ci > /tmp/telescreen-gdp-p10-ci.log 2>&1"
+      ]
+    }
+  ]
+}

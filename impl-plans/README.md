@@ -40,6 +40,25 @@ Large features are split into multiple related plans with cross-references.
 All plans share `impl-plans/conventions.md` (ownership, typing, verification and
 progress-log rules).
 
+### Go Google Drive Police (gdp: `design-docs/specs/design-go-gdrive-police.md`)
+
+Created 2026-10-30. This is an optional Go pull-mode Police worker
+(`telescreen-gdrive-police`). The Python collector stays the default. Plans in the same
+wave have disjoint write paths.
+
+| Wave | Plan | Depends on |
+|------|------|------------|
+| 1 | [gdp-p01-foundation](active/gdp-p01-foundation.md): Go module, mise gates, vendored x/text, cross-package contracts | - |
+| 1 | [gdp-p02-parity-fixtures](active/gdp-p02-parity-fixtures.md): Python generator, pytext tables, parity fixtures | - |
+| 2 | [gdp-p03-police-worker](active/gdp-p03-police-worker.md): contract client and pull loop | p01 |
+| 2 | [gdp-p04-google-clients](active/gdp-p04-google-clients.md): service-account auth, Drive/Sheets/Admin | p01 |
+| 2 | [gdp-p05-detect-core](active/gdp-p05-detect-core.md): rule detector port | p01, p02 |
+| 2 | [gdp-p06-gdrive-handlers](active/gdp-p06-gdrive-handlers.md): partition, scan_shard, detect, guards | p01, p02 |
+| 2 | [gdp-p07-config-docs](active/gdp-p07-config-docs.md): env config, go/README, examples note | p01 |
+| 3 | [gdp-p08-detect-seal](active/gdp-p08-detect-seal.md): masking, sealing, Redactor, fingerprints, Engine | p02, p05 |
+| 3 | [gdp-p09-envelopes-contract](active/gdp-p09-envelopes-contract.md): envelope goldens and Python schema test | p01, p03 |
+| 4 | [gdp-p10-cmd-e2e](active/gdp-p10-cmd-e2e.md): binary wiring and offline E2E sweep | p02-p09 |
+
 The [inventory and alert boundary plan](active/inventory-alert-boundaries.md) is complete:
 independent persistence, durable handoffs, inventory master authority, owner migrations
 and verified cutover/rollback. Its [completion audit](../design-docs/specs/design-inventory-boundary-verification.md)

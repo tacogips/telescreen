@@ -27,6 +27,7 @@ Store questions, pending decisions, and items awaiting user approval.
 - [qa-automated-remediation-scopes.md](./qa-automated-remediation-scopes.md) - Write scopes for automated remediation (resolved: rejected; read-only)
 - [pending-custom-push-resource-identity.md](./pending-custom-push-resource-identity.md) - `/scan` and `/findings` key the same custom locator differently (pending; v1.4 keeps the current behavior)
 - [pending-service-split-tradeoffs.md](./pending-service-split-tradeoffs.md) - Service split defaults: replicated API tokens, shared identity key, pending receipts, CLI audit path, two topologies (pending owner review; defaults apply)
+- [pending-go-gdrive-police-contract-gaps.md](./pending-go-gdrive-police-contract-gaps.md) - Go Drive Police: contract 1.2 gaps (skipped channel, owner/placement, 1 MiB body, Redactor on hex fingerprints, 1000-locator cap), changes feed not ported, 410 is a fetch failure like Python (owner decided V1; rest pending owner review, defaults apply)
 
 ## Adding New Items
 
