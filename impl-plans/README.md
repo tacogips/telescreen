@@ -50,6 +50,10 @@ supersedes h1 (run 1 blocked in wave 1 on Go caches; see `conventions.md` sectio
 Run 2 accepted gdp-p01..gdp-p09 at `fb93c5e`. Run 3 dispatches only gdp-p10 under
 [telescreen-gdp-20261031-h3](active/telescreen-gdp-20261031-h3-dispatch.json), which
 supersedes h2. The owner repaired the `go-lint` mise task that blocked gdp-p10 in run 2.
+Run 4 dispatches only gdp-p10 under
+[telescreen-gdp-20261031-h4](active/telescreen-gdp-20261031-h4-dispatch.json), which
+supersedes h3. Run 3 blocked gdp-p10 on the artifact boundary, and the owner resolution is in
+the gdp-p10 Progress Log. gdp-p01..gdp-p09 are accepted at `fd86812`.
 
 | Wave | Plan | Depends on |
 |------|------|------------|

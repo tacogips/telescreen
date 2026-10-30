@@ -20,6 +20,15 @@ rejected the Go template in the `go-lint` task. The owner has repaired the task 
 and `mise.toml` is not edited in run 3. The design is otherwise unchanged; section 16 now
 names the gitleaks commands that the 2026-10-30 owner ruling requires.
 
+Run 4 (2026-10-31): continuation under dispatch manifest `telescreen-gdp-20261031-h4`,
+which supersedes h3. gdp-p01..gdp-p09 are accepted dependencies at checkpoint `fd86812`,
+and run 4 dispatches only gdp-p10. Run 3 blocked gdp-p10 on the artifact boundary: the E2E
+built its binary under pytest `tmp_path`, and `mise run ci` runs `uv build` into `dist/`.
+The owner resolution in the gdp-p10 Progress Log settles both: the E2E binary is
+`go/bin/telescreen-gdrive-police-e2e` (section 10), and the workflow CI gate replaces the
+final `mise run build` with `uv build --out-dir /tmp/telescreen-gdp-p10-dist` (section 16).
+The design is otherwise unchanged.
+
 ## Overview
 
 The Bureau never imports out-of-process code, so this worker reaches it only through the
@@ -723,7 +732,8 @@ the default described above and is recorded for the owner in
   entry and are never a blocker. Only `go/bin` (gdp-p10) is a repository artifact root.
 - `uvicorn` serving the harness app in the test loop is new. If the harness cannot be
   served this way, the fallback is a dedicated SQLite app built from the same `wiring`.
-  The plan must decide this before implementation.
+  gdp-p10 records the decision in its Progress Log; the real `uvicorn.Server` on port 0 is
+  preferred (owner resolution, run 2 -> run 3).
 
 ### 16. Acceptance and verification
 
@@ -733,12 +743,22 @@ status and the full log path of each command, and only commands that execute tes
 - `mise run go-lint`
 - `mise run go-test`
 - `mise run go-build`
-- `uv run pytest tests/go_police -q`
+- `uv run --frozen pytest -p no:cacheprovider tests/go_police`
 - `uv run ruff check .`
 - `uv run ruff format --check .`
 - `uv run python tools/typelint.py`
 - `uv run ty check`
-- `mise run ci`
+- The `mise run ci` sequence of section 11, run step by step in its order (`fmt-check`,
+  `lint`, `typelint`, `typecheck`, `go-lint`, `go-test`, `go-build`, `test`), with the
+  final `mise run build` replaced by `uv build --out-dir /tmp/telescreen-gdp-p10-dist`
+  (owner resolution, gdp-p10 Progress Log, run 3 -> run 4; 2026-10-08 ruling in
+  `impl-plans/conventions.md` section 7), so no build output lands in the repository
+  `dist/`. The workflow does not run the literal `mise run ci` and does not edit
+  `mise.toml`; the owner runs the literal `mise run ci` after the workflow.
+- Artifact boundary: the only repository build outputs are `go/bin/telescreen-gdrive-police`
+  and `go/bin/telescreen-gdrive-police-e2e`, each recorded with its sha256. pytest
+  `tmp_path`, everything under `/tmp`, Go caches and gitignored tool caches
+  (`.pytest_cache`, `.ruff_cache`, `__pycache__`, `.venv`) are not artifacts and never block.
 - gitleaks, always from the repository root with `--config .gitleaks.toml` (owner ruling
   2026-10-30, `impl-plans/conventions.md` section 7). It scans tracked content only, so
   `tmp/`, `.venv` and the gitignored `go/bin` are never in scope:
@@ -749,7 +769,7 @@ status and the full log path of each command, and only commands that execute tes
     must exit 0;
   - `mise exec -- gitleaks git --config .gitleaks.toml --redact`, the whole repository
     history. A finding only in a commit at or before `ae4ba45` predates gdp: record its
-    rule id and commit as pre-existing; it does not block run 3.
+    rule id and commit as pre-existing; it does not block the run.
 
 ## References
 

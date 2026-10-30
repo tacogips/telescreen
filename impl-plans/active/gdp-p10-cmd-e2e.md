@@ -3,15 +3,16 @@
 **Status**: Ready
 **Run 2**: Re-dispatched 2026-10-30 under `impl-plans/active/telescreen-gdp-20261030-h2-dispatch.json` (supersedes h1; same tasks, wave and writePaths). Evidence goes under `tmp/telescreen-gdp-20261030-h2/gdp-p10-cmd-e2e/attempt-<n>/`. Go caches follow the 2026-10-30 Go ruling in `impl-plans/conventions.md` section 7: never an artifact root, never a blocker; `go/bin` is this plan's only artifact root.
 **Run 3**: Re-dispatched 2026-10-31, alone, under `impl-plans/active/telescreen-gdp-20261031-h3-dispatch.json` (supersedes h2; same tasks and writePaths). gdp-p01..gdp-p09 are accepted dependencies at `fb93c5e`. Evidence goes under `tmp/telescreen-gdp-20261031-h3/gdp-p10-cmd-e2e/attempt-<n>/`, and the h3 manifest's verification log paths replace the `/tmp/telescreen-gdp-p10-*.log` paths below. See the Owner resolution at the end of the Progress Log.
+**Run 4**: Re-dispatched 2026-10-31, alone in wave 1, under `impl-plans/active/telescreen-gdp-20261031-h4-dispatch.json` (supersedes h3; same tasks, writePaths, sharedPaths and artifactRoots). gdp-p01..gdp-p09 are accepted dependencies at `fd86812`. Evidence goes under `tmp/telescreen-gdp-20261031-h4/gdp-p10-cmd-e2e/attempt-<n>/`. Both Owner resolutions at the end of the Progress Log apply. The E2E binary is `go/bin/telescreen-gdrive-police-e2e`, and the CI gate is the `mise run ci` sequence with `uv build --out-dir /tmp/telescreen-gdp-p10-dist`; the literal `mise run ci` is never run.
 **Design Reference**: design-docs/specs/design-go-gdrive-police.md sections 2, 3, 8.1, 10, 11, 15, 16
 **Created**: 2026-10-30
-**Last Updated**: 2026-10-30
+**Last Updated**: 2026-10-31
 
 ## Plan Metadata
 
 - planId: `gdp-p10-cmd-e2e`
 - planPath: `impl-plans/active/gdp-p10-cmd-e2e.md`
-- wave: 4
+- wave: 1 (h4; it was wave 4 in h1/h2)
 - dependsOn: `gdp-p02-parity-fixtures`, `gdp-p03-police-worker`, `gdp-p04-google-clients`, `gdp-p05-detect-core`, `gdp-p06-gdrive-handlers`, `gdp-p07-config-docs`, `gdp-p08-detect-seal`, `gdp-p09-envelopes-contract`
   - p02 and p09 are needed because this plan's gates run their tests:
     `tests/go_police/test_parity_fixtures_current.py`,
@@ -178,6 +179,9 @@ Imitate:
   `GOMODCACHE` values that exist in `os.environ`, plus the worker variables. Convert it
   inline at the call (`env=dict(pairs)`), as conventions section 3 allows.
 - Every wait has a timeout. No orphan processes: kill in `finally`.
+- Artifact boundary (run 3 block): the E2E binary goes only to
+  `go/bin/telescreen-gdrive-police-e2e`. Never build into `tmp_path` or any other repository
+  path. `tmp_path` holds only test data such as the generated service-account JSON.
 
 ## Tests (input -> expected)
 
@@ -190,29 +194,35 @@ Imitate:
 ```bash
 set -o pipefail
 export PYTHONDONTWRITEBYTECODE=1
-EV=tmp/telescreen-gdp-20261031-h3/gdp-p10-cmd-e2e/attempt-<n>; mkdir -p "$EV"
+EV=tmp/telescreen-gdp-20261031-h4/gdp-p10-cmd-e2e/attempt-<n>; mkdir -p "$EV"
 mise run go-lint > "$EV/golint.log" 2>&1; echo "exit=$?"
 mise run go-test > "$EV/gotest.log" 2>&1; echo "exit=$?"
 mise run go-build > "$EV/gobuild.log" 2>&1; echo "exit=$?"; ls -l go/bin/telescreen-gdrive-police
 mise exec -- go version
-shasum -a 256 go/bin/telescreen-gdrive-police
 mise exec -- uv run --frozen pytest -p no:cacheprovider tests/go_police -rA 2>&1 | tee "$EV/pytest-go-police.log"; echo "exit=$?"
+shasum -a 256 go/bin/telescreen-gdrive-police go/bin/telescreen-gdrive-police-e2e
 uv run --frozen ruff format --check --no-cache tests/go_police
 uv run --frozen ruff check --no-cache tests/go_police
 uv run --frozen ty check tests/go_police
-uv run --frozen python tools/typelint.py > "$EV/typelint.log" 2>&1; ! grep -E '^tests/go_police' "$EV/typelint.log"
+uv run --frozen python tools/typelint.py > "$EV/typelint.log" 2>&1; echo "exit=$?"; ! grep -F 'tests/go_police/' "$EV/typelint.log"
 wc -l tests/go_police/e2e_fakes.py tests/go_police/test_gdrive_police_e2e.py go/cmd/telescreen-gdrive-police/*.go
 test -z "$(git diff --name-only fb93c5e -- mise.toml)"
 { mise run fmt-check && mise run lint && mise run typelint && mise run typecheck && mise run go-lint && mise run go-test && mise run go-build && mise run test && uv build --out-dir /tmp/telescreen-gdp-p10-dist; } > "$EV/ci.log" 2>&1; echo "exit=$?"
+git status --porcelain > "$EV/git-status.log"; ! grep -E ' dist/' "$EV/git-status.log"
 ```
 
-Run 3 (h3): log paths are under `EV`. The `/tmp/telescreen-gdp-p10-*.log` paths from h2
-are no longer used. Every file in the `wc -l` output must be under 1000 lines. The
-`mise.toml` check must print nothing and exit 0.
+Run 4 (h4): log paths are under `EV`. The h2 `/tmp/telescreen-gdp-p10-*.log` paths and the
+h3 evidence root are no longer used. Every file in the `wc -l` output must be under 1000
+lines. The `mise.toml` check must print nothing and exit 0. The typelint grep matches
+absolute or relative paths, so a typelint violation in `tests/go_police` fails it. The last
+line is the CI gate: do not run the literal `mise run ci` and do not run `uv build` without
+`--out-dir /tmp/telescreen-gdp-p10-dist`. After the gates, `git status --porcelain` must list
+only this plan's writePaths (the gitignored `go/bin`, `tmp/` and tool caches do not appear),
+and in particular no `dist/` entry.
 
 The `go/bin` artifact audit record goes in the Progress Log: the `go version` output, the
 build command (`mise run go-build`) with its exit code, and the sha256 of
-`go/bin/telescreen-gdrive-police`.
+`go/bin/telescreen-gdrive-police` and `go/bin/telescreen-gdrive-police-e2e`.
 
 Required results:
 
