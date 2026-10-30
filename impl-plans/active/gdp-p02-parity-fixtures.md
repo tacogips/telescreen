@@ -1,6 +1,7 @@
 # GDP-P02 Parity Fixtures: Python Generator, pytext Tables, Golden Parity Data
 
 **Status**: Ready
+**Run 2**: Re-dispatched 2026-10-30 under `impl-plans/active/telescreen-gdp-20261030-h2-dispatch.json` (supersedes h1; same tasks, wave and writePaths). Evidence goes under `tmp/telescreen-gdp-20261030-h2/gdp-p02-parity-fixtures/attempt-<n>/`. Continue from the run-1 partial session (keep and reconcile `tools/gen_go_police_fixtures.py` and the eight `go/internal/pytext/data` tables; do not duplicate them) per the Owner resolution in the Progress Log, and re-run every final gate.
 **Design Reference**: design-docs/specs/design-go-gdrive-police.md sections 7, 8.1, 9.1-9.5
 **Created**: 2026-10-30
 **Last Updated**: 2026-10-30

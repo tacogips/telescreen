@@ -1,6 +1,7 @@
 # GDP-P05 Rule Detector Port: Normalization, Validators, 15 Rule Matchers, Merge
 
 **Status**: Ready
+**Run 2**: Re-dispatched 2026-10-30 under `impl-plans/active/telescreen-gdp-20261030-h2-dispatch.json` (supersedes h1; same tasks, wave and writePaths). Evidence goes under `tmp/telescreen-gdp-20261030-h2/gdp-p05-detect-core/attempt-<n>/`. Go caches follow the 2026-10-30 Go ruling in `impl-plans/conventions.md` section 7: never an artifact root, never a blocker.
 **Design Reference**: design-docs/specs/design-go-gdrive-police.md sections 9.1, 9.2, 9.5
 **Created**: 2026-10-30
 **Last Updated**: 2026-10-30

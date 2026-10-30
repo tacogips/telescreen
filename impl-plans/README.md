@@ -44,7 +44,9 @@ progress-log rules).
 
 Created 2026-10-30. This is an optional Go pull-mode Police worker
 (`telescreen-gdrive-police`). The Python collector stays the default. Plans in the same
-wave have disjoint write paths.
+wave have disjoint write paths. Run 2 dispatches all ten plans under
+[telescreen-gdp-20261030-h2](active/telescreen-gdp-20261030-h2-dispatch.json), which
+supersedes h1 (run 1 blocked in wave 1 on Go caches; see `conventions.md` section 7).
 
 | Wave | Plan | Depends on |
 |------|------|------------|

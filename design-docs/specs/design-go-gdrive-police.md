@@ -7,6 +7,12 @@ collector in `src/telescreen/collectors/google/` is unchanged and stays the defa
 Status: Draft, 2026-10-30. Issue reference: none. The source is the workflow input
 (execution mode `issue-resolution`).
 
+Run 2 (2026-10-30): continuation under dispatch manifest `telescreen-gdp-20261030-h2`,
+which supersedes `telescreen-gdp-20261030-h1`. The design accepted in run 1 (step3
+comm-000006) is reused unchanged. Run 1 blocked in wave 1 on Go toolchain caches, which the
+owner ruling of 2026-10-30 in `impl-plans/conventions.md` section 7 settles (see section 15,
+Toolchain).
+
 ## Overview
 
 The Bureau never imports out-of-process code, so this worker reaches it only through the
@@ -696,7 +702,10 @@ the default described above and is recorded for the owner in
 - E2E timing. The harness `FakeClock` and real worker time interact on leases and
   deadlines. Waits are bounded and the subprocess is cleaned up deterministically.
 - Toolchain: `mise install` must provide go 1.27.3. Vendoring removes the need for module
-  downloads.
+  downloads. Per the owner ruling of 2026-10-30 (`impl-plans/conventions.md` section 7),
+  the default `GOCACHE`/`GOMODCACHE`, or `/tmp/telescreen-<planId>-gocache` and
+  `/tmp/telescreen-gdp-gomodcache`, are user-level caches: they need no `artifactRoots`
+  entry and are never a blocker. Only `go/bin` (gdp-p10) is a repository artifact root.
 - `uvicorn` serving the harness app in the test loop is new. If the harness cannot be
   served this way, the fallback is a dedicated SQLite app built from the same `wiring`.
   The plan must decide this before implementation.

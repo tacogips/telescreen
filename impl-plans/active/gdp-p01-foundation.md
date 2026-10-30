@@ -1,6 +1,7 @@
 # GDP-P01 Foundation: Go Module, Toolchain, Vendored x/text, Cross-Package Contracts
 
 **Status**: Ready
+**Run 2**: Re-dispatched 2026-10-30 under `impl-plans/active/telescreen-gdp-20261030-h2-dispatch.json` (supersedes h1; same tasks, wave and writePaths). Evidence goes under `tmp/telescreen-gdp-20261030-h2/gdp-p01-foundation/attempt-<n>/`. Go caches follow the 2026-10-30 Go ruling in `impl-plans/conventions.md` section 7 and the Owner resolution in the Progress Log: never an artifact root, never a blocker.
 **Design Reference**: design-docs/specs/design-go-gdrive-police.md sections 1, 3, 5, 8.1, 9.2, 11
 **Created**: 2026-10-30
 **Last Updated**: 2026-10-30

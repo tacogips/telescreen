@@ -1,6 +1,7 @@
 # GDP-P10 Binary Wiring (cmd/telescreen-gdrive-police) and Offline End-to-End Sweep Test
 
 **Status**: Ready
+**Run 2**: Re-dispatched 2026-10-30 under `impl-plans/active/telescreen-gdp-20261030-h2-dispatch.json` (supersedes h1; same tasks, wave and writePaths). Evidence goes under `tmp/telescreen-gdp-20261030-h2/gdp-p10-cmd-e2e/attempt-<n>/`. Go caches follow the 2026-10-30 Go ruling in `impl-plans/conventions.md` section 7: never an artifact root, never a blocker; `go/bin` is this plan's only artifact root.
 **Design Reference**: design-docs/specs/design-go-gdrive-police.md sections 2, 3, 8.1, 10, 11, 15, 16
 **Created**: 2026-10-30
 **Last Updated**: 2026-10-30
