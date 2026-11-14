@@ -1,0 +1,24 @@
+{
+  "contract_version": "1.0",
+  "task_id": "task-scan",
+  "status": "completed",
+  "findings": [
+    {
+      "locator": "repo://example.invalid/repo/file",
+      "rule_id": "github-token",
+      "rule_class": "token",
+      "masked_snippet": "ghp_****************[40]",
+      "location": "line 10",
+      "confidence": 0.99,
+      "external_fingerprint": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "stats": {
+    "resources_scanned": 12,
+    "resources_failed": 0,
+    "bytes_scanned": 1200
+  },
+  "complete_locators": [
+    "repo://example.invalid/repo/file"
+  ]
+}
