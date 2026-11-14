@@ -1,0 +1,94 @@
+import { cleanup, fireEvent, screen, waitFor, within } from "@solidjs/testing-library";
+import { afterEach, expect, it, vi } from "vitest";
+import { mockApi, renderSettings, settle } from "./testUtils";
+
+afterEach(() => { cleanup(); sessionStorage.clear(); vi.restoreAllMocks(); });
+
+const users = [
+  { handle: "alex", display_name: "Alex Morgan", email: null, role: "admin", idp_managed: false, active: true, last_sign_in_at: null, teams: ["security"] },
+  { handle: "riley", display_name: "Riley Chen", email: null, role: "responder", idp_managed: true, active: true, last_sign_in_at: "2026-10-10T12:00:00Z", teams: ["security", "dev"] },
+  { handle: "sam", display_name: "Sam Lee", email: null, role: "viewer", idp_managed: false, active: true, last_sign_in_at: null, teams: [] },
+];
+const matrix = { roles: [{ role: "admin", permissions: ["users.read", "users.write", "templates.read"] }, { role: "responder", permissions: ["templates.read"] }, { role: "viewer", permissions: ["templates.read"] }], scopes: [{ scope: "read", permissions: ["templates.read"] }, { scope: "admin", permissions: ["users.write"] }] };
+const write = ["users.read", "users.write"];
+
+function handler(url: string, init: RequestInit | undefined): Response | undefined {
+  if (url === "/api/users") return Response.json({ items: users });
+  if (url === "/api/roles") return Response.json(matrix);
+  if (url === "/api/members") return Response.json({ items: [{ id: "mem-01", handle: "alex", display_name: "Alex Morgan", email: null, slack_user_id: "U-01", active: true }] });
+  if (url === "/api/members/alex" && init?.method === "PATCH") return Response.json({ id: "mem-01", handle: "alex", display_name: "Alex Prime", email: null, slack_user_id: "U-01", active: true });
+  if (url === "/api/members/alex/deactivate" && init?.method === "POST") return Response.json({ error: { code: "last_admin", detail: "At least one administrator must remain." } }, { status: 409 });
+  if (url === "/api/users/sam/role" && init?.method === "PUT") return Response.json({ ...users[2], role: "responder" });
+  if (url === "/api/users/alex/role" && init?.method === "PUT") return Response.json({ error: { code: "last_admin", detail: "At least one administrator must remain." } }, { status: 409 });
+  return undefined;
+}
+async function enabledSelect(handle: string): Promise<HTMLSelectElement> {
+  const select = await screen.findByLabelText(`Role for ${handle}`) as HTMLSelectElement;
+  await waitFor(() => expect(select).toBeEnabled());
+  return select;
+}
+
+it("changes a role through setRole", async () => {
+  const fetchMock = mockApi(write, handler);
+  renderSettings("/settings/users");
+  fireEvent.change(await enabledSelect("sam"), { target: { value: "responder" } });
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/users/sam/role", expect.objectContaining({ method: "PUT", body: JSON.stringify({ role: "responder" }) })));
+  expect(screen.getAllByText("Users and roles")).toHaveLength(2);
+});
+
+it("shows the inline last_admin error and restores the role", async () => {
+  mockApi(write, handler);
+  renderSettings("/settings/users");
+  const select = await enabledSelect("alex");
+  fireEvent.change(select, { target: { value: "viewer" } });
+  expect(await screen.findByText("At least one administrator must remain.")).toBeInTheDocument();
+  expect(select.value).toBe("admin");
+});
+
+it("renders the permission matrix with role and scope columns and the IdP marker", async () => {
+  mockApi(write, handler);
+  renderSettings("/settings/users");
+  const headers = (await screen.findAllByRole("columnheader")).map((cell) => cell.textContent);
+  expect(headers).toEqual(expect.arrayContaining(["admin", "responder", "viewer", "scope: read", "scope: admin"]));
+  expect(screen.getByRole("rowheader", { name: "users.write" })).toBeInTheDocument();
+  expect(screen.getByText("templates")).toBeInTheDocument();
+  expect(screen.getByLabelText("admin has users.write")).toBeInTheDocument();
+  expect(screen.queryByLabelText("viewer has users.write")).toBeNull();
+  const marker = screen.getByText("Managed by IdP");
+  expect(marker.closest("[title]")).toHaveAttribute("title", "The next sign-in resets this role from the identity provider.");
+  expect(within(marker.closest("tr") as HTMLElement).getByText("@riley")).toBeInTheDocument();
+});
+
+it("disables the role select without users.write", async () => {
+  const fetchMock = mockApi(["users.read"], handler);
+  renderSettings("/settings/users");
+  const select = await screen.findByLabelText("Role for sam");
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/auth/me", expect.anything()));
+  await settle();
+  expect(select).toBeDisabled();
+});
+
+it("shows a forbidden banner instead of loading forever when users cannot be read", async () => {
+  const forbidden = (): Response => Response.json({ error: { code: "forbidden", detail: "permission is not granted" } }, { status: 403 });
+  mockApi([], (url) => (url === "/api/users" || url === "/api/roles" ? forbidden() : undefined));
+  renderSettings("/settings/users");
+  await waitFor(() => expect(screen.getAllByText("permission is not granted").length).toBeGreaterThan(0));
+  expect(screen.queryByText("Loading users…")).toBeNull();
+});
+
+it("edits a member through the display-name accessible action and sends only changed fields", async () => {
+  const fetchMock = mockApi([...write, "directory.write"], handler);
+  renderSettings("/settings/users");
+  fireEvent.click(await screen.findByRole("button", { name: "Edit Alex Morgan" }));
+  fireEvent.input(await screen.findByLabelText("Display name"), { target: { value: "Alex Prime" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save member" }));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/members/alex", expect.objectContaining({ method: "PATCH", body: JSON.stringify({ display_name: "Alex Prime" }) })));
+});
+
+it("shows a last_admin response inline when deactivation is rejected", async () => {
+  mockApi(write, handler);
+  renderSettings("/settings/users");
+  const alexRow = await screen.findByRole("row", { name: /@alex/ });
+  fireEvent.click(within(alexRow).getByRole("button", { name: "Deactivate" }));
+  expect(await screen.findByText("At least one administrator must remain.")).toBeInTheDocument();
+});

@@ -1,0 +1,179 @@
+{
+  "taskId": "telescreen-v11-20261010-c4",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "f9a9100ed0f99114b9166dfcd2088e100df93041",
+  "supersedes": "impl-plans/active/telescreen-v11-20261010-c3-dispatch.json",
+  "evidenceRoot": "tmp/telescreen-v11-20261010-c4",
+  "evidenceRootNotes": "Untracked (gitignored by **/tmp); never staged or committed. Use per-plan and per-attempt subdirectories: tmp/telescreen-v11-20261010-c4/<planId>/attempt-<n>/. Command logs go to /tmp/telescreen-<planId>-*.log and builds to /tmp/telescreen-<planId>-dist or /tmp/telescreen-<planId>-web (conventions section 7).",
+  "runScope": "Telescreen v1.1 final run (session 6, round 3). v11-p01..v11-p20 are integration-accepted and recorded as acceptedDependencies (not re-implemented). v11-p21-leak-e2e code is complete and committed at f9a9100 (P1, P2, R1, R2, O1-O4 pass). c3 was already dispatched in session 5; c4 supersedes it. Only v11-p21 (wave 5) is dispatched, in re-verify mode: change no test unless a review finding names a concrete defect, re-run every gate on the committed tree, and report only final passing commands with an empty priorVerification (conventions 7a). Serial finalization F runs after integration review, outside fanout.",
+  "designDocPaths": [
+    "design-docs/specs/design-v1-1-dspm-adoption.md",
+    "design-docs/specs/architecture.md",
+    "design-docs/specs/command.md",
+    "design-docs/specs/design-api-and-ui.md",
+    "design-docs/specs/design-data-model.md",
+    "design-docs/specs/design-masking.md",
+    "design-docs/specs/design-police-contract.md",
+    "design-docs/specs/design-ui-sentry.md",
+    "design-docs/user-qa/qa-credential-validity-check.md",
+    "design-docs/user-qa/qa-on-demand-reveal.md",
+    "design-docs/user-qa/qa-automated-remediation-scopes.md"
+  ],
+  "planIndexPath": "impl-plans/README.md",
+  "acceptedDependencies": [
+    {"planId": "v11-p01-foundation", "planPath": "impl-plans/active/v11-p01-foundation.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13"},
+    {"planId": "v11-p02-db-migration", "planPath": "impl-plans/active/v11-p02-db-migration.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13"},
+    {"planId": "v11-p03-police-contract", "planPath": "impl-plans/active/v11-p03-police-contract.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13"},
+    {"planId": "v11-p04-ui-foundation", "planPath": "impl-plans/active/v11-p04-ui-foundation.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13"},
+    {"planId": "v11-p05-issues-record", "planPath": "impl-plans/active/v11-p05-issues-record.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13"},
+    {"planId": "v11-p06-issues-remediation", "planPath": "impl-plans/active/v11-p06-issues-remediation.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13"},
+    {"planId": "v11-p07-policy-risk", "planPath": "impl-plans/active/v11-p07-policy-risk.md", "commit": "af943da41afb3137d73909ffd3c293ea53aa8751"},
+    {"planId": "v11-p08-collectors-core", "planPath": "impl-plans/active/v11-p08-collectors-core.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13"},
+    {"planId": "v11-p09-collectors-slack", "planPath": "impl-plans/active/v11-p09-collectors-slack.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13"},
+    {"planId": "v11-p10-collectors-google", "planPath": "impl-plans/active/v11-p10-collectors-google.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13"},
+    {"planId": "v11-p11-collectors-github", "planPath": "impl-plans/active/v11-p11-collectors-github.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13"},
+    {"planId": "v11-p12-police-bureau", "planPath": "impl-plans/active/v11-p12-police-bureau.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13"},
+    {"planId": "v11-p13-workflow", "planPath": "impl-plans/active/v11-p13-workflow.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13"},
+    {"planId": "v11-p14-directory-search", "planPath": "impl-plans/active/v11-p14-directory-search.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13"},
+    {"planId": "v11-p15-ui-issues", "planPath": "impl-plans/active/v11-p15-ui-issues.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13"},
+    {"planId": "v11-p16-ui-ops", "planPath": "impl-plans/active/v11-p16-ui-ops.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13"},
+    {"planId": "v11-p17-api-issues", "planPath": "impl-plans/active/v11-p17-api-issues.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13"},
+    {"planId": "v11-p18-api-ops", "planPath": "impl-plans/active/v11-p18-api-ops.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13"},
+    {"planId": "v11-p19-wiring", "planPath": "impl-plans/active/v11-p19-wiring.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13"},
+    {"planId": "v11-p20-docs-examples", "planPath": "impl-plans/active/v11-p20-docs-examples.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13"}
+  ],
+  "serialFinalization": "After v11-p21-leak-e2e is integration-accepted: git mv impl-plans/active/v11-p*.md to impl-plans/completed/ and the c1, c2, c3 and c4 dispatch manifests to impl-plans/completed/dispatch/. Update impl-plans/README.md (21 table rows from active/ to completed/, phase rows 8-12 COMPLETED, a v1.1 complete line with the final commit), check the README.md v1.1 feature list for accuracy, add a status line to design-docs/specs/design-v1-1-dspm-adoption.md, and update design-docs/specs/architecture.md:15 so it no longer refers to impl-plans/active. Serial and outside fanout; one commit pushed to origin/main after integration review.",
+  "reviewContext": {
+    "issueReference": {
+      "title": "Telescreen v1.1: features adopted from comparable sensitive-data monitoring systems (F1-F10)",
+      "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-6",
+      "intakeCommunication": "workflowInput (issue-resolution, no GitHub issue number): FINAL v1.1 RUN round 3 at HEAD f9a9100; intake comm-000268, design comm-000269, design review comm-000270 (accepted)",
+      "planAcceptance": "accepted by step5-impl-plan-review comm-000272 (plan comm-000271); no high or mid findings, no repair requests"
+    },
+    "userProblem": "Telescreen v1.1 (F1-F10) is integration-accepted except v11-p21-leak-e2e, whose code is complete and committed at f9a9100 (P1, P2, R1, R2, O1-O4 pass; 572 passed / 4 skipped; web 146 passed; 35 screenshots). Session 5 was blocked only because its step result listed superseded interim failing runs in priorVerification. p21 must be re-verified on the committed tree, reported per conventions 7a, reviewed, and v1.1 finalized (archive, docs, commit, push).",
+    "requiredOutcomes": [
+      "Leak gaps L1-L9 stay closed: tests/leak/test_leak_matrix_v11.py passes with raw-sample, file-name and owner-email canaries; the v1 matrix is unchanged and passing.",
+      "e2e flows P1, P2, R1, R2, O1, O2, O3 and O4 pass through the assembled app with no xfail, skip or weakened assertion. The p21 tests stay unchanged since f9a9100 unless a review finding names a concrete defect.",
+      "No src/** or v1 leak-matrix drift since af943da. Since 809b02d the only src change is the owner fix src/telescreen/issues/policy/decider.py.",
+      "Whole-repository gates pass offline (pytest at least 572 passed, 4 skipped, 0 failed). src/web install, typecheck, vitest (at least 146 passed), build and screenshot smoke (35 PNGs, zero browser errors) pass.",
+      "The step result verification lists only final passing commands with exit status and log path, and priorVerification is empty.",
+      "Serial finalization archives all v11 plans and the c1-c4 manifests, updates impl-plans/README.md, README and the design-doc status, and pushes the commit to origin/main."
+    ],
+    "nonGoals": [
+      "Re-implementing or editing v11-p01..v11-p20 (accepted dependencies) or any src/** file.",
+      "Rewriting passing p21 tests without a concrete review defect.",
+      "F11-F16 and any credential validity check, raw-value reveal or source write scope (owner decisions).",
+      "Dependency changes (pyproject.toml, uv.lock, src/web/package.json, bun.lock) and edits to existing Alembic migrations."
+    ],
+    "constraints": [
+      "AGENTS.md: English only, no emojis, python-coding-standards; plan files under 400 lines; Python files under 1000 lines.",
+      "Strict typing via tools/typelint.py, ruff ANN/PGH and ty; no weakening, no type-ignore or ty-ignore comments.",
+      "Raw detected values, file names, paths, titles and emails are never persisted, logged, indexed, notified or returned.",
+      "The default uv run pytest passes offline; integration tests are marked and skipped without TELESCREEN_TEST_DATABASE_URL / TELESCREEN_TEST_MEILI_URL.",
+      "A defect in an accepted plan becomes a reconciliation request against the owning plan in the Progress Log, never a skip and never a src/** edit by p21.",
+      "Record sha256 before and after each edited file (drift protocol).",
+      "Conventions 7a: fixed findings only in addressedFeedback; verification lists only final passing commands; offline-skipped integration tests and /tmp outputs are not risks."
+    ],
+    "designDecisionsAndRationale": [
+      "R-1: version 1 stays the identity key; only value fingerprints use the active key version (O4).",
+      "R-12: the rescanner reports inconclusive for incomplete content; verify rescan keeps pending_verification (R2).",
+      "Design section 4 rule 1: any matching violate policy decides over a matching allow (P2).",
+      "The new c4 manifest supersedes c3 because c3 was already dispatched in session 5. c4 dispatches only p21 in re-verify mode at base f9a9100.",
+      "Dispatch manifests are archived to impl-plans/completed/dispatch/ (v1 convention, impl-plans/README.md:43-44)."
+    ],
+    "intentionalTradeoffs": [
+      "Re-verify mode: p21 tests are not rewritten unless review names a concrete defect; stability of the committed passing tree is preferred over fresh authoring.",
+      "A new c4 manifest is added instead of editing c3, because c3 was already dispatched in session 5; c4 is the only newly added manifest in this checkpoint.",
+      "src/web/node_modules has no tracked toolchain audit manifest; the install is pinned by src/web/bun.lock --frozen-lockfile and the bun version and bun.lock sha256 are recorded in the p21 Progress Log.",
+      "The p21 plan line budget is tight (392 of 400); the Session 6 Progress Log entry is limited to 7 lines and enforced by the wc -l < 400 check."
+    ],
+    "supportedEdgeCases": [
+      "P2: a matching violate placement policy decides over a matching allow (design section 4 rule 1).",
+      "R2: an inconclusive rescan of incomplete content keeps the issue in pending_verification (R-12).",
+      "O3: issue D is created after the stop-case clock advance so exception expiry and reopen are exercised in order.",
+      "O4: fingerprint key rotation keeps version 1 as the identity key while value fingerprints use the active key version (R-1).",
+      "Naive and aware datetimes in the policy max-age check (owner fix in src/telescreen/issues/policy/decider.py at af943da).",
+      "Leak canaries (raw samples, file names, owner emails) are absent from DB rows, logs, search documents, notifications, digests and API responses."
+    ],
+    "outOfScopeEdgeCases": [
+      "PostgreSQL and Meilisearch integration tests without TELESCREEN_TEST_DATABASE_URL / TELESCREEN_TEST_MEILI_URL (offline-skipped, not risks per conventions 7a).",
+      "Credential validity checks, raw-value reveal and any source write scope (owner decisions).",
+      "F11-F16 and any change to v11-p01..v11-p20 or src/**."
+    ],
+    "lowFindingsCarried": [
+      "impl-plans/active/v11-p21-leak-e2e.md:26: no tracked toolchain audit manifest for the src/web/node_modules artifact root; the install is pinned by src/web/bun.lock via --frozen-lockfile, and the bun version and bun.lock sha256 are recorded in the Progress Log (low, non-blocking)."
+    ],
+    "sourcePaths": [
+      "impl-plans/conventions.md",
+      "impl-plans/README.md",
+      "impl-plans/active/v11-p21-leak-e2e.md",
+      "impl-plans/active/telescreen-v11-20261010-c3-dispatch.json",
+      "design-docs/specs/design-v1-1-dspm-adoption.md",
+      "design-docs/specs/design-masking.md",
+      "tests/leak/harness.py",
+      "tests/leak/sinks.py",
+      "tests/leak/flows_v11.py",
+      "tests/leak/test_leak_matrix_v11.py",
+      "tests/e2e/harness.py",
+      "tests/e2e/test_flow_v11_policy.py",
+      "tests/e2e/test_flow_v11_remediation.py",
+      "tests/e2e/test_flow_v11_owner_health.py",
+      "examples/workflows/owner-review.yaml",
+      "src/web/scripts/screenshots.ts"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "v11-p21-leak-e2e",
+      "planPath": "impl-plans/active/v11-p21-leak-e2e.md",
+      "wave": 5,
+      "mode": "re-verify",
+      "dependsOn": ["v11-p19-wiring", "v11-p20-docs-examples", "v11-p15-ui-issues", "v11-p16-ui-ops", "v11-p07-policy-risk"],
+      "writePaths": [
+        "impl-plans/active/v11-p21-leak-e2e.md",
+        "tests/leak/flows_v11.py",
+        "tests/leak/test_leak_matrix_v11.py",
+        "tests/leak/harness.py",
+        "tests/leak/sinks.py",
+        "tests/e2e/test_flow_v11_policy.py",
+        "tests/e2e/test_flow_v11_remediation.py",
+        "tests/e2e/test_flow_v11_owner_health.py",
+        "src/web/node_modules",
+        "tmp/ui-screenshots"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["src/web/node_modules", "tmp/ui-screenshots"],
+      "acceptanceCriteria": [
+        "tests/leak/test_leak_matrix_v11.py and the unchanged v1 matrix pass. No raw sample appears in any sink, and no canary appears in new tables, notifications or API responses.",
+        "P1, P2, R1, R2, O1, O2, O3 and O4 pass with no xfail, skip or weakened assertion. git diff --name-only f9a9100 -- tests prints nothing unless a review finding names a concrete defect, and then only the named p21 test files.",
+        "No src/** or v1 leak-matrix drift since af943da.",
+        "All whole-repository Python gates (pytest at least 572 passed, 4 skipped, 0 failed) and web gates (vitest at least 146 passed, 35 PNGs, no 'Browser reported') exit 0 with no tolerances.",
+        "The plan file stays under 400 lines, with one Session 6 Progress Log entry of at most 7 lines that records the plan sha256 before and after. The step result verification lists only final passing commands with exit status and log path, and priorVerification is empty."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/leak tests/e2e > /tmp/telescreen-v11-p21-leak-e2e-pytest-scoped.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache . > /tmp/telescreen-v11-p21-leak-e2e-format.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache . > /tmp/telescreen-v11-p21-leak-e2e-ruff.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v11-p21-leak-e2e-typelint.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check > /tmp/telescreen-v11-p21-leak-e2e-ty.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-v11-p21-leak-e2e-pytest.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv build --out-dir /tmp/telescreen-v11-p21-leak-e2e-dist > /tmp/telescreen-v11-p21-leak-e2e-build.log 2>&1",
+        "set -o pipefail; cd src/web && bun install --frozen-lockfile > /tmp/telescreen-v11-p21-leak-e2e-web-install.log 2>&1",
+        "set -o pipefail; cd src/web && bun run typecheck > /tmp/telescreen-v11-p21-leak-e2e-web-typecheck.log 2>&1",
+        "set -o pipefail; cd src/web && bun run test > /tmp/telescreen-v11-p21-leak-e2e-web-test.log 2>&1",
+        "set -o pipefail; cd src/web && bun run build --outDir /tmp/telescreen-v11-p21-leak-e2e-web --emptyOutDir > /tmp/telescreen-v11-p21-leak-e2e-web-build.log 2>&1",
+        "set -o pipefail; cd src/web && bun run screenshots > /tmp/telescreen-v11-p21-leak-e2e-web-screenshots.log 2>&1",
+        "test \"$(ls tmp/ui-screenshots/*.png | wc -l | tr -d ' ')\" -eq 35",
+        "! grep -q 'Browser reported' /tmp/telescreen-v11-p21-leak-e2e-web-screenshots.log",
+        "test \"$(git diff --name-only 809b02d -- src tests/leak/test_leak_matrix.py tests/leak/flows.py)\" = 'src/telescreen/issues/policy/decider.py'",
+        "test -z \"$(git diff --name-only af943da -- src tests/leak/test_leak_matrix.py tests/leak/flows.py)\"",
+        "! grep -rnE 'xfail|pytest.skip|mark.skip' tests/leak tests/e2e",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v11-p21-leak-e2e.md)\" -eq 0",
+        "test \"$(wc -l < impl-plans/active/v11-p21-leak-e2e.md | tr -d ' ')\" -lt 400"
+      ]
+    }
+  ]
+}

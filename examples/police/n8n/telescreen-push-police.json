@@ -1,0 +1,83 @@
+{
+  "name": "Telescreen push Police",
+  "nodes": [
+    {
+      "parameters": {"httpMethod": "POST", "path": "telescreen-police", "responseMode": "responseNode", "options": {"rawBody": true}},
+      "id": "webhook-in",
+      "name": "Receive task",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "telescreen-police"
+    },
+    {
+      "parameters": {"jsCode": "// Verify the exact Webhook raw-body bytes. Enable NODE_FUNCTION_ALLOW_BUILTIN=crypto.\nconst crypto = require('crypto');\nconst item = $input.first();\nconst headers = item.json.headers ?? {};\nconst timestamp = String(headers['x-telescreen-timestamp'] ?? '');\nconst nonce = String(headers['x-telescreen-nonce'] ?? '');\nconst signature = String(headers['x-telescreen-signature'] ?? '');\nconst rawBodyBase64 = item.binary?.data?.data;\nconst timestampSeconds = Number(timestamp);\nconst nowSeconds = Math.floor(Date.now() / 1000);\nconst secret = $env.TELESCREEN_POLICE_SIGNING_SECRET;\nconst globalData = $getWorkflowStaticData('global');\nconst nonceStore = globalData.policePushNonces ?? {};\nfor (const [savedNonce, expiresAt] of Object.entries(nonceStore)) {\n  if (typeof expiresAt !== 'number' || expiresAt <= nowSeconds) delete nonceStore[savedNonce];\n}\nlet valid = false;\nif (typeof secret === 'string' && secret.length > 0 && /^[0-9]+$/.test(timestamp) && Number.isSafeInteger(timestampSeconds) && /^[0-9a-f]{32}$/i.test(nonce) && /^v1=[0-9a-f]{64}$/.test(signature) && typeof rawBodyBase64 === 'string' && Math.abs(nowSeconds - timestampSeconds) <= 300 && !Object.prototype.hasOwnProperty.call(nonceStore, nonce)) {\n  const rawBody = Buffer.from(rawBodyBase64, 'base64');\n  const prefix = Buffer.from(`${timestamp}.${nonce}.`, 'utf8');\n  const digest = crypto.createHmac('sha256', Buffer.from(secret, 'utf8')).update(prefix).update(rawBody).digest('hex');\n  const expected = Buffer.from(`v1=${digest}`, 'utf8');\n  const provided = Buffer.from(signature, 'utf8');\n  if (expected.length === provided.length && crypto.timingSafeEqual(expected, provided)) {\n    nonceStore[nonce] = nowSeconds + 600;\n    valid = true;\n  }\n}\nglobalData.policePushNonces = nonceStore;\nreturn [{ json: { ...item.json, valid }, ...(item.binary ? { binary: item.binary } : {}) }];"},
+      "id": "verify-signature",
+      "name": "Verify HMAC",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {"conditions": {"boolean": [{"value1": "={{$json.valid}}", "operation": "true"}]}},
+      "id": "signature-valid",
+      "name": "Signature valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {"respondWith": "json", "responseBody": "={\"error\":\"unauthorized\"}", "options": {"responseCode": 401}},
+      "id": "reject",
+      "name": "Reject request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 500]
+    },
+    {
+      "parameters": {"respondWith": "json", "responseBody": "={\"accepted\":true}", "options": {"responseCode": 202}},
+      "id": "accept",
+      "name": "Accept request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {"jsCode": "// Replace this safe placeholder with local scan logic. Never return task input values.\nconst crypto = require('crypto');\nconst task = $json.body;\nconst callback = task.callback;\nconst result = { contract_version: task.contract_version, task_id: task.task_id, status: 'completed', summary: 'Example placeholder: replace with local Police verification logic', findings: [], result_token: callback.result_token };\nif (task.task_type === 'verify_remediation') result.outcome = 'failed';\nif (task.task_type === 'scan_shard') {\n  result.stats = { resources_scanned: 0, resources_failed: 0, bytes_scanned: 0 };\n  result.complete_locators = [];\n}\nconst resultBody = JSON.stringify(result);\nconst timestamp = String(Math.floor(Date.now() / 1000));\nconst nonce = crypto.randomBytes(16).toString('hex');\nreturn [{ json: { callbackUrl: callback.url, resultBody, timestamp, nonce, signingInput: `${timestamp}.${nonce}.${resultBody}` } }];"},
+      "id": "scan-task",
+      "name": "Scan locally",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {"action": "hmac", "type": "SHA256", "value": "={{$json.signingInput}}", "secret": "={{$env.TELESCREEN_POLICE_SIGNING_SECRET}}", "encoding": "hex", "dataPropertyName": "signatureHex"},
+      "id": "sign-callback",
+      "name": "Sign callback",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [1340, 200]
+    },
+    {
+      "parameters": {"method": "POST", "url": "={{$json.callbackUrl}}", "sendHeaders": true, "headerParameters": {"parameters": [{"name": "Content-Type", "value": "application/json"}, {"name": "X-Telescreen-Timestamp", "value": "={{$json.timestamp}}"}, {"name": "X-Telescreen-Nonce", "value": "={{$json.nonce}}"}, {"name": "X-Telescreen-Signature", "value": "={{'v1=' + $json.signatureHex}}"}]}, "sendBody": true, "contentType": "raw", "rawContentType": "application/json", "body": "={{$json.resultBody}}", "options": {}}
+      ,"id": "callback",
+      "name": "Submit signed result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1560, 200]
+    }
+  ],
+  "connections": {
+    "Receive task": {"main": [[{"node": "Verify HMAC", "type": "main", "index": 0}]]},
+    "Verify HMAC": {"main": [[{"node": "Signature valid?", "type": "main", "index": 0}]]},
+    "Signature valid?": {"main": [[{"node": "Accept request", "type": "main", "index": 0}], [{"node": "Reject request", "type": "main", "index": 0}]]},
+    "Accept request": {"main": [[{"node": "Scan locally", "type": "main", "index": 0}]]},
+    "Scan locally": {"main": [[{"node": "Sign callback", "type": "main", "index": 0}]]},
+    "Sign callback": {"main": [[{"node": "Submit signed result", "type": "main", "index": 0}]]}
+  },
+  "active": false,
+  "settings": {"executionOrder": "v1"},
+  "versionId": "telescreen-push-police-v1",
+  "meta": {"templateCredsSetupCompleted": false},
+  "tags": []
+}
