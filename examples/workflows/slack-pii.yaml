@@ -1,0 +1,30 @@
+apiVersion: telescreen.workflow/v1
+kind: Workflow
+name: slack-pii-triage
+description: Triage a sensitive-data finding from a Slack message.
+trigger:
+  "on": [issue_created, issue_regressed]
+  match:
+    sources: [slack]
+    rule_classes: [email, phone, national_id]
+    min_severity: medium
+start: notify_channel_owner
+steps:
+  - id: notify_channel_owner
+    type: notify
+    channel: slack
+    to: [team:slack-owners]
+    subject: Review a Slack data-handling issue
+    body: Review the masked issue and coordinate removal of the sensitive content.
+    next: triage
+  - id: triage
+    type: human_task
+    title: Triage the Slack data-handling issue
+    assignee: team:secops-triage
+    sla: PT4H
+    escalation_policy: secops-standard
+    outcomes:
+      reviewed: completed
+  - id: completed
+    type: end
+    result: succeeded

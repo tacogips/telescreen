@@ -1,0 +1,194 @@
+{
+  "taskId": "telescreen-gdp-20261031-h3",
+  "supersedes": "impl-plans/active/telescreen-gdp-20261030-h2-dispatch.json",
+  "supersedesNotes": "Run 3 (continuation). h2 (run 2, workflowExecutionId opus-terra-design-and-implement-review-loop-session-2) accepted gdp-p01..gdp-p09 at checkpoint fb93c5e. It blocked only gdp-p10-cmd-e2e because mise renders task scripts with Tera and rejected the Go template {{.Dir}} in the go-lint task. The owner repaired go-lint in mise.toml (find-based gofmt -l plus go vet ./...; verified exit 0 and exit 1 on a mutation). Run 3 dispatches only gdp-p10-cmd-e2e. Its plan, dependsOn, writePaths, sharedPaths and artifactRoots are identical to h2; the only plan edit is a run-3 status line.",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "fb93c5e74bbc502793f31065cb5f6d64d1590444",
+  "originalHeadNotes": "Intake on main at fb93c5e (workflowExecutionId opus-terra-design-and-implement-review-loop-session-3). The working tree was clean at intake. main is 4 commits ahead of origin/main (fb93c5e, 73d8c3f, 8f0f541, 70f77b8). This is recorded only and is not a blocker, because gitPush is false. The run-3 planning edits (this manifest, the run-3 status and the section 11 and 16 edits in design-go-gdrive-police.md, the gdp-p10 run-3 status line and verification block, and the impl-plans/README.md h3 pointer) are committed in the run-3 plan checkpoint on top of fb93c5e, accepted by step5-impl-plan-review comm-000116 with no high or mid findings. The gdp-p10 implementation and serial finalization land in later commits.",
+  "evidenceRoot": "tmp/telescreen-gdp-20261031-h3",
+  "evidenceRootNotes": "Untracked (gitignored by **/tmp); never staged or committed. Every command log for gdp-p10 goes under tmp/telescreen-gdp-20261031-h3/gdp-p10-cmd-e2e/attempt-<n>/ (EV below), and finalization logs go under tmp/telescreen-gdp-20261031-h3/finalize/. The h1 and h2 evidence under tmp/telescreen-gdp-20261030-h1 and tmp/telescreen-gdp-20261030-h2 is superseded. It is never cited as priorVerification: gdp-p10 re-runs every gate and leaves priorVerification empty.",
+  "goCachePolicy": "Owner ruling 2026-10-30 (impl-plans/conventions.md section 7): the mise-installed Go toolchain, the default GOCACHE (~/Library/Caches/go-build) and GOMODCACHE (~/go/pkg/mod), or /tmp/telescreen-<planId>-gocache and /tmp/telescreen-gdp-gomodcache, are user-level tool caches outside the repository. They need no artifactRoots entry, are not tracked by fanout change tracking, and are never a reason to report a blocker. go/vendor is committed source. The only repository artifact root is go/bin (gdp-p10).",
+  "gitleaksPolicy": "Owner ruling 2026-10-30 (conventions section 7): run gitleaks from the repository root with --config .gitleaks.toml. Synthetic secrets use the xor-v1 *_b64 fixture encoding or fragments assembled at run time. Never add path-wide allowlists; only field-exact condition = \"AND\" entries for provably non-secret values. The commands are listed in design-go-gdrive-police.md section 16 and in serialFinalization.",
+  "shellPreamble": "Every verification shell starts with `set -o pipefail` and `export PYTHONDONTWRITEBYTECODE=1` (conventions section 7), then `EV=tmp/telescreen-gdp-20261031-h3/gdp-p10-cmd-e2e/attempt-<n>; mkdir -p \"$EV\"`. Run every command in the foreground. Record each command with its exit status and full log path in the plan Progress Log; an incomplete log is not a pass. A command that only skips is not evidence.",
+  "designDocPaths": [
+    "design-docs/specs/design-go-gdrive-police.md",
+    "design-docs/user-qa/pending-go-gdrive-police-contract-gaps.md",
+    "design-docs/specs/design-police-contract.md",
+    "design-docs/specs/architecture.md",
+    "design-docs/user-qa/README.md"
+  ],
+  "planIndexPath": "impl-plans/README.md",
+  "conventionsPath": "impl-plans/conventions.md",
+  "acceptedDependencies": [
+    {"planId": "gdp-p01-foundation", "planPath": "impl-plans/active/gdp-p01-foundation.md", "commit": "fb93c5e74bbc502793f31065cb5f6d64d1590444", "acceptedAt": "fb93c5e", "acceptedIn": "telescreen-gdp-20261030-h2", "provides": "go/ module (go.mod, go.sum, vendored golang.org/x/text), go 1.27.3 pin, go-test/go-lint/go-build mise tasks in ci, go/bin gitignore"},
+    {"planId": "gdp-p02-parity-fixtures", "planPath": "impl-plans/active/gdp-p02-parity-fixtures.md", "commit": "fb93c5e74bbc502793f31065cb5f6d64d1590444", "acceptedAt": "fb93c5e", "acceptedIn": "telescreen-gdp-20261030-h2", "provides": "Python-generated golden parity fixtures (xor-v1 *_b64), tools/gen_go_police_fixtures.py, go/internal/pytext tables, tests/go_police/test_parity_fixtures_current.py"},
+    {"planId": "gdp-p03-police-worker", "planPath": "impl-plans/active/gdp-p03-police-worker.md", "commit": "fb93c5e74bbc502793f31065cb5f6d64d1590444", "acceptedAt": "fb93c5e", "acceptedIn": "telescreen-gdp-20261030-h2", "provides": "go/internal/police contract 1.2 client: register, long-poll claim, heartbeat with lease extension and cancellation, submit result, error envelopes, rate_limited retry"},
+    {"planId": "gdp-p04-google-clients", "planPath": "impl-plans/active/gdp-p04-google-clients.md", "commit": "fb93c5e74bbc502793f31065cb5f6d64d1590444", "acceptedAt": "fb93c5e", "acceptedIn": "telescreen-gdp-20261030-h2", "provides": "go/internal/googleauth service-account JWT bearer with delegation subject; go/internal/gapi Drive v3, Sheets v4 and Admin clients (only 404 is gone)"},
+    {"planId": "gdp-p05-detect-core", "planPath": "impl-plans/active/gdp-p05-detect-core.md", "commit": "fb93c5e74bbc502793f31065cb5f6d64d1590444", "acceptedAt": "fb93c5e", "acceptedIn": "telescreen-gdp-20261030-h2", "provides": "go/internal/detect rule detector core (normalize via go/internal/unorm, catalog, validators)"},
+    {"planId": "gdp-p06-gdrive-handlers", "planPath": "impl-plans/active/gdp-p06-gdrive-handlers.md", "commit": "fb93c5e74bbc502793f31065cb5f6d64d1590444", "acceptedAt": "fb93c5e", "acceptedIn": "telescreen-gdp-20261030-h2", "provides": "go/internal/gdrive detect, partition and scan_shard handlers, exposure classification, locators, item and external fingerprints, inventories"},
+    {"planId": "gdp-p07-config-docs", "planPath": "impl-plans/active/gdp-p07-config-docs.md", "commit": "fb93c5e74bbc502793f31065cb5f6d64d1590444", "acceptedAt": "fb93c5e", "acceptedIn": "telescreen-gdp-20261030-h2", "provides": "go/internal/config env-based configuration, go/README.md, examples/police/gdrive-go/README.md"},
+    {"planId": "gdp-p08-detect-seal", "planPath": "impl-plans/active/gdp-p08-detect-seal.md", "commit": "fb93c5e74bbc502793f31065cb5f6d64d1590444", "acceptedAt": "fb93c5e", "acceptedIn": "telescreen-gdp-20261030-h2", "provides": "detect seal: masked_snippet-only findings and redactor-safe result strings with parity tests"},
+    {"planId": "gdp-p09-envelopes-contract", "planPath": "impl-plans/active/gdp-p09-envelopes-contract.md", "commit": "fb93c5e74bbc502793f31065cb5f6d64d1590444", "acceptedAt": "fb93c5e", "acceptedIn": "telescreen-gdp-20261030-h2", "provides": "go/internal/envelopes result envelopes and tests/go_police/test_go_envelopes_contract.py schema validation"}
+  ],
+  "acceptedDependenciesRule": "Accepted plans are not re-dispatched, rewritten or re-implemented. Their files (including mise.toml, .gitignore, go/go.mod, go/go.sum, go/vendor, go/internal/**, go/testdata/**, tools/gen_go_police_fixtures.py, tools/go_police_fixture_cases.py, tests/go_police/test_parity_fixtures_current.py, tests/go_police/test_go_envelopes_contract.py, go/README.md and examples/police/gdrive-go/README.md) are read-only for gdp-p10. A defect found there is a Reconciliation request in the gdp-p10 Progress Log, reproduced by a failing test id; serial finalization resolves it.",
+  "waves": [
+    {"id": "1", "plans": ["gdp-p10-cmd-e2e"], "notes": "Sole plan. Continues the partial run-2 session: go/cmd/telescreen-gdrive-police/main.go, run.go and run_test.go exist. Remaining: tests/go_police/e2e_fakes.py, tests/go_police/test_gdrive_police_e2e.py, the uvicorn-or-fallback decision (prefer uvicorn.Server on port 0), and the module-wide gates (go-lint, go-test, go-build, the tests/go_police suite, mise run ci)."},
+    {"id": "finalize", "serial": true, "dependsOn": ["1"]}
+  ],
+  "sharedFileOwnership": {
+    "rule": "gdp-p10 writes only its writePaths; sharedPaths is empty. Workers never edit this manifest, the h1/h2 manifests, impl-plans/README.md, design-docs/**, mise.toml, .gitignore, .gitleaks.toml, src/**, db/**, tests/e2e/harness.py, the contract schemas, pyproject.toml, uv.lock or any accepted dependency's files. Workers never run go get, go mod tidy or go mod vendor, and never run git checkout, restore, stash, reset, clean, commit, add or push. Per-edit discipline: read the file fresh before each edit, record pre/post SHA-256 under EV, and file a Reconciliation request instead of overwriting a file whose hash changed outside the worker's own edits.",
+    "dependencies": "No new Go or Python dependency and no lockfile change. The E2E uses only declared dependencies (uvicorn, PyJWT, cryptography, the stdlib http.server) and the vendored Go module.",
+    "reconciliation": "A defect in an accepted plan's file is a Reconciliation request in the gdp-p10 Progress Log, reproduced by a failing test id. Serial finalization reproduces it and fixes the root cause in the owning plan's paths."
+  },
+  "serialFinalization": {
+    "when": "After gdp-p10-cmd-e2e is integration-accepted with no high or mid findings open.",
+    "logRoot": "tmp/telescreen-gdp-20261031-h3/finalize",
+    "steps": [
+      "Resolve any Reconciliation requests recorded in the gdp plan Progress Logs (reproduce first; fix the root cause in the owning plan's paths).",
+      "Docs: set the design-go-gdrive-police.md status line to Implemented with the final commit reference, and confirm that design-go-gdrive-police.md, go/README.md and examples/police/gdrive-go/README.md describe configuration, enrollment, scaling, the parity guarantees and limits (rule detector only), the V1 owner decision (only 404 is gone) and the G1-G5 gaps.",
+      "Archive per .claude/skills/impl-plan/SKILL.md and the existing layout: git mv impl-plans/active/gdp-p01..gdp-p10 plans to impl-plans/completed/, and the h1, h2 and h3 manifests to impl-plans/completed/dispatch/. Move the impl-plans/README.md gdp section from Active Plans to Completed Plans with links to the archived paths and h3 as the final manifest (superseding h2 and h1). Fix every relative link to the moved files (grep for active/gdp- and telescreen-gdp-20261030 across impl-plans/ and design-docs/).",
+      "Rerun on the final tree, each with exit status and full log path under logRoot: mise run go-lint, mise run go-test, mise run go-build (plus go version and shasum -a 256 go/bin/telescreen-gdrive-police), uv run --frozen pytest -p no:cacheprovider tests/go_police -rA (parity freshness, envelope contract and E2E PASSED, zero skipped), and mise run ci. Confirm git diff --name-only fb93c5e -- mise.toml prints nothing.",
+      "Stage gdp-scoped files explicitly by path (no git add -A; no tmp/, go/bin/ or unrelated files). Run mise exec -- gitleaks git --config .gitleaks.toml --pre-commit --staged --redact; it must exit 0.",
+      "Commit locally on main. Then run mise exec -- gitleaks git --config .gitleaks.toml --redact --log-opts=ae4ba45..HEAD (every gdp commit plus the new one; must exit 0) and mise exec -- gitleaks git --config .gitleaks.toml --redact (whole history; a finding only in a commit at or before ae4ba45 is recorded as pre-existing and does not block). Do not push (gitPush false)."
+    ]
+  },
+  "reviewContext": {
+    "issueReference": "none (local workflowInput; no issueUrl, issueNumber or issueRepository; gitPush false). runtimeVariables.workflowInput of opus-terra-design-and-implement-review-loop-session-3 (continuation run 3, checkpoint fb93c5e) is the authoritative intake. Design accepted by step3 comm-000006 (run 1), with run-2 edits accepted by step3 comm-000024; plans accepted by step5-impl-plan-review comm-000010 (run 1) and comm-000026 (run 2). The workflowInput targetScope item (3) still says 404/410 map to gone; owner decision V1 (only 404 is gone, 410 is a fetch failure) overrides it.",
+    "userProblem": "Telescreen has a Python Google Drive collector (src/telescreen/collectors/google/). The owner wants an optional Go version that covers the same Drive estate (gdrive files, Google Docs exported as text, Google Sheets values) and reports the same data (masked findings, complete_locators, resource_exposures 1.1, resource_inventories 1.2). Because the Bureau never imports out-of-process code, it integrates as a pull-mode Police worker through contract v1.2. gdp-p01..gdp-p09 are done; run 3 finishes the binary's E2E proof, the final gates, docs, archive and the local commit.",
+    "requiredOutcomes": [
+      "mise run go-build exits 0 and produces go/bin/telescreen-gdrive-police; go version and shasum -a 256 are recorded in the gdp-p10 Progress Log.",
+      "mise run go-test and mise run go-lint exit 0, with mise.toml unchanged against fb93c5e.",
+      "uv run pytest tests/go_police exits 0 with test_parity_fixtures_current.py, test_go_envelopes_contract.py and the new test_gdrive_police_e2e.py PASSED and zero skipped. The E2E completes a partition plus scan_shard sweep against an in-process Bureau with fake Drive/Sheets/Admin/token servers. The Bureau accepts the results: findings recorded, exposures and inventories applied, no raw_value_detected.",
+      "mise run ci exits 0, with the full log kept under tmp/telescreen-gdp-20261031-h3/.",
+      "gitleaks with --config .gitleaks.toml exits 0 on the staged changes and over the gdp commits including the new one.",
+      "The design doc, go/README.md and examples/police/gdrive-go/README.md describe configuration, enrollment, scaling, and the parity guarantees and limits (rule detector only).",
+      "gdp-p01..gdp-p10 and the h1/h2/h3 manifests are archived, impl-plans/README.md is updated, and the final local commit is on main with nothing pushed."
+    ],
+    "nonGoals": [
+      "Any redesign, plan rewrite or re-implementation of gdp-p01..gdp-p09.",
+      "Any edit to mise.toml, tests/e2e/harness.py, src/** or the Police contract schemas.",
+      "ML and LLM detectors, verify_remediation, push mode, the Drive changes feed and watch channels (D6).",
+      "Live Google Workspace verification."
+    ],
+    "constraints": [
+      "Conform to contract 1.2 as published; contract gaps are open questions (design section 14, user-qa file), never schema edits.",
+      "No raw secret or content value leaves the worker: masked_snippet only; every result string passes the Bureau Redactor; logs never print content, permission e-mails, file names or tokens.",
+      "Credentials only from env vars or files named by env vars. The E2E generates its RSA key at run time into tmp_path; no committed credentials, keys or real tenant identifiers.",
+      "Python code follows the python-coding-standards skill and typelint (no Any/object/dict/**kwargs, dataclasses/enums, no type: ignore; env built as list[tuple[str, str]] and converted inline). No touched file reaches 1000 lines.",
+      "Go code is gofmt-clean and go vet clean, with no package-level mutable state.",
+      "All verification is offline with fakes. Skip-only commands are not evidence. A missing go binary in the E2E is pytest.fail, never a skip. Non-test greps never contain the Python test-runner word.",
+      "Every wait in the E2E is bounded; the worker subprocess, uvicorn server and fake HTTP server are torn down in finally.",
+      "English only, no emojis."
+    ],
+    "designDecisionsAndRationale": [
+      "Pull-mode Police worker over contract 1.2, because the Bureau never imports out-of-process code (design overview).",
+      "The E2E serves the real harness app with uvicorn.Server on port 0 in the test's event loop (design section 15). The fallback is a dedicated app built from the same wiring in e2e_fakes.py; whichever is used is recorded in the gdp-p10 Progress Log.",
+      "go-lint lists files with find instead of go list -f '{{.Dir}}', because mise renders task scripts with Tera (owner repair 2026-10-31, design section 11).",
+      "Only 404 maps to gone; 410 is a fetch failure (owner decision V1, 2026-10-30).",
+      "The E2E estate keeps every shard at resources_failed = 0, so exposures and inventories are applied (design 8.1); G1/V3 degradation is avoided by construction."
+    ],
+    "intentionalTradeoffs": [
+      "uvicorn.Server on port 0 is preferred over the dedicated fallback app, because it exercises the real harness wiring; the fallback is kept for sandbox loopback limits (design section 15).",
+      "go-lint uses find-based gofmt -l plus go vet ./... instead of go list templates, because mise renders task scripts with Tera (owner repair, design section 11).",
+      "410 is treated as a fetch failure rather than gone (owner decision V1), at the cost of differing from the workflowInput targetScope item (3) wording.",
+      "Only the rule detector is ported; ML and LLM detectors stay Python-only.",
+      "The typelint grep check in the gdp-p10 verification is weak (typelint prints absolute paths); it is kept as is because mise run ci runs typelint and must exit 0 (step5 comm-000116 low finding)."
+    ],
+    "supportedEdgeCases": [
+      "A file that returns 404 and a trashed file end with no open issue.",
+      "Sheets inventories report kind table with item_count 3; Drive and Docs inventories report kind file.",
+      "Domain-wide delegation: the token server sees both the user and the admin subjects.",
+      "run() exit codes: 2 for configuration errors, 3 for unauthorized enrollment.",
+      "rate_limited responses honor retry_after_seconds; long-poll claims and heartbeats with lease extension and cancellation.",
+      "A missing go binary in the E2E is pytest.fail, never a skip; SQLite 'database is locked' falls back to concurrency 2, recorded in the Progress Log."
+    ],
+    "outOfScopeEdgeCases": [
+      "Live Google Workspace tenants and real credentials.",
+      "Shard-wide G1/V3 degradation when resources_failed > 0 (pending owner acceptance in design-docs/user-qa/pending-go-gdrive-police-contract-gaps.md).",
+      "The Drive changes feed, watch channels and push mode (D6).",
+      "verify_remediation and ML/LLM detection."
+    ],
+    "residualRisks": [
+      "E2E timing: FakeClock leases, long-poll claims and SQLite concurrency (independent_sessions=True; lower concurrency to 2 if 'database is locked' appears and record it).",
+      "uvicorn on port 0 inside the node sandbox loopback; the design 15 fallback exists.",
+      "mise run ci wall-clock now includes go-test, go-build and the E2E subprocess build; commands run in the foreground with bounded timeouts.",
+      "GDP-R5-L1 and GDP-R5-L2 remain low residuals; G1/V3 shard-wide degradation is pending owner acceptance in user-qa."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/design-go-gdrive-police.md",
+      "design-docs/user-qa/pending-go-gdrive-police-contract-gaps.md",
+      "design-docs/specs/design-police-contract.md",
+      "design-docs/specs/design-map-reduce-sweeps.md",
+      "impl-plans/conventions.md",
+      "impl-plans/active/gdp-p10-cmd-e2e.md",
+      "go/cmd/telescreen-gdrive-police",
+      "go/internal/config",
+      "go/internal/police",
+      "go/internal/gdrive",
+      "src/telescreen/police/claims.py",
+      "src/telescreen/contracts/police/v1",
+      "tests/e2e/harness.py",
+      "tests/e2e/test_flow_v14_inventory.py",
+      "tests/e2e/test_flow_sweep.py",
+      "tests/leak/flows_v11.py",
+      "tests/support/samples.py",
+      "mise.toml",
+      ".gitleaks.toml"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "gdp-p10-cmd-e2e",
+      "planPath": "impl-plans/active/gdp-p10-cmd-e2e.md",
+      "wave": "1",
+      "dependsOn": [
+        "gdp-p02-parity-fixtures",
+        "gdp-p03-police-worker",
+        "gdp-p04-google-clients",
+        "gdp-p05-detect-core",
+        "gdp-p06-gdrive-handlers",
+        "gdp-p07-config-docs",
+        "gdp-p08-detect-seal",
+        "gdp-p09-envelopes-contract"
+      ],
+      "dependsOnNotes": "All dependencies are acceptedDependencies at fb93c5e; none is dispatched in run 3.",
+      "continuation": "Partial run-2 session: go/cmd/telescreen-gdrive-police/main.go, run.go and run_test.go exist (hashes in the plan's run-2 Progress Log). Re-verify them; change them only if a gate or review requires it. Leave priorVerification empty.",
+      "writePaths": [
+        "impl-plans/active/gdp-p10-cmd-e2e.md",
+        "go/cmd/telescreen-gdrive-police",
+        "go/bin",
+        "tests/go_police/e2e_fakes.py",
+        "tests/go_police/test_gdrive_police_e2e.py"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["go/bin"],
+      "artifactRootNotes": "go/bin is the gitignored build output of mise run go-build (declared by the accepted gdp-p10 plan; gitignored by gdp-p01). Its audit record (go version, build command and exit code, sha256 of go/bin/telescreen-gdrive-police) goes in the gdp-p10 Progress Log. Never committed.",
+      "acceptanceCriteria": [
+        "The binary builds via mise run go-build, and the run() exit codes (2 config, 3 unauthorized) are tested in go/cmd/telescreen-gdrive-police.",
+        "The offline E2E passes. Three police sweeps (gdrive, gdocs, gsheets) over the delegated fake estate succeed with resources_failed 0. Issues exist under police:<config> with the credential, email, password and payment_card classes. Exposures are applied. The Sheets inventory has item_count 3 with kind table; the Drive and Docs kind is file. The 404 and trashed files have no open issue. There is no police.result_rejected and no status 422. The token server saw the user and admin subjects. Worker output contains no raw sample, e-mail, file name or token.",
+        "mise run go-lint, mise run go-test, mise run go-build, the tests/go_police suite (parity freshness, envelope contract and E2E PASSED, zero skipped) and mise run ci exit 0, with log paths under EV. mise.toml is unchanged against fb93c5e.",
+        "ruff format, ruff check, ty and typelint are clean for tests/go_police; no touched file reaches 1000 lines.",
+        "The Progress Log is complete, including the uvicorn-or-fallback decision, the go/bin audit record and the pre/post hashes."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; EV=tmp/telescreen-gdp-20261031-h3/gdp-p10-cmd-e2e/attempt-<n>; mkdir -p \"$EV\"",
+        "mise run go-lint > \"$EV/golint.log\" 2>&1; echo \"exit=$?\"",
+        "mise run go-test > \"$EV/gotest.log\" 2>&1; echo \"exit=$?\"",
+        "mise run go-build > \"$EV/gobuild.log\" 2>&1; echo \"exit=$?\"; ls -l go/bin/telescreen-gdrive-police",
+        "mise exec -- go version",
+        "shasum -a 256 go/bin/telescreen-gdrive-police",
+        "mise exec -- uv run --frozen pytest -p no:cacheprovider tests/go_police -rA 2>&1 | tee \"$EV/pytest-go-police.log\"; echo \"exit=$?\"",
+        "uv run --frozen ruff format --check --no-cache tests/go_police",
+        "uv run --frozen ruff check --no-cache tests/go_police",
+        "uv run --frozen ty check tests/go_police",
+        "uv run --frozen python tools/typelint.py > \"$EV/typelint.log\" 2>&1; ! grep -E '^tests/go_police' \"$EV/typelint.log\"",
+        "wc -l tests/go_police/e2e_fakes.py tests/go_police/test_gdrive_police_e2e.py go/cmd/telescreen-gdrive-police/*.go",
+        "test -z \"$(git diff --name-only fb93c5e -- mise.toml)\"",
+        "mise run ci > \"$EV/ci.log\" 2>&1; echo \"exit=$?\""
+      ]
+    }
+  ]
+}

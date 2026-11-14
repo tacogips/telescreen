@@ -1,0 +1,1 @@
+{"name":"gdrive","version":"1.0","contract_version":"1.2","mode":"pull","task_types":["detect","partition","scan_shard"],"labels":["police=gdrive"],"concurrency":4}
