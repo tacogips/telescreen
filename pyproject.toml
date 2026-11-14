@@ -1,0 +1,101 @@
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "telescreen"
+version = "0.1.0"
+description = "Telescreen: sensitive-data retention violation monitoring and incident response"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn>=0.34",
+  "pydantic>=2.10",
+  "sqlalchemy[asyncio]>=2.0,<2.1",
+  "asyncpg>=0.30",
+  "alembic>=1.14",
+  "httpx>=0.28",
+  "anthropic>=0.49,<1",
+  "mcp>=1.0,<2",
+  "pyyaml>=6.0",
+  "croniter>=6.0",
+  "pyjwt[crypto]>=2.10",
+  "jsonschema>=4.23",
+]
+
+
+[project.urls]
+Homepage = "https://github.com/user/repo"
+Repository = "https://github.com/user/repo"
+
+[project.scripts]
+"telescreen" = "telescreen.cli:main"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3.5",
+  "pytest-cov>=6.0.0",
+  "pytest-asyncio>=0.25",
+  "aiosqlite>=0.21",
+  "ruff>=0.11.0",
+  "ty==0.0.85",
+  "types-pyyaml>=6.0.12",
+  "types-croniter>=6.0.0",
+  "types-jsonschema>=4.23",
+]
+
+[project.optional-dependencies]
+ml = ["transformers", "torch"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/telescreen", "src/telescreen_police_sdk"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tools", "."]
+addopts = "-ra --import-mode=importlib"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["integration: needs TELESCREEN_TEST_DATABASE_URL or TELESCREEN_TEST_MEILI_URL"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+# Markdown code blocks in design docs and plans are illustrative, not formatted source.
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+# ANN enforces annotations (ANN401 forbids Any); PGH forbids blanket type ignores.
+select = ["E", "F", "I", "B", "UP", "SIM", "ANN", "PGH"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["telescreen", "telescreen_police_sdk", "typelint", "tests"]
+
+[tool.ty.environment]
+python-version = "3.12"
+extra-paths = ["tools", "."]
+
+[tool.ty.terminal]
+error-on-warning = true
+
+# Project AST lint (tools/typelint.py). Rules TL001-TL010 are documented in the
+# module docstring and in .claude/skills/python-coding-standards/SKILL.md.
+# per-file-ignores is the ONLY exemption mechanism; every entry needs a comment
+# explaining the external boundary that makes it unavoidable.
+[tool.typelint]
+paths = ["src", "tests", "tools"]
+exclude = ["src/web"]
+extra-allowed-bases = []
+
+[tool.typelint.per-file-ignores]
+# stdlib json / PyYAML return untyped natives; this is the sole decoder boundary.
+"src/telescreen/core/json.py" = ["TL005"]
+# stdlib json / PyYAML return untyped natives; the standalone SDK mirrors this boundary.
+"src/telescreen_police_sdk/_json.py" = ["TL005"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

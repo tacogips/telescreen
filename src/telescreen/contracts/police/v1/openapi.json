@@ -1,0 +1,45 @@
+{
+  "openapi": "3.1.0",
+  "info": {"title": "Telescreen Police Contract", "version": "1.0"},
+  "servers": [{"url": "/api/police/v1"}],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {"type": "http", "scheme": "bearer"}
+    },
+    "schemas": {
+      "Manifest": {"$ref": "./manifest.schema.json"},
+      "Registration": {"$ref": "./registration.schema.json"},
+      "ClaimRequest": {"$ref": "./claim-request.schema.json"},
+      "ClaimResponse": {"$ref": "./claim-response.schema.json"},
+      "HeartbeatRequest": {"$ref": "./heartbeat-request.schema.json"},
+      "HeartbeatResponse": {"$ref": "./heartbeat-response.schema.json"},
+      "TaskEnvelope": {"$ref": "./task-envelope.schema.json"},
+      "ResultEnvelope": {"$ref": "./result-envelope.schema.json"},
+      "Error": {"$ref": "./error.schema.json"},
+      "PartitionResult": {"$ref": "./partition-result.schema.json"}
+    },
+    "parameters": {
+      "Timestamp": {"name": "X-Telescreen-Timestamp", "in": "header", "required": true, "schema": {"type": "string"}},
+      "Nonce": {"name": "X-Telescreen-Nonce", "in": "header", "required": true, "schema": {"type": "string", "pattern": "^[0-9a-f]{32}$"}},
+      "Signature": {"name": "X-Telescreen-Signature", "in": "header", "required": true, "schema": {"type": "string", "pattern": "^v1=[0-9a-f]{64}$"}}
+    }
+  },
+  "paths": {
+    "/workers/register": {
+      "post": {"security": [{"bearerAuth": []}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Manifest"}}}}, "responses": {"200": {"description": "Worker registered", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Registration"}}}, "default": {"description": "Request rejected", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}}}}
+    },
+    "/workers/{worker_id}/claim": {
+      "post": {"security": [{"bearerAuth": []}], "parameters": [{"name": "worker_id", "in": "path", "required": true, "schema": {"type": "string"}}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ClaimRequest"}}}}, "responses": {"200": {"description": "Claimed tasks", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ClaimResponse"}}}}}}
+    },
+    "/workers/{worker_id}/heartbeat": {
+      "post": {"security": [{"bearerAuth": []}], "parameters": [{"name": "worker_id", "in": "path", "required": true, "schema": {"type": "string"}}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HeartbeatRequest"}}}}, "responses": {"200": {"description": "Lease heartbeat", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HeartbeatResponse"}}}}}}
+    },
+    "/tasks/{task_id}/result": {
+      "post": {"security": [{"bearerAuth": []}], "parameters": [{"name": "task_id", "in": "path", "required": true, "schema": {"type": "string"}}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ResultEnvelope"}}}}, "responses": {"200": {"description": "Result accepted"}}}
+    },
+    "/callbacks/{task_id}": {
+      "post": {"parameters": [{"name": "task_id", "in": "path", "required": true, "schema": {"type": "string"}}, {"$ref": "#/components/parameters/Timestamp"}, {"$ref": "#/components/parameters/Nonce"}, {"$ref": "#/components/parameters/Signature"}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ResultEnvelope"}}}}, "responses": {"200": {"description": "Callback accepted"}}}
+    },
+    "/openapi.json": {"get": {"responses": {"200": {"description": "This OpenAPI document", "content": {"application/json": {"schema": {"type": "object"}}}}}}}
+  }
+}

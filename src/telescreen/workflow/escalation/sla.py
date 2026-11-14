@@ -1,0 +1,161 @@
+"""Durable human-task SLA escalation handler."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from telescreen.core.clock import Clock
+from telescreen.core.json import json_object, json_str, parse_json
+from telescreen.core.vocabulary import (
+    ActorKind,
+    EngineTaskKind,
+    IssueHistoryKind,
+    NotificationChannel,
+)
+from telescreen.db.models import EscalationPolicyRow, HumanTaskRow, WorkflowRunRow
+from telescreen.ports.audit import AuditEntry, AuditLog
+from telescreen.ports.directory import RecipientResolver, ResolvedRecipients
+from telescreen.ports.issues import IssueHistoryEntry, IssueRecorder
+from telescreen.ports.notifications import NotificationRequest, NotificationSender
+from telescreen.ports.workflow import ClaimedTask, TaskResult, TaskSpec
+from telescreen.workflow.dsl.escalation import (
+    EscalationPolicySpec,
+    EscalationTier,
+    escalation_from_json,
+)
+from telescreen.workflow.engine.repository import WorkflowRepository
+from telescreen.workflow.queue.sql_queue import SqlTaskQueue
+
+
+@dataclass
+class SlaCheckHandler:
+    """Advance an overdue human task through its configured escalation tiers."""
+
+    sessions: async_sessionmaker[AsyncSession]
+    repository: WorkflowRepository
+    queue: SqlTaskQueue
+    notifications: NotificationSender
+    resolver: RecipientResolver
+    issues: IssueRecorder
+    audit: AuditLog
+    clock: Clock
+    kind: EngineTaskKind = EngineTaskKind.SLA_CHECK
+
+    async def handle(self, task: ClaimedTask) -> TaskResult:
+        """Escalate only tasks that remain open when the SLA task runs."""
+        async with self.sessions.begin() as session:
+            human_task: HumanTaskRow | None = await session.get(HumanTaskRow, task.ref_id)
+            if human_task is None or human_task.status != "open":
+                return TaskResult.done()
+            run: WorkflowRunRow | None = await self.repository.run(session, human_task.run_id)
+            if run is None:
+                return TaskResult.done()
+            policy_row: EscalationPolicyRow | None = (
+                await session.get(EscalationPolicyRow, human_task.escalation_policy_id)
+                if human_task.escalation_policy_id is not None
+                else None
+            )
+            policy: EscalationPolicySpec | None = (
+                escalation_from_json(parse_json(policy_row.tiers_json))
+                if policy_row is not None
+                else None
+            )
+            now: datetime = self.clock.now()
+            if run.issue_id is not None:
+                await self.issues.add_history(
+                    session,
+                    IssueHistoryEntry(
+                        run.issue_id,
+                        IssueHistoryKind.SLA_BREACHED,
+                        "system:workflow",
+                        now,
+                        "Human task SLA breached",
+                    ),
+                )
+            tier: EscalationTier | None = (
+                policy.tiers[human_task.tier_index]
+                if policy is not None and human_task.tier_index < len(policy.tiers)
+                else None
+            )
+            if tier is None:
+                await self._audit(session, human_task, run, "sla.breached")
+                return TaskResult.done()
+            human_task.assignee_ref = tier.assign_to
+            human_task.tier_index += 1
+            due_at: datetime = now + tier.after
+            human_task.due_at = due_at
+            await self._send_tier(session, human_task, run, tier.notify, tier.channels)
+            await self._audit(session, human_task, run, "sla.escalated")
+            await self.queue.enqueue(
+                session,
+                TaskSpec(
+                    EngineTaskKind.SLA_CHECK,
+                    human_task.id,
+                    json_object((("human_task_id", json_str(human_task.id)),)),
+                    due_at,
+                    f"sla:{human_task.id}:{human_task.tier_index}",
+                ),
+            )
+        return TaskResult.done()
+
+    async def _send_tier(
+        self,
+        session: AsyncSession,
+        human_task: HumanTaskRow,
+        run: WorkflowRunRow,
+        refs: tuple[str, ...],
+        channels: tuple[NotificationChannel, ...],
+    ) -> None:
+        """Resolve tier recipients and enqueue DLP-gated channel notifications."""
+        resolved: list[tuple[str, ResolvedRecipients]] = [
+            (ref, await self.resolver.resolve(session, ref)) for ref in refs
+        ]
+        for channel in channels:
+            targets: list[str] = []
+            for _, recipient in resolved:
+                if channel is NotificationChannel.EMAIL:
+                    targets.extend(recipient.emails)
+                else:
+                    targets.extend(recipient.slack_channels)
+                    targets.extend(recipient.slack_user_ids)
+            if targets:
+                unique_targets: list[str] = []
+                for target in targets:
+                    if target not in unique_targets:
+                        unique_targets.append(target)
+                await self.notifications.send(
+                    session,
+                    NotificationRequest(
+                        channel,
+                        tuple(unique_targets),
+                        "Workflow task escalated",
+                        human_task.title,
+                        "system:workflow",
+                        run.id,
+                        run.issue_id,
+                    ),
+                )
+
+    async def _audit(
+        self,
+        session: AsyncSession,
+        human_task: HumanTaskRow,
+        run: WorkflowRunRow,
+        action: str,
+    ) -> None:
+        """Append a safe escalation audit entry."""
+        await self.audit.append(
+            session,
+            AuditEntry(
+                ActorKind.SYSTEM,
+                "system:workflow",
+                action,
+                "human_task",
+                human_task.id,
+                "Human task SLA breached",
+                json_object((("run_id", json_str(run.id)),)),
+            ),
+        )

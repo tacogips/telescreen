@@ -1,0 +1,83 @@
+{
+  "name": "Telescreen push Police",
+  "nodes": [
+    {
+      "parameters": {"httpMethod": "POST", "path": "telescreen-police", "responseMode": "responseNode", "options": {"rawBody": true}},
+      "id": "webhook-in",
+      "name": "Receive task",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "telescreen-police"
+    },
+    {
+      "parameters": {"action": "hmac", "type": "SHA256", "value": "={{$json.body}}", "secret": "={{$env.TELESCREEN_POLICE_SIGNING_SECRET}}", "encoding": "base64"},
+      "id": "verify-signature",
+      "name": "Verify HMAC",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {"conditions": {"string": [{"value1": "={{$json.signature}}", "operation": "equals", "value2": "={{$json.headers['x-telescreen-signature']}}"}]}},
+      "id": "signature-valid",
+      "name": "Signature valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {"respondWith": "json", "responseBody": "={\"error\":\"unauthorized\"}", "options": {"responseCode": 401}},
+      "id": "reject",
+      "name": "Reject request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 500]
+    },
+    {
+      "parameters": {"respondWith": "json", "responseBody": "={\"accepted\":true}", "options": {"responseCode": 202}},
+      "id": "accept",
+      "name": "Accept request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {"jsCode": "// Replace this safe placeholder with local scan logic. Never return source values.\nconst task = $json.body;\nreturn [{ json: { task_id: task.task_id, contract_version: task.contract_version, status: 'completed', summary: 'Police scan completed', findings: [], callback: task.callback } }];"},
+      "id": "scan-task",
+      "name": "Scan locally",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {"action": "hmac", "type": "SHA256", "value": "={{$json.resultBody}}", "secret": "={{$env.TELESCREEN_POLICE_SIGNING_SECRET}}", "encoding": "base64"},
+      "id": "sign-callback",
+      "name": "Sign callback",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [1340, 200]
+    },
+    {
+      "parameters": {"method": "POST", "url": "={{$json.callback.url}}", "sendHeaders": true, "headerParameters": {"parameters": [{"name": "Authorization", "value": "Bearer {{$json.callback.result_token}}"}, {"name": "X-Telescreen-Signature", "value": "={{$json.signature}}"}]}, "sendBody": true, "contentType": "raw", "rawContentType": "application/json", "body": "={{$json.resultBody}}", "options": {}}
+      ,"id": "callback",
+      "name": "Submit signed result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1560, 200]
+    }
+  ],
+  "connections": {
+    "Receive task": {"main": [[{"node": "Verify HMAC", "type": "main", "index": 0}]]},
+    "Verify HMAC": {"main": [[{"node": "Signature valid?", "type": "main", "index": 0}]]},
+    "Signature valid?": {"main": [[{"node": "Accept request", "type": "main", "index": 0}], [{"node": "Reject request", "type": "main", "index": 0}]]},
+    "Accept request": {"main": [[{"node": "Scan locally", "type": "main", "index": 0}]]},
+    "Scan locally": {"main": [[{"node": "Sign callback", "type": "main", "index": 0}]]},
+    "Sign callback": {"main": [[{"node": "Submit signed result", "type": "main", "index": 0}]]}
+  },
+  "active": false,
+  "settings": {"executionOrder": "v1"},
+  "versionId": "telescreen-push-police-v1",
+  "meta": {"templateCredsSetupCompleted": false},
+  "tags": []
+}
