@@ -1,0 +1,3 @@
+interface:
+  display_name: "slack-app-setup"
+  short_description: "Use when registering, updating or connecting the Telescreen Slack app (notification bot) in a Slack workspace with the Slack CLI from mise, inviting the bot into a channel, and wiring and verifying its token in Telescreen."

@@ -1,0 +1,15 @@
+{
+  "name": "Example Police",
+  "version": "1.0.0",
+  "contract_version": "1.0",
+  "mode": "pull",
+  "task_types": [
+    "verify_remediation",
+    "partition",
+    "scan_shard"
+  ],
+  "labels": [
+    "team=security"
+  ],
+  "concurrency": 4
+}
