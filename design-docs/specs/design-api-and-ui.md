@@ -1,0 +1,312 @@
+# Reporting Bureau API, Assistant and UI
+
+REST API surface, authentication, error model, evidence API, search, Assistant MCP/chat,
+and the SolidJS UI.
+
+## Overview
+
+The Bureau is a FastAPI app built by `telescreen.api.app.create_app(container)`. Routers are
+owned by feature packages (`telescreen.api.routers.<area>`); shared auth, error handling and
+pagination live in `telescreen.api.common`. All bodies are pydantic dataclasses. Responses
+contain only masked data. The UI consumes the same API.
+
+## Details
+
+### Authentication and errors (`telescreen.api.common`)
+
+- `Authorization: Bearer <token>`; `require_scope(scope)` dependency resolves the token hash
+  in `api_tokens` and yields `Principal(token_id, member_id, scopes)`. `admin` implies all.
+- Webhook endpoints (`/api/collectors/*`) authenticate by provider signatures; police endpoints by
+  enrollment/worker tokens or push signatures.
+- Error body: `{"error": {"code": "<snake_case>", "detail": "<static text>", "error_id"?}}`.
+  Codes include `validation_error`, `unauthorized`, `forbidden`, `not_found`, `conflict`,
+  `raw_value_detected`, `evidence_rejected`, `evidence_required`, `unsupported_media_type`,
+  `evidence_scanner_unavailable`,
+  `payload_too_large`, `invalid_transition`, `internal_error`.
+- Validation errors list only `loc` and `type` (see Masking design).
+- Pagination: `?limit=<1-200>&cursor=<opaque>`; responses `{items, next_cursor}`.
+
+v1.2 replaces `require_scope` with `require_permission(ctx, Permission)`
+(`design-v1-2-notifications-and-identity.md` section 5):
+
+- Every route declares exactly one permission, or one `declare_external(kind)` for health,
+  auth config, webhooks, the police contract and OIDC sign-in. A route-walk test enforces
+  this.
+- The `Bearer` value is a static API token (hash lookup, as in v1) or, when
+  `TELESCREEN_OIDC_ISSUER` is set, an OIDC access token (a JWT validated per section 6.2).
+- `Principal(kind, token_id, member_id, role, permissions)`.
+- Token permissions: an unbound token gets its scope permissions. A member-bound token gets
+  its scope permissions intersected with the member's role permissions, plus the machine
+  permission `ingest.push` from scopes. An OIDC principal gets the role permissions of its
+  linked member.
+- New error codes: `invalid_token`, `idp_unavailable`, `no_role`, `not_provisioned`,
+  `identity_conflict`, `last_admin`, `unknown_template`, `unknown_variable`,
+  `template_event_mismatch`, `recipient_unreachable`.
+
+### Free-form JSON on the wire
+
+`JsonValue` (`telescreen.core.json`) is an internal model. Its dataclass shape (kind, items,
+members) must never appear on the wire, so pydantic dataclass bodies never have a
+`JsonValue` field. Two rules apply:
+
+| API family | Free-form members | Encoding |
+|------------|-------------------|----------|
+| Internal REST API used by the UI (`/api/collectors`, `/api/runs`) | collector `selector`, step `input`/`output`, run `context` (escalation tiers and workflow sources are typed or plain strings and are not affected) | A JSON-encoded string field with the `_json` suffix (`selector_json`, `input_json`, `output_json`, `context_json`), the same canonical text as the DB column. Inbound strings are parsed with `parse_json` and decoded into the per-kind dataclasses; invalid documents return 422 `validation_error` with JSON paths only. The UI uses `JSON.parse`/`JSON.stringify` |
+| External contracts (`/api/police/v1`, `GET /api/ingest/v1/sources/{name}/config`) | police task `input`, result `payload`, custom selector `document` | Native JSON objects, so n8n and other clients need no double decoding. The router reads the raw body. Typed members are parsed with `TypeAdapter.validate_json` on a dataclass without the free-form member (unknown members are ignored). The free-form member is extracted with `parse_json` and its accessors. Responses are written with `dump_json` into a `Response` with type `application/json`. The SDK does the same through `telescreen_police_sdk/_json.py` |
+
+### Endpoints
+
+| Area | Endpoint | Scope |
+|------|----------|-------|
+| Health | `GET /api/health` | none |
+| Ingest | `POST /api/ingest/v1/scan`, `POST /api/ingest/v1/findings`, `GET /api/ingest/v1/sources/{name}/config` | ingest |
+| Issues | `GET /api/issues?status&source&rule_class&severity&assignee&q&sort=last_seen|first_seen|times_seen` | read |
+| | `GET /api/issues/stats?bucket=day|hour&days=1-90` (global, all issues; `{buckets: [{start, count}]}`; there is no per-issue stats route) | read |
+| | `GET /api/issues/{id}`, `/events`, `/history` (linked runs come from `GET /api/runs?issue_id=`, evidence from `GET /api/evidence?issue_id=`, so each router reads only its own package's tables) | read |
+| | `PATCH /api/issues/{id}` `{status?, assignee_ref?}`; `POST /api/issues/{id}/comments` | write |
+| Workflows | `GET /api/workflows`, `GET /api/workflows/{name}`, `GET /api/workflows/{name}/versions/{v}`, `GET /api/workflows/schema` | read |
+| | `POST /api/workflows` `{source_format, source_text}` (new version), `POST /api/workflows/validate`, `POST /api/workflows/{name}/activate {version}` | write |
+| Runs | `POST /api/workflows/{name}/runs {issue_id?}`, `GET /api/runs?status&workflow&issue_id`, `GET /api/runs/{id}` (steps, transitions, human tasks), `POST /api/runs/{id}/cancel` | read / write |
+| Human tasks | `GET /api/human-tasks?assignee=me|<ref>&status`, `POST /api/human-tasks/{id}/complete {outcome, comment?}` | read / write |
+| Evidence | `PUT /api/evidence?issue_id&step_run_id?&filename` (raw body), `GET /api/evidence?issue_id&step_run_id?`, `GET /api/evidence/{id}`, `GET /api/evidence/{id}/content` | write / read |
+| Escalation | `GET/POST /api/escalation-policies`, `PUT /api/escalation-policies/{name}` | read / admin |
+| Directory | `GET/POST /api/members`, `GET/POST /api/teams`, `PUT /api/teams/{slug}/members` | read / admin |
+| Collectors | `GET /api/collectors`, `POST /api/collectors`, `PATCH /api/collectors/{id}`, `POST /api/collectors/{id}/run`, `POST /api/collectors/{id}/sweep` (via `SweepLauncher`; 409 `conflict` while a sweep of the config is active) | read / admin |
+| Map jobs | `GET /api/map-jobs?origin&status&collector_config_id`, `GET /api/map-jobs/{id}` (counts by status, partitions done/total, findings so far, paused_until, failed shard keys with error codes) | read |
+| | `POST /api/map-jobs/{id}/cancel`, `POST /api/map-jobs/{id}/retry-failed` | admin |
+| Collector webhooks | `POST /api/collectors/{kind}/webhook` for `slack`, `github`, `gdrive` (also serves gdocs/gsheets), dispatched through `CollectorRegistry` | signatures |
+| Police | `/api/police/v1/*` (contract), `GET /api/police/workers`, `POST /api/police/workers/{id}/disable` | contract / read, admin |
+| Audit | `GET /api/audit/search?q&action&actor&target_kind&from&to`, `GET /api/audit/verify` | read |
+| Search | `GET /api/search?q&index=issues|findings|runs|audit` | read |
+| Chat | `POST /api/chat {messages: [{role, content}]}` | read |
+
+### v1.1 endpoints
+
+Behavior is in `design-v1-1-dspm-adoption.md`. Bodies are pydantic dataclasses; lists
+return `{items, next_cursor}`. Free-form policy sources are plain strings
+(`source_text`), as for workflows.
+
+| Area | Endpoint | Scope |
+|------|----------|-------|
+| Issues (changed) | `GET /api/issues` adds `exposure=<Visibility>`, `sort=risk`, `assignee=me|my_teams` (resolved through `RecipientResolver.member_ref` / `team_refs_of`), and the new statuses. Items add `base_severity`, `exposure_visibility`, `risk_score`, `policy_name`, `policy_version`, `resolution` | read |
+| | `GET /api/issues/{id}` adds `exposure` (enums and counts), `exposure_changed_at`, `asset_tier`, `assignee_ref`, `owner {present: bool, member_ref: str or null}` (one `RecipientResolver.member_for_owner` call; never the keyed ref), `active_exception` (id, status, duration, expires_at, approver_ref) | read |
+| | `PATCH /api/issues/{id}`: `status` limited to the v1.1 user transitions; `resolved` / `ignored` return 422 `invalid_transition` | write |
+| | `POST /api/issues/{id}/remediation {action: remove|restrict, include_linked: bool, note?}` -> `{issue_ids, rescans_enqueued}` | write |
+| | `POST /api/issues/{id}/resolve {reason: false_positive|manual_unverified, note}` | write (`manual_unverified`: admin) |
+| | `GET /api/issues/{id}/occurrences` -> `{items: [{issue_id, short_id, source, display_locator, status, severity, exposure_visibility}], key_versions}` | read |
+| Exceptions | `POST /api/issues/{id}/exceptions {reason, duration}`; `GET /api/exceptions?status&issue_id&approver=me`; `POST /api/exceptions/{id}/approve {note?}`, `/reject {note?}`, `/revoke` | write / read / approver or admin |
+| Policies | `GET /api/policies` (one item per name: active version, effect, enabled, owner_team); `GET /api/policies/{name}` (versions); `GET /api/policies/{name}/versions/{v}` (source); `POST /api/policies/validate {source_format, source_text}` -> `{valid, errors}`; `POST /api/policies {source_format, source_text}` (new inactive version); `POST /api/policies/{name}/activate {version}`; `POST /api/policies/{name}/disable` | read / admin |
+| Coverage | `GET /api/collectors/{id}/coverage` -> `{since, counts: [{state, reason, count}], unscannable_total}` (scan jobs of the last 7 days plus current `resource_coverage`); `GET /api/collectors/{id}/coverage/resources?state&limit&cursor` -> items `{resource_id (12-hex key prefix), source, state, reason, truncated_bytes, exposure_visibility, first_seen_at, last_attempt_at, issues: [{issue_id, short_id}]}` | read |
+| Collectors (changed) | `GET /api/collectors` items add `health {status, conditions, last_success_at, last_failure_at, consecutive_failures, last_event_at, watch_expires_at, event_only}` | read |
+| Police (changed) | `GET /api/police/workers` items add `health {status, conditions}` | read |
+| Human tasks (changed) | `GET /api/human-tasks?assignee=me` resolves the principal's `member:<handle>` and team refs (fixes the v1 `member:<id>` lookup, and a token without a member gets 403 instead of an unfiltered list); `POST /api/human-tasks/{id}/complete` adds `exception_duration` (required for the `owner_review` outcome `exception`, which also requires `comment`) | read / write |
+| Directory (changed) | `GET/POST /api/teams` add `lead` (member handle, nullable); `GET /api/members/{handle}/identities` -> items `{id, kind, origin, key_prefix, created_at}`; `POST /api/members/{handle}/identities {kind, value}` (value keyed, never stored or echoed); `DELETE /api/members/{handle}/identities/{id}` | read / admin |
+| Escalation (changed) | Tier objects in `tiers_json` accept optional `min_risk` (0-100) | admin |
+
+Search: the `issues` index adds `exposure_visibility` and `risk_score`. Filterable gains
+`exposure_visibility`; sortable gains `risk_score`. `ensure_indexes()` applies the new
+settings, and `telescreen search reindex` refreshes documents after the migration.
+
+### v1.2 endpoints
+
+Behavior is in `design-v1-2-notifications-and-identity.md`. Permissions are those of its
+section 5.1. Template text fields are plain strings. Validation errors list `{field, code}`
+and never echo text.
+
+| Area | Endpoint | Permission |
+|------|----------|-----------|
+| Auth | `GET /api/auth/config` -> `{oidc: {issuer, client_id, authorization_endpoint, token_endpoint, end_session_endpoint, scopes: string[]} or null, token_login}` (the UI joins `scopes` with spaces in the authorization request) | external `public` |
+| | `POST /api/auth/session` (Bearer OIDC access token) -> `{member: {handle, display_name}, role, permissions}`; 403 `no_role` / `not_provisioned` / `forbidden`, 409 `identity_conflict`, 401 `invalid_token`, 503 `idp_unavailable` | external `oidc_sign_in` |
+| | `GET /api/auth/me` -> `{kind: token or oidc, member: {handle, display_name} or null, role, permissions}` | `auth.self` |
+| Templates | `GET /api/notification-templates` -> items `{name, event_kind, builtin, description, active_version, latest_version, updated_at}` (built-ins merged with DB names) | `templates.read` |
+| | `GET /api/notification-templates/{name}` -> `{name, event_kind, builtin, active_version, versions: [{version, active, created_by, created_at}], variables: [paths allowed for the event]}`; `GET /api/notification-templates/{name}/versions/{v}` -> text fields (v 0 is the built-in) | `templates.read` |
+| | `POST /api/notification-templates/validate {event_kind, subject, body, email_subject?, email_body?, slack_body?}` -> `{valid, errors}`; `POST /api/notification-templates/preview` (same body, or `{name, version}`) -> `{email: {subject, body, dlp_verdict}, slack: {subject, body, dlp_verdict}}` using the synthetic context | `templates.read` |
+| | `POST /api/notification-templates {name, event_kind, description?, subject, body, email_subject?, email_body?, slack_body?}` -> `{name, version}` (new inactive version); `POST /api/notification-templates/{name}/activate {version}` (0 restores a built-in) | `templates.write` |
+| Users and roles | `GET /api/users` -> items `{handle, display_name, email, role, idp_managed, active, last_sign_in_at, teams}`; `GET /api/roles` -> `{roles: [{role, permissions}], scopes: [{scope, permissions}]}` | `users.read` |
+| | `PUT /api/users/{handle}/role {role: admin or responder or viewer or null}` -> user; 409 `last_admin` | `users.write` |
+| Tokens | `GET /api/tokens` -> items `{id, label, scopes, member_handle, created_at, revoked_at}` | `tokens.read` |
+| | `POST /api/tokens {label, scopes, member_handle?}` -> `{id, token}` (shown once); `POST /api/tokens/{id}/revoke` | `tokens.write` |
+| Workflows (changed) | Upload accepts `telescreen.workflow/v2` and applies the template and set checks of section 4.2; `GET /api/workflows/schema` serves a schema that accepts v1 and v2 | unchanged |
+| Runs (changed) | v2 `notify` step outputs carry per-target counts (section 4.3) | unchanged |
+
+### v1.3 endpoints
+
+Status: implemented 2026-10-13.
+
+Behavior is in `design-v1-3-sentry-parity.md` (section numbers below refer to it).
+Permissions are those of its section 2. Every new router has its own `<Area>RouterDeps` and
+is registered by `build_container` through the v1.3 wiring implementation. Validation errors never echo the query, URL, pattern or
+text.
+
+| Area | Endpoint | Permission |
+|------|----------|-----------|
+| Stream (changed) | `GET /api/issues` adds `query`, `period`/`start`/`end`, `trend`, sorts `values`/`priority`/`trending`; items add `priority`, `priority_manual`, `needs_review`, `assignee {kind, ref, display_name}`, `archive`, `merged_count`, `bookmarked`, `updated_at`, `trend`; `assignee=none` fixed; merged children excluded (4, 5.1) | `issues.read` |
+| | `GET /api/issues/counts?query&period&updated_since` -> `{tabs, updated_since_count}` (4) | `issues.read` |
+| Views | `GET`/`POST /api/views`, `PATCH`/`DELETE /api/views/{id}`, `PUT`/`DELETE /api/views/{id}/star`, `PUT /api/views/default` (5.2) | `views.read` / `views.write`; shared: `views.manage_shared` |
+| Triage | `POST /api/issues/{id}/archive`, `/unarchive`, `/review`; `PATCH /api/issues/{id}` adds `priority` (7, 8.1) | `issues.write` |
+| Bulk and merge | `POST /api/issues/bulk`, `POST /api/issues/merge`, `POST /api/issues/{id}/unmerge` (6) | `issues.write` (+ `issues.resolve_unverified` for that reason) |
+| Detail (changed) | `GET /api/issues/{id}` adds `subscription`, `merged_into`, `merged_children`, `suggested_assignees` and the stream fields; `GET /api/issues/{id}/events` adds `order` and `issue_short_id` (8.1, 8.2) | `issues.read` |
+| | `GET /api/issues/{id}/events/{oldest\|latest\|recommended\|finding_id}`, `GET /api/issues/{id}/tags`, `GET /api/issues/{id}/stats`, `GET /api/issues/{id}/activity` (8.2-8.4) | `issues.read` |
+| Comments | `POST /api/issues/{id}/comments` (now an `issue_comments` row); `PATCH`/`DELETE /api/issues/{id}/comments/{comment_id}` (author, or `comments.manage_any`) (8.4) | `issues.write` |
+| Follow | `PUT /api/issues/{id}/subscription`, `PUT`/`DELETE /api/issues/{id}/bookmark` (8.4) | `issues.follow` |
+| External issues | `GET /api/issues/{id}/external-issues`, `GET /api/external-issues/github/repos` | `issues.read` |
+| | `POST /api/issues/{id}/external-issues`, `DELETE /api/issues/{id}/external-issues/{link_id}`, `POST /api/issues/{id}/external-issues/github` (8.5) | `external_issues.write` |
+| Alerts | `GET /api/alert-rules`, `GET /api/alert-rules/{id}`, `GET /api/alert-rules/{id}/history` | `alerts.read` |
+| | `POST /api/alert-rules`, `POST /api/alert-rules/validate`, `PUT`/`DELETE /api/alert-rules/{id}`, `POST /api/alert-rules/{id}/enable\|disable` (9) | `alerts.write` |
+| | `POST /api/alert-rules/{id}/mute\|unmute` | `alerts.mute` |
+| Workflows (changed) | `GET /api/workflows` items add `trigger_events`, `active`, `last_run_at`, `runs_30d` (9) | `workflows.read` |
+| Profile | `GET`/`PUT /api/auth/me/notification-settings`; `GET`/`POST /api/auth/me/tokens`, `POST /api/auth/me/tokens/{id}/revoke` (10.1, 12) | `profile.self` |
+| Dashboard | `GET /api/dashboard?period` (11) | `issues.read` |
+| Integrations | `GET /api/integrations` / `POST /api/integrations/{kind}/test` (12) | `integrations.read` / `integrations.test` |
+| Members | `PATCH /api/members/{handle}` | `directory.write` |
+| | `POST /api/members/{handle}/deactivate\|reactivate` (12) | `users.write` |
+| Ownership | `GET /api/ownership-rules`, `POST /api/ownership-rules/test` | `ownership.read` |
+| | `POST /api/ownership-rules`, `PUT`/`DELETE /api/ownership-rules/{id}`, `POST /api/ownership-rules/reorder` (12) | `ownership.write` |
+
+### v1.4 endpoints
+
+Status: implemented 2026-10-14. Behavior, query parameters and response shapes are in
+`design-v1-4-data-inventory.md` section 9. There is no literal segment under
+`/api/data/assets/`.
+
+| Area | Endpoint | Permission |
+|------|----------|-----------|
+| Register | `GET /api/data/assets`, `GET /api/data/counts`, `GET /api/data/export` (masked CSV), `GET /api/data/resource-assets/{resource_key}` | `data.read` |
+| | `GET /api/data/assets/{id}`, `/events`, `/items`, `/item-series` | `data.read` |
+| | `POST /api/data/assets` (register), `PATCH /api/data/assets/{id}`, `PUT /api/data/assets/{id}/fields`, `POST /api/data/assets/{id}/events`, `/mark-deleted`, `/restore` | `data.write` |
+| Field schema | `GET /api/data/fields` | `data.read` |
+| | `POST /api/data/fields/validate-values` | `data.write` |
+| | `POST /api/data/fields`, `PATCH`/`DELETE /api/data/fields/{id}`, `POST /api/data/fields/{id}/archive\|unarchive`, `POST /api/data/fields/reorder` | `data_fields.admin` |
+| Ingest (changed, additive) | `/scan` resources accept `removed`, `item_keys` or `item_count`, `kind`; `/findings` accepts `item_fingerprints` or `item_count`, `kind` | `ingest.push` |
+| Collectors (changed) | Create, update and list carry `inventory_mode` (`sensitive_only`, `all`, `off`); an update without it keeps the current mode | unchanged |
+
+UI: a "Data" area (`/data`, `/data/new`, `/data/:id`), Settings > Field schema
+(`/settings/data-fields`), the issue detail asset link, the dashboard overdue tile and the
+collector inventory mode (`design-v1-4-data-inventory.md` section 10).
+
+### Service split (designed)
+
+See [service split](design-service-split.md). Public paths, payloads and permissions are
+unchanged in both topologies. In the full split, Telescreen proxies:
+
+- `/api/data/*` to Inventory;
+- `/api/auth/me/notification-settings` and `/api/notification-templates[/...]` to
+  Notification.
+
+Each service authenticates the forwarded bearer against its own directory replica.
+`/api/integrations` takes the email/Slack `configured` flags and test sends from
+Notification. In split mode the UI audit page shows Telescreen actions only. Inventory and
+Notification audit chains are verified and exported through their CLIs. Internal
+versioned contracts are `/internal/inventory/v1/commands` and
+`/internal/notification/v1/{commands,test,templates/lookup,channels,health}`. `src/web`
+does not change.
+
+### Evidence
+
+- Upload is a raw request body (`application/octet-stream`), read in memory up to
+  `TELESCREEN_EVIDENCE_MAX_BYTES` (default 10 MiB); no multipart, so no temporary spool
+  files hold unscanned content.
+- Accepted content types (user decision, `design-docs/user-qa/qa-evidence-file-types.md`):
+  - Text-like, detected from the filename extension and UTF-8 decodability: `.txt`, `.md`,
+    `.log`, `.csv`, `.json`, `.yaml`, `.yml`. Scanned with the configured text `Detector`.
+  - Images: `.png`, `.jpg`/`.jpeg`, `.webp`, verified by magic bytes (extension and magic
+    must agree). Scanned by an `ImageEvidenceScanner` Protocol whose default implementation
+    sends the image to the vision-capable managed LLM (`TELESCREEN_MANAGED_LLM_PROVIDER`,
+    default `claude`; see design-detectors.md). The model returns only
+    `{contains_sensitive: bool, rule_classes: [...]}` and is instructed never to transcribe
+    content; free text in the response rejects the scan. Images cannot be masked, so the
+    verdict is accept or reject only. EXIF/metadata (GPS, author) is stripped before
+    storage. Fail closed: when no image scanner is configured (no managed LLM credentials),
+    image uploads are rejected with 503 `evidence_scanner_unavailable`; scanner errors
+    after retries also reject.
+  - Anything else is rejected with 415 `unsupported_media_type`.
+- Scan with the configured detector (injected `Detector` for text, `ImageEvidenceScanner` for
+  images); any finding rejects: content is
+  discarded, an `evidence` row with verdict `rejected` and the rule classes is stored, 422
+  `evidence_rejected` with rule classes only, audit record.
+- Clean content is stored through `EvidenceStore` (`LocalFileEvidenceStore` at
+  `TELESCREEN_EVIDENCE_DIR`, key = evidence id) with sha256; the filename is redacted;
+  history `evidence_added` is written through `IssueRecorder.add_history`; `RunSignaler` is
+  not called (completion is explicit through the human task).
+
+### Search
+
+- `SearchBackend` port: `ensure_indexes()`, `upsert(index, documents)`, `delete(index,
+  ids)`, `search(index, query, filters, limit, offset) -> SearchPage`.
+- `MeiliSearchBackend` (httpx, `TELESCREEN_MEILI_URL`, key secret ref) with index settings:
+  `issues` (filterable: status, source, rule_class, severity, assignee; sortable: last_seen,
+  first_seen, times_seen), `findings` (filterable: issue_id, rule_class), `runs`
+  (filterable: status, workflow, issue_id), `audit` (filterable: action, actor_ref,
+  target_kind, at; sortable: seq, at). `InMemorySearchBackend` for dev/tests.
+- `DocumentIndexer` implements `SearchIndexer`: builds documents from masked DB rows, runs
+  `IndexGuard`, then upserts. `telescreen search reindex` rebuilds all indexes.
+
+### Assistant (`telescreen.assistant`)
+
+- `AssistantTools` service with typed methods: `search_issues(query, status, limit)`,
+  `get_issue(issue_id)`, `count_incidents(start, end, group_by: status|source|rule_class|
+  severity)`, `incident_report(start, end)` (markdown summary), `list_workflow_runs(status,
+  limit)`, `audit_search(query, limit)`. Outputs are JSON or markdown text passed through
+  `Redactor` as a final guard.
+- MCP server: `telescreen mcp` runs the `mcp` SDK `FastMCP` over stdio with these tools.
+- Chat: `POST /api/chat` runs a tool loop on the managed LLM provider selected by
+  `TELESCREEN_MANAGED_LLM_PROVIDER` (`claude` default, or `codex`). It uses the shared
+  `LlmClient` from `telescreen.detection.factory` and the model from
+  `TELESCREEN_MANAGED_LLM_MODEL`.
+  - The loop is provider-agnostic and does not use provider-native tool calling. On each
+    round the model returns JSON matching the `ChatStep` schema: either
+    `{action: "tool", tool, arguments}` or `{action: "answer", answer}`.
+  - At most 6 tool rounds.
+  - User messages are redacted before sending.
+  - Tool arguments are parsed into per-tool dataclasses with `TypeAdapter`.
+  - Tool results (already masked) are appended to the transcript.
+  - The final answer is redacted.
+  - No chat history is stored; the client resends the transcript.
+  - Tests use a fake `LlmClient`.
+
+### UI (`src/web`)
+
+Visual design, layout, components and page patterns follow
+`design-docs/specs/design-ui-sentry.md` (Sentry-based UI, owner decision 2026-10-09). That
+document takes precedence over the page descriptions below where they differ.
+
+Stack: SolidJS, TypeScript (strict), Vite, `@solidjs/router`, vitest, jsdom,
+`@solidjs/testing-library`. Package scripts (owned by foundation in `package.json`):
+`dev`, `build` (`vite build`), `typecheck` (`tsc --noEmit`), `test` (`vitest run`).
+
+- Shell: superseded by `design-ui-sentry.md` sections 3 and 8.2 (primary rail, secondary
+  panel, TopBar slots); the route table in `routes.tsx` still points to
+  `pages/<area>/index.tsx`.
+- Page scope against this API: `design-ui-sentry.md` section 8.1 (binding for v1; no new
+  endpoints are added for the UI rework). Mock API mode: section 8.3. The v1.1 additions
+  (exposure, risk, new statuses, My tasks, policies, coverage, health, exceptions) are in
+  `design-ui-sentry.md` section 9, against the "v1.1 endpoints" above.
+- API client: `src/api/client.ts` (fetch wrapper with bearer token, error decoding into the
+  error model) and `src/api/types.ts` (hand-written types mirroring the API dataclasses).
+  The token is entered on the Settings page and kept in `sessionStorage`. From v1.2 it is
+  entered on `/login`, next to "Sign in with SSO" (OIDC Authorization Code + PKCE,
+  `src/web/src/auth/`). The OIDC tokens are kept in `sessionStorage`, refreshed before
+  expiry, and cleared on logout (`design-ui-sentry.md` section 10).
+- Pages:
+  - Issues list: filters (status, source, rule class, severity, assignee, free text via
+    search), columns short id, title, status badge, first seen, last seen, events, 14-day
+    sparkline (inline SVG).
+  - Issue detail: masked event list, history timeline, assignment, status transition
+    buttons (allowed transitions only), linked runs with current step, evidence list and
+    upload with rejection messages.
+  - Search: global search across indexes.
+  - Workflows: list, YAML/JSON editor (textarea with server-side validate and error list),
+    version list, activate.
+  - Runs: list and detail with ordered steps, statuses, visits, send-back transitions,
+    waiting human tasks and SLA due times, human task completion form.
+  - Police (workers, mode, labels, heartbeat age), Collectors (configs, trigger mode, run now),
+    Escalation Policies (tier editor as JSON), Audit (search and chain verify), Assistant
+    chat, Settings.
+- Tests: component tests per page with a mocked fetch.
+- Serving: `vite` dev server proxies `/api` to `http://localhost:8000`; in production the
+  Bureau serves `TELESCREEN_WEB_DIST` as static files at `/` with SPA fallback (rules in
+  `design-ui-sentry.md` section 8.6; the wheel carries no UI assets).
+
+## References
+
+See `design-docs/references/README.md`.

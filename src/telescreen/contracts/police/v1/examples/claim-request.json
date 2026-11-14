@@ -1,0 +1,7 @@
+{
+  "max_tasks": 4,
+  "wait_seconds": 2,
+  "task_types": [
+    "verify_remediation"
+  ]
+}

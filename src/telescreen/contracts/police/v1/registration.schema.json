@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.telescreen.invalid/police/v1/registration.schema.json",
+  "type": "object",
+  "properties": {
+    "worker_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lease_seconds": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "heartbeat_interval_seconds": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "max_wait_seconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "worker_token": {
+      "type": "string",
+      "minLength": 1
+    },
+    "signing_secret": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "worker_id",
+    "lease_seconds",
+    "heartbeat_interval_seconds",
+    "max_wait_seconds"
+  ],
+  "additionalProperties": false
+}

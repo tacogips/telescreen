@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.telescreen.invalid/police/v1/resource-exposure.schema.json",
+  "type": "object",
+  "properties": {
+    "locator": {"type": "string", "minLength": 1, "maxLength": 1024},
+    "visibility": {
+      "enum": ["public", "anyone_with_link", "external_shared", "domain", "internal", "private", "unknown"]
+    },
+    "external_principal_count": {"type": "integer", "minimum": 0},
+    "shared_drive": {"type": "boolean"},
+    "channel_kind": {"enum": ["public", "private", "dm", "connect"]},
+    "repo_visibility": {"enum": ["public", "internal", "private"]},
+    "is_fork": {"type": "boolean"}
+  },
+  "required": ["locator", "visibility"],
+  "additionalProperties": false
+}

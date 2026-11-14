@@ -1,0 +1,33 @@
+apiVersion: telescreen.workflow/v2
+kind: Workflow
+name: notification-sets-example
+description: Deliver a masked alert to configured Slack and email targets.
+notification_sets:
+  - name: secops-alerts
+    targets:
+      - recipients: [slack_channel:C0123ABCDE]
+        channels: [slack]
+        template: system.workflow_notify
+      - recipients: [email:secops-leads@example.invalid]
+        channels: [email]
+        template: system.workflow_notify
+trigger:
+  "on": [issue_created]
+  match:
+    min_severity: high
+start: notify_secops
+steps:
+  - id: notify_secops
+    type: notify
+    notification_set: secops-alerts
+    next: assign_review
+  - id: assign_review
+    type: human_task
+    title: Review the notification set example
+    assignee: team:secops
+    notify_set: secops-alerts
+    outcomes:
+      reviewed: completed
+  - id: completed
+    type: end
+    result: succeeded

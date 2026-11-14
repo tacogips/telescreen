@@ -1,0 +1,185 @@
+min_version = "2026.8.3"
+
+[[hooks.enter]]
+shell = "bash"
+script = '''
+if command -v kinko >/dev/null 2>&1 && kinko hook --help >/dev/null 2>&1; then
+  eval "$(kinko --path "$MISE_PROJECT_ROOT" hook enter bash)"
+fi
+'''
+
+[[hooks.leave]]
+shell = "bash"
+script = '''
+if command -v kinko >/dev/null 2>&1 && kinko hook --help >/dev/null 2>&1; then
+  eval "$(kinko hook leave bash)"
+fi
+'''
+
+[tools]
+"aqua:slackapi/slack-cli" = "4.9.0"
+bun = "1.4.2"
+gitleaks = "latest"
+node = "22"
+pre-commit = "latest"
+python = "3.12"
+uv = "0.12.3"
+
+[tasks.default]
+description = "Show available tasks"
+run = "mise tasks ls"
+
+[tasks.setup]
+description = "Install mise tools, sync Python dev tools (ruff, ty, pytest) via uv, install git hooks"
+run = '''
+mise install
+uv sync --dev
+mise run install-git-hooks
+'''
+
+[tasks.sync]
+description = "Sync project dependencies with uv"
+run = "uv sync --dev"
+
+[tasks.lock]
+description = "Refresh uv.lock"
+run = "uv lock"
+
+[tasks.run]
+description = "Run the application"
+run = "uv run python -m telescreen"
+
+[tasks.test]
+description = "Run tests"
+run = "uv run pytest"
+
+[tasks.test-verbose]
+description = "Run tests with verbose output"
+run = "uv run pytest -vv"
+
+[tasks.test-cov]
+description = "Run tests with coverage"
+run = "uv run pytest --cov=telescreen --cov-report=term-missing"
+
+[tasks.lint]
+description = "Run Ruff lint checks"
+run = "uv run ruff check ."
+
+[tasks.typecheck]
+description = "Run ty type checks"
+run = "uv run ty check"
+
+[tasks.typelint]
+description = "Run the project AST type lint (typed declarations; no Any/object/dict; no **kwargs; dataclass/enum types)"
+run = "uv run python tools/typelint.py"
+
+[tasks.fmt]
+description = "Format code with Ruff"
+run = "uv run ruff format ."
+
+[tasks.fmt-check]
+description = "Check formatting"
+run = "uv run ruff format --check ."
+
+[tasks.build]
+description = "Build the package"
+run = "uv build"
+
+[tasks.clean]
+description = "Remove generated artifacts"
+run = "rm -rf build dist htmlcov .coverage .pytest_cache .ruff_cache src/*.egg-info"
+
+[tasks.ci]
+description = "Run the standard CI checks"
+run = "mise run fmt-check && mise run lint && mise run typelint && mise run typecheck && mise run test && mise run build"
+
+[tasks.ddl-edit]
+description = "Open the database schema (db/schema/telescreen.nodetto.jsonl) in the Nodetto app"
+run = 'open -a nodetto db/schema/telescreen.nodetto.jsonl'
+
+[tasks.ddl-export]
+description = "Regenerate db/schema/*.sql from the Nodetto schema document with nodetto-cli"
+run = """
+cli="${NODETTO_CLI:-nodetto-cli}"
+command -v "$cli" >/dev/null 2>&1 || { echo "nodetto-cli not found: brew install --cask tacogips/tap/nodetto (or set NODETTO_CLI)" >&2; exit 2; }
+"$cli" format db/schema/telescreen.nodetto.jsonl --write
+"$cli" ddl db/schema/telescreen.nodetto.jsonl --dialect postgresql --strict --output db/schema/telescreen.postgresql.sql
+"$cli" ddl db/schema/telescreen.nodetto.jsonl --dialect sqlite --strict --output db/schema/telescreen.sqlite.sql
+"""
+
+[tasks.ddl-arrange]
+description = "Tidy the Nodetto schema layout (the app's Arrange > Tidy layout) with nodetto-cli"
+run = """
+cli="${NODETTO_CLI:-nodetto-cli}"
+command -v "$cli" >/dev/null 2>&1 || { echo "nodetto-cli not found: brew install --cask tacogips/tap/nodetto (or set NODETTO_CLI)" >&2; exit 2; }
+"$cli" arrange db/schema/telescreen.nodetto.jsonl --write
+"""
+
+[tasks.ddl-check]
+description = "Check the Nodetto schema document is canonical, its SQL exports are current and the models match it"
+run = """
+cli="${NODETTO_CLI:-nodetto-cli}"
+command -v "$cli" >/dev/null 2>&1 || { echo "nodetto-cli not found: brew install --cask tacogips/tap/nodetto (or set NODETTO_CLI)" >&2; exit 2; }
+"$cli" format db/schema/telescreen.nodetto.jsonl --check
+"$cli" ddl db/schema/telescreen.nodetto.jsonl --dialect postgresql --strict --check db/schema/telescreen.postgresql.sql
+"$cli" ddl db/schema/telescreen.nodetto.jsonl --dialect sqlite --strict --check db/schema/telescreen.sqlite.sql
+uv run pytest tests/db/test_nodetto_schema.py -q
+"""
+
+[tasks.web-install]
+description = "Install web dependencies from the frozen lockfile"
+run = "cd src/web && bun install --frozen-lockfile"
+
+[tasks.web-typecheck]
+description = "Typecheck the SolidJS application"
+run = "cd src/web && bun run typecheck"
+
+[tasks.web-test]
+description = "Run web component tests"
+run = "cd src/web && bun run test"
+
+[tasks.web-build]
+description = "Build the web application"
+run = "cd src/web && bun run build"
+
+[tasks.web-ci]
+description = "Install and verify the web application"
+run = "mise run web-install && mise run web-typecheck && mise run web-test && mise run web-build"
+
+[tasks.install-git-hooks]
+description = "Install mise tools and the repository pre-commit hook"
+run = '''
+mise install
+
+hooks_path=$(git config --local --get core.hooksPath || true)
+if [ "$hooks_path" = ".git/hooks" ]; then
+  git config --local --unset-all core.hooksPath
+  hooks_path=""
+fi
+
+if [ -z "$hooks_path" ]; then
+  mise exec -- pre-commit install
+else
+  mise exec -- pre-commit validate-config .pre-commit-config.yaml
+  echo "Using existing custom Git hooks path: $hooks_path"
+fi
+'''
+
+[tasks.slack-login]
+description = "Log the Slack CLI in to a workspace (paste the printed /slackauthticket command into Slack, then enter the challenge code)"
+run = "slack login"
+
+[tasks.slack-app-validate]
+description = "Validate the Telescreen Slack app manifest against a workspace (SLACK_TEAM=<team id or name>)"
+dir = "examples/slack-app"
+run = 'slack manifest validate --app deployed --team "${SLACK_TEAM:?set SLACK_TEAM to the Slack team id or name}"'
+
+[tasks.slack-app-install]
+description = "Create or update and install the Telescreen Slack app from examples/slack-app/manifest.json (SLACK_TEAM=<team id or name>)"
+dir = "examples/slack-app"
+run = 'slack app install --environment deployed --team "${SLACK_TEAM:?set SLACK_TEAM to the Slack team id or name}"'
+
+[tasks.slack-app-settings]
+description = "Open the installed Telescreen Slack app settings page (bot token, signing secret)"
+dir = "examples/slack-app"
+run = 'slack app settings --app deployed --team "${SLACK_TEAM:?set SLACK_TEAM to the Slack team id or name}"'

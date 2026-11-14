@@ -1,0 +1,4 @@
+# Per-installation state written by the Slack CLI (app and team ids, caches).
+apps.json
+apps.dev.json
+cache/
