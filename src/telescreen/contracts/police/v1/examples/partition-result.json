@@ -1,0 +1,17 @@
+{
+  "shards": [
+    {
+      "shard_key": "repo-1",
+      "descriptor": {
+        "repository": "example/repo"
+      },
+      "weight": 1
+    }
+  ],
+  "next_cursor": null,
+  "sub_corpora": [
+    {
+      "corpus_key": "repo-1"
+    }
+  ]
+}

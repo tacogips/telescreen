@@ -1,0 +1,110 @@
+import { cleanup, fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { createMemoryHistory, MemoryRouter, Route } from "@solidjs/router";
+import { afterEach, expect, it, vi } from "vitest";
+import { setSession } from "../../auth/session";
+import SettingsPage from "./index";
+
+afterEach(() => { cleanup(); sessionStorage.clear(); document.documentElement.removeAttribute("data-theme"); vi.restoreAllMocks(); });
+
+function renderGeneral(): void {
+  const history = createMemoryHistory();
+  history.set({ value: "/settings" });
+  render(() => <MemoryRouter history={history}><Route path="/settings" component={SettingsPage} /></MemoryRouter>);
+}
+
+function initialSettingsResponses(): Response[] {
+  return [
+    new Response(JSON.stringify({ items: [], next_cursor: null })),
+    new Response(JSON.stringify({ items: [{ id: "team-1", slug: "oncall", name: "On call", email: null, slack_channel: "#ops" }], next_cursor: null })),
+    new Response(JSON.stringify({ items: [{ id: "collector-1", name: "Drive", kind: "gdrive", trigger_mode: "schedule", cron: null, sweep_cron: null, selector_json: "{}", credential_ref: "env:DRIVE_TOKEN", enabled: true }], next_cursor: null })),
+    new Response(JSON.stringify({ status: "ok" })),
+  ];
+}
+
+it("shows the General sections without a token entry", async () => {
+  const responses = initialSettingsResponses();
+  vi.spyOn(globalThis, "fetch").mockImplementation(async () => responses.shift() ?? new Response());
+  renderGeneral();
+  expect(await screen.findByText("env:DRIVE_TOKEN")).toBeInTheDocument();
+  expect(screen.getByText("On call")).toBeInTheDocument();
+  expect(screen.queryByLabelText("Bearer token")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Save token" })).toBeNull();
+  expect(document.querySelector("input[type=password]")).toBeNull();
+});
+
+it("applies the selected theme and sends team member handles", async () => {
+  const responses = initialSettingsResponses();
+  const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () => responses.shift() ?? new Response(null, { status: 204 }));
+  renderGeneral();
+  await screen.findByText("On call");
+  fireEvent.change(screen.getByLabelText("Theme"), { target: { value: "dark" } });
+  expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+  fireEvent.input(screen.getByLabelText("Member handles"), { target: { value: "alice, bob" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save team changes" }));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/teams/oncall/members", expect.objectContaining({ method: "PUT", body: JSON.stringify({ handles: ["alice", "bob"] }) })));
+});
+
+it("shows the API error when setting team members fails", async () => {
+  const responses = initialSettingsResponses();
+  responses.push(new Response(JSON.stringify({ error: { code: "internal_error", detail: "failed" } }), { status: 500 }));
+  const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () => responses.shift() ?? new Response());
+  renderGeneral();
+  await screen.findByText("On call");
+  fireEvent.input(screen.getByLabelText("Member handles"), { target: { value: "alice" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save team changes" }));
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("internal_error");
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/teams/oncall/members", expect.objectContaining({ method: "PUT" })));
+});
+
+it("adds an identity without displaying the submitted value and saves the team lead", async () => {
+  const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = String(input);
+    if (url === "/api/members" && init?.method !== "POST") return new Response(JSON.stringify({ items: [{ id: "mem-1", handle: "alex", display_name: "Alex", email: null, slack_user_id: null, active: true }], next_cursor: null }));
+    if (url === "/api/teams") return new Response(JSON.stringify({ items: [{ id: "team-1", slug: "response", name: "Response", email: null, slack_channel: null, lead: null }], next_cursor: null }));
+    if (url === "/api/collectors") return new Response(JSON.stringify({ items: [], next_cursor: null }));
+    if (url === "/api/health") return new Response(JSON.stringify({ status: "ok" }));
+    if (url === "/api/members/alex/identities" && init?.method === "POST") return new Response(JSON.stringify({ id: "alex:identity-1", kind: "email", origin: "manual", key_prefix: "hmac:v1:abc", created_at: "2026-10-10T00:00:00Z" }));
+    if (url === "/api/members/alex/identities") return new Response(JSON.stringify({ items: [{ id: "alex:identity-1", kind: "email", origin: "manual", key_prefix: "hmac:v1:abc", created_at: "2026-10-10T00:00:00Z" }], next_cursor: null }));
+    return new Response(null, { status: 204 });
+  });
+  renderGeneral();
+  fireEvent.click(await screen.findByRole("button", { name: "Identities" }));
+  fireEvent.input(await screen.findByLabelText("Value"), { target: { value: "identity@example.invalid" } });
+  fireEvent.click(screen.getByRole("button", { name: "Add identity" }));
+  expect(await screen.findByText(/hmac:v1:abc/)).toBeInTheDocument();
+  expect(screen.queryByDisplayValue("identity@example.invalid")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Close" }));
+  fireEvent.change(screen.getByLabelText("Team lead for Response"), { target: { value: "alex" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save team changes" }));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/teams/response/lead", expect.objectContaining({ method: "PUT", body: JSON.stringify({ lead: "alex" }) })));
+  expect(fetchMock).not.toHaveBeenCalledWith("/api/teams/response/members", expect.anything());
+});
+
+it("shows the Field schema link only to data field administrators", async () => {
+  const history = createMemoryHistory(); history.set({ value: "/settings/data-fields" });
+  const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = String(input);
+    if (url === "/api/auth/me") return Response.json({ kind: "token", member: { handle: "alex", display_name: "Alex" }, role: "viewer", permissions: [] });
+    return Response.json({ items: [] });
+  });
+  render(() => <MemoryRouter history={history}><Route path="/settings" component={SettingsPage} /><Route path="/settings/:id" component={SettingsPage} /></MemoryRouter>);
+  await screen.findByText("General");
+  expect(screen.queryByRole("link", { name: "Field schema" })).toBeNull();
+  expect(fetchMock).not.toHaveBeenCalledWith("/api/data/fields", expect.anything());
+});
+
+it("renders the field schema page for data field administrators", async () => {
+  setSession({ kind: "token", access_token: "test-session" });
+  const history = createMemoryHistory(); history.set({ value: "/settings/data-fields" });
+  const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = String(input);
+    if (url === "/api/auth/me") return Response.json({ kind: "token", member: { handle: "admin", display_name: "Admin" }, role: "admin", permissions: ["data_fields.admin"] });
+    if (url === "/api/data/fields") return Response.json({ items: [] });
+    return Response.json({ items: [] });
+  });
+  render(() => <MemoryRouter history={history}><Route path="/settings" component={SettingsPage} /><Route path="/settings/:id" component={SettingsPage} /></MemoryRouter>);
+  expect(await screen.findByRole("link", { name: "Field schema" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Field schema" })).toBeInTheDocument();
+  expect(fetchMock).toHaveBeenCalledWith("/api/data/fields", expect.anything());
+});

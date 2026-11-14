@@ -1,0 +1,251 @@
+{
+  "taskId": "telescreen-v1-20261009-s340",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "eb107ec9f913e06ed3bc6434c18991b71d293e81",
+  "evidenceRoot": "tmp/telescreen-v1-20261009-s340",
+  "evidenceRootNotes": "Untracked; never staged or committed. Use per-plan and per-attempt subdirectories: tmp/telescreen-v1-20261009-s340/<planId>/attempt-<n>/.",
+  "supersedes": "impl-plans/active/telescreen-v1-20261009-s338-dispatch.json (originalHead 823463f; kept unchanged as the run A historical record referenced by accepted plans)",
+  "runScope": "Continuation run A2: p11-police-sdk, p17-notifications, p21-collectors-slack, p26-workflow-mapreduce (verify in-tree code, fix open gaps) and p19-police-bureau (implement). Out of scope: src/web, p12, p13, p14, p28-assembly, p29-examples-compose.",
+  "designDocPaths": [
+    "design-docs/specs/architecture.md",
+    "design-docs/specs/notes.md",
+    "design-docs/specs/command.md",
+    "design-docs/specs/design-police-contract.md",
+    "design-docs/specs/design-map-reduce-sweeps.md",
+    "design-docs/specs/design-masking.md",
+    "design-docs/specs/design-data-model.md",
+    "design-docs/specs/design-workflow-engine.md",
+    "design-docs/specs/design-collectors-and-ingestion.md",
+    "design-docs/specs/design-detectors.md",
+    "design-docs/specs/design-api-and-ui.md",
+    "design-docs/specs/design-synthetic-test-dataset.md",
+    "design-docs/specs/design-ui-sentry.md"
+  ],
+  "acceptedDependencies": [
+    {"planId": "p01-foundation", "planPath": "impl-plans/active/p01-foundation.md", "commit": "eb107ec9f913e06ed3bc6434c18991b71d293e81", "provides": "core config, logging masking processor, telescreen.core.json, tooling, wheel packaging"},
+    {"planId": "p02-db-schema", "planPath": "impl-plans/active/p02-db-schema.md", "commit": "eb107ec9f913e06ed3bc6434c18991b71d293e81", "provides": "SQLAlchemy models and migrations incl. police, notifications, map tables, ReplayNonceStore"},
+    {"planId": "p03-detection-rules", "planPath": "impl-plans/active/p03-detection-rules.md", "commit": "eb107ec9f913e06ed3bc6434c18991b71d293e81", "provides": "RuleDetector"},
+    {"planId": "p04-ports", "planPath": "impl-plans/active/p04-ports.md", "commit": "eb107ec9f913e06ed3bc6434c18991b71d293e81", "provides": "ports incl. police, sweeps, workflow TaskHandler/TaskResult, collector adapter protocols"},
+    {"planId": "p05-police-contract", "planPath": "impl-plans/active/p05-police-contract.md", "commit": "eb107ec9f913e06ed3bc6434c18991b71d293e81", "provides": "versioned police JSON Schemas, OpenAPI document, contracts/validator.py"},
+    {"planId": "p06-workflow-dsl", "planPath": "impl-plans/active/p06-workflow-dsl.md", "commit": "eb107ec9f913e06ed3bc6434c18991b71d293e81", "provides": "workflow DSL models incl. map step"},
+    {"planId": "p07-web-shell", "planPath": "impl-plans/active/p07-web-shell.md", "commit": "eb107ec9f913e06ed3bc6434c18991b71d293e81", "provides": "SolidJS shell (not touched this run)"},
+    {"planId": "p08-masking", "planPath": "impl-plans/active/p08-masking.md", "commit": "eb107ec9f913e06ed3bc6434c18991b71d293e81", "provides": "Masker, Redactor.has_hits, IndexGuard"},
+    {"planId": "p09-detection-llm-ml", "planPath": "impl-plans/active/p09-detection-llm-ml.md", "commit": "eb107ec9f913e06ed3bc6434c18991b71d293e81", "provides": "managed/local LLM and ML detectors"},
+    {"planId": "p10-api-common", "planPath": "impl-plans/active/p10-api-common.md", "commit": "eb107ec9f913e06ed3bc6434c18991b71d293e81", "provides": "api/common (auth, errors, read_limited_body, hash_token)"},
+    {"planId": "p15-audit-search", "planPath": "impl-plans/active/p15-audit-search.md", "commit": "eb107ec9f913e06ed3bc6434c18991b71d293e81", "provides": "hash-chained audit log and search indexing"},
+    {"planId": "p16-issues-ingest", "planPath": "impl-plans/active/p16-issues-ingest.md", "commit": "eb107ec9f913e06ed3bc6434c18991b71d293e81", "provides": "issues grouping service and push ingestion API"},
+    {"planId": "p18-evidence", "planPath": "impl-plans/active/p18-evidence.md", "commit": "eb107ec9f913e06ed3bc6434c18991b71d293e81", "provides": "evidence upload with scan and rejection; evidence.py router pattern"},
+    {"planId": "p20-collectors-core", "planPath": "impl-plans/active/p20-collectors-core.md", "commit": "eb107ec9f913e06ed3bc6434c18991b71d293e81", "provides": "collector runtime and collectors package init"},
+    {"planId": "p22-collectors-google", "planPath": "impl-plans/active/p22-collectors-google.md", "commit": "eb107ec9f913e06ed3bc6434c18991b71d293e81", "provides": "Drive/Docs/Sheets collectors and sweeps"},
+    {"planId": "p23-collectors-github", "planPath": "impl-plans/active/p23-collectors-github.md", "commit": "eb107ec9f913e06ed3bc6434c18991b71d293e81", "provides": "GitHub collector and sweep"},
+    {"planId": "p24-workflow-engine", "planPath": "impl-plans/active/p24-workflow-engine.md", "commit": "eb107ec9f913e06ed3bc6434c18991b71d293e81", "provides": "durable engine, PostgreSQL task queue, executors package init"},
+    {"planId": "p25-workflow-nodes", "planPath": "impl-plans/active/p25-workflow-nodes.md", "commit": "eb107ec9f913e06ed3bc6434c18991b71d293e81", "provides": "workflow node executors incl. police_verify"},
+    {"planId": "p27-assistant", "planPath": "impl-plans/active/p27-assistant.md", "commit": "eb107ec9f913e06ed3bc6434c18991b71d293e81", "provides": "MCP server and agent chat"}
+  ],
+  "designChangeThisRun": "design-docs/specs/design-police-contract.md: PoliceGateway takes session first; attempt=0 at dispatch, +1 per claim or push delivery, never on re-queue, max_attempts from PoliceTaskRequest (default 3) for both transports; push HMAC key is the UTF-8 bytes of the signing_secret string (accepted by step3-design-review comm-005618).",
+  "waves": {
+    "A2-1": ["p11-police-sdk", "p17-notifications", "p21-collectors-slack", "p26-workflow-mapreduce"],
+    "A2-2": ["p19-police-bureau"]
+  },
+  "waveRationale": "Original 5-wave DAG and every dependsOn unchanged. p19 depends on p11 (SDK used only by tests/contract/test_bureau_contract.py), so it starts after p11's A2 verification is accepted. All writePaths are disjoint.",
+  "reviewContext": {
+    "issueReference": "workflowInput issueTitle 'Telescreen: sensitive-data retention violation monitoring, Sentry-style reporting, and DB-backed incident/AI workflow engine' (no GitHub issue number); run opus-luna-design-and-implement-review-loop-session-340, continuation run A2; plan review accepted in comm-005620",
+    "userProblem": "Finish the last backend plans of Telescreen v1: the standalone Police SDK, outbound notifications with a DLP gate, the Bureau side of the police contract (pull and push transports), the Slack collector, and map-reduce sweeps, without ever persisting or returning raw sensitive values.",
+    "requiredOutcomes": [
+      "p11, p17, p21, p26: in-tree code verified against the current source with independent test-integrity and adversarial review; only genuinely open gaps fixed (Run A2 Verify checklists).",
+      "p19: Bureau police registration, PoliceGateway with PullQueueTransport and WebhookTransport, claim/heartbeat/result, signed push delivery with one-time callback tokens, maintenance and deadline handling, router, plus an SDK-driven pull and push contract test.",
+      "All five plans pass scoped ruff format/check, ty, typelint and pytest; serial finalization passes the full offline gates and uv build."
+    ],
+    "nonGoals": [
+      "src/web and plans p12, p13, p14 (UI rework), p28-assembly, p29-examples-compose.",
+      "Re-implementing accepted dependency plans.",
+      "Changing plan ids or the DAG."
+    ],
+    "constraints": [
+      "Strict typing via tools/typelint.py, ruff ANN/PGH and ty; no Any/object/dict, no **kwargs, no type-ignore; no weakening of the linters.",
+      "Raw detected values are never persisted, logged, indexed, notified or returned; tests assert raw samples are absent.",
+      "Default pytest is offline; integration tests are marked and skipped without TELESCREEN_TEST_DATABASE_URL / TELESCREEN_TEST_MEILI_URL; offline-skipped integration tests are not risks (conventions 7a).",
+      "src/telescreen_police_sdk must not import telescreen.*; src/telescreen must not import telescreen_police_sdk (contract tests only).",
+      "No Python file reaches 1000 lines; plan files stay under 400 lines.",
+      "Fixed findings go only in addressedFeedback; findings and risks list only open issues (impl-plans/conventions.md section 7a).",
+      "No edits outside each plan's writePaths; reconciliation requests go to the Progress Log for serial finalization."
+    ],
+    "designDecisionsAndRationale": [
+      "PoliceGateway methods take the DB session first, matching src/telescreen/ports/police.py, so transports participate in the caller's transaction.",
+      "Attempt is 0 at dispatch and +1 per claim or push POST, never on re-queue; max_attempts comes from PoliceTaskRequest (default 3) for both transports, which keeps retry semantics transport-independent.",
+      "The push HMAC key is signing_secret.encode('utf-8'), matching the SDK WebhookHandler(secret: bytes) and the n8n example.",
+      "Redactor every-string rejection returns 422 and leaves the task open, so a police can resubmit a clean result before the deadline.",
+      "No transaction is held across the push POST or the long-poll sleep."
+    ],
+    "intentionalTradeoffs": [
+      "p11/p17/p21/p26 run bounded verify-and-fix checklists rather than re-implementation, to avoid churn on already reviewed code.",
+      "The p19 contract test imports the SDK only under tests/contract, so the decoupling holds at runtime."
+    ],
+    "supportedEdgeCases": [
+      "Push replay (nonce reuse or stale timestamp) rejected; callback token is single-use (409 after acceptance).",
+      "Lease expiry re-queues without consuming an attempt; exhausted attempts and deadline expiry fail the police task.",
+      "Raw values in police results, notifications or sweep outputs are rejected or masked.",
+      "Map-reduce: 10,000-shard global max_concurrency cap, crash recovery without duplicate shards, 429 backpressure, reduce with removal reconciliation.",
+      "Slack integer file timestamps and thread replies with thread_ts."
+    ],
+    "outOfScopeEdgeCases": [
+      "Open residual risk (low): p19 does not raise the police_push_delivery engine TaskSpec.max_attempts (default 5) above the police max_attempts; harmless while no caller sets max_attempts above 3.",
+      "Open residual risk (low): handling of a sync 200 push body that fails the schema or Redactor relies on the engine retry path and the task deadline.",
+      "Live PostgreSQL/Meilisearch behavior beyond the marked integration tests."
+    ],
+    "sourcePaths": [
+      "impl-plans/conventions.md",
+      "impl-plans/active/telescreen-v1-20261009-s340-dispatch.json",
+      "impl-plans/active/p11-police-sdk.md",
+      "impl-plans/active/p17-notifications.md",
+      "impl-plans/active/p19-police-bureau.md",
+      "impl-plans/active/p21-collectors-slack.md",
+      "impl-plans/active/p26-workflow-mapreduce.md",
+      "design-docs/specs/design-police-contract.md",
+      "design-docs/specs/design-map-reduce-sweeps.md",
+      "design-docs/specs/design-masking.md",
+      "design-docs/specs/design-collectors-and-ingestion.md",
+      "design-docs/specs/design-workflow-engine.md",
+      "design-docs/specs/design-data-model.md",
+      "design-docs/specs/notes.md",
+      "src/telescreen/ports/police.py",
+      "src/telescreen/contracts"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "p11-police-sdk",
+      "planPath": "impl-plans/active/p11-police-sdk.md",
+      "wave": "A2-1",
+      "dependsOn": ["p05-police-contract"],
+      "mode": "verify, fix gaps (Run A2 Verify V0-V4)",
+      "writePaths": ["impl-plans/active/p11-police-sdk.md", "src/telescreen_police_sdk/models.py", "src/telescreen_police_sdk/_json.py", "src/telescreen_police_sdk/signing.py", "src/telescreen_police_sdk/client.py", "src/telescreen_police_sdk/worker.py", "src/telescreen_police_sdk/webhook.py", "src/telescreen_police_sdk/asgi.py", "src/telescreen_police_sdk/masking.py", "src/telescreen_police_sdk/sweep.py", "tests/police_sdk", "tests/contract/test_sdk_contract.py", "examples/police"],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Run A2 Verify items V0-V4 checked with evidence against the current source.",
+        "SDK has no telescreen.* import; pull and push modes, cancellation, replay and async callback tested.",
+        "Python and n8n police examples present with placeholders only.",
+        "Scoped verification passes; logs recorded; no unchecked boxes in the plan."
+      ],
+      "verification": [
+        "uv run --frozen ruff format --check --no-cache src/telescreen_police_sdk tests/police_sdk tests/contract/test_sdk_contract.py examples/police/python",
+        "uv run --frozen ruff check --no-cache src/telescreen_police_sdk tests/police_sdk tests/contract/test_sdk_contract.py examples/police/python",
+        "uv run --frozen ty check src/telescreen_police_sdk tests/police_sdk tests/contract/test_sdk_contract.py examples/police/python",
+        "set -o pipefail; uv run --frozen pytest -p no:cacheprovider tests/police_sdk tests/contract/test_sdk_contract.py 2>&1 | tee /tmp/telescreen-p11-police-sdk-pytest.log",
+        "uv run --frozen python tools/typelint.py > /tmp/telescreen-p11-police-sdk-typelint.log 2>&1; ! grep -E '^(src/telescreen_police_sdk|tests/police_sdk|tests/contract/test_sdk_contract.py)' /tmp/telescreen-p11-police-sdk-typelint.log",
+        "! grep -rnE '^(from|import) telescreen(\\.| |$)' src/telescreen_police_sdk",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p11-police-sdk.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p17-notifications",
+      "planPath": "impl-plans/active/p17-notifications.md",
+      "wave": "A2-1",
+      "dependsOn": ["p02-db-schema", "p04-ports", "p08-masking"],
+      "mode": "verify, fix gaps (Run A2 Verify V0-V3)",
+      "writePaths": ["impl-plans/active/p17-notifications.md", "src/telescreen/notifications", "tests/notifications"],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Run A2 Verify items V0-V3 checked with evidence against the current source.",
+        "DlpGate mask, block and residual behavior and delivery idempotency tested; no raw sample value in notifications, rows or logs.",
+        "Scoped verification passes; logs recorded; no unchecked boxes in the plan."
+      ],
+      "verification": [
+        "uv run --frozen ruff format --check --no-cache src/telescreen/notifications tests/notifications",
+        "uv run --frozen ruff check --no-cache src/telescreen/notifications tests/notifications",
+        "uv run --frozen ty check src/telescreen/notifications tests/notifications",
+        "set -o pipefail; uv run --frozen pytest -p no:cacheprovider tests/notifications 2>&1 | tee /tmp/telescreen-p17-notifications-pytest.log",
+        "uv run --frozen python tools/typelint.py > /tmp/telescreen-p17-notifications-typelint.log 2>&1; ! grep -E '^(src/telescreen/notifications|tests/notifications)' /tmp/telescreen-p17-notifications-typelint.log",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p17-notifications.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p21-collectors-slack",
+      "planPath": "impl-plans/active/p21-collectors-slack.md",
+      "wave": "A2-1",
+      "dependsOn": ["p04-ports"],
+      "mode": "verify, fix gaps (Run A2 Verify V0-V3)",
+      "writePaths": ["impl-plans/active/p21-collectors-slack.md", "src/telescreen/collectors/slack", "tests/collectors/slack"],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Run A2 Verify items V0-V3 checked with evidence against the current source.",
+        "SlackAdapter and SlackSweep event, schedule and sweep modes tested with valid, invalid and old signatures; integer file timestamps and thread replies handled.",
+        "Scoped verification passes; logs recorded; no unchecked boxes in the plan."
+      ],
+      "verification": [
+        "uv run --frozen ruff format --check --no-cache src/telescreen/collectors/slack tests/collectors/slack",
+        "uv run --frozen ruff check --no-cache src/telescreen/collectors/slack tests/collectors/slack",
+        "uv run --frozen ty check src/telescreen/collectors/slack tests/collectors/slack",
+        "set -o pipefail; uv run --frozen pytest -p no:cacheprovider tests/collectors/slack 2>&1 | tee /tmp/telescreen-p21-collectors-slack-pytest.log",
+        "uv run --frozen python tools/typelint.py > /tmp/telescreen-p21-collectors-slack-typelint.log 2>&1; ! grep -E '(^|/)(src/telescreen/collectors/slack/|tests/collectors/slack/)' /tmp/telescreen-p21-collectors-slack-typelint.log",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p21-collectors-slack.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p26-workflow-mapreduce",
+      "planPath": "impl-plans/active/p26-workflow-mapreduce.md",
+      "wave": "A2-1",
+      "dependsOn": ["p06-workflow-dsl", "p08-masking", "p10-api-common"],
+      "mode": "verify, mutation evidence, fix gaps (Run A2 Verify V0-V3)",
+      "writePaths": ["impl-plans/active/p26-workflow-mapreduce.md", "src/telescreen/workflow/mapreduce", "src/telescreen/workflow/executors/map.py", "src/telescreen/api/routers/map_jobs.py", "tests/workflow/mapreduce"],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Run A2 Verify items V0-V3 checked with evidence, including mutation evidence lines with sha256 restore in the Progress Log.",
+        "10,000-shard max_concurrency cap test, crash-safe no-duplicate shards, 429 backpressure and DR-1 removal reconciliation tests pass.",
+        "Scoped verification passes; logs recorded; no unchecked boxes in the plan."
+      ],
+      "verification": [
+        "uv run --frozen ruff format --check --no-cache src/telescreen/workflow/mapreduce src/telescreen/workflow/executors/map.py src/telescreen/api/routers/map_jobs.py tests/workflow/mapreduce",
+        "uv run --frozen ruff check --no-cache src/telescreen/workflow/mapreduce src/telescreen/workflow/executors/map.py src/telescreen/api/routers/map_jobs.py tests/workflow/mapreduce",
+        "uv run --frozen ty check src/telescreen/workflow/mapreduce src/telescreen/workflow/executors/map.py src/telescreen/api/routers/map_jobs.py tests/workflow/mapreduce",
+        "set -o pipefail; uv run --frozen pytest -p no:cacheprovider tests/workflow/mapreduce 2>&1 | tee /tmp/telescreen-p26-workflow-mapreduce-pytest.log",
+        "uv run --frozen python tools/typelint.py > /tmp/telescreen-p26-workflow-mapreduce-typelint.log 2>&1; ! grep -E '^(src/telescreen/workflow/mapreduce|src/telescreen/workflow/executors/map.py|src/telescreen/api/routers/map_jobs.py|tests/workflow/mapreduce)' /tmp/telescreen-p26-workflow-mapreduce-typelint.log",
+        "grep -rqE '10_?000' tests/workflow/mapreduce",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p26-workflow-mapreduce.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p19-police-bureau",
+      "planPath": "impl-plans/active/p19-police-bureau.md",
+      "wave": "A2-2",
+      "dependsOn": ["p05-police-contract", "p08-masking", "p10-api-common", "p11-police-sdk"],
+      "mode": "implement from plan",
+      "writePaths": ["impl-plans/active/p19-police-bureau.md", "src/telescreen/police", "src/telescreen/api/routers/police.py", "tests/police", "tests/contract/test_bureau_contract.py"],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Registration, PoliceGateway with pull and push transports, claims, results, push delivery, maintenance and router delivered with the plan's exact names and session-first gateway signatures.",
+        "Pull and push flows, replay rejection, one-time callback token and raw-value rejection (422, task left open) tested.",
+        "Attempt counting (0 at dispatch, +1 per claim or POST, unchanged on re-queue), push retry/exhaustion and signing-interop (signing_secret.encode('utf-8')) tests pass.",
+        "SDK-driven contract test covering a pull cycle and a push case passes; src/telescreen does not import telescreen_police_sdk.",
+        "No file of 1000+ lines under src/telescreen/police or tests/police; scoped verification passes; no unchecked boxes in the plan."
+      ],
+      "verification": [
+        "uv run --frozen ruff format --check --no-cache src/telescreen/police src/telescreen/api/routers/police.py tests/police tests/contract/test_bureau_contract.py",
+        "uv run --frozen ruff check --no-cache src/telescreen/police src/telescreen/api/routers/police.py tests/police tests/contract/test_bureau_contract.py",
+        "uv run --frozen ty check src/telescreen/police src/telescreen/api/routers/police.py tests/police tests/contract/test_bureau_contract.py",
+        "set -o pipefail; uv run --frozen pytest -p no:cacheprovider tests/police tests/contract/test_bureau_contract.py 2>&1 | tee /tmp/telescreen-p19-police-bureau-pytest.log",
+        "uv run --frozen python tools/typelint.py > /tmp/telescreen-p19-police-bureau-typelint.log 2>&1; ! grep -E '^(src/telescreen/police|src/telescreen/api/routers/police.py|tests/police|tests/contract/test_bureau_contract.py)' /tmp/telescreen-p19-police-bureau-typelint.log",
+        "! grep -rn 'telescreen_police_sdk' src/telescreen",
+        "test -z \"$(find src/telescreen/police tests/police -name '*.py' -exec wc -l {} + | awk '$1 >= 1000 && $2 != \"total\"')\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p19-police-bureau.md)\" -eq 0"
+      ]
+    }
+  ],
+  "serialFinalization": {
+    "owner": "serial reconciliation after wave A2-2 joins (not a fanout plan)",
+    "steps": [
+      "Apply every Reconciliation request logged in the five plan Progress Logs one at a time, with fresh reads and sha256 before/after; a request touching an accepted plan's file or pyproject.toml/uv.lock must be called out in review.",
+      "Run the full gates and record exit status plus complete log path under /tmp/telescreen-s340-final-*.log: uv run --frozen ruff format --check --no-cache . ; uv run --frozen ruff check --no-cache . ; uv run --frozen python tools/typelint.py ; uv run --frozen ty check ; uv run --frozen pytest -p no:cacheprovider ; uv build --out-dir /tmp/telescreen-s340-final-dist",
+      "Check no Python file under src or tests is 1000+ lines and plan files stay under 400 lines.",
+      "Do not archive plans or modify src/web."
+    ]
+  }
+}

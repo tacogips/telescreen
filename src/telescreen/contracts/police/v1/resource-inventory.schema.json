@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.telescreen.invalid/police/v1/resource-inventory.schema.json",
+  "type": "object",
+  "properties": {
+    "locator": {"type": "string", "maxLength": 1024},
+    "item_fingerprints": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+    },
+    "item_count": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "kind": {"enum": ["file", "table", "list", "channel", "object", "folder", "other"]}
+  },
+  "required": ["locator"],
+  "additionalProperties": false,
+  "not": {"required": ["item_fingerprints", "item_count"]}
+}

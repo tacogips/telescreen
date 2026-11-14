@@ -1,0 +1,52 @@
+apiVersion: telescreen.workflow/v1
+kind: Workflow
+name: drive-weekly-sweep
+description: Manually start a concurrent scan of the configured Google Drive domain.
+start: drive_sweep
+steps:
+  - id: drive_sweep
+    type: map
+    source:
+      partition:
+        via: collector
+        collector: gdrive-domain
+    map:
+      via: collector
+    max_concurrency: 64
+    shard_timeout: PT5M
+    shard_max_attempts: 3
+    timeout: PT24H
+    outcomes:
+      succeeded: report_complete
+      partial: report_partial
+      failed: report_failed
+  - id: report_complete
+    type: notify
+    channel: slack
+    to: [team:workspace-ops]
+    subject: Drive sweep completed
+    body: The Drive sweep completed. Review the count-only run summary.
+    next: completed
+  - id: report_partial
+    type: notify
+    channel: slack
+    to: [team:workspace-ops]
+    subject: Drive sweep was partial
+    body: Some resources could not be checked. Review failures before resolving findings.
+    next: partial
+  - id: report_failed
+    type: notify
+    channel: slack
+    to: [team:workspace-ops]
+    subject: Drive sweep failed
+    body: The Drive sweep failed before reconciliation could complete.
+    next: failed
+  - id: completed
+    type: end
+    result: succeeded
+  - id: partial
+    type: end
+    result: failed
+  - id: failed
+    type: end
+    result: failed

@@ -1,0 +1,52 @@
+apiVersion: telescreen.workflow/v1
+kind: Workflow
+name: gdrive-mynumber-sheet
+description: Remediate a Drive spreadsheet containing a national identifier.
+trigger:
+  "on": [issue_created, issue_regressed]
+  match:
+    sources: [gdrive, gdocs, gsheets]
+    rule_classes: [national_id]
+    min_severity: high
+start: rescan
+steps:
+  - id: rescan
+    type: detect
+    detectors: [rule]
+    outcomes:
+      found: owner_triage
+      clean: completed
+      error: failed
+  - id: owner_triage
+    type: human_task
+    title: Review the Drive spreadsheet finding
+    assignee: team:drive-owners
+    sla: PT4H
+    escalation_policy: secops-standard
+    outcomes:
+      remediation_required: collect_evidence
+  - id: collect_evidence
+    type: evidence_upload
+    title: Upload proof that the spreadsheet was corrected
+    assignee: team:drive-owners
+    min_files: 1
+    sla: PT24H
+    escalation_policy: dev-remediation
+    next: police_recheck
+  - id: police_recheck
+    type: police_verify
+    task_type: verify_remediation
+    labels: [scope=google-workspace]
+    input:
+      instructions: Verify the spreadsheet no longer contains the detected identifier.
+    timeout: PT2H
+    outcomes:
+      passed: completed
+      failed: owner_triage
+      error: failed
+  - id: completed
+    type: end
+    result: succeeded
+  - id: failed
+    type: end
+    result: failed

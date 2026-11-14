@@ -1,0 +1,1 @@
+"""Issue detail query helpers."""

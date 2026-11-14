@@ -1,0 +1,416 @@
+{
+  "taskId": "telescreen-v13-20261012-e1",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "57f389b93b001a4138bfb7656f0db9661268956f",
+  "evidenceRoot": "tmp/telescreen-v13-20261012-e1",
+  "evidenceRootNotes": "Untracked (gitignored by **/tmp); never staged or committed. Use per-plan and per-attempt subdirectories: tmp/telescreen-v13-20261012-e1/<planId>/attempt-<n>/. Command logs go to /tmp/telescreen-<planId>-*.log and builds to /tmp/telescreen-<planId>-dist or /tmp/telescreen-<planId>-web (conventions section 7).",
+  "runScope": "Run 1 of 3 of Telescreen v1.3 (Sentry parity, design-docs/specs/design-v1-3-sentry-parity.md) at base 57f389b, per impl-plans/README.md 'Dispatch runs'. Run waves: 1 {v13-p01-foundation, v13-p02-db, v13-p03-ui-foundation}; 2 {v13-p04-issue-stream-backend, v13-p05-triage-lifecycle-backend, v13-p09-notifications-backend, v13-p13-ui-stream}. Manifest wave numbers are run order and equal the plan-file waves for these 7 plans. The 10 remaining accepted plans are listed in laterRunPlans and are NOT dispatched here: run 2 {p06, p07, p08, p10, p11, p14, p15, p16} and run 3 {p12, p17} get their own manifests that record the accepted run-1 plans as acceptedDependencies. The run table in design section 15 (which still lists p07 in run 1) is superseded by the accepted plan metadata and impl-plans/README.md (p07 moved to wave 3 after it gained a dependency on p04, review P5R-F1).",
+  "designDocPaths": [
+    "design-docs/specs/design-v1-3-sentry-parity.md",
+    "design-docs/specs/design-v1-3-sentry-parity-review.md",
+    "design-docs/specs/architecture.md",
+    "design-docs/specs/design-api-and-ui.md",
+    "design-docs/specs/design-data-model.md",
+    "design-docs/specs/design-masking.md",
+    "design-docs/specs/design-ui-sentry.md"
+  ],
+  "planIndexPath": "impl-plans/README.md",
+  "conventionsPath": "impl-plans/conventions.md",
+  "serialFinalization": "Not in this run. After v13-p17-verification-docs (run 3) is integration-accepted: move impl-plans/active/v13-p*.md to impl-plans/completed/ and the v13 dispatch manifests to impl-plans/completed/dispatch/; update impl-plans/README.md and the status lines of the v1.3 design documents. Serial and outside fanout.",
+  "reviewContext": {
+    "issueReference": {
+      "title": "Telescreen v1.3: Sentry parity for UI and features (self-review follow-up)",
+      "githubIssue": "none supplied (issue-resolution workflowInput)",
+      "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-11",
+      "requirements": "design-docs/specs/design-v1-3-sentry-parity-review.md (57f389b), corrected in its section 7",
+      "designAcceptance": "design-docs/specs/design-v1-3-sentry-parity.md accepted at Step 3 (comm-000483)",
+      "planAcceptance": "plan revision comm-000486 (fixes for Step 5 findings comm-000485) accepted by step5-impl-plan-review comm-000487; P5R-F1 and P5R-F2 verified fixed; no repair requests"
+    },
+    "userProblem": "The owner asked (translated): 'Self-review the UI and the features. Are we providing the same usability and functionality as Sentry? If not, improve it.' The committed self-review found 7 defects (B1 reversed First/Latest navigation, B2 assigned:none raising RECIPIENT_UNKNOWN, B3 regressed/acknowledged/in_progress hidden by is:unresolved, B4 raw member ids as assignees, B5 negation dropped, B6 activity without actors, B7 navigation/chart/tags over a page instead of all findings) and a 60-item Sentry gap table (9 present, 23 partial, 28 missing).",
+    "requiredOutcomes": [
+      "B1-B7 fixed with regression tests that fail on 57f389b.",
+      "S1 stream tabs with counts, period picker, per-issue trend, Values column, priority and trending sorts, display names, auto-refresh banner; S2 server query language (negation, has:, dates, comparisons, priority:, assigned:none, assigned:#team, is:*) and server saved views; S3 bulk and merge/unmerge; S4 archived (four conditions, bounded by 90 days) and escalating statuses; S5 Sentry-like issue detail; S6 alert rules with action interval, mute and history; S7 per-user notification settings, mention/subscription delivery and weekly report; S8 dashboard; S9 integrations, tokens, member edit/deactivate, ownership rules; S10 palette, shortcuts, onboarding, profile, workflows list, realistic mock seed.",
+      "Every new API route declares a permission; the route-walk test passes (p12).",
+      "Leak matrix extended to tag aggregates, stats, saved views, bulk and merge records, archive state, alert rules and history, subscriptions, mentions, activity, external issue bodies, weekly report and integration status (p17).",
+      "Screenshot smoke covers every new page and state in light and dark with zero browser errors on a seed of at least 40 issues across statuses (p03 list, p17 strict run).",
+      "mise run ci passes offline; src/web typecheck, vitest, build and screenshots pass; README, design docs and impl-plans index updated and v13 plans archived (p17).",
+      "Run 1 outcome: the wave-1 contracts (vocabulary, permissions, settings, ports, router split, models and 0004_v1_3, UI client/mock/components/routes/screenshot list) plus the stream backend (B2, B3, B5, S1, S2), the triage lifecycle backend (S4, priority, For review, group helpers, ingest hooks), the notifications backend (S7) and the UI stream (B3, B4, B5 UI) are implemented and verified."
+    ],
+    "nonGoals": [
+      "Deferred by the accepted review (section 5): releases and 'resolve in next release', environments, projects, Discover, Jira create (link by URL covers Jira), replay/performance/profiling.",
+      "No dependency change: pyproject.toml, uv.lock, src/web/package.json and src/web/bun.lock unchanged; no new heavy UI dependency (hand-rendered SVG charts).",
+      "No edit of existing Alembic migrations (0001_initial, 0002_v1_1, 0003_v1_2); no change to tools/typelint.py, ruff ANN/PGH or ty strictness; no per-file-ignore entries.",
+      "Meilisearch is not used for the stream (D7); archive never becomes permanent suppression (D2, D3).",
+      "Run 1 does not wire new routers or bindings (p12, run 3) and does not touch detail, alerts, dashboard, integrations, directory/ownership or the later UI pages."
+    ],
+    "constraints": [
+      "AGENTS.md / CLAUDE.md: English only, no emojis, python-coding-standards; plan files under 400 lines; every Python file under 1000 lines (api/routers/issues.py split by p01, issues/service.py split by p05 into ingest_transitions.py).",
+      "Strict typing via tools/typelint.py, ruff ANN/PGH and ty; no type-ignore or ty-ignore; no Any, object, dict/mapping types or **kwargs; dataclasses and enums only.",
+      "Raw detected values are never persisted, logged, indexed, notified or returned; saved view names/queries, comments, external issue bodies and alert payloads pass Redactor (and the DLP gate before egress) and hold masked values or fingerprints only; errors never echo the query.",
+      "Default uv run pytest passes offline; integration tests skip without TELESCREEN_TEST_DATABASE_URL / TELESCREEN_TEST_MEILI_URL; live tests (tests/live, marker live) skip offline.",
+      "Database changes only via the new idempotent revision 0004_v1_3 (down_revision 0003_v1_2).",
+      "New Protocol methods go into new Protocols; new fields on existing DTOs and services are defaulted so wiring.py compiles unchanged until p12.",
+      "Conventions 2 and 7a: write only inside writePaths; a needed change elsewhere is a Reconciliation request; fixed findings only in addressedFeedback; verification lists only final passing commands; offline-skipped integration/live tests and /tmp outputs are not risks.",
+      "No git checkout/restore/stash/reset/clean/commit/add by workers; bun install only with --frozen-lockfile; builds and logs go to /tmp."
+    ],
+    "designDecisionsAndRationale": [
+      "D1: UNRESOLVED_STATUSES (unresolved, acknowledged, in_progress, regressed, escalating) is the open set behind is:unresolved and the Unresolved tab (fixes B3); OPEN_STATUSES adds escalating and archived so reconciliation still covers them.",
+      "D2-D4: new archived and escalating statuses; ignored stays approved-exception only; every archive ends by archived_at + 90 days; escalation on condition met or widened exposure.",
+      "D5-D6: priority derived from severity until set manually; needs_review set on create/regress/escalate/system unarchive/verification failure and cleared by any human triage action.",
+      "D7-D10: server-side SQL query parser (no Meilisearch), period scoping, Values = distinct_fingerprints, server saved views gated by Redactor with personal/shared visibility.",
+      "D12-D13: merge keeps child rows (merged_into_id), recomputes group counters, cascades group actions, rejects exception requests on group members (merged_group).",
+      "D16: ActorDirectory port resolves actor refs to display names (fixes B4/B6 without exposing raw ids).",
+      "D22-D24: per-member notification categories; direct categories choose the channel, alerts/workflow_tasks only filter member recipients; sla_escalated is never filtered; weekly report through a cron provider and the editable system.weekly_report template.",
+      "Plan DAG: wave-1 contracts first; p01 splits issues.py mechanically and hands issues_common.py/issues_list.py to p04, issues_actions.py to p05 and the template built-ins to p09 as single later editors; p04 is the single wave-2 owner of the shared item serializer and the counts router must be registered before the issues router (contract for p12)."
+    ],
+    "intentionalTradeoffs": [
+      "Runs are capped at 8 plans because earlier sessions hit the 1M-token prompt limit in implementation-wave-outcome; this manifest dispatches 7 plans and leaves 10 accepted plans to later manifests (laterRunPlans).",
+      "Manifest scoped ruff/ty commands are narrowed to each plan's own write and shared paths (conventions 7 'YOUR paths') instead of whole directories that contain sibling plans' in-progress files; typelint still runs on the whole repository and is filtered to the plan's paths.",
+      "p05's tests/issues regression run ignores tests/issues/v13_query (p04's in-progress tests). p04's tests/api/v11_issues run and p05's tests/api/v11_issues run execute while the sibling edits issues_list.py or issues_actions.py; a failure caused by the sibling's in-progress file is recorded as such in the Progress Log, own failures are fixed. p12 and p17 rerun the full suite after the joins.",
+      "p01 and p02 require the full offline suite to pass during wave 1; p04, p05 and p09 record the full suite as informational Progress Log evidence only (not manifest verification).",
+      "p05 tests never assert on the _issue_json fields p04 adds (rule at v13-p05 :223-224); only status code and id of responses.",
+      "Low residual (comm-000487): the p03 mock query evaluator duplicates the p04 server parser semantics; p17 E1 checks the server behavior against it.",
+      "p03 screenshots run in non-strict mode (missing targets log state-skipped); p17 runs TELESCREEN_SCREENSHOTS_STRICT=1. A missing browser is a recorded verification gap, never a pass.",
+      "Every plan declares artifactRoots none: no plan installs tools into the repository beyond the gitignored src/web/node_modules from bun install --frozen-lockfile, and outputs go to /tmp or the gitignored tmp/ui-screenshots."
+    ],
+    "supportedEdgeCases": [
+      "assigned:none and legacy assignee=none return only unassigned issues and never reach the recipient resolver (B2).",
+      "Negated terms for every key, key:[a,b] lists, quoted values, TELE-n free text, LIKE text with % and _ escaped; more than 20 tokens or 1000 characters, unknown keys and invalid enum values give 422 invalid_query with token_index and reason and no echo of the query.",
+      "Merged children never appear in the list or counts; trends include children's findings.",
+      "Saved views: sample secret in name or query -> 422 with no row; 51st personal view -> limit_exceeded; shared view without views.manage_shared -> 403; unbound token -> 403.",
+      "Archive from a non-open status -> invalid_transition; count 0 or duration 200000 -> validation_error; expiry tick returns the issue as unresolved with system:archive history; exposure widening while archived escalates; exception approval and verification requests clear archive fields; merge/rebase never escalates or extends archive_until.",
+      "Notification settings: defaults by available address; opted-out member gets a skipped row with recipient_opted_out and no task; slack without a Slack id -> 422 recipient_unreachable; uncategorized v1.2 requests are byte-for-byte unchanged; weekly report enqueued once per fire.",
+      "UI: the raw query string is always sent; client validation only marks tokens; shortcuts are ignored inside editable elements; bulk failures are shown, not dropped; the auto-refresh banner never reorders the list."
+    ],
+    "outOfScopeEdgeCases": [
+      "Live PostgreSQL/Meilisearch behavior beyond marked integration tests skipped offline.",
+      "Live Slack, Mailpit and Keycloak checks (tests/live/v13, p17 in run 3).",
+      "Route registration order and real bindings in the running app (p12, run 3); run-1 API tests build their own apps in the documented order.",
+      "Releases, environments, projects, Discover and Jira create (deferred)."
+    ],
+    "lowFindingsCarried": [
+      "comm-000487 residual (Low): the p03 mock query evaluator duplicates the p04 server parser semantics; p17 E1 checks server behavior against it."
+    ],
+    "sourcePaths": [
+      "impl-plans/conventions.md",
+      "impl-plans/README.md",
+      "design-docs/specs/design-v1-3-sentry-parity.md",
+      "design-docs/specs/design-v1-3-sentry-parity-review.md",
+      "design-docs/specs/architecture.md",
+      "design-docs/specs/design-api-and-ui.md",
+      "design-docs/specs/design-data-model.md",
+      "design-docs/specs/design-masking.md",
+      "design-docs/specs/design-ui-sentry.md",
+      "src/telescreen/api/routers/issues.py",
+      "src/telescreen/issues/service.py",
+      "src/telescreen/core/vocabulary.py",
+      "src/telescreen/core/permissions.py",
+      "src/web/src/api/client.ts",
+      "src/web/scripts/screenshots.ts"
+    ]
+  },
+  "laterRunPlans": [
+    {"planId": "v13-p06-bulk-merge-backend", "planPath": "impl-plans/active/v13-p06-bulk-merge-backend.md", "plannedRun": 2, "dependsOn": ["v13-p04-issue-stream-backend", "v13-p05-triage-lifecycle-backend"]},
+    {"planId": "v13-p07-issue-detail-backend", "planPath": "impl-plans/active/v13-p07-issue-detail-backend.md", "plannedRun": 2, "dependsOn": ["v13-p01-foundation", "v13-p02-db", "v13-p04-issue-stream-backend"]},
+    {"planId": "v13-p08-alerts-backend", "planPath": "impl-plans/active/v13-p08-alerts-backend.md", "plannedRun": 2, "dependsOn": ["v13-p01-foundation", "v13-p02-db"]},
+    {"planId": "v13-p10-dashboard-integrations-backend", "planPath": "impl-plans/active/v13-p10-dashboard-integrations-backend.md", "plannedRun": 2, "dependsOn": ["v13-p01-foundation", "v13-p02-db", "v13-p04-issue-stream-backend"]},
+    {"planId": "v13-p11-directory-ownership-backend", "planPath": "impl-plans/active/v13-p11-directory-ownership-backend.md", "plannedRun": 2, "dependsOn": ["v13-p01-foundation", "v13-p02-db"]},
+    {"planId": "v13-p14-ui-detail", "planPath": "impl-plans/active/v13-p14-ui-detail.md", "plannedRun": 2, "dependsOn": ["v13-p03-ui-foundation", "v13-p13-ui-stream"]},
+    {"planId": "v13-p15-ui-alerts-profile", "planPath": "impl-plans/active/v13-p15-ui-alerts-profile.md", "plannedRun": 2, "dependsOn": ["v13-p03-ui-foundation"]},
+    {"planId": "v13-p16-ui-dashboard-org", "planPath": "impl-plans/active/v13-p16-ui-dashboard-org.md", "plannedRun": 2, "dependsOn": ["v13-p03-ui-foundation"]},
+    {"planId": "v13-p12-wiring", "planPath": "impl-plans/active/v13-p12-wiring.md", "plannedRun": 3, "dependsOn": ["v13-p04-issue-stream-backend", "v13-p05-triage-lifecycle-backend", "v13-p06-bulk-merge-backend", "v13-p07-issue-detail-backend", "v13-p08-alerts-backend", "v13-p09-notifications-backend", "v13-p10-dashboard-integrations-backend", "v13-p11-directory-ownership-backend"]},
+    {"planId": "v13-p17-verification-docs", "planPath": "impl-plans/active/v13-p17-verification-docs.md", "plannedRun": 3, "dependsOn": ["v13-p12-wiring", "v13-p13-ui-stream", "v13-p14-ui-detail", "v13-p15-ui-alerts-profile", "v13-p16-ui-dashboard-org"]}
+  ],
+  "plans": [
+    {
+      "planId": "v13-p01-foundation",
+      "planPath": "impl-plans/active/v13-p01-foundation.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "impl-plans/active/v13-p01-foundation.md",
+        "src/telescreen/core/vocabulary.py",
+        "src/telescreen/core/permissions.py",
+        "src/telescreen/core/config.py",
+        "src/telescreen/ports/issues.py",
+        "src/telescreen/ports/notifications.py",
+        "src/telescreen/ports/workflow.py",
+        "src/telescreen/ports/directory.py",
+        "src/telescreen/issues/transitions.py",
+        "src/telescreen/api/routers/issues.py",
+        "src/telescreen/api/routers/issues_common.py",
+        "src/telescreen/api/routers/issues_list.py",
+        "src/telescreen/api/routers/issues_detail.py",
+        "src/telescreen/api/routers/issues_actions.py",
+        "src/telescreen/api/routers/issues_comments.py",
+        "src/telescreen/notifications/templates/builtins.py",
+        "src/telescreen/notifications/templates/variables.py",
+        "src/telescreen/notifications/templates/synthetic.py",
+        "tests/core/v13",
+        "tests/ports/v13",
+        "tests/core/test_v11_foundation.py",
+        "tests/core/v12/test_permissions_and_oidc_settings.py",
+        "tests/api/v12_rbac/test_v12_rbac_router_permissions.py"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "tests/core/test_v11_foundation.py", "intendedEdit": "OPEN_STATUSES tuple assertion (about :115) gains escalating and archived only."},
+        {"path": "tests/api/v12_rbac/test_v12_rbac_router_permissions.py", "intendedEdit": "Issue route module names change from issues to issues_list/issues_detail/issues_actions/issues_comments (12 RouteRule rows) and MODULES replaces issues with the four names; paths and permissions unchanged. Handed to v13-p11 afterwards."},
+        {"path": "src/telescreen/api/routers/issues_common.py", "intendedEdit": "Created by the mechanical split (IssuesRouterDeps, helpers, IssueItemExtras contract, _issue_json(issue, extras=None) ignoring extras); handed to v13-p04 as its single wave-2 editor."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Deliverables 1-7: vocabulary values exactly as design section 2 (new statuses, enums, ErrorCodes, UNRESOLVED_STATUSES, OPEN_STATUSES order, priority_for_severity), USER_TRANSITIONS additions, the 14 v13 permissions and role sets matching the design matrix, the five settings with validation, port DTOs and new Protocols (no method added to an existing Protocol), the mechanical issues router split with the same 12 (method, path) routes and IssueItemExtras contract, and built-ins for the six new notification events.",
+        "Behavior unchanged: the full offline pytest suite passes; only the three owned existing tests are edited and only for assertions the change breaks.",
+        "Every src/telescreen/api/routers/issues*.py file under 1000 lines; no dependency or typelint change.",
+        "Completion Criteria all ticked; Progress Log has hashes and command evidence."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/core src/telescreen/ports src/telescreen/issues/transitions.py src/telescreen/api/routers/issues.py src/telescreen/api/routers/issues_common.py src/telescreen/api/routers/issues_list.py src/telescreen/api/routers/issues_detail.py src/telescreen/api/routers/issues_actions.py src/telescreen/api/routers/issues_comments.py src/telescreen/notifications/templates tests/core tests/ports tests/api/v12_rbac",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/core src/telescreen/ports src/telescreen/issues/transitions.py src/telescreen/api/routers/issues.py src/telescreen/api/routers/issues_common.py src/telescreen/api/routers/issues_list.py src/telescreen/api/routers/issues_detail.py src/telescreen/api/routers/issues_actions.py src/telescreen/api/routers/issues_comments.py src/telescreen/notifications/templates tests/core tests/ports tests/api/v12_rbac",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/core src/telescreen/ports src/telescreen/issues/transitions.py src/telescreen/api/routers/issues.py src/telescreen/api/routers/issues_common.py src/telescreen/api/routers/issues_list.py src/telescreen/api/routers/issues_detail.py src/telescreen/api/routers/issues_actions.py src/telescreen/api/routers/issues_comments.py src/telescreen/notifications/templates tests/core tests/ports tests/api/v12_rbac",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p01-typelint.log 2>&1; ! grep -E '^(src/telescreen/(core|ports)/|src/telescreen/api/routers/issues(_common|_list|_detail|_actions|_comments)?[.]py|src/telescreen/issues/transitions[.]py|src/telescreen/notifications/templates/|tests/(core|ports)/|tests/api/v12_rbac/)' /tmp/telescreen-v13-p01-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/core tests/ports tests/api/v12_rbac 2>&1 | tee /tmp/telescreen-v13-p01-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-v13-p01-pytest-all.log 2>&1",
+        "wc -l src/telescreen/api/routers/issues*.py > /tmp/telescreen-v13-p01-wc.log; ! awk '$2 != \"total\" && $1 >= 1000' /tmp/telescreen-v13-p01-wc.log | grep -q .",
+        "test -z \"$(git diff --name-only HEAD -- pyproject.toml uv.lock src/web/package.json src/web/bun.lock tools/typelint.py)\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v13-p01-foundation.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v13-p02-db",
+      "planPath": "impl-plans/active/v13-p02-db.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "impl-plans/active/v13-p02-db.md",
+        "src/telescreen/db/models",
+        "src/telescreen/db/migrations/versions/0004_v1_3.py",
+        "tests/db/test_models.py",
+        "tests/db/test_v13_migration.py"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "tests/db/test_models.py", "intendedEdit": "EXPECTED_TABLES gains the 14 v1.3 tables (34 -> 48) and the minimal-row test supplies minimal values for them."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "IssueRow gains priority, priority_manual, needs_review, merged_into_id and the five archive columns plus ix_issues_status_merged; new issues_v13.py, alerts.py and integrations.py models, NotificationRow.category and NotificationSettingRow, all exported; 48 tables in the metadata.",
+        "0004_v1_3 (down_revision 0003_v1_2) is idempotent, backfills priority from severity and needs_review for unresolved/regressed only when it added the priority column, and downgrades cleanly; earlier migrations untouched.",
+        "tests/db passes and the full offline suite passes; scoped gates pass; typelint grep empty; model files under 1000 lines.",
+        "Completion Criteria all ticked; Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/db tests/db",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/db tests/db",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/db tests/db",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p02-typelint.log 2>&1; ! grep -E '^(src/telescreen/db/|tests/db/)' /tmp/telescreen-v13-p02-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/db 2>&1 | tee /tmp/telescreen-v13-p02-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-v13-p02-pytest-all.log 2>&1",
+        "test -z \"$(git diff --name-only HEAD -- src/telescreen/db/migrations/versions/0001_initial.py src/telescreen/db/migrations/versions/0002_v1_1.py src/telescreen/db/migrations/versions/0003_v1_2.py)\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v13-p02-db.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v13-p03-ui-foundation",
+      "planPath": "impl-plans/active/v13-p03-ui-foundation.md",
+      "wave": 1,
+      "dependsOn": [],
+      "writePaths": [
+        "impl-plans/active/v13-p03-ui-foundation.md",
+        "src/web/src/api",
+        "src/web/src/components",
+        "src/web/src/routes.tsx",
+        "src/web/src/App.tsx",
+        "src/web/src/shell.test.tsx",
+        "src/web/scripts/screenshots.ts"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Typed types and client functions for every v1.3 endpoint (new fields on existing response types optional; existing signatures kept), api/issueQuery.ts key spec with validateIssueTokens and the mock-only evaluateIssueQuery, and a mock serving every v1.3 endpoint from a seed of at least 40 issues covering every status (at least 2 each), source, severity, priority and exposure, with merged group, mentions, external links, alert history, settings, tokens, ownership rules and integration statuses.",
+        "Components Avatar, PeriodPicker, StreamTabs, ShortcutHelp, shell/shortcuts.ts registry, StatusBadge labels; nav renamed (Assigned to me, Bookmarks; no localStorage views); palette issue search; dashboard and alerts areas registered; screenshot list covers every state of design section 16 with TELESCREEN_SCREENSHOTS_STRICT support.",
+        "No files under src/web/src/pages; package.json and bun.lock unchanged; fixtures follow the masking rules and tests/leak/test_ui_fixtures.py passes.",
+        "bun install --frozen-lockfile, typecheck, the whole vitest suite, build to /tmp and the non-strict screenshot smoke (zero page or console errors) pass; Completion Criteria all ticked; Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; cd src/web && bun install --frozen-lockfile > /tmp/telescreen-v13-p03-install.log 2>&1",
+        "set -o pipefail; cd src/web && bun run typecheck 2>&1 | tee /tmp/telescreen-v13-p03-typecheck.log",
+        "set -o pipefail; cd src/web && bun run test 2>&1 | tee /tmp/telescreen-v13-p03-test.log",
+        "set -o pipefail; cd src/web && bun run build --outDir /tmp/telescreen-v13-p03-web --emptyOutDir 2>&1 | tee /tmp/telescreen-v13-p03-build.log",
+        "set -o pipefail; cd src/web && bun run screenshots 2>&1 | tee /tmp/telescreen-v13-p03-shots.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/leak/test_ui_fixtures.py 2>&1 | tee /tmp/telescreen-v13-p03-fixtures.log",
+        "test -z \"$(git diff --name-only HEAD -- src/web/package.json src/web/bun.lock)\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v13-p03-ui-foundation.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v13-p04-issue-stream-backend",
+      "planPath": "impl-plans/active/v13-p04-issue-stream-backend.md",
+      "wave": 2,
+      "dependsOn": ["v13-p01-foundation", "v13-p02-db"],
+      "writePaths": [
+        "impl-plans/active/v13-p04-issue-stream-backend.md",
+        "src/telescreen/issues/query",
+        "src/telescreen/issues/views.py",
+        "src/telescreen/api/routers/issue_counts.py",
+        "src/telescreen/api/routers/issue_views.py",
+        "tests/issues/v13_query",
+        "tests/api/v13_stream"
+      ],
+      "sharedPaths": [
+        "src/telescreen/api/routers/issues_list.py",
+        "src/telescreen/api/routers/issues_common.py"
+      ],
+      "sharedPathNotes": [
+        {"path": "src/telescreen/api/routers/issues_list.py", "intendedEdit": "Created by v13-p01 (wave 1, mechanical move). Only wave-2 editor: query, period, start, end, trend parameters, sorts values/priority/trending with sort-tuple cursors, legacy assignee=none (B2)."},
+        {"path": "src/telescreen/api/routers/issues_common.py", "intendedEdit": "Created by v13-p01 (wave 1). Only wave-2 editor: _issue_json emits priority, priority_manual, needs_review, archive, updated_at and the extras (assignee, merged_count, bookmarked; defaults without extras), plus the batched issue_item_extras helper. v13-p05 and v13-p07 never edit it."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "issues/query package (model, parser, filters, period, trend, select_matching_ids contract for p06) with design 5.1 semantics; B2, B3 and B5 regression tests exist, pass and name the defect in their docstrings.",
+        "GET /api/issues gains query/period/trend and the priority, trending and values sorts with keyset cursors; merged children excluded from list and counts; 422 invalid_query body carries token_index and reason and never echoes the query.",
+        "GET /api/issues/counts in issue_counts.py (registered before the issues router in tests) and /api/views in issue_views.py, each route with exactly one permission dependency; SavedViewService enforces Redactor (no row stored on a hit), limits, ownership, views.manage_shared and audit with ids/visibility only.",
+        "issue_item_extras and _issue_json(issue, extras=None) signatures as specified; existing issue-API tests pass; every file under 1000 lines; Completion Criteria all ticked; Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/issues/query src/telescreen/issues/views.py src/telescreen/api/routers/issues_list.py src/telescreen/api/routers/issues_common.py src/telescreen/api/routers/issue_counts.py src/telescreen/api/routers/issue_views.py tests/issues/v13_query tests/api/v13_stream",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/issues/query src/telescreen/issues/views.py src/telescreen/api/routers/issues_list.py src/telescreen/api/routers/issues_common.py src/telescreen/api/routers/issue_counts.py src/telescreen/api/routers/issue_views.py tests/issues/v13_query tests/api/v13_stream",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/issues/query src/telescreen/issues/views.py src/telescreen/api/routers/issues_list.py src/telescreen/api/routers/issues_common.py src/telescreen/api/routers/issue_counts.py src/telescreen/api/routers/issue_views.py tests/issues/v13_query tests/api/v13_stream",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p04-typelint.log 2>&1; ! grep -E '^(src/telescreen/issues/query/|src/telescreen/issues/views[.]py|src/telescreen/api/routers/(issues_list|issues_common|issue_counts|issue_views)[.]py|tests/issues/v13_query/|tests/api/v13_stream/)' /tmp/telescreen-v13-p04-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/issues/v13_query tests/api/v13_stream tests/api/v11_issues tests/issues/test_issues_api.py 2>&1 | tee /tmp/telescreen-v13-p04-pytest.log",
+        "wc -l src/telescreen/issues/query/*.py src/telescreen/issues/views.py src/telescreen/api/routers/issues_list.py src/telescreen/api/routers/issues_common.py src/telescreen/api/routers/issue_counts.py src/telescreen/api/routers/issue_views.py > /tmp/telescreen-v13-p04-wc.log; ! awk '$2 != \"total\" && $1 >= 1000' /tmp/telescreen-v13-p04-wc.log | grep -q .",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v13-p04-issue-stream-backend.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v13-p05-triage-lifecycle-backend",
+      "planPath": "impl-plans/active/v13-p05-triage-lifecycle-backend.md",
+      "wave": 2,
+      "dependsOn": ["v13-p01-foundation", "v13-p02-db"],
+      "writePaths": [
+        "impl-plans/active/v13-p05-triage-lifecycle-backend.md",
+        "src/telescreen/issues/service.py",
+        "src/telescreen/issues/ingest_transitions.py",
+        "src/telescreen/issues/lifecycle.py",
+        "src/telescreen/issues/repository.py",
+        "src/telescreen/issues/exceptions.py",
+        "src/telescreen/issues/policy_apply.py",
+        "src/telescreen/issues/archive.py",
+        "src/telescreen/issues/groups.py",
+        "src/telescreen/api/routers/issue_triage.py",
+        "tests/issues/v13_lifecycle"
+      ],
+      "sharedPaths": [
+        "src/telescreen/api/routers/issues_actions.py"
+      ],
+      "sharedPathNotes": [
+        {"path": "src/telescreen/api/routers/issues_actions.py", "intendedEdit": "Created by v13-p01 (wave 1, mechanical move). Only wave-2 editor: IssuePatchBody.priority and PATCH rejection of status archived, escalating, resolved and ignored with _invalid_transition()."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Safety rules 1-5 each have a named test: no v1.3 path writes ignored, allowed or an exception row; archive_until never null while archived and at most 90 days after archived_at; every exit from archived goes through clear_archive; merge/rebase never escalates or changes archive_until/archived_at; service.py under 1000 lines after moving the post-insert chain into ingest_transitions.py.",
+        "archive.py (ArchivePolicy, validation, archive/unarchive, evaluate_after_ingest, rebase_archive, ArchiveMaintenanceProvider) and groups.py (active_children, primary_of, recompute_group_counters, cascade_to_children, propagate_child_open) match the plan signatures used by p06.",
+        "Priority from severity until manual, needs_review set/cleared as D6, merged_group on exception requests for group members, findings observer and activity notifier calls with defaulted IssueService fields; issue_triage.py archive/unarchive/review routes need issues.write; tests assert DB rows/snapshots/history, never p04's serializer fields.",
+        "Existing tests/issues and tests/api/v11_issues pass unchanged; scoped gates pass; typelint grep empty; Completion Criteria all ticked; Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/issues/service.py src/telescreen/issues/ingest_transitions.py src/telescreen/issues/lifecycle.py src/telescreen/issues/repository.py src/telescreen/issues/exceptions.py src/telescreen/issues/policy_apply.py src/telescreen/issues/archive.py src/telescreen/issues/groups.py src/telescreen/api/routers/issues_actions.py src/telescreen/api/routers/issue_triage.py tests/issues/v13_lifecycle",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/issues/service.py src/telescreen/issues/ingest_transitions.py src/telescreen/issues/lifecycle.py src/telescreen/issues/repository.py src/telescreen/issues/exceptions.py src/telescreen/issues/policy_apply.py src/telescreen/issues/archive.py src/telescreen/issues/groups.py src/telescreen/api/routers/issues_actions.py src/telescreen/api/routers/issue_triage.py tests/issues/v13_lifecycle",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/issues/service.py src/telescreen/issues/ingest_transitions.py src/telescreen/issues/lifecycle.py src/telescreen/issues/repository.py src/telescreen/issues/exceptions.py src/telescreen/issues/policy_apply.py src/telescreen/issues/archive.py src/telescreen/issues/groups.py src/telescreen/api/routers/issues_actions.py src/telescreen/api/routers/issue_triage.py tests/issues/v13_lifecycle",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p05-typelint.log 2>&1; ! grep -E '^(src/telescreen/issues/(service|ingest_transitions|lifecycle|repository|exceptions|policy_apply|archive|groups)[.]py|src/telescreen/api/routers/(issues_actions|issue_triage)[.]py|tests/issues/v13_lifecycle/)' /tmp/telescreen-v13-p05-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/issues tests/api/v11_issues --ignore=tests/issues/v13_query 2>&1 | tee /tmp/telescreen-v13-p05-pytest.log",
+        "test \"$(wc -l < src/telescreen/issues/service.py)\" -lt 1000",
+        "wc -l src/telescreen/issues/ingest_transitions.py src/telescreen/issues/lifecycle.py src/telescreen/issues/repository.py src/telescreen/issues/archive.py src/telescreen/issues/groups.py src/telescreen/api/routers/issues_actions.py src/telescreen/api/routers/issue_triage.py > /tmp/telescreen-v13-p05-wc.log; ! awk '$2 != \"total\" && $1 >= 1000' /tmp/telescreen-v13-p05-wc.log | grep -q .",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v13-p05-triage-lifecycle-backend.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v13-p09-notifications-backend",
+      "planPath": "impl-plans/active/v13-p09-notifications-backend.md",
+      "wave": 2,
+      "dependsOn": ["v13-p01-foundation", "v13-p02-db"],
+      "writePaths": [
+        "impl-plans/active/v13-p09-notifications-backend.md",
+        "src/telescreen/notifications/sender.py",
+        "src/telescreen/notifications/repository.py",
+        "src/telescreen/notifications/member_send.py",
+        "src/telescreen/notifications/preferences.py",
+        "src/telescreen/notifications/tester.py",
+        "src/telescreen/notifications/guard.py",
+        "src/telescreen/notifications/weekly.py",
+        "src/telescreen/api/routers/notification_settings.py",
+        "tests/notifications/v13"
+      ],
+      "sharedPaths": [
+        "src/telescreen/notifications/templates/builtins.py",
+        "src/telescreen/notifications/templates/variables.py",
+        "src/telescreen/notifications/templates/synthetic.py"
+      ],
+      "sharedPathNotes": [
+        {"path": "src/telescreen/notifications/templates/builtins.py", "intendedEdit": "Created and extended by v13-p01 (wave 1). Edit only to fix a v1.3 built-in found wrong by this plan's tests; v12 parity tests stay green."},
+        {"path": "src/telescreen/notifications/templates/variables.py", "intendedEdit": "From v13-p01. Same rule: fix only v1.3 variable paths or event groups found wrong by this plan's tests."},
+        {"path": "src/telescreen/notifications/templates/synthetic.py", "intendedEdit": "From v13-p01. Same rule: fix only v1.3 synthetic contexts found wrong by this plan's tests."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "PreferenceService with D22 defaults; NotificationService.send applies the alerts/workflow_tasks member filter (skipped rows with recipient_opted_out, no task, audit notification.skipped), never filters sla_escalated, stores category on every v1.3 row, and keeps v1.2 behavior byte for byte for uncategorized requests.",
+        "NotificationService satisfies NotificationSender and MemberNotifier; NotificationServiceTester satisfies NotificationTester; DlpOutboundGuard satisfies OutboundContentGuard (ty check).",
+        "WeeklyReportProvider enqueues once per fire (weekly:<fire_minute>) and WeeklyReportHandler sends per active member independently with masked summary text only; GET/PUT /api/auth/me/notification-settings need profile.self and a member principal, slack without a Slack id -> 422 recipient_unreachable.",
+        "The whole tests/notifications suite (v1, v12, v13) passes; scoped gates pass; typelint grep empty; sender.py under 1000 lines; Completion Criteria all ticked; Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/notifications src/telescreen/api/routers/notification_settings.py tests/notifications",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/notifications src/telescreen/api/routers/notification_settings.py tests/notifications",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/notifications src/telescreen/api/routers/notification_settings.py tests/notifications",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v13-p09-typelint.log 2>&1; ! grep -E '^(src/telescreen/notifications/|src/telescreen/api/routers/notification_settings[.]py|tests/notifications/v13/)' /tmp/telescreen-v13-p09-typelint.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/notifications 2>&1 | tee /tmp/telescreen-v13-p09-pytest.log",
+        "wc -l src/telescreen/notifications/*.py src/telescreen/api/routers/notification_settings.py > /tmp/telescreen-v13-p09-wc.log; ! awk '$2 != \"total\" && $1 >= 1000' /tmp/telescreen-v13-p09-wc.log | grep -q .",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v13-p09-notifications-backend.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "v13-p13-ui-stream",
+      "planPath": "impl-plans/active/v13-p13-ui-stream.md",
+      "wave": 2,
+      "dependsOn": ["v13-p03-ui-foundation"],
+      "writePaths": [
+        "impl-plans/active/v13-p13-ui-stream.md",
+        "src/web/src/pages/issues/IssueList.tsx",
+        "src/web/src/pages/issues/IssueList.test.tsx",
+        "src/web/src/pages/issues/IssueListControls.tsx",
+        "src/web/src/pages/issues/IssueListRows.tsx",
+        "src/web/src/pages/issues/IssueBulkActions.tsx",
+        "src/web/src/pages/issues/query.ts",
+        "src/web/src/pages/issues/query.test.ts",
+        "src/web/src/pages/issues/savedViews.ts",
+        "src/web/src/pages/issues/issues.css",
+        "src/web/src/pages/issues/StreamViews.tsx",
+        "src/web/src/pages/issues/ArchiveMenu.tsx",
+        "src/web/src/pages/issues/StreamViews.test.tsx"
+      ],
+      "sharedPaths": [],
+      "sharedPathNotes": [
+        {"path": "src/web/src/pages/issues/ArchiveMenu.tsx", "intendedEdit": "Created and owned by this plan; v13-p14 (run 2) imports it read-only in the detail header."}
+      ],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "B3 (default query is:unresolved shows a regressed issue), B4 (assignee renders 'Alice Example' with initials AE, never mem-01) and B5 (!source:slack sent verbatim as query) UI regression tests pass.",
+        "Stream tabs with counts, autocomplete search, PeriodPicker, all 7 sorts and the 24h/14d trend toggle kept in URL params; rows with trend, values, priority, avatar and '+N merged'; bulk actions incl. 'Select all N matching' ({query, period}), archive menu, merge and failure toasts; server saved views with one-time localStorage import; auto-refresh banner that never reorders; stream shortcuts through registerShortcuts.",
+        "No edits in src/web/src/api or src/web/src/components; no new npm package; bun install --frozen-lockfile, typecheck, the whole vitest suite and build to /tmp pass.",
+        "Completion Criteria all ticked; Progress Log complete."
+      ],
+      "verification": [
+        "set -o pipefail; cd src/web && bun install --frozen-lockfile > /tmp/telescreen-v13-p13-install.log 2>&1",
+        "set -o pipefail; cd src/web && bun run typecheck 2>&1 | tee /tmp/telescreen-v13-p13-typecheck.log",
+        "set -o pipefail; cd src/web && bun run test 2>&1 | tee /tmp/telescreen-v13-p13-test.log",
+        "set -o pipefail; cd src/web && bun run build --outDir /tmp/telescreen-v13-p13-web --emptyOutDir 2>&1 | tee /tmp/telescreen-v13-p13-build.log",
+        "test -z \"$(git diff --name-only HEAD -- src/web/package.json src/web/bun.lock)\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v13-p13-ui-stream.md)\" -eq 0"
+      ]
+    }
+  ]
+}

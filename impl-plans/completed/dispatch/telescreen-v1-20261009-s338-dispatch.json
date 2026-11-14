@@ -1,0 +1,530 @@
+{
+  "taskId": "telescreen-v1-20261009-s338",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "823463fd77f1fdea737be191bd24ca55057f52c5",
+  "evidenceRoot": "tmp/telescreen-v1-20261009-s338",
+  "supersedes": "impl-plans/active/telescreen-v1-20261008-s319-dispatch.json (originalHead 7022a54; removed in this run)",
+  "runScope": "Continuation run A: the 12 remaining backend plans only. Out of scope (run B): src/web, p12-ui-issues, p13-ui-workflows, p14-ui-ops, p28-assembly, p29-examples-compose.",
+  "acceptedDependencies": [
+    {"planId": "p01-foundation", "planPath": "impl-plans/active/p01-foundation.md", "commit": "c81fe52", "provides": "Package skeleton, settings dataclass, telescreen.core.json boundary, CLI entrypoint, pyproject/uv.lock/mise/hatch wheel config"},
+    {"planId": "p02-db-schema", "planPath": "impl-plans/active/p02-db-schema.md", "commit": "c81fe52", "provides": "SQLAlchemy MappedAsDataclass ORM models (police, workflow, issues, notifications, evidence, audit, map jobs), Alembic migrations, ReplayNonceStore, tests/support/db.py"},
+    {"planId": "p03-detection-rules", "planPath": "impl-plans/active/p03-detection-rules.md", "commit": "c81fe52", "provides": "Detection types, Detector protocol, RuleDetector (credentials, PII incl. Japanese formats) and CompositeDetector"},
+    {"planId": "p04-ports", "planPath": "impl-plans/active/p04-ports.md", "commit": "c81fe52", "provides": "Cross-plan Protocols and DTOs in telescreen.ports (PoliceGateway, findings/ExternalScan, workflow TaskHandler/RunSignaler/ScheduleProvider, collectors, notifications)"},
+    {"planId": "p05-police-contract", "planPath": "impl-plans/active/p05-police-contract.md", "commit": "c81fe52", "provides": "Police contract v1 OpenAPI + JSON Schemas, contracts.validator (validate, openapi_document), SDK package skeleton"},
+    {"planId": "p06-workflow-dsl", "planPath": "impl-plans/active/p06-workflow-dsl.md", "commit": "c81fe52", "provides": "Workflow DSL models and validation, expression evaluator, StepExecutor step API (step_type registry)"},
+    {"planId": "p07-web-shell", "planPath": "impl-plans/active/p07-web-shell.md", "commit": "c81fe52", "provides": "SolidJS web shell, typed API client and shared components (run B scope; not touched in run A)"},
+    {"planId": "p08-masking", "planPath": "impl-plans/active/p08-masking.md", "commit": "c81fe52", "provides": "Masker, Redactor (has_hits), IndexGuard, HMAC fingerprints and mandatory log masking"},
+    {"planId": "p09-detection-llm-ml", "planPath": "impl-plans/active/p09-detection-llm-ml.md", "commit": "c81fe52", "provides": "LLM harness, managed (Claude/Codex) and local LLM detectors, ML detector adapter, detector factory"},
+    {"planId": "p10-api-common", "planPath": "impl-plans/active/p10-api-common.md", "commit": "c81fe52", "provides": "FastAPI app factory, common API errors/pagination, directory (orgs/teams/members/mailing lists) and bearer API tokens"},
+    {"planId": "p22-collectors-google", "planPath": "impl-plans/active/p22-collectors-google.md", "commit": "c81fe52", "provides": "Google Drive, Docs and Sheets collector adapters with fakes"},
+    {"planId": "p23-collectors-github", "planPath": "impl-plans/active/p23-collectors-github.md", "commit": "c81fe52", "provides": "GitHub collector adapter (webhook HMAC verification, scheduled scans) with fakes"}
+  ],
+  "waves": {
+    "A1": ["p11-police-sdk", "p15-audit-search", "p16-issues-ingest", "p17-notifications", "p18-evidence", "p21-collectors-slack"],
+    "A2": ["p19-police-bureau", "p20-collectors-core", "p24-workflow-engine", "p25-workflow-nodes", "p26-workflow-mapreduce", "p27-assistant"]
+  },
+  "waveRationale": "Every run-A plan depends only on accepted plans, except p19, which depends on p11 (SDK used only by tests/contract/test_bureau_contract.py). The original 5-wave DAG and every dependsOn are unchanged. The s319 wave 4 (11 plans) is split into two waves of 6 so no wave-outcome prompt nears the context limit (s319 stop cause). A1 holds p11 and the plans that are reviewed or close to done. A2 holds p19 (new) and the interrupted engine-side plans.",
+  "resumeStatus": {
+    "p11-police-sdk": "blocked at s319 (cause not recorded in-tree); resume: re-verify and repair",
+    "p15-audit-search": "passed per-branch test-integrity and adversarial review at s319; resume: verify only",
+    "p16-issues-ingest": "blocked at s319 (cause not recorded in-tree); resume: re-verify and repair",
+    "p17-notifications": "interrupted at s319; resume: gap-fill",
+    "p18-evidence": "passed per-branch test-integrity and adversarial review at s319; resume: verify only",
+    "p19-police-bureau": "not started; implement from plan",
+    "p20-collectors-core": "interrupted at s319; resume: gap-fill",
+    "p21-collectors-slack": "passed per-branch test-integrity and adversarial review at s319; resume: verify only",
+    "p24-workflow-engine": "interrupted at s319; resume: gap-fill",
+    "p25-workflow-nodes": "passed per-branch test-integrity and adversarial review at s319; resume: verify only",
+    "p26-workflow-mapreduce": "interrupted at s319; resume: gap-fill",
+    "p27-assistant": "interrupted at s319; resume: gap-fill"
+  },
+  "designDocPaths": [
+    "design-docs/specs/architecture.md",
+    "design-docs/specs/command.md",
+    "design-docs/specs/design-api-and-ui.md",
+    "design-docs/specs/design-collectors-and-ingestion.md",
+    "design-docs/specs/design-data-model.md",
+    "design-docs/specs/design-detectors.md",
+    "design-docs/specs/design-map-reduce-sweeps.md",
+    "design-docs/specs/design-masking.md",
+    "design-docs/specs/design-police-contract.md",
+    "design-docs/specs/design-workflow-engine.md",
+    "design-docs/specs/design-synthetic-test-dataset.md",
+    "design-docs/specs/design-ui-sentry.md",
+    "design-docs/specs/notes.md",
+    "design-docs/user-qa/qa-evidence-file-types.md",
+    "design-docs/user-qa/qa-llm-data-egress.md",
+    "design-docs/user-qa/qa-ui-authentication.md"
+  ],
+  "reviewContext": {
+    "issueReference": "workflowInput (no issue URL/number); workflowExecutionId opus-luna-design-and-implement-review-loop-session-338; intake comm-005543; design accepted by step3-design-review comm-005545 (accepted=true, no findings). Design change in this run: architecture.md section 6 and design-police-contract.md now state that the SDK asgi.py TL005 per-file-ignore is NOT pre-approved.",
+    "constraints": [
+      "English only, no emojis; plan files under 400 lines; Python files under 1000 lines.",
+      "Strict typing enforced by tools/typelint.py (TL001-TL010), ruff ANN/PGH and ty 0.0.85; no Any/object/dict/Mapping/TypedDict, no **kwargs or ** unpacking, no # type: ignore or # ty: ignore; the only per-file-ignores are src/telescreen/core/json.py and src/telescreen_police_sdk/_json.py.",
+      "Never persist, log, index, notify or return raw sensitive values; masked values and keyed HMAC fingerprints only; monitored content scanned transiently.",
+      "Default uv run pytest passes offline; integration tests marked integration and skipped unless TELESCREEN_TEST_DATABASE_URL / TELESCREEN_TEST_MEILI_URL are set.",
+      "No plan edits pyproject.toml, uv.lock, mise.toml, .gitignore, README.md or src/web; dependency or shared-file changes go through Reconciliation requests and serial finalization.",
+      "Police SDK never imports telescreen.*; the Bureau never imports telescreen_police_sdk except tests/contract/test_bureau_contract.py.",
+      "Accepted plans p01-p10, p22, p23 are not re-implemented; their files change only through serial finalization with a review call-out.",
+      "All plans of a wave share one working directory and branch: write only inside writePaths, no git mutation commands, per-edit fresh read plus sha256 before/after logging (impl-plans/conventions.md section 2); verification shells start with set -o pipefail and export PYTHONDONTWRITEBYTECODE=1.",
+      "Resume rule: verify in-tree code against the plan, repair gaps, do not rewrite working code from scratch."
+    ],
+    "userProblem": "The owner needs Telescreen, a Sentry-style monitor for sensitive-data retention violations (credentials, PII, confidential data) across Slack, Google Drive/Docs/Sheets, GitHub and custom collectors/Police, with a Reporting Bureau hub, durable DB-backed incident/AI workflow engine, outbound DLP, searchable hash-chained audit and an AI assistant, never storing raw sensitive values. Run A completes the 12 remaining backend plans on top of the 12 accepted plans committed at c81fe52.",
+    "requiredOutcomes": [
+      "p11: standalone Police SDK (pull worker, push webhook/ASGI helper with HMAC signature verification, sweep partition/scan_shard handlers, example private-DB police, n8n push example) with contract tests; no telescreen.* import.",
+      "p15: append-only hash-chained audit log with verification, Meilisearch indexing behind IndexGuard, audit and search APIs.",
+      "p16: Sentry-like issue grouping (source + resource locator + rule class), first/last seen, times_seen, status transitions incl. regressed and auto-resolve, push ingestion API that re-guards pushed findings.",
+      "p17: notifications (Slack, email) behind an outbound DLP gate that masks or blocks raw values, audited.",
+      "p18: evidence upload (text and images) scanned and rejected on PII/credentials, fail closed.",
+      "p19: Bureau police service and API: register, claim, heartbeat, result for pull mode; signed webhook dispatch and signed callback for push mode behind PoliceGateway; Bureau-side contract test against the SDK.",
+      "p20: collectors core service, registry, scheduler (event/schedule/both), rescanner, police and sweep integration, collectors API.",
+      "p21: Slack collector (Events API signing verification, scheduled scans, sweep).",
+      "p24: durable workflow engine (runs, steps, transitions, SKIP LOCKED queue, leases/retries, timers, scheduler, human tasks with SLA escalation, triggers) and its APIs.",
+      "p25: detect, ai_agent, notify and police_verify step executors.",
+      "p26: map-reduce sweeps (map step, streaming partition, global max_concurrency dispatch, 429 backpressure, crash-safe no-duplicate shards, count-only reduce with removal reconciliation, 10,000-shard concurrency-cap test).",
+      "p27: assistant MCP server and agent chat with masked tool outputs.",
+      "Serial finalization passes full-repository ruff format/check, typelint, ty, offline pytest and uv build."
+    ],
+    "nonGoals": [
+      "src/web and UI plans p12-ui-issues, p13-ui-workflows, p14-ui-ops (reworked to design-docs/specs/design-ui-sentry.md in run B).",
+      "p28-assembly and p29-examples-compose (run B).",
+      "Re-implementing accepted plans p01-p10, p22, p23.",
+      "OIDC SSO (deferred; v1 uses bearer API tokens).",
+      "Airflow/n8n/Kestra as the core engine."
+    ],
+    "designDecisionsAndRationale": [
+      "Self-built durable workflow engine and map-reduce on PostgreSQL instead of Airflow/n8n/Kestra: human-in-the-loop steps, send-back, evidence gates and DB-visible progress must stay raw-data-free (design-workflow-engine.md, design-map-reduce-sweeps.md, notes.md).",
+      "Bureau and Police couple only through the versioned HTTP+JSON contract with pull and push transports behind PoliceGateway, so n8n and other languages can implement Police (design-police-contract.md).",
+      "Raw values are never persisted; only masked representations and keyed HMAC fingerprints; IndexGuard and DLP gate add defense in depth (design-masking.md).",
+      "Run A splits the s319 wave 4 into waves A1 and A2 of six plans each so no wave-outcome prompt nears the context limit that stopped s319.",
+      "The SDK asgi.py TL005 per-file-ignore is not pre-approved (architecture.md section 6, design-police-contract.md); p11 must comply without it or raise a reviewed Reconciliation request."
+    ],
+    "intentionalTradeoffs": [
+      "All wave plans share one working directory and branch with disjoint writePaths instead of worktrees; serial finalization re-runs the full gates to catch cross-plan breakage.",
+      "Shared files (pyproject.toml, uv.lock, accepted-plan files) change only through serially applied Reconciliation requests, at the cost of slower dependency changes.",
+      "Plans already reviewed at s319 (p15, p18, p21, p25) are verified rather than rewritten, accepting that their review predates run A."
+    ],
+    "supportedEdgeCases": [
+      "Police lease expiry and re-claim, replayed or stale webhook signatures rejected by the nonce store and replay window, a resource counted as failed whenever its handler raises.",
+      "Map-reduce crash recovery without duplicate shards, 429 backpressure, removal reconciliation in reduce.",
+      "Issue regression after resolve and auto-resolve when a later scan no longer finds the item.",
+      "Evidence images scanned by the vision LLM, fail closed when it is unavailable.",
+      "Notifications containing raw values masked or blocked by the DLP gate; tests assert raw sample secrets never appear in DB rows, logs, index documents, notifications or API responses."
+    ],
+    "outOfScopeEdgeCases": [
+      "Live PostgreSQL/Meilisearch behavior beyond integration-marked tests skipped offline.",
+      "Real Slack/Google/GitHub/LLM network calls (fakes only).",
+      "UI rendering and docker compose deployment behavior (run B)."
+    ],
+    "sourcePaths": [
+      "design-docs/specs/architecture.md",
+      "design-docs/specs/design-police-contract.md",
+      "design-docs/specs/design-workflow-engine.md",
+      "design-docs/specs/design-map-reduce-sweeps.md",
+      "design-docs/specs/design-masking.md",
+      "design-docs/specs/notes.md",
+      "impl-plans/conventions.md",
+      "src/telescreen",
+      "src/telescreen_police_sdk",
+      "tests",
+      "tools/typelint.py",
+      "pyproject.toml"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "p11-police-sdk",
+      "planPath": "impl-plans/active/p11-police-sdk.md",
+      "wave": "A1",
+      "dependsOn": ["p05-police-contract"],
+      "writePaths": [
+        "impl-plans/active/p11-police-sdk.md",
+        "src/telescreen_police_sdk/models.py",
+        "src/telescreen_police_sdk/_json.py",
+        "src/telescreen_police_sdk/signing.py",
+        "src/telescreen_police_sdk/client.py",
+        "src/telescreen_police_sdk/worker.py",
+        "src/telescreen_police_sdk/webhook.py",
+        "src/telescreen_police_sdk/asgi.py",
+        "src/telescreen_police_sdk/masking.py",
+        "src/telescreen_police_sdk/sweep.py",
+        "tests/police_sdk",
+        "tests/contract/test_sdk_contract.py",
+        "examples/police"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Run A Resume checklist in the plan is fully ticked with evidence",
+        "All SDK modules delivered; no telescreen.* imports in the SDK; asgi.py has no per-file-ignore",
+        "Pull and push modes tested, including cancellation, replay and the async callback",
+        "Python and n8n examples plus READMEs delivered, with no secrets",
+        "Scoped verification passes; logs recorded; Progress Log updated"
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen_police_sdk tests/police_sdk tests/contract/test_sdk_contract.py examples/police/python",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen_police_sdk tests/police_sdk tests/contract/test_sdk_contract.py examples/police/python",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen_police_sdk tests/police_sdk tests/contract/test_sdk_contract.py examples/police/python",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/police_sdk tests/contract/test_sdk_contract.py 2>&1 | tee /tmp/telescreen-p11-police-sdk-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-p11-police-sdk-typelint.log 2>&1; ! grep -E '^(src/telescreen_police_sdk|tests/police_sdk|tests/contract/test_sdk_contract.py)' /tmp/telescreen-p11-police-sdk-typelint.log",
+        "! grep -rnE '^(from|import) telescreen(\\.| |$)' src/telescreen_police_sdk",
+        "! grep -n 'telescreen_police_sdk/asgi.py' pyproject.toml",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p11-police-sdk.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p15-audit-search",
+      "planPath": "impl-plans/active/p15-audit-search.md",
+      "wave": "A1",
+      "dependsOn": ["p08-masking", "p10-api-common"],
+      "writePaths": [
+        "impl-plans/active/p15-audit-search.md",
+        "src/telescreen/audit",
+        "src/telescreen/search",
+        "src/telescreen/api/routers/audit.py",
+        "src/telescreen/api/routers/search.py",
+        "tests/audit",
+        "tests/search"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Run A Resume checklist in the plan is fully ticked with evidence",
+        "AuditLogService, verify_chain, the search backends, DocumentIndexer, AuditIndexSchedule, reindex_all and both routers delivered with the exact names",
+        "Guard rejection, tamper detection and leak tests pass",
+        "Scoped verification passes; logs recorded; Progress Log updated"
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/audit src/telescreen/search src/telescreen/api/routers/audit.py src/telescreen/api/routers/search.py tests/audit tests/search",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/audit src/telescreen/search src/telescreen/api/routers/audit.py src/telescreen/api/routers/search.py tests/audit tests/search",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/audit src/telescreen/search src/telescreen/api/routers/audit.py src/telescreen/api/routers/search.py tests/audit tests/search",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/audit tests/search 2>&1 | tee /tmp/telescreen-p15-audit-search-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-p15-audit-search-typelint.log 2>&1; ! grep -E '^(src/telescreen/(audit|search)|src/telescreen/api/routers/(audit|search)\\.py|tests/(audit|search))' /tmp/telescreen-p15-audit-search-typelint.log",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p15-audit-search.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p16-issues-ingest",
+      "planPath": "impl-plans/active/p16-issues-ingest.md",
+      "wave": "A1",
+      "dependsOn": ["p08-masking", "p10-api-common"],
+      "writePaths": [
+        "impl-plans/active/p16-issues-ingest.md",
+        "src/telescreen/issues",
+        "src/telescreen/api/routers/issues.py",
+        "src/telescreen/api/routers/ingest.py",
+        "tests/issues"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Run A Resume checklist in the plan is fully ticked with evidence",
+        "IssueService (recorder, reader, transitions), ResourceScannerImpl, IngestService and both routers delivered with the exact names",
+        "Lifecycle, regression, auto-resolve, skip, resolve_unchecked and leak tests pass",
+        "Scoped verification passes; logs recorded; Progress Log updated"
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/issues src/telescreen/api/routers/issues.py src/telescreen/api/routers/ingest.py tests/issues",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/issues src/telescreen/api/routers/issues.py src/telescreen/api/routers/ingest.py tests/issues",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/issues src/telescreen/api/routers/issues.py src/telescreen/api/routers/ingest.py tests/issues",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/issues 2>&1 | tee /tmp/telescreen-p16-issues-ingest-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-p16-issues-ingest-typelint.log 2>&1; ! grep -E '^(src/telescreen/issues|src/telescreen/api/routers/(issues|ingest)\\.py|tests/issues)' /tmp/telescreen-p16-issues-ingest-typelint.log",
+        "test -z \"$(find src/telescreen/issues tests/issues src/telescreen/api/routers/issues.py src/telescreen/api/routers/ingest.py -name '*.py' -exec wc -l {} + | awk '$1 >= 1000 && $2 != \"total\"')\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p16-issues-ingest.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p17-notifications",
+      "planPath": "impl-plans/active/p17-notifications.md",
+      "wave": "A1",
+      "dependsOn": ["p02-db-schema", "p04-ports", "p08-masking"],
+      "writePaths": [
+        "impl-plans/active/p17-notifications.md",
+        "src/telescreen/notifications",
+        "tests/notifications"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Run A Resume checklist in the plan is fully ticked with evidence",
+        "DlpGate, CensoredMessage guard, NotificationService, delivery handler, Slack and email notifiers delivered with the exact names",
+        "DLP mask, block and residual tests and delivery idempotency tests pass",
+        "Scoped verification passes; logs recorded; Progress Log updated"
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/notifications tests/notifications",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/notifications tests/notifications",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/notifications tests/notifications",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/notifications 2>&1 | tee /tmp/telescreen-p17-notifications-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-p17-notifications-typelint.log 2>&1; ! grep -E '^(src/telescreen/notifications|tests/notifications)' /tmp/telescreen-p17-notifications-typelint.log",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p17-notifications.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p18-evidence",
+      "planPath": "impl-plans/active/p18-evidence.md",
+      "wave": "A1",
+      "dependsOn": ["p08-masking", "p09-detection-llm-ml", "p10-api-common"],
+      "writePaths": [
+        "impl-plans/active/p18-evidence.md",
+        "src/telescreen/evidence",
+        "src/telescreen/api/routers/evidence.py",
+        "tests/evidence"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Run A Resume checklist in the plan is fully ticked with evidence",
+        "Classifier, stripper (JPEG, PNG, WebP), image scanner, store, service, query and router delivered with the exact names",
+        "Every evidence case in the design-masking leak matrix is covered by a test",
+        "Scoped verification passes; logs recorded; Progress Log updated"
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/evidence src/telescreen/api/routers/evidence.py tests/evidence",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/evidence src/telescreen/api/routers/evidence.py tests/evidence",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/evidence src/telescreen/api/routers/evidence.py tests/evidence",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/evidence 2>&1 | tee /tmp/telescreen-p18-evidence-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-p18-evidence-typelint.log 2>&1; ! grep -E '^(src/telescreen/evidence|src/telescreen/api/routers/evidence.py|tests/evidence)' /tmp/telescreen-p18-evidence-typelint.log",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p18-evidence.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p21-collectors-slack",
+      "planPath": "impl-plans/active/p21-collectors-slack.md",
+      "wave": "A1",
+      "dependsOn": ["p04-ports"],
+      "writePaths": [
+        "impl-plans/active/p21-collectors-slack.md",
+        "src/telescreen/collectors/slack",
+        "tests/collectors/slack"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Run A Resume checklist in the plan is fully ticked with evidence",
+        "SlackAdapter (all CollectorAdapter methods) and SlackSweep delivered with the exact names",
+        "Event, schedule and sweep modes tested, with valid, invalid and old signatures",
+        "Scoped verification passes; logs recorded; Progress Log updated"
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/collectors/slack tests/collectors/slack",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/collectors/slack tests/collectors/slack",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/collectors/slack tests/collectors/slack",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/collectors/slack 2>&1 | tee /tmp/telescreen-p21-collectors-slack-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-p21-collectors-slack-typelint.log 2>&1; ! grep -E '^(src/telescreen/collectors/slack|tests/collectors/slack)' /tmp/telescreen-p21-collectors-slack-typelint.log",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p21-collectors-slack.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p19-police-bureau",
+      "planPath": "impl-plans/active/p19-police-bureau.md",
+      "wave": "A2",
+      "dependsOn": ["p05-police-contract", "p08-masking", "p10-api-common", "p11-police-sdk"],
+      "writePaths": [
+        "impl-plans/active/p19-police-bureau.md",
+        "src/telescreen/police",
+        "src/telescreen/api/routers/police.py",
+        "tests/police",
+        "tests/contract/test_bureau_contract.py"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Registration, gateway and transports, claims, results, push delivery, maintenance and router delivered with the exact names",
+        "Pull and push flows, replay, token one-time use and raw-value rejection tested",
+        "The SDK-driven contract test passes",
+        "Scoped verification passes; logs recorded; Progress Log updated"
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/police src/telescreen/api/routers/police.py tests/police tests/contract/test_bureau_contract.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/police src/telescreen/api/routers/police.py tests/police tests/contract/test_bureau_contract.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/police src/telescreen/api/routers/police.py tests/police tests/contract/test_bureau_contract.py",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/police tests/contract/test_bureau_contract.py 2>&1 | tee /tmp/telescreen-p19-police-bureau-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-p19-police-bureau-typelint.log 2>&1; ! grep -E '^(src/telescreen/police|src/telescreen/api/routers/police.py|tests/police|tests/contract/test_bureau_contract.py)' /tmp/telescreen-p19-police-bureau-typelint.log",
+        "! grep -rn 'telescreen_police_sdk' src/telescreen",
+        "test -z \"$(find src/telescreen/police tests/police -name '*.py' -exec wc -l {} + | awk '$1 >= 1000 && $2 != \"total\"')\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p19-police-bureau.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p20-collectors-core",
+      "planPath": "impl-plans/active/p20-collectors-core.md",
+      "wave": "A2",
+      "dependsOn": ["p08-masking", "p10-api-common"],
+      "writePaths": [
+        "impl-plans/active/p20-collectors-core.md",
+        "src/telescreen/collectors/__init__.py",
+        "src/telescreen/collectors/service.py",
+        "src/telescreen/collectors/repository.py",
+        "src/telescreen/collectors/codec.py",
+        "src/telescreen/collectors/registry.py",
+        "src/telescreen/collectors/scheduler.py",
+        "src/telescreen/collectors/rescanner.py",
+        "src/telescreen/collectors/police.py",
+        "src/telescreen/collectors/tasks.py",
+        "src/telescreen/collectors/sweep.py",
+        "src/telescreen/api/routers/collectors.py",
+        "tests/collectors/core"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Run A Resume checklist in the plan is fully ticked with evidence",
+        "All collectors-core modules delivered with the exact names; the ports are implemented",
+        "Webhook, scan modes, scheduling, rescans, police dispatch and sweeper tested",
+        "The no-raw-locator test passes",
+        "Scoped verification passes; logs recorded; Progress Log updated"
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/collectors/__init__.py src/telescreen/collectors/service.py src/telescreen/collectors/repository.py src/telescreen/collectors/codec.py src/telescreen/collectors/registry.py src/telescreen/collectors/scheduler.py src/telescreen/collectors/rescanner.py src/telescreen/collectors/police.py src/telescreen/collectors/tasks.py src/telescreen/collectors/sweep.py src/telescreen/api/routers/collectors.py tests/collectors/core",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/collectors/__init__.py src/telescreen/collectors/service.py src/telescreen/collectors/repository.py src/telescreen/collectors/codec.py src/telescreen/collectors/registry.py src/telescreen/collectors/scheduler.py src/telescreen/collectors/rescanner.py src/telescreen/collectors/police.py src/telescreen/collectors/tasks.py src/telescreen/collectors/sweep.py src/telescreen/api/routers/collectors.py tests/collectors/core",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/collectors/__init__.py src/telescreen/collectors/service.py src/telescreen/collectors/repository.py src/telescreen/collectors/codec.py src/telescreen/collectors/registry.py src/telescreen/collectors/scheduler.py src/telescreen/collectors/rescanner.py src/telescreen/collectors/police.py src/telescreen/collectors/tasks.py src/telescreen/collectors/sweep.py src/telescreen/api/routers/collectors.py tests/collectors/core",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/collectors/core 2>&1 | tee /tmp/telescreen-p20-collectors-core-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-p20-collectors-core-typelint.log 2>&1; ! grep -E '^(src/telescreen/collectors/(__init__|service|repository|codec|registry|scheduler|rescanner|police|tasks|sweep)\\.py|src/telescreen/api/routers/collectors.py|tests/collectors/core)' /tmp/telescreen-p20-collectors-core-typelint.log",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p20-collectors-core.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p24-workflow-engine",
+      "planPath": "impl-plans/active/p24-workflow-engine.md",
+      "wave": "A2",
+      "dependsOn": ["p06-workflow-dsl", "p08-masking", "p10-api-common"],
+      "writePaths": [
+        "impl-plans/active/p24-workflow-engine.md",
+        "src/telescreen/workflow/engine",
+        "src/telescreen/workflow/queue",
+        "src/telescreen/workflow/scheduler",
+        "src/telescreen/workflow/escalation",
+        "src/telescreen/workflow/triggers",
+        "src/telescreen/workflow/executors/__init__.py",
+        "src/telescreen/workflow/executors/flow.py",
+        "src/telescreen/workflow/executors/human.py",
+        "src/telescreen/api/routers/workflows.py",
+        "src/telescreen/api/routers/runs.py",
+        "src/telescreen/api/routers/human_tasks.py",
+        "src/telescreen/api/routers/escalation.py",
+        "tests/workflow/engine"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Run A Resume checklist in the plan is fully ticked with evidence",
+        "Queue, worker, scheduler, engine, definitions, flow and human executors, escalation, triggers and the four routers delivered with the exact names",
+        "Every test case in the plan passes",
+        "No file over 1000 lines (wc -l recorded)",
+        "Scoped verification passes; logs recorded; Progress Log updated"
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/workflow/engine src/telescreen/workflow/queue src/telescreen/workflow/scheduler src/telescreen/workflow/escalation src/telescreen/workflow/triggers src/telescreen/workflow/executors/__init__.py src/telescreen/workflow/executors/flow.py src/telescreen/workflow/executors/human.py src/telescreen/api/routers/workflows.py src/telescreen/api/routers/runs.py src/telescreen/api/routers/human_tasks.py src/telescreen/api/routers/escalation.py tests/workflow/engine",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/workflow/engine src/telescreen/workflow/queue src/telescreen/workflow/scheduler src/telescreen/workflow/escalation src/telescreen/workflow/triggers src/telescreen/workflow/executors/__init__.py src/telescreen/workflow/executors/flow.py src/telescreen/workflow/executors/human.py src/telescreen/api/routers/workflows.py src/telescreen/api/routers/runs.py src/telescreen/api/routers/human_tasks.py src/telescreen/api/routers/escalation.py tests/workflow/engine",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/workflow/engine src/telescreen/workflow/queue src/telescreen/workflow/scheduler src/telescreen/workflow/escalation src/telescreen/workflow/triggers src/telescreen/workflow/executors/__init__.py src/telescreen/workflow/executors/flow.py src/telescreen/workflow/executors/human.py src/telescreen/api/routers/workflows.py src/telescreen/api/routers/runs.py src/telescreen/api/routers/human_tasks.py src/telescreen/api/routers/escalation.py tests/workflow/engine",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/workflow/engine 2>&1 | tee /tmp/telescreen-p24-workflow-engine-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-p24-workflow-engine-typelint.log 2>&1; ! grep -E '^(src/telescreen/workflow/(engine|queue|scheduler|escalation|triggers)|src/telescreen/workflow/executors/(__init__|flow|human)\\.py|src/telescreen/api/routers/(workflows|runs|human_tasks|escalation)\\.py|tests/workflow/engine)' /tmp/telescreen-p24-workflow-engine-typelint.log",
+        "test -z \"$(find src/telescreen/workflow/engine src/telescreen/workflow/queue src/telescreen/workflow/scheduler src/telescreen/workflow/escalation src/telescreen/workflow/triggers tests/workflow/engine -name '*.py' -exec wc -l {} + | awk '$1 >= 1000 && $2 != \"total\"')\"",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p24-workflow-engine.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p25-workflow-nodes",
+      "planPath": "impl-plans/active/p25-workflow-nodes.md",
+      "wave": "A2",
+      "dependsOn": ["p02-db-schema", "p06-workflow-dsl", "p08-masking", "p09-detection-llm-ml"],
+      "writePaths": [
+        "impl-plans/active/p25-workflow-nodes.md",
+        "src/telescreen/workflow/executors/detect.py",
+        "src/telescreen/workflow/executors/ai_agent.py",
+        "src/telescreen/workflow/executors/notify.py",
+        "src/telescreen/workflow/executors/police_verify.py",
+        "tests/workflow/executors"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Run A Resume checklist in the plan is fully ticked with evidence",
+        "Four executors (detect, ai_agent, notify, police_verify) delivered with the exact names and step_type values",
+        "Tests in the plan pass",
+        "Scoped verification passes; logs recorded; Progress Log updated"
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/workflow/executors/detect.py src/telescreen/workflow/executors/ai_agent.py src/telescreen/workflow/executors/notify.py src/telescreen/workflow/executors/police_verify.py tests/workflow/executors",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/workflow/executors/detect.py src/telescreen/workflow/executors/ai_agent.py src/telescreen/workflow/executors/notify.py src/telescreen/workflow/executors/police_verify.py tests/workflow/executors",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/workflow/executors/detect.py src/telescreen/workflow/executors/ai_agent.py src/telescreen/workflow/executors/notify.py src/telescreen/workflow/executors/police_verify.py tests/workflow/executors",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/workflow/executors 2>&1 | tee /tmp/telescreen-p25-workflow-nodes-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-p25-workflow-nodes-typelint.log 2>&1; ! grep -E '^(src/telescreen/workflow/executors/(detect|ai_agent|notify|police_verify)\\.py|tests/workflow/executors)' /tmp/telescreen-p25-workflow-nodes-typelint.log",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p25-workflow-nodes.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p26-workflow-mapreduce",
+      "planPath": "impl-plans/active/p26-workflow-mapreduce.md",
+      "wave": "A2",
+      "dependsOn": ["p06-workflow-dsl", "p08-masking", "p10-api-common"],
+      "writePaths": [
+        "impl-plans/active/p26-workflow-mapreduce.md",
+        "src/telescreen/workflow/mapreduce",
+        "src/telescreen/workflow/executors/map.py",
+        "src/telescreen/api/routers/map_jobs.py",
+        "tests/workflow/mapreduce"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Run A Resume checklist in the plan is fully ticked with evidence",
+        "Job service, launcher, partition, dispatch, shard, sink, reduce, map executor and router delivered with the exact names",
+        "The 10,000-shard cap test (lower bound 32 after first tick, upper bound 32 in flight, sequential double dispatch) and the DR-1 reconciliation tests pass",
+        "Scoped verification passes; logs recorded; Progress Log updated"
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/workflow/mapreduce src/telescreen/workflow/executors/map.py src/telescreen/api/routers/map_jobs.py tests/workflow/mapreduce",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/workflow/mapreduce src/telescreen/workflow/executors/map.py src/telescreen/api/routers/map_jobs.py tests/workflow/mapreduce",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/workflow/mapreduce src/telescreen/workflow/executors/map.py src/telescreen/api/routers/map_jobs.py tests/workflow/mapreduce",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/workflow/mapreduce 2>&1 | tee /tmp/telescreen-p26-workflow-mapreduce-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-p26-workflow-mapreduce-typelint.log 2>&1; ! grep -E '^(src/telescreen/workflow/mapreduce|src/telescreen/workflow/executors/map.py|src/telescreen/api/routers/map_jobs.py|tests/workflow/mapreduce)' /tmp/telescreen-p26-workflow-mapreduce-typelint.log",
+        "grep -rqE '10_?000' tests/workflow/mapreduce",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p26-workflow-mapreduce.md)\" -eq 0"
+      ]
+    },
+    {
+      "planId": "p27-assistant",
+      "planPath": "impl-plans/active/p27-assistant.md",
+      "wave": "A2",
+      "dependsOn": ["p08-masking", "p09-detection-llm-ml", "p10-api-common"],
+      "writePaths": [
+        "impl-plans/active/p27-assistant.md",
+        "src/telescreen/assistant",
+        "src/telescreen/api/routers/chat.py",
+        "tests/assistant"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": [],
+      "acceptanceCriteria": [
+        "Run A Resume checklist in the plan is fully ticked with evidence",
+        "AssistantTools (six tools), MCP server builder, ChatService and the chat router delivered with the exact names",
+        "Leak guard and tool-loop tests pass",
+        "Scoped verification passes; logs recorded; Progress Log updated"
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache src/telescreen/assistant src/telescreen/api/routers/chat.py tests/assistant",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache src/telescreen/assistant src/telescreen/api/routers/chat.py tests/assistant",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check src/telescreen/assistant src/telescreen/api/routers/chat.py tests/assistant",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/assistant 2>&1 | tee /tmp/telescreen-p27-assistant-pytest.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-p27-assistant-typelint.log 2>&1; ! grep -E '^(src/telescreen/assistant|src/telescreen/api/routers/chat.py|tests/assistant)' /tmp/telescreen-p27-assistant-typelint.log",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/p27-assistant.md)\" -eq 0"
+      ]
+    }
+  ],
+  "serialFinalization": {
+    "owner": "serial reconciliation after wave A2 joins (not a fanout plan)",
+    "steps": [
+      "Apply every Reconciliation request logged in the 12 run-A plan Progress Logs, one at a time, with fresh reads and sha256 before/after logging; a request touching an accepted plan's file (p01-p10, p22, p23) or pyproject.toml must be called out in review.",
+      "Run the full-repository gates in order and record exit status plus complete log path under /tmp/telescreen-s338-final-*.log: uv run --frozen ruff format --check --no-cache . ; uv run --frozen ruff check --no-cache . ; uv run --frozen python tools/typelint.py ; uv run --frozen ty check ; uv run --frozen pytest -p no:cacheprovider ; uv build --out-dir /tmp/telescreen-s338-final-dist",
+      "Attribute every full-tree failure to the owning plan by path (writePaths above, or accepted-plan writePaths in the s319 record) and repair serially; never weaken typelint, ruff ANN/PGH or ty.",
+      "Check no Python file under src or tests is 1000+ lines: test -z \"$(find src tests -name '*.py' -exec wc -l {} + | awk '$1 >= 1000 && $2 != \"total\"')\"",
+      "Check plan files stay under 400 lines: wc -l impl-plans/active/p*.md",
+      "Do not archive plans or modify src/web; run B owns p12-p14, p28, p29."
+    ]
+  }
+}

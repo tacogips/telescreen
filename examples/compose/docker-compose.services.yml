@@ -1,0 +1,199 @@
+services:
+  telescreen-postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: telescreen
+      POSTGRES_USER: telescreen
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U telescreen -d telescreen"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - telescreen-postgres-data:/var/lib/postgresql/data
+
+  inventory-postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: inventory
+      POSTGRES_USER: inventory
+      POSTGRES_PASSWORD: ${INVENTORY_POSTGRES_PASSWORD:?Set INVENTORY_POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inventory -d inventory"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - inventory-postgres-data:/var/lib/postgresql/data
+
+  notification-postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: notification
+      POSTGRES_USER: notification
+      POSTGRES_PASSWORD: ${NOTIFICATION_POSTGRES_PASSWORD:?Set NOTIFICATION_POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notification -d notification"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - notification-postgres-data:/var/lib/postgresql/data
+
+  migrate-main:
+    build:
+      context: ../..
+      dockerfile: examples/compose/Dockerfile
+    environment:
+      TELESCREEN_DATABASE_URL: postgresql+asyncpg://telescreen:${POSTGRES_PASSWORD}@telescreen-postgres:5432/telescreen
+    command: ["telescreen", "migrate", "--store", "main"]
+    depends_on:
+      telescreen-postgres:
+        condition: service_healthy
+
+  migrate-inventory:
+    build:
+      context: ../..
+      dockerfile: examples/compose/Dockerfile
+    environment:
+      TELESCREEN_INVENTORY_DATABASE_URL: postgresql+asyncpg://inventory:${INVENTORY_POSTGRES_PASSWORD}@inventory-postgres:5432/inventory
+    command: ["telescreen-inventory", "migrate"]
+    depends_on:
+      inventory-postgres:
+        condition: service_healthy
+
+  migrate-notification:
+    build:
+      context: ../..
+      dockerfile: examples/compose/Dockerfile
+    environment:
+      TELESCREEN_NOTIFICATION_DATABASE_URL: postgresql+asyncpg://notification:${NOTIFICATION_POSTGRES_PASSWORD}@notification-postgres:5432/notification
+    command: ["telescreen-notification", "migrate"]
+    depends_on:
+      notification-postgres:
+        condition: service_healthy
+
+  inventory:
+    build:
+      context: ../..
+      dockerfile: examples/compose/Dockerfile
+    restart: unless-stopped
+    environment:
+      TELESCREEN_INVENTORY_DATABASE_URL: postgresql+asyncpg://inventory:${INVENTORY_POSTGRES_PASSWORD}@inventory-postgres:5432/inventory
+      TELESCREEN_NOTIFICATION_SERVICE_URL: http://notification:8002
+      TELESCREEN_NOTIFICATION_INVENTORY_TOKEN: file:/run/secrets/notification_inventory_token
+      TELESCREEN_INVENTORY_SERVICE_TOKEN: file:/run/secrets/inventory_service_token
+      TELESCREEN_FINGERPRINT_KEY: file:/run/secrets/fingerprint_key
+    secrets:
+      - fingerprint_key
+      - inventory_service_token
+      - notification_inventory_token
+    command: ["telescreen-inventory", "serve", "--host", "0.0.0.0", "--port", "8001"]
+    depends_on:
+      migrate-inventory:
+        condition: service_completed_successfully
+      migrate-notification:
+        condition: service_completed_successfully
+
+  notification:
+    build:
+      context: ../..
+      dockerfile: examples/compose/Dockerfile
+    restart: unless-stopped
+    environment:
+      TELESCREEN_NOTIFICATION_DATABASE_URL: postgresql+asyncpg://notification:${NOTIFICATION_POSTGRES_PASSWORD}@notification-postgres:5432/notification
+      TELESCREEN_NOTIFICATION_SERVICE_TOKEN: file:/run/secrets/notification_service_token
+      TELESCREEN_NOTIFICATION_INVENTORY_TOKEN: file:/run/secrets/notification_inventory_token
+      TELESCREEN_FINGERPRINT_KEY: file:/run/secrets/fingerprint_key
+      TELESCREEN_SMTP_HOST: ${TELESCREEN_SMTP_HOST:-mail}
+      TELESCREEN_SMTP_PORT: ${TELESCREEN_SMTP_PORT:-1025}
+      TELESCREEN_SMTP_STARTTLS: ${TELESCREEN_SMTP_STARTTLS:-false}
+      TELESCREEN_SLACK_BOT_TOKEN: file:/run/secrets/slack_bot_token
+    secrets:
+      - fingerprint_key
+      - notification_service_token
+      - notification_inventory_token
+      - slack_bot_token
+    command: ["telescreen-notification", "serve", "--host", "0.0.0.0", "--port", "8002"]
+    depends_on:
+      migrate-notification:
+        condition: service_completed_successfully
+
+  bureau:
+    build:
+      context: ../..
+      dockerfile: examples/compose/Dockerfile
+    restart: unless-stopped
+    environment:
+      TELESCREEN_DATABASE_URL: postgresql+asyncpg://telescreen:${POSTGRES_PASSWORD}@telescreen-postgres:5432/telescreen
+      TELESCREEN_INVENTORY_SERVICE_URL: http://inventory:8001
+      TELESCREEN_NOTIFICATION_SERVICE_URL: http://notification:8002
+      TELESCREEN_INVENTORY_SERVICE_TOKEN: file:/run/secrets/inventory_service_token
+      TELESCREEN_NOTIFICATION_SERVICE_TOKEN: file:/run/secrets/notification_service_token
+      TELESCREEN_FINGERPRINT_KEY: file:/run/secrets/fingerprint_key
+      TELESCREEN_WEB_DIST: /app/web
+    secrets:
+      - fingerprint_key
+      - inventory_service_token
+      - notification_service_token
+    command: ["telescreen", "serve", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - evidence-data:/app/var/evidence
+    depends_on:
+      migrate-main:
+        condition: service_completed_successfully
+      migrate-inventory:
+        condition: service_completed_successfully
+      migrate-notification:
+        condition: service_completed_successfully
+
+  engine:
+    build:
+      context: ../..
+      dockerfile: examples/compose/Dockerfile
+    restart: unless-stopped
+    environment:
+      TELESCREEN_DATABASE_URL: postgresql+asyncpg://telescreen:${POSTGRES_PASSWORD}@telescreen-postgres:5432/telescreen
+      TELESCREEN_INVENTORY_SERVICE_URL: http://inventory:8001
+      TELESCREEN_NOTIFICATION_SERVICE_URL: http://notification:8002
+      TELESCREEN_INVENTORY_SERVICE_TOKEN: file:/run/secrets/inventory_service_token
+      TELESCREEN_NOTIFICATION_SERVICE_TOKEN: file:/run/secrets/notification_service_token
+      TELESCREEN_FINGERPRINT_KEY: file:/run/secrets/fingerprint_key
+    secrets:
+      - fingerprint_key
+      - inventory_service_token
+      - notification_service_token
+    command: ["telescreen", "worker"]
+    volumes:
+      - evidence-data:/app/var/evidence
+    depends_on:
+      migrate-main:
+        condition: service_completed_successfully
+      migrate-inventory:
+        condition: service_completed_successfully
+      migrate-notification:
+        condition: service_completed_successfully
+
+volumes:
+  telescreen-postgres-data:
+  inventory-postgres-data:
+  notification-postgres-data:
+  evidence-data:
+
+secrets:
+  fingerprint_key:
+    file: ./secrets/fingerprint_key
+  inventory_service_token:
+    file: ./secrets/inventory_service_token
+  notification_service_token:
+    file: ./secrets/notification_service_token
+  notification_inventory_token:
+    file: ./secrets/notification_inventory_token
+  slack_bot_token:
+    file: ./secrets/slack_bot_token

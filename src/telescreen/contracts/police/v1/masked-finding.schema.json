@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.telescreen.invalid/police/v1/masked-finding.schema.json",
+  "type": "object",
+  "properties": {
+    "locator": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    },
+    "rule_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rule_class": {
+      "enum": [
+        "credential",
+        "token",
+        "private_key",
+        "password",
+        "payment_card",
+        "national_id",
+        "email",
+        "phone",
+        "address"
+      ]
+    },
+    "masked_snippet": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "location": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "external_fingerprint": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 128
+    }
+  },
+  "required": [
+    "locator",
+    "rule_id",
+    "rule_class",
+    "masked_snippet",
+    "location",
+    "confidence",
+    "external_fingerprint"
+  ],
+  "additionalProperties": false
+}

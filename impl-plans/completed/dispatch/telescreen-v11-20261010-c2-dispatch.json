@@ -1,0 +1,179 @@
+{
+  "taskId": "telescreen-v11-20261010-c2",
+  "workflowMode": "issue-resolution",
+  "implementationBranch": "main",
+  "baseBranch": "main",
+  "remote": "origin",
+  "originalHead": "809b02d552918a2bfb74cbf708b6f4a3dd388b13",
+  "supersedes": "impl-plans/active/telescreen-v11-20261010-c1-dispatch.json",
+  "evidenceRoot": "tmp/telescreen-v11-20261010-c2",
+  "evidenceRootNotes": "Untracked (gitignored by **/tmp); never staged or committed. Use per-plan and per-attempt subdirectories: tmp/telescreen-v11-20261010-c2/<planId>/attempt-<n>/. Command logs go to /tmp/telescreen-<planId>-*.log and builds to /tmp/telescreen-<planId>-dist or /tmp/telescreen-<planId>-web (conventions section 7).",
+  "runScope": "Telescreen v1.1 final run (session 4). v11-p01..v11-p20 are integration-accepted at 809b02d and recorded as acceptedDependencies (not re-implemented). Only v11-p21-leak-e2e (wave 5) is dispatched, with the final whole-repository and web gates and no tolerances. Serial finalization F runs after p21, outside fanout.",
+  "designDocPaths": [
+    "design-docs/specs/design-v1-1-dspm-adoption.md",
+    "design-docs/specs/architecture.md",
+    "design-docs/specs/command.md",
+    "design-docs/specs/design-api-and-ui.md",
+    "design-docs/specs/design-data-model.md",
+    "design-docs/specs/design-masking.md",
+    "design-docs/specs/design-police-contract.md",
+    "design-docs/specs/design-ui-sentry.md",
+    "design-docs/user-qa/qa-credential-validity-check.md",
+    "design-docs/user-qa/qa-on-demand-reveal.md",
+    "design-docs/user-qa/qa-automated-remediation-scopes.md"
+  ],
+  "planIndexPath": "impl-plans/README.md",
+  "acceptedDependencies": [
+    {"planId": "v11-p01-foundation", "planPath": "impl-plans/active/v11-p01-foundation.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13", "provides": "v1.1 vocabulary, settings and fingerprint key versioning, RiskWeights, ports DTOs and protocols, versioned Fingerprinter"},
+    {"planId": "v11-p02-db-migration", "planPath": "impl-plans/active/v11-p02-db-migration.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13", "provides": "v1.1 ORM columns and tables and idempotent Alembic revision 0002_v1_1"},
+    {"planId": "v11-p03-police-contract", "planPath": "impl-plans/active/v11-p03-police-contract.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13", "provides": "Police contract 1.1 resource_exposures schema and SDK support"},
+    {"planId": "v11-p04-ui-foundation", "planPath": "impl-plans/active/v11-p04-ui-foundation.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13", "provides": "UI types, client, mock API fixtures, shared components and routes for v1.1"},
+    {"planId": "v11-p05-issues-record", "planPath": "impl-plans/active/v11-p05-issues-record.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13", "provides": "Issue record path with exposure, effective severity, placement, owner routing, policy decision, risk; status machine; PolicyReevaluateHandler"},
+    {"planId": "v11-p06-issues-remediation", "planPath": "impl-plans/active/v11-p06-issues-remediation.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13", "provides": "Remediation, resolve with reason, release to team, exceptions, linked occurrences, verify_rescan, owner digest, exception-expiry maintenance"},
+    {"planId": "v11-p07-policy-risk", "planPath": "impl-plans/active/v11-p07-policy-risk.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13", "provides": "Placement policy loader, versioned PolicyStore, PolicyDecider (max_age_days) and RiskScorer"},
+    {"planId": "v11-p08-collectors-core", "planPath": "impl-plans/active/v11-p08-collectors-core.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13", "provides": "Scan coverage, unscannable list, inconclusive rescans and collector health provider"},
+    {"planId": "v11-p09-collectors-slack", "planPath": "impl-plans/active/v11-p09-collectors-slack.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13", "provides": "Slack exposure, owner, placement, modified time and coverage context"},
+    {"planId": "v11-p10-collectors-google", "planPath": "impl-plans/active/v11-p10-collectors-google.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13", "provides": "Google exposure, owner, placement, modified time and coverage context; non-quota 403 FORBIDDEN"},
+    {"planId": "v11-p11-collectors-github", "planPath": "impl-plans/active/v11-p11-collectors-github.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13", "provides": "GitHub exposure, CODEOWNERS owner, placement, modified time and coverage context; non-rate-limit 403 FORBIDDEN"},
+    {"planId": "v11-p12-police-bureau", "planPath": "impl-plans/active/v11-p12-police-bureau.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13", "provides": "Bureau resource_exposures handling, claim heartbeats and police_silent health"},
+    {"planId": "v11-p13-workflow", "planPath": "impl-plans/active/v11-p13-workflow.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13", "provides": "DSL loader split, owner_review human task, detect inconclusive mapping, min_risk escalation"},
+    {"planId": "v11-p14-directory-search", "planPath": "impl-plans/active/v11-p14-directory-search.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13", "provides": "Keyed member identities, team lead, owner directory resolver, search exposure and risk fields"},
+    {"planId": "v11-p15-ui-issues", "planPath": "impl-plans/active/v11-p15-ui-issues.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13", "provides": "Issue list and detail pages for v1.1 fields and actions"},
+    {"planId": "v11-p16-ui-ops", "planPath": "impl-plans/active/v11-p16-ui-ops.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13", "provides": "My tasks and Policies pages; collectors, police, escalation and settings extensions"},
+    {"planId": "v11-p17-api-issues", "planPath": "impl-plans/active/v11-p17-api-issues.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13", "provides": "Issue, exception and policy API endpoints"},
+    {"planId": "v11-p18-api-ops", "planPath": "impl-plans/active/v11-p18-api-ops.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13", "provides": "Collector health and coverage, police health, identities and team lead endpoints, owner_review completion, assignee=me fix"},
+    {"planId": "v11-p19-wiring", "planPath": "impl-plans/active/v11-p19-wiring.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13", "provides": "All v1.1 components, handlers, schedules and routers bound in build_container via wiring_v11.py"},
+    {"planId": "v11-p20-docs-examples", "planPath": "impl-plans/active/v11-p20-docs-examples.md", "commit": "809b02d552918a2bfb74cbf708b6f4a3dd388b13", "provides": "README v1.1 features, owner-review example workflow, escalation tier and env placeholders"}
+  ],
+  "serialFinalization": "After v11-p21-leak-e2e is integration-accepted: move impl-plans/active/v11-*.md to impl-plans/completed and the c1 and c2 dispatch manifests to impl-plans/completed/dispatch, update impl-plans/README.md, README.md and design-doc status. Serial, outside fanout; no parallel commit, push or merge.",
+  "reviewContext": {
+    "issueReference": {
+      "title": "Telescreen v1.1: features adopted from comparable sensitive-data monitoring systems (F1-F10)",
+      "workflowExecutionId": "opus-luna-design-and-implement-review-loop-session-4",
+      "intakeCommunication": "workflowInput (issue-resolution, no GitHub issue number): FINAL v1.1 RUN, implement only v11-p21-leak-e2e, then archive",
+      "planAcceptance": "step5-impl-plan-review comm-000246 (accepted; no repair requests)"
+    },
+    "userProblem": "Telescreen v1 judges content only. DSPM, DLP and secret-scanner products judge risk as content x placement x exposure, confirm resolution by rescan, treat unscanned as unsafe, route to data owners and track exceptions with expiry. The owner asked to adopt F1-F10 as specified in design-v1-1-dspm-adoption.md while keeping every v1 data-handling guarantee. F1-F10 code is integration-accepted at 809b02d; this run proves the leak matrix and end-to-end flows and finishes the release.",
+    "requiredOutcomes": [
+      "Leak matrix extended to new tables, API responses, search documents, notifications, digests and logs with raw-sample, file-name and owner-email canaries (v11-p21 gaps L1-L9).",
+      "v1.1 end-to-end flows P1, P2, R1, R2, O1, O2, O3, O4 pass through the assembled app with no xfail, skip or weakened assertion.",
+      "The v1 leak matrix (tests/leak/test_leak_matrix.py, tests/leak/flows.py) is unchanged since 809b02d and passes; no src/** change.",
+      "mise run ci passes offline; src/web install, typecheck, vitest, build and the screenshot smoke (35 PNGs, zero browser errors) pass.",
+      "All v11 plans archived to impl-plans/completed; impl-plans/README.md, README and docs updated (serial finalization)."
+    ],
+    "nonGoals": [
+      "Re-implementing v11-p01..v11-p20 (accepted dependencies).",
+      "F11 ticket export, F13 custom classifiers, F16 evaluation harness (v1.2).",
+      "F12 automated remediation or any source write scope (owner decision: read-only).",
+      "F14 credential validity checks against providers (owner decision).",
+      "F15 reveal of raw values (owner decision: deep links to the source location only).",
+      "Dependency changes (pyproject.toml, uv.lock, src/web/package.json, bun.lock) and edits to existing Alembic migrations."
+    ],
+    "constraints": [
+      "AGENTS.md: English only, no emojis, python-coding-standards; plan files under 400 lines; Python files under 1000 lines.",
+      "Strict typing via tools/typelint.py, ruff ANN/PGH and ty; no weakening, no type-ignore or ty-ignore comments, no new per-file-ignores.",
+      "Raw detected values, file names, paths, titles and emails never persisted, logged, indexed, notified or returned.",
+      "Default uv run pytest passes offline; integration tests marked and skipped without TELESCREEN_TEST_DATABASE_URL / TELESCREEN_TEST_MEILI_URL.",
+      "v11-p21 writes no src/**; a defect in an accepted plan becomes a reconciliation request against the owning plan in the Progress Log.",
+      "Canary strings built at runtime from fragments; canary email domain example.com.",
+      "sha256 recorded before and after each edited file (drift protocol).",
+      "Conventions 7a: fixed findings only in addressedFeedback; verification lists only final passing commands; offline-skipped integration tests and /tmp outputs are not risks."
+    ],
+    "designDecisionsAndRationale": [
+      "R-1: version 1 stays the identity key; only value fingerprints use the active key version, so key rotation never re-keys issues or counts as remediation.",
+      "R-2: issues.severity is the effective severity and base_severity is added.",
+      "R-3: PATCH can no longer set resolved or ignored; dedicated remediation, resolve and exception operations replace it.",
+      "R-5: exception approval through /api/exceptions by teams.lead_member_id or an admin.",
+      "R-6: public unscannable resources raise collector health unscannable_public.",
+      "R-11: My tasks uses three list endpoints with the assignee=me fix.",
+      "R-12: rescanner reports inconclusive for incomplete content; detect maps it to error/scan_incomplete.",
+      "Section 12 provider names ExceptionMaintenanceProvider (issues/maintenance.py) and IssuePolicyMaintenance (issues/policy_apply.py) match the current code (design-doc working-tree refinement accepted in comm-000246).",
+      "New c2 manifest supersedes c1 because c1 was already dispatched in session 3 with all 21 plans; c2 lists p01-p20 as acceptedDependencies and dispatches only p21 with its declared artifact roots."
+    ],
+    "intentionalTradeoffs": [
+      "src/web/node_modules and tmp/ui-screenshots are declared artifactRoots of v11-p21 (gitignored, generated by bun install --frozen-lockfile and bun run screenshots); build outputs go to /tmp per conventions section 7.",
+      "The v11-p21 final gates run whole-repository with no tolerances."
+    ],
+    "supportedEdgeCases": [
+      "Policy allow then violate: violate wins; policy change moves open -> allowed without counting as remediation.",
+      "Rescan with incomplete content is inconclusive and never resolves; resource gone (404) records resource_deleted.",
+      "Exception expiry reopens the issue; until_regressed exceptions end on regression.",
+      "Fingerprint key rotation with version 1 as identity key keeps issue identity.",
+      "Token without a member passing assignee=me gets no unfiltered list.",
+      "min_risk escalation below threshold is skipped."
+    ],
+    "outOfScopeEdgeCases": [
+      "Live PostgreSQL/Meilisearch behavior beyond marked integration tests skipped offline.",
+      "Real external services (Slack, Google, GitHub, SMTP, LLM providers) and real docker compose up.",
+      "PolicyReevaluateHandler explicit rejection of requested exceptions with decided_by=system (low residual; approving such a request returns 409)."
+    ],
+    "lowFindingsCarried": [
+      "impl-plans/active/v11-p21-leak-e2e.md:26: no tracked toolchain audit manifest for the src/web/node_modules artifact root; install is pinned by src/web/bun.lock via --frozen-lockfile; the implementer records the bun version and bun.lock sha256 in the Progress Log (low, non-blocking).",
+      "impl-plans/active/v11-p05-issues-record.md: PolicyReevaluateHandler open -> allowed does not explicitly reject requested exceptions with decided_by=system (low)."
+    ],
+    "residualRisks": [
+      "Closing L3, L4, L7, L8 or O1-O4 may expose a defect in an accepted plan (p06, p07, p12, p13, p18 or p19); routed to a reconciliation request, src/** not patched by p21.",
+      "The screenshot smoke needs a local Chromium; a missing browser is a blocker to report."
+    ],
+    "sourcePaths": [
+      "impl-plans/conventions.md",
+      "impl-plans/README.md",
+      "impl-plans/active/v11-p21-leak-e2e.md",
+      "impl-plans/active/telescreen-v11-20261010-c1-dispatch.json",
+      "design-docs/specs/design-v1-1-dspm-adoption.md",
+      "design-docs/specs/design-masking.md",
+      "design-docs/specs/architecture.md",
+      "tests/leak/harness.py",
+      "tests/leak/sinks.py",
+      "tests/e2e/harness.py",
+      "src/web/scripts/screenshots.ts"
+    ]
+  },
+  "plans": [
+    {
+      "planId": "v11-p21-leak-e2e",
+      "planPath": "impl-plans/active/v11-p21-leak-e2e.md",
+      "wave": 5,
+      "dependsOn": ["v11-p19-wiring", "v11-p20-docs-examples", "v11-p15-ui-issues", "v11-p16-ui-ops"],
+      "writePaths": [
+        "impl-plans/active/v11-p21-leak-e2e.md",
+        "tests/leak/flows_v11.py",
+        "tests/leak/test_leak_matrix_v11.py",
+        "tests/leak/harness.py",
+        "tests/leak/sinks.py",
+        "tests/e2e/test_flow_v11_policy.py",
+        "tests/e2e/test_flow_v11_remediation.py",
+        "tests/e2e/test_flow_v11_owner_health.py",
+        "src/web/node_modules",
+        "tmp/ui-screenshots"
+      ],
+      "sharedPaths": [],
+      "artifactRoots": ["src/web/node_modules", "tmp/ui-screenshots"],
+      "acceptanceCriteria": [
+        "File-name and owner-email canaries, the new sink, 10 v1.1 leak flows, the v1.1 matrix test and 3 e2e flow files (policy, remediation, owner/health) added; the v1 matrix test unchanged and passing; no raw sample in any sink and no canary in new tables, notifications or API responses.",
+        "Leak gaps L1-L9 and every Deliverable 5 e2e scenario P1, P2, R1, R2, O1, O2, O3, O4 (plan Remaining Work section) have passing assembled-app assertions with no xfail, skip or weakened assertion; no src/** change and tests/leak/test_leak_matrix.py and tests/leak/flows.py unchanged since 809b02d.",
+        "All whole-repository Python gates (ruff format, ruff check, typelint, ty, pytest, uv build to /tmp) and web gates (install, typecheck, test, build to /tmp, screenshot smoke with 35 PNGs and zero browser errors) exit 0 with no tolerances.",
+        "Completion Criteria all ticked; Progress Log complete with hashes, command evidence, bun version and bun.lock sha256."
+      ],
+      "verification": [
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider tests/leak tests/e2e 2>&1 | tee /tmp/telescreen-v11-p21-leak-e2e-pytest-scoped.log",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff format --check --no-cache . > /tmp/telescreen-v11-p21-leak-e2e-format.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ruff check --no-cache . > /tmp/telescreen-v11-p21-leak-e2e-ruff.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen python tools/typelint.py > /tmp/telescreen-v11-p21-leak-e2e-typelint.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen ty check > /tmp/telescreen-v11-p21-leak-e2e-ty.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv run --frozen pytest -p no:cacheprovider > /tmp/telescreen-v11-p21-leak-e2e-pytest.log 2>&1",
+        "set -o pipefail; export PYTHONDONTWRITEBYTECODE=1; uv build --out-dir /tmp/telescreen-v11-p21-leak-e2e-dist > /tmp/telescreen-v11-p21-leak-e2e-build.log 2>&1",
+        "set -o pipefail; cd src/web && bun install --frozen-lockfile > /tmp/telescreen-v11-p21-leak-e2e-web-install.log 2>&1",
+        "set -o pipefail; cd src/web && bun run typecheck > /tmp/telescreen-v11-p21-leak-e2e-web-typecheck.log 2>&1",
+        "set -o pipefail; cd src/web && bun run test > /tmp/telescreen-v11-p21-leak-e2e-web-test.log 2>&1",
+        "set -o pipefail; cd src/web && bun run build --outDir /tmp/telescreen-v11-p21-leak-e2e-web --emptyOutDir > /tmp/telescreen-v11-p21-leak-e2e-web-build.log 2>&1",
+        "set -o pipefail; cd src/web && bun run screenshots > /tmp/telescreen-v11-p21-leak-e2e-web-screenshots.log 2>&1",
+        "test \"$(ls tmp/ui-screenshots/*.png | wc -l | tr -d ' ')\" -eq 35",
+        "! grep -q 'Browser reported' /tmp/telescreen-v11-p21-leak-e2e-web-screenshots.log",
+        "test -z \"$(git diff --name-only 809b02d -- src tests/leak/test_leak_matrix.py tests/leak/flows.py)\"",
+        "! grep -rnE 'xfail|pytest.skip|mark.skip' tests/leak tests/e2e",
+        "test \"$(grep -c '^- \\[ \\]' impl-plans/active/v11-p21-leak-e2e.md)\" -eq 0"
+      ]
+    }
+  ]
+}
