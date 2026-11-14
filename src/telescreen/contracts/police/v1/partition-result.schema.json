@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.telescreen.invalid/police/v1/partition-result.schema.json",
+  "type": "object",
+  "properties": {
+    "shards": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "properties": {
+          "shard_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "descriptor": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "weight": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "shard_key",
+          "descriptor",
+          "weight"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "next_cursor": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sub_corpora": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "corpus_key": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "corpus_key"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "shards",
+    "next_cursor",
+    "sub_corpora"
+  ],
+  "additionalProperties": false
+}

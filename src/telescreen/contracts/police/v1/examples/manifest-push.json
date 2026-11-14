@@ -1,0 +1,12 @@
+{
+  "name": "Example Push Police",
+  "version": "1.0.0",
+  "contract_version": "1.0",
+  "mode": "push",
+  "task_types": [
+    "detect"
+  ],
+  "labels": [],
+  "concurrency": 1,
+  "endpoint_url": "https://police.example.invalid/tasks"
+}
